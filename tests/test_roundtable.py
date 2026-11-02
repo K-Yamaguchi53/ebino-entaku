@@ -6,7 +6,7 @@ import json
 from fake_client import FakeClient, text_response, tool_response
 
 from conftest import COMPANY, DISPLAY_NAME, make_seat
-from ebino import moderator, roundtable
+from ebino import editor, moderator, roundtable
 from ebino.gate import Gate, NameList
 from ebino.guard import Guard
 from ebino.index import build_index
@@ -39,17 +39,22 @@ def librarian_finds(*ids):
     return text_response({"utterance_ids": list(ids)})
 
 
-def moderator_says(quotes, splits=()):
+def moderator_says(quotes, splits=(), silent=()):
     return text_response({
         "quotes": [{"utterance_id": i, "text": t} for i, t in quotes],
         "splits": [{"heading": h, "side_a": list(a), "side_b": list(b)} for h, a, b in splits],
+        "silent_seat_ids": list(silent),
     })
 
 
-def run(answers, plant=False):
+def editor_says(ask=(), rephrase=""):
+    return text_response({"ask_seat_ids": list(ask), "rephrase": rephrase})
+
+
+def run(answers, plant=False, question=QUESTION):
     client = FakeClient(answers)
     guard = Guard(UTTERANCES)
-    result = roundtable.run(Gate(client, names()), ENTRIES, guard, QUESTION, plant=plant)
+    result = roundtable.run(Gate(client, names()), ENTRIES, SEATS, guard, question, plant=plant)
     return result, client, guard
 
 
@@ -71,18 +76,20 @@ def test_an_answered_round_shows_the_pieces_own_words_in_order_with_a_split():
     assert [r["model"] for r in client.requests] == ["claude-sonnet-5-5", "claude-opus-5-5"]
 
 
-def test_the_moderator_gets_only_the_librarians_pieces_and_no_company_or_name():
-    _, client, _ = run([librarian_finds("a1", "b1"), moderator_says([])])
+def test_no_company_or_name_reaches_the_moderator_or_the_editor():
+    _, client, _ = run([librarian_finds("a1", "b1"), moderator_says([]), editor_says(["S02"])])
+    assert [r["model"] for r in client.requests] == ["claude-sonnet-5-5", "claude-opus-5-5", "claude-sonnet-5-5"]
     data = json.loads(client.requests[1]["messages"][0]["content"])
     assert data["question"] == QUESTION
     assert [p["utterance_id"] for p in data["pieces"]] == ["a1", "b1"]
+    assert data["seats"][1] == {"seat_id": "S02", "kind": "adult", "title": "農家", "district": "北地区"}
     sent = client.all_sent()
-    for word in (COMPANY, "はるかぜ", "架空農園", "架空保育園", DISPLAY_NAME, "山川", "谷口", "森川"):
+    for word in (COMPANY, "はるかぜ", "架空農園", "架空保育園", DISPLAY_NAME, "山川", "谷口", "森川", "2026"):
         assert word not in sent
 
 
 def test_the_instruction_and_the_data_are_kept_apart():
-    request = moderator.request_for(QUESTION, ENTRIES[:1])
+    request = moderator.request_for(QUESTION, ENTRIES[:1], SEATS)
     assert request["system"][0]["cache_control"] == {"type": "ephemeral"}
     assert QUESTION not in request["system"][0]["text"]
     assert "a1" not in request["system"][0]["text"]
@@ -127,10 +134,75 @@ def test_seats_and_quotes_per_seat_are_capped_and_the_seat_comes_from_the_piece(
 
 
 def test_no_pieces_found_is_silent_without_calling_the_moderator():
-    result, client, _ = run([librarian_finds()])
+    result, client, _ = run([librarian_finds(), editor_says()])
     assert result.status == "silent" and result.answered_seats == 0
-    assert len(client.requests) == 1
+    assert [r["model"] for r in client.requests] == ["claude-sonnet-5-5", "claude-sonnet-5-5"]
     assert result.message == ""  # Silence shows only the count, no words.
+    assert result.card.origin == "no_answer" and result.card.text == QUESTION
+
+
+# --- silent seats and question cards (SPEC 5-1, 14-12, 14-13) ---
+
+def test_related_seats_without_words_are_silent_and_answered_ones_are_not():
+    result, _, _ = run([
+        librarian_finds("a1", "b1"),
+        moderator_says([("a1", "休みは決めて取ります。")], silent=["S03", "S01", "Z99"]),
+    ])
+    # S01 spoke, Z99 is not a seat, so only S03 shows 「まだ誰も聞いていない」.
+    assert result.silent_seats == ["S03"]
+    assert result.card is None  # A card is made by itself only when no seat answered.
+
+
+def test_a_seat_whose_quote_the_guard_stopped_is_neither_answered_nor_silent():
+    result, _, _ = run([
+        librarian_finds("a1", "b1"),
+        moderator_says([("a1", "休みは決めて取ります。"), ("b1", "作り話です。")], silent=["S02"]),
+    ])
+    assert result.seat_order == ["S01"] and result.silent_seats == []
+
+
+def test_when_no_seat_answers_the_question_becomes_a_card_with_a_back():
+    result, client, _ = run([
+        librarian_finds("a1"),
+        moderator_says([("a1", "作り話です。")], silent=["S03"]),
+        editor_says(["S02", "S02", "Z99", "S03"], "休みの取り方を、どうやって決めてきましたか"),
+    ], question="休みは何日？")
+    assert result.status == "silent" and result.silent_seats == ["S03"]
+    card = result.card
+    assert (card.origin, card.text, card.seat_id) == ("no_answer", "休みは何日？", "")
+    assert card.card_id.startswith("q-") and len(card.card_id) == 10
+    assert card.back.ask_seat_ids == ("S02", "S03")
+    assert card.back.rephrase == "休みの取り方を、どうやって決めてきましたか"
+    assert card.front() == {"card_id": card.card_id, "origin": "no_answer", "text": "休みは何日？", "seat_id": ""}
+    assert client.requests[2]["output_config"]["effort"] == "low"
+
+
+def test_the_back_of_a_card_drops_a_rephrase_with_a_name_or_too_long():
+    gate = Gate(FakeClient([editor_says([], "山川さんに休みを聞く"), editor_says([], "あ" * 81)]), names())
+    assert editor.write_back(gate, "休みは？", SEATS).rephrase == ""
+    assert editor.write_back(gate, "休みは？", SEATS).rephrase == ""
+
+
+def test_a_card_is_still_made_when_the_editor_fails():
+    result, _, _ = run([librarian_finds(), text_response("", stop_reason="refusal")])
+    assert result.status == "silent"
+    assert result.card.text == QUESTION and result.card.back == editor.Back(reason="refusal")
+
+
+def test_a_student_writes_a_card_at_a_silent_seat():
+    client = FakeClient([editor_says(["S03"])])
+    card = editor.card_from_student(Gate(client, names()), "S03", "  子どもと話すとき、何に気をつけますか  ", SEATS)
+    assert (card.origin, card.seat_id, card.text) == ("student", "S03", "子どもと話すとき、何に気をつけますか")
+    assert editor.card_from_student(Gate(client, names()), "S03", "   ", SEATS) is None
+    assert editor.card_from_student(Gate(client, names()), "Z99", "問い", SEATS) is None
+
+
+def test_a_name_in_a_students_card_keeps_the_card_but_never_reaches_the_editor():
+    client = FakeClient([editor_says()])
+    card = editor.card_from_student(Gate(client, names()), "S03", "森川さんは休みに何をしますか", SEATS)
+    assert card.text == "森川さんは休みに何をしますか"  # People read cards before they go out.
+    assert card.back.reason == "name_in_request"
+    assert client.requests == []
 
 
 def test_a_refusal_shows_the_fixed_sentence_and_is_not_silence():
@@ -142,7 +214,7 @@ def test_a_refusal_shows_the_fixed_sentence_and_is_not_silence():
 
 def test_a_name_in_the_question_stops_the_round_before_any_request():
     client = FakeClient([librarian_finds("a1")])
-    result = roundtable.run(Gate(client, names()), ENTRIES, Guard(UTTERANCES), "山川さんの休みは？")
+    result = roundtable.run(Gate(client, names()), ENTRIES, SEATS, Guard(UTTERANCES), "山川さんの休みは？")
     assert (result.status, result.reason) == ("unavailable", "name_in_request")
     assert client.requests == []
 

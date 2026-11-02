@@ -7,7 +7,8 @@ words out (SPEC 5-1).
 Three ways a round ends, kept apart (SPEC 5-1, 14-51):
   - answered: at least one quote passed the guard.
   - silent: no seat answered. The screen shows only the count, 0, and the
-    question becomes a question card. No model adds words.
+    question becomes a question card. No model adds words on the screen;
+    the editor writes only on the back of the card (SPEC 14-13).
   - unavailable: a model refused or failed, or the gate stopped a request.
     The screen shows the fixed sentence in texts/ and the reason code is
     recorded. This is not silence, so it never shows 「答えた席：0」.
@@ -15,10 +16,12 @@ Three ways a round ends, kept apart (SPEC 5-1, 14-51):
 
 from dataclasses import dataclass, field
 
-from . import librarian, moderator
+from . import editor, librarian, moderator
+from .editor import QuestionCard
 from .gate import Gate, GateError, ModelUnavailable
 from .guard import Guard, Quote, plant_fake
 from .index import Entry
+from .ingest.seats import Seat
 from .texts import MODEL_UNAVAILABLE, PLANTED_FAKE_QUOTE, load_text
 
 ANSWERED = "answered"
@@ -57,6 +60,9 @@ class Round:
     planted_stopped: list[str] = field(default_factory=list)
     planted_passed: int = 0
     splits_dropped: int = 0
+    # Related seats with no words: 「まだ誰も聞いていない」 (SPEC 14-12).
+    silent_seats: list[str] = field(default_factory=list)
+    card: QuestionCard | None = None  # Made only when no seat answered.
 
     @property
     def seat_order(self) -> list[str]:
@@ -81,14 +87,17 @@ def _splits(plans, shown: dict[str, ShownQuote], gate: Gate) -> tuple[list[Split
     return kept, dropped
 
 
-def run(gate: Gate, entries: list[Entry], guard: Guard, question: str, plant: bool = False) -> Round:
+def run(
+    gate: Gate, entries: list[Entry], seats: list[Seat], guard: Guard, question: str, plant: bool = False
+) -> Round:
     by_id = {entry.utterance_id: entry for entry in entries}
     try:
         found = librarian.find(gate, entries, question)
         result = Round(question, SILENT, candidates=found.utterance_ids, librarian_ended=found.ended)
         if not found.utterance_ids:
+            result.card = editor.card_for_no_answer(gate, question, seats)
             return result
-        plan = moderator.plan(gate, question, [by_id[i] for i in found.utterance_ids])
+        plan = moderator.plan(gate, question, [by_id[i] for i in found.utterance_ids], seats)
     except (GateError, ModelUnavailable) as error:
         return Round(question, UNAVAILABLE, reason=str(error), message=load_text(MODEL_UNAVAILABLE))
 
@@ -112,5 +121,9 @@ def run(gate: Gate, entries: list[Entry], guard: Guard, question: str, plant: bo
             result.guard_stopped += 1
     result.quotes = list(shown.values())
     result.splits, result.splits_dropped = _splits(plan.splits, shown, gate)
+    answered = set(result.seat_order)
+    result.silent_seats = [s for s in plan.silent_seat_ids if s not in answered]
     result.status = ANSWERED if result.quotes else SILENT
+    if result.status == SILENT:
+        result.card = editor.card_for_no_answer(gate, question, seats)
     return result

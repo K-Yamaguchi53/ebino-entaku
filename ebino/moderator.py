@@ -14,11 +14,13 @@ from dataclasses import dataclass
 from .gate import Gate, ModelUnavailable, json_answer, json_request
 from .guard import Quote
 from .index import Entry
+from .ingest.seats import Seat
 from .prompts import MODERATOR
 
 MAX_SEATS = 8
 MAX_QUOTES_PER_SEAT = 2
 MAX_SPLITS = 3
+MAX_SILENT = 8
 
 SCHEMA = {
     "type": "object",
@@ -45,8 +47,9 @@ SCHEMA = {
                 "additionalProperties": False,
             },
         },
+        "silent_seat_ids": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["quotes", "splits"],
+    "required": ["quotes", "splits", "silent_seat_ids"],
     "additionalProperties": False,
 }
 
@@ -62,12 +65,20 @@ class SplitPlan:
 class Plan:
     quotes: tuple[Quote, ...]  # In speaking order.
     splits: tuple[SplitPlan, ...]
+    # Seats the moderator found related to the question but with no words
+    # among the pieces: they show 「まだ誰も聞いていない」 (SPEC 14-12).
+    silent_seat_ids: tuple[str, ...] = ()
 
 
-def request_for(question: str, candidates: list[Entry]) -> dict:
-    """The instruction part is the system text; the data part (the question
-    and the pieces) is the message, so the two can be kept apart (SPEC 6)."""
-    data = {"question": question, "pieces": [entry.for_model() for entry in candidates]}
+def request_for(question: str, candidates: list[Entry], seats: list[Seat]) -> dict:
+    """The instruction part is the system text; the data part (the question,
+    the pieces and the seat list) is the message, so the two can be kept
+    apart (SPEC 6). Seats go in through Seat.for_model only."""
+    data = {
+        "question": question,
+        "pieces": [entry.for_model() for entry in candidates],
+        "seats": [seat.for_model() for seat in seats],
+    }
     return json_request("moderator", MODERATOR, json.dumps(data, ensure_ascii=False), SCHEMA)
 
 
@@ -75,7 +86,7 @@ def _ids(value) -> tuple[str, ...]:
     return tuple(dict.fromkeys(v for v in value if isinstance(v, str))) if isinstance(value, list) else ()
 
 
-def clean(answer, candidates: list[Entry]) -> Plan:
+def clean(answer, candidates: list[Entry], seats: list[Seat] = ()) -> Plan:
     if not isinstance(answer, dict):
         raise ModelUnavailable("bad_output")
     seat_of = {entry.utterance_id: entry.seat_id for entry in candidates}
@@ -100,9 +111,12 @@ def clean(answer, candidates: list[Entry]) -> Plan:
     for item in answer.get("splits") or []:
         if isinstance(item, dict) and isinstance(item.get("heading"), str):
             splits.append(SplitPlan(item["heading"].strip(), _ids(item.get("side_a")), _ids(item.get("side_b"))))
-    return Plan(tuple(quotes), tuple(splits[:MAX_SPLITS]))
+    known = {seat.seat_id for seat in seats}
+    silent = [s for s in _ids(answer.get("silent_seat_ids")) if s in known and s not in per_seat]
+    return Plan(tuple(quotes), tuple(splits[:MAX_SPLITS]), tuple(silent[:MAX_SILENT]))
 
 
-def plan(gate: Gate, question: str, candidates: list[Entry]) -> Plan:
+def plan(gate: Gate, question: str, candidates: list[Entry], seats: list[Seat]) -> Plan:
     """Raises GateError or ModelUnavailable (reason codes only)."""
-    return clean(json_answer(gate.send("moderator", request_for(question, candidates))), candidates)
+    answer = json_answer(gate.send("moderator", request_for(question, candidates, seats)))
+    return clean(answer, candidates, seats)
