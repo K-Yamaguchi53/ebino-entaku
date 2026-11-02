@@ -11,7 +11,9 @@ from reportlab.pdfgen import canvas
 from conftest import make_seat
 from ebino.ingest.poster_pdf import (
     Fragment,
+    Heading,
     heading_of,
+    split_fragment,
     ingest_poster,
     ingest_poster_fragments,
     purpose_examples,
@@ -229,6 +231,170 @@ def test_no_role_heading_fails_closed(poster_seat):
 def test_no_purpose_role_still_stops(poster_seat):
     with pytest.raises(IngestError, match="purpose_heading_missing"):
         ingest_poster_fragments(lines("結果", "減っていた。"), poster_seat)
+
+
+# --- SPEC 14-44: the second real-data run -------------------------------------
+
+
+def theme_reason_style():
+    """テーマ設定理由 is the topmost heading; the hypothesis has words before it."""
+    return [
+        Fragment("【架空の公園の遊具を調べる】", 50, 10),
+        Fragment(STUDENT, 400, 10),
+        *lines(
+            "探究テーマ設定理由①", "公園の遊具が古いと聞いた。",
+            "スポーツイベントの開催による効果、研究仮説", "大会を開けば人が集まるのではないか。",
+            "②実習活動を通して", "大会を一回開いた。",
+            "企画実践前の課題", "道具が足りなかった。",
+            "◎10:30〜スタート",
+            "これからの課題", "次は道具を借りたい。",
+        ),
+    ]
+
+
+def test_body_under_a_topmost_theme_reason_survives(poster_seat):
+    utterances = ingest_poster_fragments(theme_reason_style(), poster_seat)
+    texts = [u.text for u in utterances]
+    assert "公園の遊具が古いと聞いた。" in texts
+    everything = "".join(u.text + u.heading for u in utterances)
+    assert "川辺" not in everything and "三郎" not in everything
+    assert "遊具を調べる" not in everything  # The title still goes with the name.
+
+
+def test_theme_reason_style_maps_to_roles():
+    sections = [(s.label, s.role, s.text) for s in split_sections(theme_reason_style())]
+    assert sections == [
+        ("探究テーマ設定理由", "背景と課題", "公園の遊具が古いと聞いた。"),
+        ("スポーツイベントの開催による効果、研究仮説", "目的", "大会を開けば人が集まるのではないか。"),
+        ("実習活動を通して", "手法", "大会を一回開いた。"),
+        ("企画実践前の課題", "背景と課題", "道具が足りなかった。◎10:30〜スタート"),
+        ("これからの課題", "結論と展望", "次は道具を借りたい。"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "text, label, role",
+    [
+        ("テーマ設定理由", "テーマ設定理由", "背景と課題"),
+        ("テーマ設定の理由", "テーマ設定の理由", "背景と課題"),
+        ("探究テーマ設定理由①", "探究テーマ設定理由", "背景と課題"),
+        ("１．探究テーマ設定理由②", "探究テーマ設定理由", "背景と課題"),
+        ("はじめに", "はじめに", "背景と課題"),
+        ("初めに", "初めに", "背景と課題"),
+        ("動機", "動機", "背景と課題"),
+        ("きっかけ", "きっかけ", "背景と課題"),
+        ("企画実践前の課題", "企画実践前の課題", "背景と課題"),
+        ("実践後の課題", "実践後の課題", "結論と展望"),
+        ("これからの課題", "これからの課題", "結論と展望"),
+        ("目標", "目標", "目的"),
+        ("【目標】", "目標", "目的"),
+        ("②実習活動を通して", "実習活動を通して", "手法"),
+        ("スポーツイベントの開催による効果、研究仮説", "スポーツイベントの開催による効果、研究仮説", "目的"),
+        ("3. 地域の祭りを続けるための探究仮説", "地域の祭りを続けるための探究仮説", "目的"),
+    ],
+)
+def test_second_run_heading_shapes(text, label, role):
+    assert heading_of(text) == Heading(label, role)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "◎10:30〜スタート",
+        "◆1:0.5:2",
+        "【2025年の記録】",
+        "この町の公園には古い遊具が多く残っていると聞いた",  # long, no purpose ending
+        "公園の遊具が古いので新しくすることがこの探究の目的。",  # has 。
+        "町の人に何度も話を聞きに行き考えを深めていくことがこの探究の目的",  # over 30
+    ],
+)
+def test_second_run_body_lines_are_not_headings(text):
+    assert heading_of(text) is None
+
+
+def test_heading_and_body_on_one_line_are_split():
+    fragments = [
+        Fragment(STUDENT, 50, 10),
+        Fragment("背景　自由な園児が多く集団行動が", 50, 60),
+        Fragment("苦手だった。", 50, 80),
+        Fragment("目標 小学校に進級したとき困らない", 50, 100),
+        Fragment("ようにする。", 50, 120),
+    ]
+    sections = [(s.label, s.role, s.text) for s in split_sections(fragments)]
+    assert sections == [
+        ("背景", "背景と課題", "自由な園児が多く集団行動が苦手だった。"),
+        ("目標", "目的", "小学校に進級したとき困らないようにする。"),
+    ]
+
+
+def test_bracketed_heading_with_inner_spaces_is_not_split():
+    assert split_fragment(Fragment("＜ 調査活動 ＞", 50, 60)) == [Fragment("＜ 調査活動 ＞", 50, 60)]
+
+
+def test_unknown_word_and_space_is_not_split():
+    fragment = Fragment("地域 の人に聞いた", 50, 60)
+    assert split_fragment(fragment) == [fragment]
+
+
+def char_positions(*runs):
+    """(text, x0) runs laid out at 12pt per character."""
+    text = "".join(run for run, _ in runs)
+    xs = tuple(x0 + 12 * i for run, x0 in runs for i in range(len(run)))
+    return text, xs
+
+
+def test_two_headings_on_one_line_become_two_columns():
+    text, xs = char_positions(("探究テーマ設定理由①", 50), ("　", 170), ("探究テーマ設定理由②", 300))
+    fragments = [
+        Fragment(STUDENT, 50, 10),
+        Fragment(text, 50, 60, xs),
+        Fragment("左の段の文。", 50, 80),
+        Fragment("右の段の文。", 300, 80),
+    ]
+    sections = [(s.label, s.text) for s in split_sections(fragments)]
+    assert sections == [("探究テーマ設定理由", "左の段の文。"), ("探究テーマ設定理由", "右の段の文。")]
+
+
+def test_purpose_sample_falls_back_to_the_theme_reason(poster_seat):
+    fragments = lines("探究テーマ設定理由", "遊具が古いから選んだ。", "調査活動", "三十人に聞いた。")
+    examples = purpose_examples(ingest_poster_fragments(fragments, poster_seat))
+    assert [(u.section, u.heading, u.text) for u in examples] == [
+        ("背景と課題", "探究テーマ設定理由", "遊具が古いから選んだ。")
+    ]
+
+
+def test_a_hypothesis_wins_over_the_theme_reason(poster_seat):
+    examples = purpose_examples(ingest_poster_fragments(theme_reason_style(), poster_seat))
+    assert [u.heading for u in examples] == ["スポーツイベントの開催による効果、研究仮説"]
+
+
+def test_plain_background_is_not_a_purpose_sample(poster_seat):
+    with pytest.raises(IngestError, match="purpose_heading_missing"):
+        ingest_poster_fragments(lines("背景", "店が少ない。", "結果", "増えた。"), poster_seat)
+
+
+def write_theme_reason_poster(path):
+    """A real PDF: two headings on one line, and a heading with its body beside it."""
+    pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
+    pdf = canvas.Canvas(str(path), pagesize=A4)
+    pdf.setFont("HeiseiKakuGo-W5", 12)
+    pdf.drawString(380, 800, STUDENT)
+    pdf.drawString(50, 740, "探究テーマ設定理由①　探究テーマ設定理由②")
+    pdf.drawString(50, 720, "左の段の文。")
+    pdf.drawString(194, 720, "右の段の文。")
+    pdf.drawString(50, 680, "目標　小学校で困らないようにする。")
+    pdf.save()
+    return path
+
+
+def test_real_pdf_splits_headings_by_character_position(tmp_path, poster_seat):
+    utterances = ingest_poster(write_theme_reason_poster(tmp_path / "poster01.pdf"), poster_seat)
+    assert [(u.section, u.heading, u.text) for u in utterances] == [
+        ("背景と課題", "探究テーマ設定理由", "左の段の文。"),
+        ("背景と課題", "探究テーマ設定理由", "右の段の文。"),
+        ("目的", "目標", "小学校で困らないようにする。"),
+    ]
+    assert "川辺" not in "".join(u.text for u in utterances)
 
 
 def write_poster(path, pages=1):

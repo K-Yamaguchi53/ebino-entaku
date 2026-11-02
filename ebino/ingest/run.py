@@ -15,7 +15,15 @@ from pathlib import Path
 
 from .article_docx import ingest_article
 from .masks import SeatMasks, load_masks
-from .poster_pdf import ROLES, ingest_poster, purpose_examples, purpose_rank
+from .poster_pdf import (
+    PURPOSE_FROM_HYPOTHESIS,
+    PURPOSE_FROM_THEME_REASON,
+    ROLES,
+    ingest_poster,
+    pdf_page_count,
+    purpose_examples,
+    purpose_rank,
+)
 from .seats import Seat, load_seats
 from .slides_pdf import ingest_slides
 from .utterance import IngestError, Utterance
@@ -37,6 +45,9 @@ class Report:
     dropped_rows: int = 0
     poster_sections_by_role: Counter = field(default_factory=Counter)
     posters_purpose_from_hypothesis: int = 0
+    posters_purpose_from_theme_reason: int = 0
+    multi_page_works_read: int = 0
+    multi_page_works_skipped: int = 0
 
     def lines(self) -> list[str]:
         return [
@@ -51,6 +62,10 @@ class Report:
             f"table rows dropped: {self.dropped_rows}",
             f"poster sections by role: {dict(self.poster_sections_by_role)}",
             f"posters whose purpose comes from 仮説/経緯: {self.posters_purpose_from_hypothesis}",
+            "posters whose purpose comes from テーマ設定の理由: "
+            f"{self.posters_purpose_from_theme_reason}",
+            "multi-page inquiry works (read / skipped, no rows in masks.tsv): "
+            f"{self.multi_page_works_read} / {self.multi_page_works_skipped}",
         ]
 
 
@@ -66,13 +81,24 @@ def _ingest_seat(
         report.dropped_rows += stats.dropped_rows
         return utterances
     if suffix == ".pdf" and seat.kind == "poster":
+        if pdf_page_count(path) > 1:
+            # Talk slides and multi-page posters: names are scattered, so they are
+            # read like slides and only after a person wrote rows (SPEC 14-45).
+            if not masks:
+                report.multi_page_works_skipped += 1
+                raise IngestError("poster_not_one_page")
+            utterances = ingest_slides(path, seat, masks)
+            report.multi_page_works_read += 1
+            return utterances
         utterances = ingest_poster(path, seat, masks)
         for utterance in utterances:
             role = utterance.section if utterance.section in ROLES else "(other)"
             report.poster_sections_by_role[role] += 1
         examples = purpose_examples(utterances)
-        if examples and purpose_rank(examples[0].heading) > 0:
-            report.posters_purpose_from_hypothesis += 1
+        if examples:
+            rank = purpose_rank(examples[0].section, examples[0].heading)
+            report.posters_purpose_from_hypothesis += rank == PURPOSE_FROM_HYPOTHESIS
+            report.posters_purpose_from_theme_reason += rank == PURPOSE_FROM_THEME_REASON
         return utterances
     if suffix == ".pdf" and seat.kind in ("cross", "outsider_teacher"):
         if not masks:

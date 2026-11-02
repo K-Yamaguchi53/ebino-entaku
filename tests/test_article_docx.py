@@ -278,5 +278,104 @@ def test_id_shape_and_normalization():
     assert identifier == make_id("adult", "a.docx", "朝の店")
 
 
+# --- SPEC 14-46: the older booklets, copied from paper into the same table ------
+
+SIX = ["坂本", "山川 太郎", "海野 花子", "谷口 一郎", "川辺 三郎", "森田 健"]
+SIX_BODY = (
+    "坂本さんと山川さん、花子さん、谷口一郎さん、川辺さん、森田社長が並ぶ。"
+    "「坂本です」と笑う。三郎さんは山川太郎さんの隣にいる。"
+)
+
+
+def write_booklet_article(path, rows):
+    """rows: (number, item, [paragraphs]). Each paragraph is a real w:p in the cell."""
+    document = Document()
+    table = document.add_table(rows=len(rows), cols=3)
+    for row, (number, item, paragraphs) in zip(table.rows, rows):
+        row.cells[0].text = number
+        row.cells[1].text = item
+        cell = row.cells[2]
+        if paragraphs:
+            cell.paragraphs[0].text = paragraphs[0]
+            for paragraph in paragraphs[1:]:
+                cell.add_paragraph(paragraph)
+    document.save(path)
+    return path
+
+
+def name_pieces(names):
+    return {piece for name in names for piece in re.split(r"[\s、]+", name) if len(piece) >= 2}
+
+
+@pytest.mark.parametrize("name_row", [SIX, ["、".join(SIX)]], ids=["paragraphs", "one_line"])
+def test_six_people_in_the_name_row_are_all_masked(tmp_path, name_row):
+    rows = [
+        ("1", "名前", name_row),
+        ("3", "キャッチコピー", ["六人で守る店。"]),
+        ("8", "本文", [SIX_BODY]),
+        ("10", "取材者名", [INTERVIEWER]),
+    ]
+    path = write_booklet_article(tmp_path / "R6_s02L.docx", rows)
+    utterances, _ = ingest_article(path, make_seat(seat_id="D01", display_name="坂本さん・山川さん"))
+    text = dump(utterances)
+    for piece in name_pieces(SIX):
+        assert piece not in text
+    assert "坂本です" not in text and "この方です" in text
+
+
+def test_empty_interviewer_row_does_not_stop(tmp_path):
+    rows = [
+        ("1", "名前", [PERSON]),
+        ("8", "本文", ["山川さんは朝から店に立つ。"]),
+        ("10", "取材者名", []),
+    ]
+    path = write_booklet_article(tmp_path / "R6_s03L.docx", rows)
+    utterances, _ = ingest_article(path, make_seat(seat_id="D02"))
+    assert [u.text for u in utterances] == ["この方は朝から店に立つ。"]
+
+
+def test_missing_interviewer_row_does_not_stop(seat):
+    utterances, _ = ingest_article_rows(ArticleRows({"1": [PERSON], "8": ["本文の文。"]}), seat)
+    assert [u.text for u in utterances] == ["本文の文。"]
+
+
+def company_page_rows(name_paragraphs):
+    return [
+        ("1", "名前", name_paragraphs),
+        ("5", "仕事の内容", ["坂本工務店で家を建てる。"]),
+        ("8", "本文", []),
+        ("10", "取材者名", []),
+        ("13", "会社PR", ["坂本が始めた、木の家の会社です。"]),
+        ("14", "先輩社員からのメッセージ", ["「坂本社長に教わった」と話す先輩もいる。"]),
+    ]
+
+
+def test_old_company_page_with_empty_body_passes(tmp_path):
+    path = write_booklet_article(tmp_path / "R5_c01.docx", company_page_rows(["坂本 一"]))
+    seat = make_seat(seat_id="D03", company="坂本工務店", display_name="")
+    utterances, _ = ingest_article(path, seat)
+    assert {u.section for u in utterances} == {"仕事の内容", "会社PR", "先輩社員からのメッセージ"}
+    assert "坂本" not in dump(utterances)
+
+
+def test_old_company_page_with_empty_name_row_stops(tmp_path):
+    path = write_booklet_article(tmp_path / "R5_c02.docx", company_page_rows([]))
+    seat = make_seat(seat_id="D04", company="坂本工務店", display_name="")
+    with pytest.raises(IngestError, match="name_row_missing"):
+        ingest_article(path, seat)
+
+
+def test_merged_seat_masks_every_article_s_people(tmp_path):
+    # Two booklets' articles for one company, rows appended paragraph by paragraph.
+    rows = [
+        ("1", "名前", ["山川 太郎", "坂本 一"]),
+        ("8", "本文", ["山川さんは店を継いだ。", "坂本さんは店を始めた。"]),
+        ("10", "取材者名", [INTERVIEWER]),
+    ]
+    path = write_booklet_article(tmp_path / "M_B05.docx", rows)
+    utterances, _ = ingest_article(path, make_seat(seat_id="B05"))
+    assert [u.text for u in utterances] == ["この方は店を継いだ。", "この方は店を始めた。"]
+
+
 def test_address_constant_is_really_in_the_fixture():
     assert any(ADDRESS in cell for row in ROWS for cell in row)

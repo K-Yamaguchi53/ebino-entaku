@@ -56,6 +56,27 @@ def test_company_row_alone_counts_as_rows_for_slides(tmp_path):
     assert masks["S01"]
 
 
+@pytest.mark.parametrize("row", ["P02\t確認済み\t\n", "P02\t確認済み\n"])
+def test_confirmed_row_counts_as_rows_but_hides_nothing(tmp_path, row):
+    masks = load_masks(masks_file(tmp_path, row), {"P02"})
+    assert masks["P02"]
+    assert masks["P02"].confirmed
+    seat = make_seat(seat_id="P02", kind="poster", company="", display_name="3年生")
+    assert masks["P02"].pairs(seat) == []
+
+
+def test_confirmed_row_with_a_value_stops(tmp_path):
+    with pytest.raises(ValueError, match="confirmed takes no value") as caught:
+        load_masks(masks_file(tmp_path, "P02\t確認済み\t谷口\n"), {"P02"})
+    assert "line 2" in str(caught.value) and "谷口" not in str(caught.value)
+
+
+def test_sample_has_a_confirmed_row():
+    seats = load_seats(SAMPLES / "seats.tsv")
+    masks = load_masks(SAMPLES / "masks.tsv", {seat.seat_id for seat in seats})
+    assert masks["P02"].confirmed and not masks["S01"].confirmed
+
+
 def test_missing_file_means_no_masks(tmp_path):
     assert load_masks(tmp_path / "masks.tsv", {"S01"}) == {}
 

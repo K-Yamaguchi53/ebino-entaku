@@ -17,6 +17,9 @@ COLUMNS = ("席ID", "種類", "値")
 KIND_WORD = "語"
 KIND_COMPANY = "社名"
 KIND_PAGE = "ページ"
+# A person checked the work and found no names in its text (SPEC 14-45).
+# The value is empty. It counts as "has rows" but hides nothing.
+KIND_CONFIRMED = "確認済み"
 _VALUE_SEPARATOR = re.compile(r"[、,，/／;；|｜]")
 
 
@@ -25,9 +28,11 @@ class SeatMasks:
     words: tuple[str, ...] = ()
     pages: frozenset[int] = frozenset()
     companies: tuple[str, ...] = ()
+    confirmed: bool = False
 
     def __bool__(self) -> bool:
-        return bool(self.words or self.pages or self.companies)
+        """True when a person has looked at this seat (any row in masks.tsv)."""
+        return bool(self.words or self.pages or self.companies or self.confirmed)
 
     def pairs(self, seat: Seat) -> list[tuple[str, str]]:
         """(term, replacement) from the seat table and masks.tsv.
@@ -55,12 +60,15 @@ def load_masks(path: Path, seat_ids: set[str]) -> dict[str, SeatMasks]:
     words: dict[str, list[str]] = {}
     companies: dict[str, list[str]] = {}
     pages: dict[str, set[int]] = {}
+    confirmed: set[str] = set()
     with open(path, encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file, delimiter="\t")
         if tuple(reader.fieldnames or ()) != COLUMNS:
             raise ValueError("masks.tsv columns do not match")
         for row in reader:
             line = reader.line_num
+            if row.get("値") is None and (row.get("種類") or "").strip() == KIND_CONFIRMED:
+                row["値"] = ""  # 「確認済み」 may be written without the empty third column.
             if None in row or None in row.values():
                 raise ValueError(f"masks.tsv line {line}: wrong column count")
             seat_id = row["席ID"].strip()
@@ -68,6 +76,11 @@ def load_masks(path: Path, seat_ids: set[str]) -> dict[str, SeatMasks]:
             value = re.sub(r"\s+", "", row["値"])
             if seat_id not in seat_ids:
                 raise ValueError(f"masks.tsv line {line}: unknown seat")
+            if kind == KIND_CONFIRMED:
+                if value:
+                    raise ValueError(f"masks.tsv line {line}: confirmed takes no value")
+                confirmed.add(seat_id)
+                continue
             if not value:
                 raise ValueError(f"masks.tsv line {line}: empty value")
             if kind in (KIND_WORD, KIND_COMPANY):
@@ -86,6 +99,7 @@ def load_masks(path: Path, seat_ids: set[str]) -> dict[str, SeatMasks]:
             words=tuple(words.get(seat_id, ())),
             pages=frozenset(pages.get(seat_id, ())),
             companies=tuple(companies.get(seat_id, ())),
+            confirmed=seat_id in confirmed,
         )
-        for seat_id in {*words, *companies, *pages}
+        for seat_id in {*words, *companies, *pages, *confirmed}
     }
