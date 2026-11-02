@@ -10,6 +10,7 @@ INTERVIEWER = "海野 花子"
 COMPANY = "有限会社はるかぜ理容"
 PHONE = "0984-00-0000"
 ADDRESS = "えびの市大字架空町123番地"
+DISPLAY_NAME = "山川さん"
 
 ROWS = [
     ("番号", "項目", "記事", "字数"),
@@ -41,6 +42,7 @@ def make_seat(**overrides) -> Seat:
         kind="adult",
         title="理容師",
         company=COMPANY,
+        display_name=DISPLAY_NAME,
         district="架空地区",
         year="2026",
         source_file="article01.docx",
@@ -73,7 +75,8 @@ def write_seats(path, seats):
         lines.append(
             "\t".join(
                 [
-                    s.seat_id, s.kind, s.title, s.company, s.district, s.year,
+                    s.seat_id, s.kind, s.title, s.company, s.display_name,
+                    s.district, s.year,
                     s.source_file, str(s.table_no or ""),
                     "1" if s.is_crossing_target else "",
                 ]

@@ -1,5 +1,6 @@
-席ID	種類	肩書き	会社名	地区	年度	元ファイル	使う表	越境の線の先
-S01	adult	理容師	有限会社はるかぜ理容	架空地区	2026	article01.docx
-P01	poster	探究の先輩（川の水を調べた）			2025	poster01.pdf
-C01	cross	県外・海外に出た先輩（架空の島）			2026	slide01.pdf
-O01	outsider_teacher	外から来た大人（架空の研究者）			2026	lecture01.pdf
+席ID	種類	肩書き	会社名	表示名	地区	年度	元ファイル	使う表	越境の線の先
+S01	adult	理容師	有限会社はるかぜ理容	山川さん	架空地区	2026	article01.docx
+S02	adult	農家	架空農園	谷さん・森さん	架空地区	2025	r7/R7_p01.docx
+P01	poster	探究の先輩（川の水を調べた）		卒業生		2025	poster01.pdf
+C01	cross	県外・海外に出た人（架空の島）		1年生		2026	slide01.pdf
+O01	outsider_teacher	外から来た大人（架空の研究者）				2026	lecture01.pdf

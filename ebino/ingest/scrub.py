@@ -128,10 +128,31 @@ def company_terms(company: str) -> list[str]:
 
 
 def interviewer_terms(raw: str) -> list[str]:
-    terms: list[str] = []
-    for one in _LIST_SEP.split(raw):
-        terms.extend(name_parts(one).terms)
-    return terms
+    return list(people_parts([raw]).terms)
+
+
+def people_parts(paragraphs) -> NameParts:
+    """Several people: one per paragraph, or listed with 、 in one paragraph.
+    Each person's own full name stays a unit, so 山川太郎 is masked whole."""
+    terms: set[str] = set()
+    unsplit = single_char = False
+    for paragraph in paragraphs:
+        for one in _LIST_SEP.split(paragraph):
+            parts = name_parts(one)
+            terms.update(parts.terms)
+            unsplit |= parts.unsplit
+            single_char |= parts.single_char
+    return NameParts(tuple(sorted(terms, key=len, reverse=True)), unsplit, single_char)
+
+
+_DISPLAY_SEP = re.compile(r"[・、,，\s　]+")
+_DISPLAY_HONORIFIC = re.compile(r"(?:さん|様|氏)$")
+
+
+def display_name_terms(display_name: str) -> list[str]:
+    """Family names from a seat label such as 「山川さん・海野さん」."""
+    terms = (_DISPLAY_HONORIFIC.sub("", part) for part in _DISPLAY_SEP.split(display_name))
+    return [term for term in terms if term]
 
 
 @dataclass

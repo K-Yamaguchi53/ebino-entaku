@@ -1,25 +1,66 @@
 """Read an inquiry poster (one-page PDF).
 
-Student names sit at the top, so everything above the first section heading is
-dropped by position. No name list is needed, and a misread heading fails closed.
+Student names sit at the top. Everything above the first heading that maps to
+one of the five roles is dropped by position, a title included. No name list is
+needed, and a poster without such a heading fails closed.
+
+Real headings vary (SPEC 14-42): numbering styles, brackets, and two sets of
+words. Each heading maps to one of five roles; a heading that maps to none
+keeps its own words as a separate section instead of being thrown away.
 """
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
 import pdfplumber
 
 from .masks import SeatMasks
+from .pdf_quiet import quiet_pdf_warnings
 from .scrub import forbidden_terms, mask_pairs, normalize_for_match
 from .seats import Seat
 from .utterance import (
     IngestError, Utterance, VOICE_OWN, assert_clean, make_id, unique_by_id,
 )
 
-SECTIONS = ("背景と課題", "目的", "手法", "結果", "結論と展望")
-PURPOSE = "目的"
-_DECORATION = re.compile(r"^[\d.．、,)）(（【\[■●◆▶▼・]+|[】\]:：]+$")
+ROLE_BACKGROUND = "背景と課題"
+ROLE_PURPOSE = "目的"
+ROLE_METHOD = "手法"
+ROLE_RESULT = "結果"
+ROLE_OUTLOOK = "結論と展望"
+ROLES = (ROLE_BACKGROUND, ROLE_PURPOSE, ROLE_METHOD, ROLE_RESULT, ROLE_OUTLOOK)
+
+# Checked in this order; the first keyword found in a heading decides its role.
+# 成果と反省 → 結果, 成果と今後の展望 → 結論と展望, 実践後の課題 → 結論と展望.
+_ROLE_KEYWORDS = (
+    (ROLE_PURPOSE, ("目的", "仮説")),
+    (ROLE_BACKGROUND, ("背景", "経緯")),
+    (ROLE_OUTLOOK, ("展望", "まとめ", "結論")),
+    (ROLE_RESULT, ("結果", "成果", "考察")),
+    (ROLE_OUTLOOK, ("課題", "反省")),
+    (ROLE_METHOD, ("調査", "活動", "企画", "方法", "手法", "実践", "手順")),
+)
+# A line with no number or bracket is a heading only if it is exactly one of these.
+KNOWN_HEADINGS = frozenset(
+    {
+        *ROLES,
+        "研究仮説", "探究仮説", "経緯・目的", "調査活動", "活動調査", "実践", "活動コンセプト",
+        "実践後の課題", "課題", "これからの課題", "実践するに当たっての課題",
+        "成果と今後の展望", "今後の展望",
+        "背景", "企画実践の背景", "企画の目的", "企画実践の目的", "活動内容", "企画実践",
+        "企画内容", "考えた企画", "方法", "企画実践手順・手法", "成果と反省",
+        "実習先の成果と反省", "成果と反省点", "活動の成果", "反応と実習の成果",
+        "考察・結果", "結果と考察", "考察", "展望", "反省・展望", "まとめと反省", "結論",
+    }
+)
+_MAX_HEADING_CHARS = 16
+_NUMBER = re.compile(r"^(\d{1,2})(?!\d)([\s.,、:)）]*)")
+_OPEN = "<〈《【[◎■●◆◇□▶▼★☆"
+_CLOSE = ">〉》】]"
+_OPENING = re.compile(rf"^[{re.escape(_OPEN)}\s]+")
+_CLOSING = re.compile(rf"[{re.escape(_CLOSE)}\s:：]+$")
+_ENGLISH_GLOSS = re.compile(r"\s*\(\s*[A-Za-z][A-Za-z\s&/-]*\)\s*$")
 _X_TOLERANCE = 5
 _Y_TOLERANCE = 2
 _LINE_TOLERANCE = 3
@@ -34,45 +75,113 @@ class Fragment:
     top: float
 
 
-def heading_of(text: str) -> str | None:
-    cleaned = _DECORATION.sub("", normalize_for_match(text))
-    return cleaned if cleaned in SECTIONS else None
+@dataclass(frozen=True)
+class Heading:
+    label: str  # The heading's own words, numbering and brackets removed.
+    role: str | None  # One of ROLES, or None for a heading that maps to none.
 
 
-def split_sections(fragments: list[Fragment]) -> dict[str, str]:
-    headings: dict[str, Fragment] = {}
+@dataclass(frozen=True)
+class Section:
+    label: str
+    role: str | None
+    text: str
+
+    @property
+    def name(self) -> str:
+        return self.role or self.label
+
+
+def role_of(label: str) -> str | None:
+    if label in ROLES:
+        return label
+    for role, keywords in _ROLE_KEYWORDS:
+        if any(keyword in label for keyword in keywords):
+            return role
+    return None
+
+
+def _starts_like_heading(label: str) -> bool:
+    keywords = (keyword for _, words in _ROLE_KEYWORDS for keyword in words)
+    return label in KNOWN_HEADINGS or any(label.startswith(k) for k in keywords)
+
+
+def heading_of(text: str) -> Heading | None:
+    line = unicodedata.normalize("NFKC", text).strip()
+    if not line or len(re.sub(r"\s+", "", line)) > _MAX_HEADING_CHARS:
+        return None
+    rest = line
+    number = _NUMBER.match(rest)
+    if number:
+        rest = rest[number.end() :]
+    bracketed = bool(_OPENING.match(rest))
+    rest = _OPENING.sub("", rest)
+    rest = _ENGLISH_GLOSS.sub("", rest)
+    rest = _CLOSING.sub("", rest)
+    label = re.sub(r"\s+", "", rest)
+    if not label or label.endswith("。"):
+        return None
+    role = role_of(label)
+    if number and not number.group(2) and not _starts_like_heading(label):
+        # "10か所で測った" and "3つの課題" are body lines; "1企画実践の背景" is a heading.
+        return None
+    if not number and not bracketed and label not in KNOWN_HEADINGS:
+        return None
+    return Heading(label, role)
+
+
+def split_sections(fragments: list[Fragment]) -> list[Section]:
+    found = [(fragment, heading_of(fragment.text)) for fragment in fragments]
+    headings = [(f, h) for f, h in found if h]
+    known = [f.top for f, h in headings if h.role]
+    if not known:
+        raise IngestError("poster_heading_missing")
+    cutoff = min(known) - _Y_TOLERANCE  # The name line: nothing above survives.
+    headings = [(f, h) for f, h in headings if f.top >= cutoff]
+    heading_ids = {id(f) for f, h in found if h}
+
+    collected: dict[int, list[Fragment]] = {id(f): [] for f, _ in headings}
     for fragment in fragments:
-        name = heading_of(fragment.text)
-        if name:
-            headings.setdefault(name, fragment)
-    if PURPOSE not in headings:
-        raise IngestError("purpose_heading_missing")
-
-    collected: dict[str, list[Fragment]] = {name: [] for name in headings}
-    heading_set = set(map(id, headings.values()))
-    for fragment in fragments:
-        if id(fragment) in heading_set or heading_of(fragment.text):
+        if id(fragment) in heading_ids or fragment.top < cutoff:
             continue
         # The owner is the nearest heading above, in this fragment's column.
         above = [
-            (head.top, name)
-            for name, head in headings.items()
+            (head.top, index)
+            for index, (head, _) in enumerate(headings)
             if head.top <= fragment.top + _Y_TOLERANCE
             and head.x0 <= fragment.x0 + _X_TOLERANCE
         ]
         if above:
-            collected[max(above)[1]].append(fragment)
+            owner = headings[max(above)[1]][0]
+            collected[id(owner)].append(fragment)
 
-    sections: dict[str, str] = {}
-    for name, parts in collected.items():
-        parts.sort(key=lambda f: (round(f.top / _LINE_TOLERANCE), f.x0))
+    sections: list[Section] = []
+    for head, heading in headings:
+        parts = sorted(
+            collected[id(head)], key=lambda f: (round(f.top / _LINE_TOLERANCE), f.x0)
+        )
         text = "".join(part.text.strip() for part in parts)
         if text:
-            sections[name] = text
+            sections.append(Section(heading.label, heading.role, text))
     return sections
 
 
+def purpose_rank(label: str) -> int:
+    """0: a 目的 heading. 1: 研究仮説・探究仮説・経緯・目的, used only without a 0."""
+    return 0 if "目的" in label and "経緯" not in label else 1
+
+
+def purpose_examples(utterances: list[Utterance]) -> list[Utterance]:
+    """The poster's purpose to show as a sample question (SPEC 5-1, 14-42)."""
+    candidates = [u for u in utterances if u.section == ROLE_PURPOSE]
+    if not candidates:
+        return []
+    best = min(purpose_rank(u.heading) for u in candidates)
+    return [u for u in candidates if purpose_rank(u.heading) == best]
+
+
 def read_fragments(path: Path) -> list[Fragment]:
+    quiet_pdf_warnings()
     with pdfplumber.open(path) as pdf:
         if len(pdf.pages) != 1:
             raise IngestError("poster_not_one_page")
@@ -86,21 +195,25 @@ def ingest_poster_fragments(
     masks.check_pages(1)
     if 1 in masks.pages:
         return []
-    pairs = masks.pairs(seat.company)
+    sections = split_sections(fragments)
+    if not any(section.role == ROLE_PURPOSE for section in sections):
+        # The purpose sample is part of the core (SPEC 8), so stop and say so.
+        raise IngestError("purpose_heading_missing")
+    pairs = masks.pairs(seat)
     utterances: list[Utterance] = []
-    for section, raw in split_sections(fragments).items():
-        text = mask_pairs(raw, pairs).strip()
+    for section in sections:
+        text = mask_pairs(section.text, pairs).strip()
         if text:
             utterances.append(
                 Utterance(
                     id=make_id(seat.kind, seat.source_file, text),
                     seat_id=seat.seat_id,
                     kind=seat.kind,
-                    year=seat.year,
-                    section=section,
+                    section=section.name,
                     voice=VOICE_OWN,
                     text=text,
                     paragraph=text,
+                    heading=mask_pairs(section.label, pairs),
                 )
             )
     utterances = unique_by_id(utterances)

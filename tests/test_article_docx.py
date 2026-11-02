@@ -79,7 +79,7 @@ def test_row_number(raw, key):
 
 
 def test_unknown_row_is_dropped_and_counted(tmp_path, seat):
-    rows = [*ROWS, ("11", "備考", "新しい欄に書いた秘密", "")]
+    rows = [*ROWS, ("15", "備考", "新しい欄に書いた秘密", "")]
     utterances, stats = ingest_article(write_article(tmp_path / "a.docx", rows), seat)
     assert "秘密" not in dump(utterances)
     assert stats.dropped_rows >= 1
@@ -122,7 +122,19 @@ def test_missing_name_row_fails_closed(seat):
 
 def test_missing_body_fails(seat):
     with pytest.raises(IngestError, match="body_row_missing"):
-        ingest_article_rows(ArticleRows({"1": [PERSON]}), seat)
+        ingest_article_rows(ArticleRows({"1": [PERSON], "3": ["キャッチコピー。"]}), seat)
+
+
+@pytest.mark.parametrize("key", ["13", "14"])
+def test_company_page_without_body_passes_on_row_13_or_14(key):
+    rows = {"1": ["森田 健"], key: ["森田が始めた、木の家の会社です。"]}
+    utterances, _ = ingest_article_rows(ArticleRows(rows), make_seat(display_name=""))
+    assert [u.text for u in utterances] == ["この方が始めた、木の家の会社です。"]
+
+
+def test_company_page_without_head_name_still_stops():
+    with pytest.raises(IngestError, match="name_row_missing"):
+        ingest_article_rows(ArticleRows({"13": ["会社の紹介。"]}), make_seat(display_name=""))
 
 
 def test_variant_the_mask_misses_stops_the_article(seat):
@@ -151,6 +163,75 @@ def test_repeated_paragraph_becomes_one(seat):
     rows = {"1": [PERSON], "8": ["同じ段落がここにある文です。", "同じ段落がここにある文です。"]}
     utterances, _ = ingest_article_rows(ArticleRows(rows), seat)
     assert len(utterances) == 1
+
+
+@pytest.mark.parametrize(
+    "names",
+    [
+        ["山川 太郎", "海野 花子"],
+        ["山川 太郎", "海野 花子", "谷 一"],
+        ["山川 太郎、海野 花子"],
+    ],
+)
+def test_every_person_in_the_name_row_is_masked(names):
+    seat = make_seat(display_name="")
+    body = "山川太郎さんと海野さん、花子さん、谷さんが話す。太郎は笑う。"
+    rows = {"1": names, "8": [body]}
+    utterances, _ = ingest_article_rows(ArticleRows(rows), seat)
+    text = dump(utterances)
+    for name in names:
+        for part in re.split(r"[\s、]+", name):
+            assert part not in text
+
+
+def test_two_people_never_merge_into_one_masked_name(seat):
+    rows = {"1": ["山川 太郎", "海野 花子"], "8": ["山川太郎と海野花子が話す。"]}
+    utterances, _ = ingest_article_rows(ArticleRows(rows), make_seat(display_name=""))
+    assert utterances[0].text == "この方と この方が話す。".replace(" ", "")
+
+
+def test_company_page_head_name_is_masked():
+    rows = {
+        "1": ["森田 健"],
+        "8": ["森田社長は地元の木を使う。"],
+        "13": ["森田が始めた会社です。"],
+    }
+    utterances, _ = ingest_article_rows(ArticleRows(rows), make_seat(display_name=""))
+    assert "森田" not in dump(utterances)
+
+
+def test_one_character_family_name_before_kanji_is_flagged_not_masked():
+    # SPEC 14-28: left for a human check, so the count must say so.
+    rows = {"1": ["森 健"], "8": ["森社長は地元の木を使う。"]}
+    utterances, stats = ingest_article_rows(ArticleRows(rows), make_seat(display_name=""))
+    assert stats.single_char_name
+    assert utterances[0].text == "森社長は地元の木を使う。"
+
+
+@pytest.mark.parametrize(
+    "key, section, voice",
+    [
+        ("11", "高校生に一言", "spoken"),
+        ("12", "求める人材", "company"),
+        ("13", "会社PR", "company"),
+        ("14", "先輩社員からのメッセージ", "senior"),
+    ],
+)
+def test_last_years_extra_rows_carry_their_source(seat, key, section, voice):
+    rows = {"1": [PERSON], "8": ["本文の文。"], key: ["行の言葉です。"]}
+    utterances, _ = ingest_article_rows(ArticleRows(rows), seat)
+    extra = [u for u in utterances if u.section == section]
+    assert [(u.voice, u.text) for u in extra] == [(voice, "行の言葉です。")]
+
+
+def test_source_notes_for_each_written_voice():
+    from ebino.ingest.utterance import SOURCE_NOTES
+
+    assert SOURCE_NOTES == {
+        "article": "取材記事（本人確認済み）",
+        "company": "会社の紹介文（本人確認済み）",
+        "senior": "先輩社員の言葉（本人確認済み）",
+    }
 
 
 def test_same_piece_in_two_paragraphs_is_one_utterance_with_one_id(seat):

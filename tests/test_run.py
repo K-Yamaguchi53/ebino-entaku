@@ -26,7 +26,8 @@ def test_output_has_no_source_file_or_company_field(tmp_path):
     run(setup_data(tmp_path, [make_seat()]))
     rows = json.loads((tmp_path / "ingested" / "utterances.json").read_text(encoding="utf-8"))
     assert rows
-    assert set(rows[0]) == {"id", "seat_id", "kind", "year", "section", "voice", "text", "paragraph"}
+    assert set(rows[0]) == {"id", "seat_id", "kind", "section", "voice", "text", "paragraph", "heading"}
+    assert "2026" not in json.dumps(rows)  # The year is never carried (SPEC 14-34).
     assert "article01" not in json.dumps(rows, ensure_ascii=False)
 
 
@@ -60,6 +61,18 @@ def test_kind_and_file_type_must_agree(tmp_path):
     (tmp_path / "a.txt").write_text("x", encoding="utf-8")
     report = run(setup_data(tmp_path, [make_seat(source_file="a.txt")]))
     assert report.failures["kind_and_file_type_mismatch"] == 1
+
+
+def test_batch_counts_poster_roles_and_hypothesis_purposes(tmp_path):
+    from test_poster_pdf import write_poster
+
+    write_poster(tmp_path / "poster01.pdf")
+    seat = make_seat(seat_id="P01", kind="poster", company="", display_name="卒業生", source_file="poster01.pdf")
+    report = run(setup_data(tmp_path, [seat]))
+    assert report.ingested_by_kind["poster"] == 1
+    assert report.poster_sections_by_role == {"目的": 1, "結果": 1}
+    assert report.posters_purpose_from_hypothesis == 1
+    assert "posters whose purpose comes from 仮説/経緯: 1" in report.lines()
 
 
 def test_main_needs_the_data_folder(monkeypatch):

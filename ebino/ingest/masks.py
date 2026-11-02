@@ -9,11 +9,13 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from .scrub import COMPANY_MASK, PERSON_MASK, company_terms, normalize_for_match
+from .scrub import COMPANY_MASK, PERSON_MASK, company_terms, display_name_terms
+from .seats import KINDS_WITH_PERSONAL_NAME, Seat
 from .utterance import IngestError
 
 COLUMNS = ("席ID", "種類", "値")
 KIND_WORD = "語"
+KIND_COMPANY = "社名"
 KIND_PAGE = "ページ"
 _VALUE_SEPARATOR = re.compile(r"[、,，/／;；|｜]")
 
@@ -22,17 +24,24 @@ _VALUE_SEPARATOR = re.compile(r"[、,，/／;；|｜]")
 class SeatMasks:
     words: tuple[str, ...] = ()
     pages: frozenset[int] = frozenset()
+    companies: tuple[str, ...] = ()
 
     def __bool__(self) -> bool:
-        return bool(self.words or self.pages)
+        return bool(self.words or self.pages or self.companies)
 
-    def pairs(self, company: str) -> list[tuple[str, str]]:
-        """(term, replacement) for the seat's company and all mask words."""
-        companies = company_terms(company)
-        result = [(term, COMPANY_MASK) for term in companies]
-        for word in self.words:
-            mask = COMPANY_MASK if _is_company_word(word, companies) else PERSON_MASK
-            result.append((word, mask))
+    def pairs(self, seat: Seat) -> list[tuple[str, str]]:
+        """(term, replacement) from the seat table and masks.tsv.
+
+        Every term here also goes into the final leak check.
+        """
+        result: list[tuple[str, str]] = []
+        for company in (seat.company, *self.companies):
+            result.extend((term, COMPANY_MASK) for term in company_terms(company))
+        if seat.kind in KINDS_WITH_PERSONAL_NAME:
+            result.extend(
+                (term, PERSON_MASK) for term in display_name_terms(seat.display_name)
+            )
+        result.extend((word, PERSON_MASK) for word in self.words)
         return result
 
     def check_pages(self, page_count: int) -> None:
@@ -40,18 +49,11 @@ class SeatMasks:
             raise IngestError("mask_page_out_of_range")
 
 
-def _is_company_word(word: str, companies: list[str]) -> bool:
-    """A word that overlaps the seat's company name is a short form of it."""
-    key = normalize_for_match(word)
-    return any(
-        key in name or name in key for name in map(normalize_for_match, companies)
-    )
-
-
 def load_masks(path: Path, seat_ids: set[str]) -> dict[str, SeatMasks]:
     if not path.exists():
         return {}
     words: dict[str, list[str]] = {}
+    companies: dict[str, list[str]] = {}
     pages: dict[str, set[int]] = {}
     with open(path, encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file, delimiter="\t")
@@ -68,10 +70,11 @@ def load_masks(path: Path, seat_ids: set[str]) -> dict[str, SeatMasks]:
                 raise ValueError(f"masks.tsv line {line}: unknown seat")
             if not value:
                 raise ValueError(f"masks.tsv line {line}: empty value")
-            if kind == KIND_WORD:
+            if kind in (KIND_WORD, KIND_COMPANY):
                 if _VALUE_SEPARATOR.search(value):
                     raise ValueError(f"masks.tsv line {line}: one value per line")
-                words.setdefault(seat_id, []).append(value)
+                target = words if kind == KIND_WORD else companies
+                target.setdefault(seat_id, []).append(value)
             elif kind == KIND_PAGE:
                 if not value.isascii() or not value.isdigit() or int(value) < 1:
                     raise ValueError(f"masks.tsv line {line}: bad page number")
@@ -80,7 +83,9 @@ def load_masks(path: Path, seat_ids: set[str]) -> dict[str, SeatMasks]:
                 raise ValueError(f"masks.tsv line {line}: unknown kind")
     return {
         seat_id: SeatMasks(
-            tuple(words.get(seat_id, ())), frozenset(pages.get(seat_id, ()))
+            words=tuple(words.get(seat_id, ())),
+            pages=frozenset(pages.get(seat_id, ())),
+            companies=tuple(companies.get(seat_id, ())),
         )
-        for seat_id in {*words, *pages}
+        for seat_id in {*words, *companies, *pages}
     }

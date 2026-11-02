@@ -15,12 +15,15 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 
 from .masks import SeatMasks
-from .scrub import ArticleScrubber, interviewer_terms, name_parts
+from .scrub import ArticleScrubber, interviewer_terms, people_parts
 from .seats import Seat
 from .utterance import (
     IngestError,
     Utterance,
     VOICE_ARTICLE,
+    VOICE_COMPANY,
+    VOICE_SENIOR,
+    VOICE_SPOKEN,
     assert_clean,
     dedupe_sentences,
     make_id,
@@ -28,9 +31,11 @@ from .utterance import (
     unique_by_id,
 )
 
-ROW_NAME = "1"
+ROW_NAME = "1"  # One paragraph per person; company pages hold the head's name.
 ROW_INTERVIEWER = "10"
 ROW_BODY = "8"
+# Last year's company pages have no body, only these (SPEC 14-43).
+ROWS_STANDING_IN_FOR_BODY = ("13", "14")
 USED_ROWS = {
     "3": "キャッチコピー",
     "4-2": "プロフィール",
@@ -38,6 +43,17 @@ USED_ROWS = {
     "7": "本文タイトル",
     "8": "本文",
     "9": "ランキング",
+    # Last year's booklet only (SPEC 14-36).
+    "11": "高校生に一言",
+    "12": "求める人材",
+    "13": "会社PR",
+    "14": "先輩社員からのメッセージ",
+}
+ROW_VOICES = {
+    "11": VOICE_SPOKEN,
+    "12": VOICE_COMPANY,
+    "13": VOICE_COMPANY,
+    "14": VOICE_SENIOR,
 }
 _DASHES = re.compile(r"[‐‑‒–—―−ーｰ]")
 _FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
@@ -108,12 +124,13 @@ def ingest_article_rows(
     if masks.pages:
         # A docx has no fixed pages, so the request cannot be honored safely.
         raise IngestError("page_mask_on_article")
-    raw_name = " ".join(parsed.rows.get(ROW_NAME, []))
-    person = name_parts(raw_name)
+    person = people_parts(parsed.rows.get(ROW_NAME, []))
     if not person.terms:
         # Without the name nothing can be masked, so the article must not pass.
         raise IngestError("name_row_missing")
-    if not parsed.rows.get(ROW_BODY):
+    if not any(
+        parsed.rows.get(key) for key in (ROW_BODY, *ROWS_STANDING_IN_FOR_BODY)
+    ):
         raise IngestError("body_row_missing")
 
     scrub = ArticleScrubber(
@@ -121,7 +138,7 @@ def ingest_article_rows(
         interviewer_terms=tuple(
             interviewer_terms("\n".join(parsed.rows.get(ROW_INTERVIEWER, [])))
         ),
-        seat_pairs=tuple(masks.pairs(seat.company)),
+        seat_pairs=tuple(masks.pairs(seat)),
     )
     utterances: list[Utterance] = []
     for key, section in USED_ROWS.items():
@@ -129,16 +146,16 @@ def ingest_article_rows(
             paragraph = dedupe_sentences(scrub(raw)).strip()
             if not paragraph:
                 continue
-            pieces = (
-                split_voice(paragraph) if key == ROW_BODY else [(VOICE_ARTICLE, paragraph)]
-            )
+            if key == ROW_BODY:
+                pieces = split_voice(paragraph)
+            else:
+                pieces = [(ROW_VOICES.get(key, VOICE_ARTICLE), paragraph)]
             for voice, text in pieces:
                 utterances.append(
                     Utterance(
                         id=make_id(seat.kind, seat.source_file, text),
                         seat_id=seat.seat_id,
                         kind=seat.kind,
-                        year=seat.year,
                         section=section,
                         voice=voice,
                         text=text,

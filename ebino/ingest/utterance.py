@@ -9,7 +9,16 @@ from .scrub import normalize_for_match
 
 VOICE_SPOKEN = "spoken"  # Inside 「」 in an article body: words actually said.
 VOICE_ARTICLE = "article"  # Interview article text, confirmed by the person.
+VOICE_COMPANY = "company"  # Company introduction, confirmed by the company.
+VOICE_SENIOR = "senior"  # Message from an unnamed senior employee.
 VOICE_OWN = "own"  # Written by the speaker: posters and slides.
+
+# Shown with the source. Spoken words get quotation marks instead of a note.
+SOURCE_NOTES = {
+    VOICE_ARTICLE: "取材記事（本人確認済み）",
+    VOICE_COMPANY: "会社の紹介文（本人確認済み）",
+    VOICE_SENIOR: "先輩社員の言葉（本人確認済み）",
+}
 
 _SENTENCE = re.compile(r"[^。！？!?]+[。！？!?]*")
 _QUOTE = re.compile(r"「([^「」]*)」")
@@ -38,11 +47,11 @@ class Utterance:
     id: str
     seat_id: str
     kind: str
-    year: str
     section: str
     voice: str
     text: str
     paragraph: str
+    heading: str = ""  # Posters: the heading's own words, e.g. 研究仮説.
 
     def to_dict(self) -> dict:
         return asdict(self)
