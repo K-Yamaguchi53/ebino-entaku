@@ -1,0 +1,27 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Local Claude Code settings
+.claude/settings.local.json
+
+# Safety net: real data, records and planning documents never enter this repo.
+# Real data lives in EBINO_DATA_DIR, records in EBINO_RECORDS_DIR, both outside the repo.
+*.docx
+*.pdf
+*.pptx
+*.jsonl
+/data/
+/records/
+/*.tsv
+kijun.tsv
+/SPEC.md
+/収穫カード_*.md

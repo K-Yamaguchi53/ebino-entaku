@@ -1,0 +1,95 @@
+"""The ingested unit, its stable ID, and the final leak check."""
+
+import hashlib
+import re
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from .scrub import normalize_for_match
+
+VOICE_SPOKEN = "spoken"  # Inside 「」 in an article body: words actually said.
+VOICE_ARTICLE = "article"  # Interview article text, confirmed by the person.
+VOICE_OWN = "own"  # Written by the speaker: posters and slides.
+
+_SENTENCE = re.compile(r"[^。！？!?]+[。！？!?]*")
+_QUOTE = re.compile(r"「([^「」]*)」")
+_MIN_DEDUPE_CHARS = 8
+
+
+class IngestError(Exception):
+    """Carries a reason code only, never document text."""
+
+
+def _hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
+
+
+def source_hash(file_name: str) -> str:
+    return _hash(normalize_for_match(Path(file_name).name))
+
+
+def make_id(kind: str, file_name: str, text: str) -> str:
+    """Re-ingesting unchanged text yields the same ID."""
+    return f"{kind}-{source_hash(file_name)}-{_hash(normalize_for_match(text))}"
+
+
+@dataclass
+class Utterance:
+    id: str
+    seat_id: str
+    kind: str
+    year: str
+    section: str
+    voice: str
+    text: str
+    paragraph: str
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+def dedupe_sentences(text: str) -> str:
+    """Word text boxes can repeat a sentence; keep its first appearance."""
+    seen: set[str] = set()
+    kept: list[str] = []
+    for sentence in _SENTENCE.findall(text):
+        key = normalize_for_match(sentence)
+        if len(key) >= _MIN_DEDUPE_CHARS and key in seen:
+            continue
+        seen.add(key)
+        kept.append(sentence)
+    return "".join(kept)
+
+
+def split_voice(paragraph: str) -> list[tuple[str, str]]:
+    """Split into words said (inside 「」) and the article text around them."""
+    pieces: list[tuple[str, str]] = []
+    position = 0
+    for match in _QUOTE.finditer(paragraph):
+        before = paragraph[position : match.start()].strip()
+        if before:
+            pieces.append((VOICE_ARTICLE, before))
+        if match.group(1).strip():
+            pieces.append((VOICE_SPOKEN, match.group(1).strip()))
+        position = match.end()
+    rest = paragraph[position:].strip()
+    if rest:
+        pieces.append((VOICE_ARTICLE, rest))
+    return pieces
+
+
+def unique_by_id(utterances: list[Utterance]) -> list[Utterance]:
+    """The same piece twice in one file has one ID, so it becomes one utterance."""
+    unique: dict[str, Utterance] = {}
+    for utterance in utterances:
+        unique.setdefault(utterance.id, utterance)
+    return list(unique.values())
+
+
+def assert_clean(utterances: list[Utterance], forbidden: list[str]) -> None:
+    """Last gate: catches variants the masks missed, such as full-width forms."""
+    terms = {normalize_for_match(t) for t in forbidden if t}
+    for utterance in utterances:
+        body = normalize_for_match(utterance.text + utterance.paragraph)
+        if any(term and term in body for term in terms):
+            raise IngestError("forbidden_term_remains")
