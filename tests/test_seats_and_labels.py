@@ -10,7 +10,7 @@ from ebino.ingest.run import run
 from ebino.ingest.scrub import normalize_for_match
 from ebino.ingest.seats import COLUMNS, load_seats
 from ebino.seat_label import SeatLabel, seat_label, short_company, show_private_labels
-from ebino.texts import SPLIT_NOTICE, load_text
+from ebino.texts import HEAVY_TALK_NOTICE, SPLIT_NOTICE, load_text
 
 SAMPLES = Path(__file__).parent.parent / "samples"
 
@@ -111,3 +111,7 @@ def test_seat_table_keeps_the_full_company():
 
 def test_split_notice_is_read_from_the_text_file():
     assert load_text(SPLIT_NOTICE) == "どちらが正しいかではありません。考えが分かれるところです"
+
+
+def test_heavy_talk_notice_is_read_from_the_text_file():
+    assert load_text(HEAVY_TALK_NOTICE) == "しんどい話は、ここではなく先生か保健室へ"
