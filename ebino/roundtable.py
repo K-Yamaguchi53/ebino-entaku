@@ -12,6 +12,12 @@ Three ways a round ends, kept apart (SPEC 5-1, 14-51):
   - unavailable: a model refused or failed, or the gate stopped a request.
     The screen shows the fixed sentence in texts/ and the reason code is
     recorded. This is not silence, so it never shows 「答えた席：0」.
+
+Before any of that, the question alone is checked against the gate's name
+list. A hit calls no model and makes no card: the round ends as ask_again
+with its own fixed sentence, because waiting would not help. Which word hit
+is never kept, and neither is the question, so neither the screen nor the
+records can show the name list.
 """
 
 from dataclasses import dataclass, field
@@ -22,11 +28,13 @@ from .gate import Gate, GateError, ModelUnavailable
 from .guard import Guard, Quote, plant_fake
 from .index import Entry
 from .ingest.seats import Seat
-from .texts import MODEL_UNAVAILABLE, PLANTED_FAKE_QUOTE, load_text
+from .texts import MODEL_UNAVAILABLE, NAME_IN_QUESTION, PLANTED_FAKE_QUOTE, load_text
 
 ANSWERED = "answered"
 SILENT = "silent"
 UNAVAILABLE = "unavailable"
+ASK_AGAIN = "ask_again"  # The question held a name; no model was called.
+REASON_NAME_IN_QUESTION = "name_in_question"
 
 
 @dataclass(frozen=True)
@@ -90,6 +98,8 @@ def _splits(plans, shown: dict[str, ShownQuote], gate: Gate) -> tuple[list[Split
 def run(
     gate: Gate, entries: list[Entry], seats: list[Seat], guard: Guard, question: str, plant: bool = False
 ) -> Round:
+    if gate.names.hits(question):
+        return Round("", ASK_AGAIN, reason=REASON_NAME_IN_QUESTION, message=load_text(NAME_IN_QUESTION))
     by_id = {entry.utterance_id: entry for entry in entries}
     try:
         found = librarian.find(gate, entries, question)

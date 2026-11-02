@@ -12,6 +12,10 @@ PLANTED_FAKE_QUOTE = "planted_fake_quote"
 # Shown when a model refused or failed (SPEC 14-51). Never mixed with
 # 「この問いに答えた席：0」: the seats were not silent.
 MODEL_UNAVAILABLE = "model_unavailable"
+# Shown when the student's question holds a word on the gate's name list.
+# Waiting does not help, so it asks for the word to be left out or put
+# another way. It never says which word: that would show the name list.
+NAME_IN_QUESTION = "name_in_question"
 
 
 def load_text(name: str) -> str:

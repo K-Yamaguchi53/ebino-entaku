@@ -11,7 +11,7 @@ from ebino.gate import Gate, NameList
 from ebino.guard import Guard
 from ebino.index import build_index
 from ebino.ingest.utterance import Utterance
-from ebino.texts import MODEL_UNAVAILABLE, PLANTED_FAKE_QUOTE, load_text
+from ebino.texts import MODEL_UNAVAILABLE, NAME_IN_QUESTION, PLANTED_FAKE_QUOTE, load_text
 
 SEATS = [
     make_seat(seat_id="S01"),  # 理容師, はるかぜ理容, 山川さん.
@@ -212,11 +212,29 @@ def test_a_refusal_shows_the_fixed_sentence_and_is_not_silence():
     assert result.quotes == []
 
 
-def test_a_name_in_the_question_stops_the_round_before_any_request():
-    client = FakeClient([librarian_finds("a1")])
-    result = roundtable.run(Gate(client, names()), ENTRIES, SEATS, Guard(UTTERANCES), "山川さんの休みは？")
-    assert (result.status, result.reason) == ("unavailable", "name_in_request")
-    assert client.requests == []
+def test_a_name_in_the_question_asks_again_without_calling_any_model():
+    client = FakeClient([librarian_finds("a1"), editor_says()])
+    gate = Gate(client, names())
+    result = roundtable.run(gate, ENTRIES, SEATS, Guard(UTTERANCES), "谷口さんの休みは？")
+    assert (result.status, result.reason) == ("ask_again", "name_in_question")
+    assert result.message == load_text(NAME_IN_QUESTION)
+    assert result.message != load_text(MODEL_UNAVAILABLE)
+    assert client.requests == [] and (gate.sent, gate.stopped) == (0, 0)
+    assert result.card is None  # No question card for this.
+    # Which word hit is kept nowhere, and neither is the question.
+    kept = json.dumps(vars(result), ensure_ascii=False, default=str)
+    assert "谷口" not in kept and "山川" not in kept
+
+
+def test_a_question_without_a_name_runs_as_before():
+    result, client, _ = run([librarian_finds("a1"), moderator_says([("a1", "休みは決めて取ります。")])],
+                            question="お店の休みはどう決めますか")
+    assert result.status == "answered" and len(client.requests) == 2
+
+
+def test_the_ask_again_sentence_names_no_word_and_does_not_say_wait():
+    text = load_text(NAME_IN_QUESTION)
+    assert text and "時間をおく" not in text and "答えた席" not in text
 
 
 def test_the_fixed_sentence_is_neither_a_command_nor_an_evaluation():
