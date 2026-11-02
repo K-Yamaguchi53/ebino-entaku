@@ -501,6 +501,37 @@ def test_real_pdf_keeps_the_body_under_the_topmost_question(tmp_path, poster_sea
     assert "川辺" not in everything and "手話を広める" not in everything
 
 
+# --- SPEC 14-49 ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text, label",
+    [
+        ("探究テーマの理由", "探究テーマの理由"),
+        ("テーマの理由", "テーマの理由"),
+        ("探究テーマの理由①", "探究テーマの理由"),
+        ("１．探究テーマの理由", "探究テーマの理由"),
+        ("【探究テーマの理由】", "探究テーマの理由"),
+    ],
+)
+def test_theme_reason_without_settei_is_background(text, label):
+    assert heading_of(text) == Heading(label, "背景と課題")
+
+
+def test_body_under_a_topmost_theme_reason_without_settei_survives(poster_seat):
+    fragments = [
+        Fragment(STUDENT, 50, 10),
+        *lines("探究テーマの理由", "公園の遊具が古いと聞いた。", "調査活動", "三十人に聞いた。"),
+    ]
+    utterances = ingest_poster_fragments(fragments, poster_seat)
+    assert [(u.section, u.text) for u in utterances] == [
+        ("背景と課題", "公園の遊具が古いと聞いた。"),
+        ("手法", "三十人に聞いた。"),
+    ]
+    examples = purpose_examples(utterances)
+    assert [u.heading for u in examples] == ["探究テーマの理由"]
+
+
 def write_poster(path, pages=1):
     pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
     pdf = canvas.Canvas(str(path), pagesize=A4)

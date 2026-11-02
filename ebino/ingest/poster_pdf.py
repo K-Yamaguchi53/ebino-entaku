@@ -39,7 +39,10 @@ _ROLE_KEYWORDS = (
     (ROLE_PURPOSE, ("目的", "仮説", "仮設", "目標")),  # 研究仮設: a real misspelling
     (
         ROLE_BACKGROUND,
-        ("背景", "経緯", "テーマ設定", "設定理由", "初めに", "はじめに", "動機", "きっかけ", "前の課題"),
+        (
+            "背景", "経緯", "テーマ設定", "設定理由", "テーマの理由", "初めに", "はじめに",
+            "動機", "きっかけ", "前の課題",
+        ),
     ),
     (ROLE_OUTLOOK, ("展望", "まとめ", "結論")),
     (ROLE_RESULT, ("結果", "成果", "考察")),
@@ -65,6 +68,8 @@ KNOWN_HEADINGS = frozenset(
         "企画実践前の課題", "実習活動",
         # SPEC 14-48
         "研究仮設", "探究仮設",
+        # SPEC 14-49
+        "テーマの理由", "探究テーマの理由",
     }
 )
 _MAX_HEADING_CHARS = 16
@@ -75,7 +80,7 @@ _LONG_HEADING_ENDINGS = ("研究仮説", "探究仮説", "研究仮設", "探究
 _NUMBER = re.compile(r"^(\d{1,2})(?!\d)([\s.,、:)）]*)")
 _TRAILING_NUMBER = re.compile(r"\d{1,2}$")  # 「探究テーマ設定理由①」 (① is 1 after NFKC)
 _GAP = re.compile(r"\s+")
-_THEME_REASON = re.compile(r"テーマ設定|設定理由")
+_THEME_REASON = re.compile(r"テーマ設定|設定理由|テーマの理由")
 # 「１ なぜ○○なのか（探究テーマ設定理由）」: the role word is in the closing brackets.
 _WORD_IN_CLOSING_BRACKETS = re.compile(r"^.+\(([^()]+)\)$")
 _OPEN = "<〈《【[◎■●◆◇□▶▼★☆"
