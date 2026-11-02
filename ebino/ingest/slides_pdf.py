@@ -9,7 +9,7 @@ from pathlib import Path
 import pdfplumber
 
 from .masks import SeatMasks
-from .pdf_chars import fold_radicals
+from .pdf_chars import PdfTextStats, fold_radicals, remove_controls
 from .pdf_quiet import quiet_pdf_warnings
 from .scrub import forbidden_terms, normalize_for_match, scrub_slide_text
 from .seats import Seat
@@ -31,12 +31,14 @@ def collapse_lines(pages: list[list[str]]) -> list[list[str]]:
     return collapsed
 
 
-def read_pages(path: Path) -> list[list[str]]:
+def read_pages(path: Path, stats: PdfTextStats | None = None) -> list[list[str]]:
     quiet_pdf_warnings()
     with pdfplumber.open(path) as pdf:
         # dedupe_chars handles glyphs overprinted to fake bold or outlines.
         return [
-            fold_radicals(page.dedupe_chars().extract_text() or "").splitlines()
+            fold_radicals(
+                remove_controls(page.dedupe_chars().extract_text() or "", stats)
+            ).splitlines()
             for page in pdf.pages
         ]
 
@@ -68,5 +70,7 @@ def ingest_slide_pages(
     return utterances
 
 
-def ingest_slides(path: Path, seat: Seat, masks: SeatMasks) -> list[Utterance]:
-    return ingest_slide_pages(read_pages(path), seat, masks)
+def ingest_slides(
+    path: Path, seat: Seat, masks: SeatMasks, stats: PdfTextStats | None = None
+) -> list[Utterance]:
+    return ingest_slide_pages(read_pages(path, stats), seat, masks)

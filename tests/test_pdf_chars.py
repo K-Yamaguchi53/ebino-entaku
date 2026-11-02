@@ -6,7 +6,9 @@ import pytest
 
 from conftest import make_seat, write_seats
 from ebino.ingest.masks import SeatMasks
-from ebino.ingest.pdf_chars import fold_radicals, leftover_supplement_chars
+from ebino.ingest.pdf_chars import (
+    PdfTextStats, fold_radicals, leftover_supplement_chars, remove_controls,
+)
 from ebino.ingest.poster_pdf import ingest_poster
 from ebino.ingest.run import run
 from ebino.ingest.slides_pdf import ingest_slides
@@ -49,6 +51,66 @@ def test_unmapped_supplement_char_is_kept_and_counted():
     assert text == f"小{SUPPLEMENT_UNMAPPED}"
     assert leftover_supplement_chars(text) == 1
     assert leftover_supplement_chars(fold_radicals(f"{SUPPLEMENT_LONG}野")) == 0
+
+
+def test_control_chars_are_removed_and_counted():
+    stats = PdfTextStats()
+    assert remove_controls("\x00目的\x01\x7f", stats) == "目的"
+    assert remove_controls("一行目\n\t二行目", stats) == "一行目\n\t二行目"
+    assert stats.control_chars_removed == 3
+
+
+NUL_GAP = "\x00" * 9  # Nine NUL glyphs bridge the left heading to the right one.
+
+
+def control_char_poster(path):
+    return write_text_pdf(
+        path,
+        [
+            (380, 800, "川辺 三郎"),
+            (50, 740, f"探究テーマ設定理由①{NUL_GAP}探究テーマ設定理由②"),
+            (50, 720, "左の段の本文。"),
+            (290, 720, "右の段の本文。"),
+            (50, 680, "\x01スポーツイベントの開催による効果、研究仮説"),
+            (50, 660, "仮説の本文。"),
+            (50, 620, "\x011.実務体験 \x012.コンテンツ制作 \x013.SNS発信"),
+            (50, 600, "三つを試した。"),
+        ],
+    )
+
+
+def test_poster_with_control_chars_keeps_both_columns_and_the_hypothesis(tmp_path):
+    stats = PdfTextStats()
+    path = control_char_poster(tmp_path / "poster01.pdf")
+    utterances = ingest_poster(path, poster_seat(), stats=stats)
+    assert [(u.section, u.heading, u.text) for u in utterances][:3] == [
+        ("背景と課題", "探究テーマ設定理由", "左の段の本文。"),
+        ("背景と課題", "探究テーマ設定理由", "右の段の本文。"),
+        ("目的", "スポーツイベントの開催による効果、研究仮説", "仮説の本文。"),
+    ]
+    everything = "".join(u.text + u.heading + u.paragraph for u in utterances)
+    assert not any(ch < " " for ch in everything)
+    assert "三つを試した。" in everything
+    assert stats.control_chars_removed == 9 + 1 + 3
+
+
+def test_slides_lose_control_chars(tmp_path):
+    path = write_text_pdf(tmp_path / "slide01.pdf", [(50, 780, "\x00町の\x01話")])
+    seat = make_seat(seat_id="C01", kind="cross", company="", source_file="slide01.pdf")
+    stats = PdfTextStats()
+    utterances = ingest_slides(path, seat, SeatMasks(pages=frozenset()), stats)
+    assert [u.text for u in utterances] == ["町の話"]
+    assert stats.control_chars_removed == 2
+
+
+def test_batch_reports_removed_control_chars(tmp_path):
+    control_char_poster(tmp_path / "poster01.pdf")
+    write_seats(tmp_path / "seats.tsv", [poster_seat()])
+    report = run(tmp_path)
+    assert not report.failed_seats
+    assert "control chars removed from PDF text: 13" in report.lines()
+    raw = (tmp_path / "ingested" / "utterances.json").read_text(encoding="utf-8")
+    assert "\\u0000" not in raw and "\\u0001" not in raw
 
 
 def radical_poster(path, body_extra=""):

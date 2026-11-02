@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .article_docx import ingest_article
 from .masks import SeatMasks, load_masks
-from .pdf_chars import leftover_supplement_chars
+from .pdf_chars import PdfTextStats, leftover_supplement_chars
 from .poster_pdf import (
     PURPOSE_FROM_HYPOTHESIS,
     PURPOSE_FROM_THEME_REASON,
@@ -50,6 +50,7 @@ class Report:
     multi_page_works_read: int = 0
     multi_page_works_skipped: int = 0
     leftover_radical_chars: int = 0
+    pdf_text: PdfTextStats = field(default_factory=PdfTextStats)
 
     def lines(self) -> list[str]:
         return [
@@ -70,6 +71,7 @@ class Report:
             f"{self.multi_page_works_read} / {self.multi_page_works_skipped}",
             "radical-supplement chars left (not in the table): "
             f"{self.leftover_radical_chars}",
+            f"control chars removed from PDF text: {self.pdf_text.control_chars_removed}",
         ]
 
 
@@ -91,10 +93,10 @@ def _ingest_seat(
             if not masks:
                 report.multi_page_works_skipped += 1
                 raise IngestError("poster_not_one_page")
-            utterances = ingest_slides(path, seat, masks)
+            utterances = ingest_slides(path, seat, masks, report.pdf_text)
             report.multi_page_works_read += 1
             return utterances
-        utterances = ingest_poster(path, seat, masks)
+        utterances = ingest_poster(path, seat, masks, report.pdf_text)
         for utterance in utterances:
             role = utterance.section if utterance.section in ROLES else "(other)"
             report.poster_sections_by_role[role] += 1
@@ -108,7 +110,7 @@ def _ingest_seat(
         if not masks:
             report.skipped_slide_seats += 1
             return None
-        return ingest_slides(path, seat, masks)
+        return ingest_slides(path, seat, masks, report.pdf_text)
     raise IngestError("kind_and_file_type_mismatch")
 
 

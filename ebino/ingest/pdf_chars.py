@@ -1,4 +1,8 @@
-"""Turn look-alike kanji code points from PDFs into ordinary kanji (SPEC 14-48).
+"""Clean text right after it leaves a PDF (SPEC 14-48, 14-49).
+
+Control characters (U+0000, U+0001, ...) are removed, newline and tab kept.
+
+Look-alike kanji code points are turned into ordinary kanji.
 
 Some PDFs carry 「⽬」 (a Kangxi radical) where 「目」 is meant. They look the
 same, but a name written that way slips past the masks, 「⽬的」 is not read as
@@ -9,7 +13,12 @@ is left exactly as it was. Each character stays one character, so per-character
 positions still line up.
 """
 
+import re
 import unicodedata
+from dataclasses import dataclass
+
+# Control characters other than newline and tab (U+0000, U+0001 seen in real PDFs).
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
 
 KANGXI_RADICALS = (0x2F00, 0x2FDF)
 CJK_COMPATIBILITY_IDEOGRAPHS = (0xF900, 0xFAFF)
@@ -51,6 +60,25 @@ def _fold_char(ch: str) -> str:
 
 def fold_radicals(text: str) -> str:
     return "".join(_fold_char(ch) for ch in text)
+
+
+@dataclass
+class PdfTextStats:
+    """What the clean-up removed, for the batch report."""
+
+    control_chars_removed: int = 0
+
+
+def is_control(ch: str) -> bool:
+    return bool(_CONTROL.fullmatch(ch))
+
+
+def remove_controls(text: str, stats: PdfTextStats | None = None) -> str:
+    """Drop control characters, keeping newline and tab (SPEC 14-49)."""
+    cleaned, removed = _CONTROL.subn("", text)
+    if stats is not None:
+        stats.control_chars_removed += removed
+    return cleaned
 
 
 def leftover_supplement_chars(text: str) -> int:

@@ -17,7 +17,7 @@ from pathlib import Path
 import pdfplumber
 
 from .masks import SeatMasks
-from .pdf_chars import fold_radicals
+from .pdf_chars import PdfTextStats, fold_radicals, is_control, remove_controls
 from .pdf_quiet import quiet_pdf_warnings
 from .scrub import forbidden_terms, mask_pairs, normalize_for_match
 from .seats import Seat
@@ -83,6 +83,7 @@ _CLOSE = ">〉》】]"
 _OPENING = re.compile(rf"^[{re.escape(_OPEN)}\s]+")
 _CLOSING = re.compile(rf"[{re.escape(_CLOSE)}\s:：]+$")
 _ENGLISH_GLOSS = re.compile(r"\s*\(\s*[A-Za-z][A-Za-z\s&/-]*\)\s*$")
+_WORD_GAP = 3  # pdfplumber's default x_tolerance: a wider gap starts a new word.
 _X_TOLERANCE = 5
 _Y_TOLERANCE = 2
 _LINE_TOLERANCE = 3
@@ -298,18 +299,51 @@ def pdf_page_count(path: Path) -> int:
         return len(pdf.pages)
 
 
-def read_fragments(path: Path) -> list[Fragment]:
+def fragments_from_word(word: dict, stats: PdfTextStats | None = None) -> list[Fragment]:
+    """One pdfplumber word → fragments, with control characters removed.
+
+    A control character can bridge two columns into one word (it has width but
+    is no space). Once it is gone, the word is cut again wherever the remaining
+    characters are further apart than pdfplumber's own word gap.
+    """
+    chars = list(word.get("chars", ()))
+    if not chars or "".join(c["text"] for c in chars) != word["text"]:
+        text = fold_radicals(remove_controls(word["text"], stats))
+        return [Fragment(text, word["x0"], word["top"])] if text else []
+    kept = []
+    for char in chars:
+        if is_control(char["text"]):
+            if stats is not None:
+                stats.control_chars_removed += 1
+        else:
+            kept.append(char)
+    groups: list[list[dict]] = []
+    for char in kept:
+        if groups and char["x0"] - groups[-1][-1]["x1"] <= _WORD_GAP:
+            groups[-1].append(char)
+        else:
+            groups.append([char])
+    fragments = []
+    for number, group in enumerate(groups):
+        xs = [c["x0"] for c in group]
+        if number == 0:
+            # A control glyph at the head of a heading must not push the heading
+            # right of its own column, or the body below loses its owner.
+            xs[0] = word["x0"]
+        text = fold_radicals("".join(c["text"] for c in group))
+        fragments.append(Fragment(text, xs[0], word["top"], tuple(xs)))
+    return fragments
+
+
+def read_fragments(path: Path, stats: PdfTextStats | None = None) -> list[Fragment]:
     quiet_pdf_warnings()
     with pdfplumber.open(path) as pdf:
         if len(pdf.pages) != 1:
             raise IngestError("poster_not_one_page")
-        words = pdf.pages[0].extract_words(keep_blank_chars=True, return_chars=True)
-    return [
-        Fragment(
-            fold_radicals(w["text"]), w["x0"], w["top"], tuple(c["x0"] for c in w.get("chars", ()))
+        words = pdf.pages[0].extract_words(
+            keep_blank_chars=True, return_chars=True, x_tolerance=_WORD_GAP
         )
-        for w in words
-    ]
+    return [fragment for word in words for fragment in fragments_from_word(word, stats)]
 
 
 def ingest_poster_fragments(
@@ -346,6 +380,6 @@ def ingest_poster_fragments(
 
 
 def ingest_poster(
-    path: Path, seat: Seat, masks: SeatMasks = SeatMasks()
+    path: Path, seat: Seat, masks: SeatMasks = SeatMasks(), stats: PdfTextStats | None = None
 ) -> list[Utterance]:
-    return ingest_poster_fragments(read_fragments(path), seat, masks)
+    return ingest_poster_fragments(read_fragments(path, stats), seat, masks)
