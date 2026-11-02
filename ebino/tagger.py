@@ -52,19 +52,28 @@ SCHEMA = {
 
 @dataclass
 class TagReport:
+    """A piece is in one of three states (SPEC 14-52): it has topics, the
+    model answered with no topics (a right answer for a short piece, so it is
+    not sent again), or it has not been answered yet."""
+
     pieces: int = 0
-    already: int = 0
-    tagged: int = 0
-    untagged: int = 0
+    already: int = 0  # Answered on an earlier run, with or without topics.
+    tagged: int = 0  # Answered now with at least one topic.
+    empty: int = 0  # Answered now with no topics.
+    with_topics: int = 0  # All runs.
+    empty_total: int = 0  # All runs.
+    untagged: int = 0  # Not answered yet.
     batches: int = 0
     failures: Counter = field(default_factory=Counter)
 
     def lines(self) -> list[str]:
         return [
             f"pieces: {self.pieces}",
-            f"already tagged: {self.already}",
-            f"tagged now: {self.tagged}",
-            f"left without tags: {self.untagged}",
+            f"answered before: {self.already}",
+            f"answered now with topics: {self.tagged}",
+            f"answered now with no topics: {self.empty}",
+            f"all runs: with topics {self.with_topics}  no topics {self.empty_total}",
+            f"not answered yet: {self.untagged}",
             f"batches sent: {self.batches}",
             f"failed batches by reason: {dict(self.failures)}",
         ]
@@ -98,10 +107,17 @@ def tag_pieces(
         wanted = {u.id for u in batch}
         for tag in answer.get("tags", []) if isinstance(answer, dict) else []:
             if isinstance(tag, dict) and tag.get("id") in wanted:
-                topics[tag["id"]] = _clean(tag.get("topics") or [])
-                report.tagged += 1
+                kept = _clean(tag.get("topics") or [])
+                topics[tag["id"]] = kept
+                if kept:
+                    report.tagged += 1
+                else:
+                    report.empty += 1
                 wanted.discard(tag["id"])
-    report.untagged = sum(u.id not in topics for u in utterances)
+    answered = [topics[u.id] for u in utterances if u.id in topics]
+    report.with_topics = sum(bool(kept) for kept in answered)
+    report.empty_total = len(answered) - report.with_topics
+    report.untagged = len(utterances) - len(answered)
     return topics
 
 

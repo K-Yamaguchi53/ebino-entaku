@@ -57,6 +57,31 @@ def test_a_second_run_only_fills_gaps(tmp_path):
     assert client.requests == []
 
 
+def test_empty_answers_are_counted_apart_and_not_sent_again(tmp_path):
+    # SPEC 14-52: tagged / answered with no topics / not answered yet.
+    folder = setup(tmp_path, [piece(1), piece(2), piece(3)])
+
+    def some_empty(request):
+        sent = json.loads(request["messages"][0]["content"])
+        return text_response({"tags": [
+            {"id": sent[0]["id"], "topics": ["朝"]},
+            {"id": sent[1]["id"], "topics": []},
+            {"id": sent[2]["id"], "topics": ["とても長い話題の名前ですね"]},  # Trimmed to none.
+        ]})
+
+    report = tagger.run(folder, FakeClient(some_empty))
+    assert (report.tagged, report.empty, report.untagged) == (1, 2, 0)
+    assert (report.with_topics, report.empty_total) == (1, 2)
+    assert "answered now with topics: 1" in report.lines()
+    assert "answered now with no topics: 2" in report.lines()
+
+    client = FakeClient(tags_for)
+    again = tagger.run(folder, client)
+    assert client.requests == []
+    assert (again.already, again.tagged, again.empty) == (3, 0, 0)
+    assert (again.with_topics, again.empty_total, again.untagged) == (1, 2, 0)
+
+
 def test_no_company_or_display_name_reaches_the_tagger(tmp_path):
     folder = setup(tmp_path, [piece(1), piece(2, "P01", "川の水を調べた。")])
     client = FakeClient(tags_for)
