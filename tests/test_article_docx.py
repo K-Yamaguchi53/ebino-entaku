@@ -457,6 +457,33 @@ def test_only_a_quoting_to_or_tte_makes_a_quote_speech(paragraph, pieces):
     assert split_voice(paragraph) == pieces
 
 
+# --- SPEC 14-50-2: だと・そう before a verb of saying -------------------------------
+
+
+@pytest.mark.parametrize(
+    "paragraph, pieces",
+    [
+        ("「朝が一番好き」だと語る。", [("spoken", "朝が一番好き"), ("article", "だと語る。")]),
+        ("「店は町の台所」だと話した。", [("spoken", "店は町の台所"), ("article", "だと話した。")]),
+        ("「失敗も財産」だと言う。", [("spoken", "失敗も財産"), ("article", "だと言う。")]),
+        ("「ここが自分の場所」だと思った。", [("spoken", "ここが自分の場所"), ("article", "だと思った。")]),
+        ("「まずやってみる」そう語る。", [("spoken", "まずやってみる"), ("article", "そう語る。")]),
+        ("「船は家族」そう話してくれた。", [("spoken", "船は家族"), ("article", "そう話してくれた。")]),
+        ("「また来いよ」そう言って手を振った。", [("spoken", "また来いよ"), ("article", "そう言って手を振った。")]),
+        ("「戻ってよかった」そう思う。", [("spoken", "戻ってよかった"), ("article", "そう思う。")]),
+        ("「なんとかなる」そう笑った。", [("spoken", "なんとかなる"), ("article", "そう笑った。")]),
+        ("「町の宝」だという。", [("article", "「町の宝」だという。")]),
+        ("「町の宝」だそうだ。", [("article", "「町の宝」だそうだ。")]),
+        ("「町の宝」だと話題になった。", [("article", "「町の宝」だと話題になった。")]),
+        ("「負けたくない」そんな思いで続けた。", [("article", "「負けたくない」そんな思いで続けた。")]),
+        ("「負けたくない」そのような気持ちだった。", [("article", "「負けたくない」そのような気持ちだった。")]),
+        ("「朝市」そうした行事が好きだ。", [("article", "「朝市」そうした行事が好きだ。")]),
+    ],
+)
+def test_dato_and_sou_before_saying_make_a_quote_speech(paragraph, pieces):
+    assert split_voice(paragraph) == pieces
+
+
 def test_a_quote_kept_in_the_article_is_one_piece_with_one_id(seat):
     paragraph = "「釣り部」というサークルに入った。君たちに「近道」を言わないと決めた。"
     rows = {"1": [PERSON], "8": [paragraph]}

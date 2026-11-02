@@ -26,6 +26,11 @@ _SENTENCE = re.compile(r"[^。！？!?]+[。！？!?]*")
 _QUOTE = re.compile(r"「([^「」]*)」")
 _MIN_DEDUPE_CHARS = 8
 _NOT_QUOTING_TO = ("という", "といった", "とか", "との", "とは")
+# 語る・話す・言う・思う・笑う in any form; the kana after the kanji keeps 話題・言葉 out.
+_SAY = "語[らりるれろっ]|話[さしすせそ]|言[わいうえおっ]|思[わいうえおっ]"
+_LAUGH = "笑[わいうえおっ]"
+# SPEC 14-50-2: 「…」だと語る, 「…」そう話す. だという・だそうだ・そんな do not match.
+_SAID_AFTER = re.compile(f"だと(?:{_SAY})|そう(?:{_SAY}|{_LAUGH})")
 
 
 class IngestError(Exception):
@@ -86,9 +91,13 @@ def is_said(after: str) -> bool:
     「…」って. 「…」という・といった・とか・との・とは name or stress a word,
     and so does any other follower (を・に・が・の・は・。). A 「」 that closes
     the paragraph is speech, as before.
+
+    SPEC 14-50-2 adds だと and そう before a verb of saying or thinking:
+    「…」だと語る, 「…」だと思った, 「…」そう話す, 「…」そう笑う.
+    「…」だという, 「…」だそうだ and 「…」そんな stay in the article.
     """
     after = after.lstrip()
-    if not after or after.startswith("って"):
+    if not after or after.startswith("って") or _SAID_AFTER.match(after):
         return True
     return after.startswith("と") and not after.startswith(_NOT_QUOTING_TO)
 
