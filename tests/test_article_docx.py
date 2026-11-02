@@ -13,7 +13,9 @@ from ebino.ingest.article_docx import (
     ArticleRows, cell_paragraphs, ingest_article, ingest_article_rows, row_number,
 )
 from ebino.ingest.scrub import normalize_for_match
-from ebino.ingest.utterance import IngestError, VOICE_ARTICLE, VOICE_SPOKEN, make_id
+from ebino.ingest.utterance import (
+    IngestError, VOICE_ARTICLE, VOICE_OWN, VOICE_SPOKEN, make_id,
+)
 
 
 @pytest.fixture
@@ -375,6 +377,53 @@ def test_merged_seat_masks_every_article_s_people(tmp_path):
     path = write_booklet_article(tmp_path / "M_B05.docx", rows)
     utterances, _ = ingest_article(path, make_seat(seat_id="B05"))
     assert [u.text for u in utterances] == ["この方は店を継いだ。", "この方は店を始めた。"]
+
+
+# --- SPEC 14-50: the teacher's own article --------------------------------------
+
+TEACHER = "海野 一郎"
+
+
+def teacher_rows():
+    return [
+        ("1", "名前", [TEACHER]),
+        ("2", "ふりがな", ["うみの いちろう"]),
+        ("3", "キャッチコピー", ["「寄り道」をすすめたい。"]),
+        ("4-2", "プロフィール", ["海野は架空の町で育った。"]),
+        ("5", "仕事の内容", ["高校で「地理」を教えている。"]),
+        ("7", "本文タイトル", ["遠回りの話"]),
+        ("8", "本文", ["君たちに「急げ」とは言わない。", "海野は「迷っていい」と言いたい。"]),
+        ("11", "高校生に一言", ["「なぜ」を大事に。"]),
+    ]
+
+
+@pytest.fixture
+def teacher_utterances(tmp_path):
+    path = write_booklet_article(tmp_path / "teacher01.docx", teacher_rows())
+    seat = make_seat(seat_id="O02", kind="outsider_teacher", company="", display_name="",
+                     source_file="teacher01.docx")
+    return ingest_article(path, seat)[0]
+
+
+def test_teacher_article_is_all_own_words_shown_as_the_teacher_s_article(teacher_utterances):
+    assert {u.voice for u in teacher_utterances} == {VOICE_OWN}
+    assert {u.note for u in teacher_utterances} == {"先生が書いた記事"}
+
+
+def test_teacher_article_is_not_split_at_quotes(teacher_utterances):
+    body = [u.text for u in teacher_utterances if u.section == "本文"]
+    assert body == ["君たちに「急げ」とは言わない。", "この方は「迷っていい」と言いたい。"]
+    assert [u.text for u in teacher_utterances if u.section == "高校生に一言"] == ["「なぜ」を大事に。"]
+
+
+def test_teacher_name_is_masked_and_reading_row_is_dropped(teacher_utterances):
+    text = dump(teacher_utterances)
+    assert "海野" not in text and "一郎" not in text and "うみの" not in text
+
+
+def test_interview_articles_keep_their_note(utterances):
+    assert {u.note for u in utterances if u.voice == VOICE_ARTICLE} == {"取材記事（本人確認済み）"}
+    assert {u.note for u in utterances if u.voice == VOICE_SPOKEN} == {""}
 
 
 def test_address_constant_is_really_in_the_fixture():

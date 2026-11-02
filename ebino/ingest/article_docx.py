@@ -20,8 +20,10 @@ from .seats import Seat
 from .utterance import (
     IngestError,
     Utterance,
+    TEACHER_ARTICLE_NOTE,
     VOICE_ARTICLE,
     VOICE_COMPANY,
+    VOICE_OWN,
     VOICE_SENIOR,
     VOICE_SPOKEN,
     assert_clean,
@@ -49,6 +51,8 @@ USED_ROWS = {
     "13": "会社PR",
     "14": "先輩社員からのメッセージ",
 }
+# Its docx files are the teacher's own article; its PDFs are a visitor's slides.
+KIND_TEACHER_ARTICLE = "outsider_teacher"
 ROW_VOICES = {
     "11": VOICE_SPOKEN,
     "12": VOICE_COMPANY,
@@ -140,13 +144,18 @@ def ingest_article_rows(
         ),
         seat_pairs=tuple(masks.pairs(seat)),
     )
+    # The teacher wrote the article themself: every row is their own words, not
+    # split at 「」, and shown as the teacher's article (SPEC 14-50).
+    own = seat.kind == KIND_TEACHER_ARTICLE
     utterances: list[Utterance] = []
     for key, section in USED_ROWS.items():
         for raw in parsed.rows.get(key, []):
             paragraph = dedupe_sentences(scrub(raw)).strip()
             if not paragraph:
                 continue
-            if key == ROW_BODY:
+            if own:
+                pieces = [(VOICE_OWN, paragraph)]
+            elif key == ROW_BODY:
                 pieces = split_voice(paragraph)
             else:
                 pieces = [(ROW_VOICES.get(key, VOICE_ARTICLE), paragraph)]
@@ -160,6 +169,7 @@ def ingest_article_rows(
                         voice=voice,
                         text=text,
                         paragraph=paragraph,
+                        source_note=TEACHER_ARTICLE_NOTE if own else "",
                     )
                 )
     utterances = unique_by_id(utterances)

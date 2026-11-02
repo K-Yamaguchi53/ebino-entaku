@@ -19,6 +19,8 @@ SOURCE_NOTES = {
     VOICE_COMPANY: "会社の紹介文（本人確認済み）",
     VOICE_SENIOR: "先輩社員の言葉（本人確認済み）",
 }
+# The teacher's own article (SPEC 14-50): own words, but shown as an article.
+TEACHER_ARTICLE_NOTE = "先生が書いた記事"
 
 _SENTENCE = re.compile(r"[^。！？!?]+[。！？!?]*")
 _QUOTE = re.compile(r"「([^「」]*)」")
@@ -52,9 +54,15 @@ class Utterance:
     text: str
     paragraph: str
     heading: str = ""  # Posters: the heading's own words, e.g. 研究仮説.
+    source_note: str = ""  # Set when the note depends on more than the voice.
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    @property
+    def note(self) -> str:
+        """What to show with the source; "" for spoken and own words."""
+        return self.source_note or SOURCE_NOTES.get(self.voice, "")
 
 
 def dedupe_sentences(text: str) -> str:

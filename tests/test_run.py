@@ -26,7 +26,9 @@ def test_output_has_no_source_file_or_company_field(tmp_path):
     run(setup_data(tmp_path, [make_seat()]))
     rows = json.loads((tmp_path / "ingested" / "utterances.json").read_text(encoding="utf-8"))
     assert rows
-    assert set(rows[0]) == {"id", "seat_id", "kind", "section", "voice", "text", "paragraph", "heading"}
+    assert set(rows[0]) == {
+        "id", "seat_id", "kind", "section", "voice", "text", "paragraph", "heading", "source_note",
+    }
     assert "2026" not in json.dumps(rows)  # The year is never carried (SPEC 14-34).
     assert "article01" not in json.dumps(rows, ensure_ascii=False)
 
