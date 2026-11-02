@@ -246,21 +246,38 @@ def split_sections(fragments: list[Fragment]) -> list[Section]:
     headings = [(f, h) for f, h in headings if f.top >= cutoff]
     heading_ids = {id(f) for f, h in found if h}
 
-    collected: dict[int, list[Fragment]] = {id(f): [] for f, _ in headings}
-    for fragment in fragments:
-        if id(fragment) in heading_ids or fragment.top < cutoff:
-            continue
-        # The owner is the nearest heading above, in this fragment's column.
+    def owner_of(x0: float, top: float) -> Fragment | None:
+        # The owner is the nearest heading above, in this column.
         # Two headings on one line: the one further right owns its column.
         above = [
             (head.top, head.x0, index)
             for index, (head, _) in enumerate(headings)
-            if head.top <= fragment.top + _Y_TOLERANCE
-            and head.x0 <= fragment.x0 + _X_TOLERANCE
+            if head.top <= top + _Y_TOLERANCE and head.x0 <= x0 + _X_TOLERANCE
         ]
-        if above:
-            owner = headings[max(above)[2]][0]
-            collected[id(owner)].append(fragment)
+        return headings[max(above)[2]][0] if above else None
+
+    def cut_at_columns(fragment: Fragment) -> list[Fragment]:
+        """Body lines of two columns can come out as one fragment, joined by
+        spaces. Cut where the text after a space belongs to another heading's
+        column, so the right column's body stays under its own heading."""
+        if len(fragment.char_x0) != len(fragment.text):
+            return [fragment]
+        left_owner = owner_of(fragment.x0, fragment.top)
+        for gap in _GAP.finditer(fragment.text):
+            if gap.start() == 0 or gap.end() >= len(fragment.text):
+                continue
+            if owner_of(fragment.x_at(gap.end()), fragment.top) is not left_owner:
+                return [fragment.cut(0, gap.start()), *cut_at_columns(fragment.cut(gap.end()))]
+        return [fragment]
+
+    collected: dict[int, list[Fragment]] = {id(f): [] for f, _ in headings}
+    for whole in fragments:
+        if id(whole) in heading_ids or whole.top < cutoff:
+            continue
+        for fragment in cut_at_columns(whole):
+            owner = owner_of(fragment.x0, fragment.top)
+            if owner is not None:
+                collected[id(owner)].append(fragment)
 
     sections: list[Section] = []
     for head, heading in headings:

@@ -532,6 +532,50 @@ def test_body_under_a_topmost_theme_reason_without_settei_survives(poster_seat):
     assert [u.heading for u in examples] == ["探究テーマの理由"]
 
 
+GUTTER = "　" * 8
+
+
+def write_two_column_theme_poster(path):
+    """Two theme headings side by side, and their bodies, each read as one line."""
+    return write_text_pdf(
+        path,
+        [
+            (380, 800, STUDENT),
+            (50, 740, f"探究テーマ設定理由①{GUTTER}探究テーマ設定理由②"),
+            (50, 720, f"公園の遊具が古い。{GUTTER}　町に子どもが多い。"),
+            (50, 700, "去年から気になった。"),
+            (290, 700, "遊ぶ場所が少ない。"),
+            (50, 660, "スポーツイベントの開催による効果、研究仮説"),
+            (50, 640, "大会を開けば人が集まる。"),
+            (50, 600, "結果"),
+            (50, 580, "人が 二倍に 増えた。 町の 人も 喜んだ。 次も 開きたい。"),
+        ],
+    )
+
+
+def test_two_column_theme_reasons_keep_both_bodies_and_the_hypothesis(tmp_path, poster_seat):
+    utterances = ingest_poster(write_two_column_theme_poster(tmp_path / "poster01.pdf"), poster_seat)
+    assert [(u.section, u.heading, u.text) for u in utterances] == [
+        ("背景と課題", "探究テーマ設定理由", "公園の遊具が古い。去年から気になった。"),
+        ("背景と課題", "探究テーマ設定理由", "町に子どもが多い。遊ぶ場所が少ない。"),
+        ("目的", "スポーツイベントの開催による効果、研究仮説", "大会を開けば人が集まる。"),
+        ("結果", "結果", "人が 二倍に 増えた。 町の 人も 喜んだ。 次も 開きたい。"),
+    ]
+    examples = purpose_examples(utterances)
+    assert [u.heading for u in examples] == ["スポーツイベントの開催による効果、研究仮説"]
+
+
+def test_a_full_width_line_below_two_columns_is_not_cut():
+    text, xs = char_positions(("左の見出しの下の行 右まで 続く 長い 本文", 50))
+    fragments = [
+        Fragment("目的", 50, 60),
+        Fragment("結果", 300, 60),
+        Fragment("結論", 50, 100),
+        Fragment(text, 50, 120, xs),
+    ]
+    assert by_name(fragments)["結論と展望"] == text
+
+
 def write_poster(path, pages=1):
     pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
     pdf = canvas.Canvas(str(path), pagesize=A4)
