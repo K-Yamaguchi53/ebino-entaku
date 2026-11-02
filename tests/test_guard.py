@@ -5,11 +5,13 @@ import pytest
 from ebino.guard import (
     STOP_EMPTY,
     STOP_NOT_IN_SOURCE,
+    STOP_NOT_SENTENCE_BOUNDED,
     STOP_UNKNOWN_UTTERANCE,
     Guard,
     Quote,
     check,
     plant_fake,
+    sentences,
 )
 from ebino.ingest.utterance import (
     VOICE_ANSWER,
@@ -39,14 +41,81 @@ def piece(id_, text, voice=VOICE_OWN, paragraph=None):
     [
         SOURCE,
         "休みの日は、朝から川で釣りをします。",
-        "夕方には店に戻って",
-        "川で釣り",
+        "休みの日は、朝から川で釣りをします",  # The end mark may be left out.
+        "夕方には店に戻って、明日の仕込みをします。",
     ],
 )
-def test_a_part_of_the_source_passes_and_shows_the_source(quote):
+def test_whole_sentences_of_the_source_pass_and_show_the_source(quote):
     verdict = check(quote, SOURCE)
     assert verdict.passed
     assert verdict.shown == quote
+
+
+# --- SPEC 14-51: a quote starts and ends at a sentence break ---------------------
+
+
+@pytest.mark.parametrize(
+    "quote, source",
+    [
+        ("辞めたい", "辞めたいと思ったことはない。"),
+        ("思ったことはない。", "辞めたいと思ったことはない。"),
+        ("好き。夜は", "朝が好き。夜は苦手。"),
+        ("が好き。", "朝が好き。夜は苦手。"),
+        ("夕方には店に戻って", SOURCE),
+        ("川で釣りをします。", SOURCE),
+        ("調べた", "朝市の客を\n調べた結果"),
+    ],
+)
+def test_a_quote_cut_inside_a_sentence_is_stopped(quote, source):
+    verdict = check(quote, source)
+    assert verdict.reason == STOP_NOT_SENTENCE_BOUNDED
+    assert verdict.shown == ""
+
+
+@pytest.mark.parametrize(
+    "quote, source",
+    [
+        ("朝が好き", "朝が好き。夜は苦手。"),
+        ("夜は苦手。", "朝が好き。夜は苦手。"),
+        ("朝が好き。夜は苦手。", "朝が好き。夜は苦手。"),
+        ("夜は苦手", "朝が好き！ 夜は苦手？"),
+        ("本当", "本当!?それは知らなかった。"),
+        ("それは知らなかった", "本当!?それは知らなかった。"),
+    ],
+)
+def test_a_quote_from_break_to_break_passes(quote, source):
+    assert check(quote, source).passed
+
+
+SLIDE = "朝市に人が集まらない理由\n店の数が少ない\n  開く時間が早すぎる"
+
+
+@pytest.mark.parametrize("line", ["朝市に人が集まらない理由", "店の数が少ない", "開く時間が早すぎる"])
+def test_slide_lines_split_by_line_breaks_pass_one_by_one(line):
+    verdict = check(line, SLIDE)
+    assert verdict.passed
+    assert verdict.shown == line
+
+
+def test_lines_across_a_break_pass_and_keep_the_break_on_screen():
+    verdict = check("店の数が少ない開く時間が早すぎる", SLIDE)
+    assert verdict.passed
+    assert verdict.shown == "店の数が少ない\n  開く時間が早すぎる"
+
+
+def test_a_later_bounded_occurrence_is_found():
+    # The first 「好き」 is inside a sentence; the second is a sentence of its own.
+    verdict = check("好き", "朝が好きだ。好き")
+    assert verdict.passed
+
+
+def test_sentences_cut_where_quotes_may_start_and_end():
+    assert sentences("朝が好き。夜は苦手！\n 店の数\n本当!?うん") == [
+        "朝が好き。", "夜は苦手！", "店の数", "本当!?", "うん",
+    ]
+    assert sentences("　\n。") == ["。"]
+    for sentence in sentences(SOURCE + "\n" + SLIDE):
+        assert check(sentence, SOURCE + "\n" + SLIDE).passed
 
 
 def test_width_spaces_and_line_breaks_are_made_alike_and_the_original_is_shown():
@@ -123,14 +192,16 @@ def test_the_guard_shows_only_quotes_its_pieces_hold_and_counts_them():
     pieces = [piece("a-1", SOURCE), piece("a-2", "店は朝七時に開けます。")]
     guard = Guard(pieces)
     verdicts = guard.screen([
-        Quote("a-1", "川で釣りをします。"),
+        Quote("a-1", "休みの日は、朝から川で釣りをします。"),
         Quote("a-2", "店は朝七時に開けます。"),
         Quote("a-2", "店は朝八時に開けます。"),
         Quote("a-9", "店は朝七時に開けます。"),
     ])
     assert [v.passed for v in verdicts] == [True, True, False, False]
     assert [v.reason for v in verdicts[2:]] == [STOP_NOT_IN_SOURCE, STOP_UNKNOWN_UTTERANCE]
-    assert [v.shown for v in guard.shown([Quote("a-1", "川で釣り")])] == ["川で釣り"]
+    assert [v.shown for v in guard.shown([Quote("a-1", "夕方には店に戻って、明日の仕込みをします")])] == [
+        "夕方には店に戻って、明日の仕込みをします"
+    ]
     tally = guard.tally
     assert (tally.passed, tally.stopped) == (3, 2)
     assert tally.stopped_ids == ["a-2", "a-9"]
@@ -171,7 +242,7 @@ def test_answers_are_checked_but_counted_apart():
     answer = piece("ans-1", "人と話すのが好きで、この仕事を選びました。", VOICE_ANSWER)
     guard = Guard([piece("a-1", SOURCE), answer])
     verdicts = guard.screen([
-        Quote("a-1", "川で釣りをします。"),
+        Quote("a-1", "休みの日は、朝から川で釣りをします。"),
         Quote("ans-1", "人と話すのが好きで、この仕事を選びました。"),
         Quote("ans-1", "お金のために、この仕事を選びました。"),
     ])
@@ -187,7 +258,7 @@ def test_answers_are_checked_but_counted_apart():
 def test_a_planted_fake_is_stopped_by_the_real_guard_and_kept_out_of_the_counts():
     guard = Guard([piece("a-1", SOURCE), piece("a-2", "店は朝七時に開けます。")])
     quotes = plant_fake(
-        [Quote("a-1", "川で釣りをします。"), Quote("a-2", "店は朝七時に開けます。")],
+        [Quote("a-1", "休みの日は、朝から川で釣りをします。"), Quote("a-2", "店は朝七時に開けます。")],
         load_text(PLANTED_FAKE_QUOTE),
     )
     assert [q.planted for q in quotes] == [False, True, False]

@@ -46,6 +46,7 @@ def test_clean_pieces_all_pass(tmp_path, monkeypatch, capsys):
     assert "guard passed / stopped: 4 / 0" in out.out
     assert "answers returned during the event, passed / stopped (counted apart): 1 / 0" in out.out
     assert "shown text differs from the piece: 0" in out.out
+    assert "sentences one by one, passed / stopped: 7 / 0" in out.out
 
 
 def test_a_piece_not_in_its_paragraph_is_counted_by_id(tmp_path, monkeypatch, capsys):

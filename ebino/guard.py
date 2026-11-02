@@ -3,8 +3,10 @@
 Plain code, never a model (SPEC 6). Both sides are made alike the same way,
 NFKC with every space and line break removed (SPEC 14-15, the same
 normalize_for_match the ingest uses), and the quote passes only when it is a
-part of its source. What the screen shows is the source's own text for that
-part, as it was before normalizing, never the words the model wrote.
+part of its source that starts and ends at a sentence break: the head or end
+of the piece, a line break, or 。！？!? (SPEC 14-51). What the screen shows is the
+source's own text for that part, as it was before normalizing, never the
+words the model wrote.
 
 The source is the piece the quote names by its ID (Utterance.text): the words
 said inside 「」, the article text around them, or a poster or slide section.
@@ -23,12 +25,20 @@ from .ingest.utterance import VOICE_ANSWER, Utterance
 
 STOP_EMPTY = "empty_quote"
 STOP_NOT_IN_SOURCE = "not_in_source"
+# In the source, but starting or ending inside a sentence (SPEC 14-51): 「辞めたい」
+# cut from 〈辞めたいと思ったことはない。〉 would make the person say the opposite.
+STOP_NOT_SENTENCE_BOUNDED = "not_sentence_bounded"
 STOP_UNKNOWN_UTTERANCE = "unknown_utterance"
 # The normalized source holds the quote, but no span of the original could be
 # pointed at. Not expected; stopping is the safe side.
 STOP_SPAN_NOT_FOUND = "span_not_found"
 
 _SPACE = re.compile(r"\s+")
+# Sentence ends, after NFKC: ！？ become !? and ｡ becomes 。.
+_SENTENCE_END = "。!?"
+_LINE_BREAK = re.compile(r"[\r\n  ]")
+# One sentence: up to and with its end marks, or up to a line break.
+_SENTENCE = re.compile(r"[^。！？!?｡\r\n  ]*[。！？!?｡]+|[^。！？!?｡\r\n  ]+")
 
 
 @dataclass(frozen=True)
@@ -81,7 +91,15 @@ def check(quote: str, source: str) -> Verdict:
     return Verdict(Quote("", quote), *verdict)
 
 
-def _check(quote: str, source: str) -> tuple[str, str]:
+def contains(part: str, source: str) -> Verdict:
+    """Only whether `source` holds `part`, sentence breaks aside.
+
+    Not for quotes: the batch check uses it to see that each piece lies inside
+    its paragraph, where words said start and end at 「」, not at 。."""
+    return Verdict(Quote("", part), *_check(part, source, whole_sentences=False))
+
+
+def _check(quote: str, source: str, whole_sentences: bool = True) -> tuple[str, str]:
     needle = normalize_for_match(quote)
     if not needle:
         return "", STOP_EMPTY
@@ -91,7 +109,43 @@ def _check(quote: str, source: str) -> tuple[str, str]:
     at = normal.find(needle)
     if at < 0:
         return "", STOP_SPAN_NOT_FOUND
-    return source[spans[at][0] : spans[at + len(needle) - 1][1]], ""
+    while at >= 0:
+        end = at + len(needle)
+        if not whole_sentences or _starts_sentence(normal, spans, source, at) and _ends_sentence(normal, spans, source, end):
+            return source[spans[at][0] : spans[end - 1][1]], ""
+        at = normal.find(needle, at + 1)
+    return "", STOP_NOT_SENTENCE_BOUNDED
+
+
+def _break_between(spans: list[tuple[int, int]], source: str, index: int) -> bool:
+    """Whether the original has a line break between normalized chars index-1 and index.
+    Line breaks vanish when normalizing, so they are looked up in the original."""
+    return bool(_LINE_BREAK.search(source, spans[index - 1][1], spans[index][0]))
+
+
+def _starts_sentence(normal: str, spans, source: str, index: int) -> bool:
+    """The piece's head, right after 。！？!?, or right after a line break."""
+    return (
+        index == 0
+        or normal[index - 1] in _SENTENCE_END
+        or _break_between(spans, source, index)
+    )
+
+
+def _ends_sentence(normal: str, spans, source: str, end: int) -> bool:
+    """The piece's end, a line break, or just before or after 。！？!? (the quote may
+    leave the mark out)."""
+    return (
+        end == len(normal)
+        or normal[end] in _SENTENCE_END
+        or normal[end - 1] in _SENTENCE_END
+        or _break_between(spans, source, end)
+    )
+
+
+def sentences(text: str) -> list[str]:
+    """The sentences of a piece, cut where the guard lets a quote start and end."""
+    return [s.strip() for s in _SENTENCE.findall(text) if normalize_for_match(s)]
 
 
 @dataclass
