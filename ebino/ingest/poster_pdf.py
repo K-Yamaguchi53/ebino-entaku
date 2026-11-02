@@ -9,7 +9,9 @@ words. Each heading maps to one of five roles; a heading that maps to none
 keeps its own words as a separate section instead of being thrown away.
 """
 
+import math
 import re
+import statistics
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
@@ -102,16 +104,30 @@ class Fragment:
     x0: float
     top: float
     char_x0: tuple[float, ...] = ()  # Left edge of each character, when known.
+    x1: float | None = None  # Right edge, when known.
+
+    def _has_chars(self) -> bool:
+        return bool(self.text) and len(self.char_x0) == len(self.text)
 
     def x_at(self, index: int) -> float:
-        if len(self.char_x0) == len(self.text):
-            return self.char_x0[index]
-        return self.x0
+        return self.char_x0[index] if self._has_chars() else self.x0
+
+    @property
+    def right(self) -> float:
+        """The right edge, or the best guess at it (a fragment of unknown width
+        counts as a point at its x0)."""
+        if self.x1 is not None:
+            return self.x1
+        return self.char_x0[-1] if self._has_chars() else self.x0
 
     def cut(self, start: int, end: int | None = None) -> "Fragment":
         end = len(self.text) if end is None else end
-        chars = self.char_x0[start:end] if len(self.char_x0) == len(self.text) else ()
-        return Fragment(self.text[start:end], self.x_at(start), self.top, chars)
+        chars = self.char_x0[start:end] if self._has_chars() else ()
+        if end == len(self.text):
+            x1 = self.x1
+        else:
+            x1 = self.char_x0[end] if self._has_chars() else None
+        return Fragment(self.text[start:end], self.x_at(start), self.top, chars, x1)
 
 
 @dataclass(frozen=True)
@@ -235,56 +251,162 @@ def split_fragment(fragment: Fragment) -> list[Fragment]:
     return [fragment]
 
 
-def split_sections(fragments: list[Fragment]) -> list[Section]:
-    fragments = [piece for fragment in fragments for piece in split_fragment(fragment)]
-    found = [(fragment, heading_of(fragment.text)) for fragment in fragments]
-    headings = [(f, h) for f, h in found if h]
-    known = [f.top for f, h in headings if h.role]
+@dataclass(frozen=True)
+class Placed:
+    """A body part and the heading it went to."""
+
+    piece: int  # Index into Layout.pieces.
+    fragment: Fragment
+    owner: int | None  # Index into Layout.headings; None means no heading took it.
+
+
+@dataclass(frozen=True)
+class Layout:
+    """How one poster page was read. Both the ingestion and the shape tool
+    (poster_shape) go through this, so what the tool shows is what was kept."""
+
+    pieces: tuple[Fragment, ...]  # Fragments after splitting heading lines.
+    source: tuple[int, ...]  # For each piece, the index of the fragment it came from.
+    found: tuple[Heading | None, ...]  # For each piece.
+    cutoff: float  # The name line: nothing above survives.
+    headings: tuple[int, ...]  # Pieces kept as headings, below the name line.
+    columns: tuple[tuple[float, float], ...]  # For each kept heading: [left, right).
+    placed: tuple[Placed, ...]
+
+
+def _overlaps(a: Fragment, b: Fragment) -> bool:
+    return a.x0 <= b.right and b.x0 <= a.right
+
+
+def _wide_gap_parts(fragment: Fragment) -> list[Fragment]:
+    """Cut at whitespace wider than two characters: two columns read as one line."""
+    if not fragment._has_chars() or len(fragment.text) < 2:
+        return [fragment]
+    steps = [b - a for a, b in zip(fragment.char_x0, fragment.char_x0[1:]) if b > a]
+    if not steps:
+        return [fragment]
+    step = statistics.median(steps)
+    for gap in _GAP.finditer(fragment.text):
+        if gap.start() == 0 or gap.end() >= len(fragment.text):
+            continue
+        if fragment.x_at(gap.end()) - fragment.x_at(gap.start()) > 2 * step:
+            return [fragment.cut(0, gap.start()), *_wide_gap_parts(fragment.cut(gap.end()))]
+    return [fragment]
+
+
+def _columns(heads: list[Fragment], bodies: list[Fragment]) -> list[tuple[float, float]]:
+    """Each heading's column, as [left, right).
+
+    A heading is often centred over its column or set in from it, so the body
+    starts left of the heading. The column's left edge is where
+    the body under the heading starts: the leftmost body line that reaches
+    under the heading's own text, below it and above the next heading that
+    does. Lines that also reach under another heading on the same row are no
+    evidence (they span both columns). With no such line, the column starts
+    at the heading. Headings on one row share it out: each column ends where
+    the next one to the right begins.
+    """
+    evidence = [part for body in bodies for part in _wide_gap_parts(body)]
+    lefts: list[float] = []
+    for head in heads:
+        row = [h for h in heads if h is not head and abs(h.top - head.top) <= _Y_TOLERANCE]
+        lower = [h.top for h in heads if h.top > head.top + _Y_TOLERANCE and _overlaps(h, head)]
+        bottom = min(lower, default=math.inf)
+        starts = [
+            line.x0
+            for line in evidence
+            if head.top - _Y_TOLERANCE <= line.top < bottom
+            and _overlaps(line, head)
+            and not any(_overlaps(line, other) for other in row)
+        ]
+        left = min([head.x0, *starts]) - _X_TOLERANCE
+        before = [h for h in row if h.x0 < head.x0]
+        if before:
+            left = max(left, max(h.right for h in before))
+        lefts.append(left)
+    columns = []
+    for index, head in enumerate(heads):
+        after = [
+            lefts[other]
+            for other, h in enumerate(heads)
+            if abs(h.top - head.top) <= _Y_TOLERANCE and h.x0 > head.x0
+        ]
+        columns.append((lefts[index], min(after, default=math.inf)))
+    return columns
+
+
+def read_layout(fragments: list[Fragment]) -> Layout:
+    split = [(index, piece) for index, f in enumerate(fragments) for piece in split_fragment(f)]
+    pieces = [piece for _, piece in split]
+    found = [heading_of(piece.text) for piece in pieces]
+    known = [piece.top for piece, heading in zip(pieces, found) if heading and heading.role]
     if not known:
         raise IngestError("poster_heading_missing")
-    cutoff = min(known) - _Y_TOLERANCE  # The name line: nothing above survives.
-    headings = [(f, h) for f, h in headings if f.top >= cutoff]
-    heading_ids = {id(f) for f, h in found if h}
+    cutoff = min(known) - _Y_TOLERANCE
+    heads = [i for i, heading in enumerate(found) if heading and pieces[i].top >= cutoff]
+    bodies = [i for i, heading in enumerate(found) if not heading and pieces[i].top >= cutoff]
+    columns = _columns([pieces[i] for i in heads], [pieces[i] for i in bodies])
 
-    def owner_of(x0: float, top: float) -> Fragment | None:
-        # The owner is the nearest heading above, in this column.
-        # Two headings on one line: the one further right owns its column.
+    def owner_at(x: float, top: float) -> int | None:
+        # The nearest heading above whose column holds x.
         above = [
-            (head.top, head.x0, index)
-            for index, (head, _) in enumerate(headings)
-            if head.top <= top + _Y_TOLERANCE and head.x0 <= x0 + _X_TOLERANCE
+            (pieces[head].top, pieces[head].x0, index)
+            for index, head in enumerate(heads)
+            if pieces[head].top <= top + _Y_TOLERANCE
+            and columns[index][0] <= x < columns[index][1]
         ]
-        return headings[max(above)[2]][0] if above else None
+        return max(above)[2] if above else None
 
     def cut_at_columns(fragment: Fragment) -> list[Fragment]:
         """Body lines of two columns can come out as one fragment, joined by
         spaces. Cut where the text after a space belongs to another heading's
         column, so the right column's body stays under its own heading."""
-        if len(fragment.char_x0) != len(fragment.text):
+        if not fragment._has_chars():
             return [fragment]
-        left_owner = owner_of(fragment.x0, fragment.top)
+        left_owner = owner_at(fragment.x0, fragment.top)
         for gap in _GAP.finditer(fragment.text):
             if gap.start() == 0 or gap.end() >= len(fragment.text):
                 continue
-            if owner_of(fragment.x_at(gap.end()), fragment.top) is not left_owner:
+            if owner_at(fragment.x_at(gap.end()), fragment.top) != left_owner:
                 return [fragment.cut(0, gap.start()), *cut_at_columns(fragment.cut(gap.end()))]
         return [fragment]
 
-    collected: dict[int, list[Fragment]] = {id(f): [] for f, _ in headings}
-    for whole in fragments:
-        if id(whole) in heading_ids or whole.top < cutoff:
-            continue
-        for fragment in cut_at_columns(whole):
-            owner = owner_of(fragment.x0, fragment.top)
-            if owner is not None:
-                collected[id(owner)].append(fragment)
+    placed = [
+        Placed(i, part, owner_at(part.x0, part.top))
+        for i in bodies
+        for part in cut_at_columns(pieces[i])
+    ]
+    return Layout(
+        pieces=tuple(pieces),
+        source=tuple(index for index, _ in split),
+        found=tuple(found),
+        cutoff=cutoff,
+        headings=tuple(heads),
+        columns=tuple(columns),
+        placed=tuple(placed),
+    )
 
-    sections: list[Section] = []
-    for head, heading in headings:
-        parts = sorted(
-            collected[id(head)], key=lambda f: (round(f.top / _LINE_TOLERANCE), f.x0)
+
+def section_texts(layout: Layout) -> list[str]:
+    """For each kept heading, its body in reading order ("" when it got none)."""
+    collected: list[list[Fragment]] = [[] for _ in layout.headings]
+    for place in layout.placed:
+        if place.owner is not None:
+            collected[place.owner].append(place.fragment)
+    return [
+        "".join(
+            part.text.strip()
+            for part in sorted(parts, key=lambda f: (round(f.top / _LINE_TOLERANCE), f.x0))
         )
-        text = "".join(part.text.strip() for part in parts)
+        for parts in collected
+    ]
+
+
+def split_sections(fragments: list[Fragment]) -> list[Section]:
+    layout = read_layout(fragments)
+    sections: list[Section] = []
+    for head, text in zip(layout.headings, section_texts(layout)):
+        heading = layout.found[head]
         if text:
             sections.append(Section(heading.label, heading.role, text))
     return sections
@@ -331,7 +453,7 @@ def fragments_from_word(word: dict, stats: PdfTextStats | None = None) -> list[F
     chars = list(word.get("chars", ()))
     if not chars or "".join(c["text"] for c in chars) != word["text"]:
         text = fold_radicals(remove_controls(word["text"], stats))
-        return [Fragment(text, word["x0"], word["top"])] if text else []
+        return [Fragment(text, word["x0"], word["top"], (), word.get("x1"))] if text else []
     kept = []
     for char in chars:
         if is_control(char["text"]):
@@ -353,7 +475,7 @@ def fragments_from_word(word: dict, stats: PdfTextStats | None = None) -> list[F
             # right of its own column, or the body below loses its owner.
             xs[0] = word["x0"]
         text = fold_radicals("".join(c["text"] for c in group))
-        fragments.append(Fragment(text, xs[0], word["top"], tuple(xs)))
+        fragments.append(Fragment(text, xs[0], word["top"], tuple(xs), group[-1]["x1"]))
     return fragments
 
 

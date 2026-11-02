@@ -576,6 +576,82 @@ def test_a_full_width_line_below_two_columns_is_not_cut():
     assert by_name(fragments)["結論と展望"] == text
 
 
+# --- After 506fb3a: headings set in from their columns --------------------------
+
+
+def write_centred_heading_poster(path):
+    """Headings set in from their columns, and a hypothesis heading centred over
+    a full-width body. The body starts left of every heading above it."""
+    return write_text_pdf(
+        path,
+        [
+            (380, 820, STUDENT),
+            (64, 784, "探究テーマ設定理由①"),
+            (374, 784, "探究テーマ設定理由②"),
+            (24, 768, "公園の遊具が古いと聞いた。"),
+            (301, 768, "町に子どもが多いと聞いた。"),
+            (32, 756, "町"),
+            (198, 756, "広場も少ない。"),
+            (312, 756, "外"),
+            (462, 756, "遊ぶ所がない。"),
+            (159, 730, "スポーツイベントの開催による効果、研究仮説"),
+            (27, 714, "大会を開けば町の外から人が集まり、遊具を新しくする話も進む。"),
+            (27, 700, "公園に人が来れば、店も増える。"),
+            (16, 670, "調査活動"),
+            (16, 654, "三十人に聞いた。"),
+        ],
+    )
+
+
+def test_body_left_of_a_set_in_heading_stays_under_it(tmp_path, poster_seat):
+    utterances = ingest_poster(write_centred_heading_poster(tmp_path / "poster01.pdf"), poster_seat)
+    assert [(u.section, u.heading, u.text) for u in utterances] == [
+        ("背景と課題", "探究テーマ設定理由", "公園の遊具が古いと聞いた。町広場も少ない。"),
+        ("背景と課題", "探究テーマ設定理由", "町に子どもが多いと聞いた。外遊ぶ所がない。"),
+        (
+            "目的",
+            "スポーツイベントの開催による効果、研究仮説",
+            "大会を開けば町の外から人が集まり、遊具を新しくする話も進む。公園に人が来れば、店も増える。",
+        ),
+        ("手法", "調査活動", "三十人に聞いた。"),
+    ]
+    examples = purpose_examples(utterances)
+    assert [u.heading for u in examples] == ["スポーツイベントの開催による効果、研究仮説"]
+
+
+def test_a_right_column_heading_does_not_take_the_left_column():
+    # 「結論」 starts the right column further down. The left column's lines
+    # below it still belong to 「目的」.
+    left, left_xs = char_positions(("左の段の長い文。", 50))
+    fragments = [
+        Fragment(STUDENT, 50, 10),
+        Fragment("目的", 50, 60, char_positions(("目的", 50))[1]),
+        Fragment("結果", 300, 60, char_positions(("結果", 300))[1]),
+        Fragment("右の段の文。", 300, 80, char_positions(("右の段の文。", 300))[1]),
+        Fragment("結論", 300, 200, char_positions(("結論", 300))[1]),
+        Fragment(left, 50, 250, left_xs),
+        Fragment("右の段の次の文。", 300, 220, char_positions(("右の段の次の文。", 300))[1]),
+    ]
+    assert by_name(fragments) == {
+        "目的": left,
+        "結果": "右の段の文。",
+        "結論と展望": "右の段の次の文。",
+    }
+
+
+def test_two_columns_read_as_one_line_are_no_evidence_for_a_lone_heading():
+    # Below 「結論」 (right column only), the two columns come out as one line.
+    # That line reaches under 「結論」 but must not pull the column left.
+    merged, merged_xs = char_positions(("左の文。", 50), ("　" * 12, 98), ("右の文。", 300))
+    fragments = [
+        Fragment("目的", 50, 60, char_positions(("目的", 50))[1]),
+        Fragment("左の段の文。", 50, 80, char_positions(("左の段の文。", 50))[1]),
+        Fragment("結論", 300, 200, char_positions(("結論", 300))[1]),
+        Fragment(merged, 50, 220, merged_xs),
+    ]
+    assert by_name(fragments) == {"目的": "左の段の文。左の文。", "結論と展望": "右の文。"}
+
+
 def write_poster(path, pages=1):
     pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
     pdf = canvas.Canvas(str(path), pagesize=A4)
