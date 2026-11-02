@@ -20,6 +20,7 @@ from ebino.ingest.poster_pdf import (
     split_sections,
 )
 from ebino.ingest.utterance import IngestError, VOICE_OWN
+from pdf_text import write_text_pdf
 
 STUDENT = "川辺 三郎"
 
@@ -395,6 +396,109 @@ def test_real_pdf_splits_headings_by_character_position(tmp_path, poster_seat):
         ("目的", "目標", "小学校で困らないようにする。"),
     ]
     assert "川辺" not in "".join(u.text for u in utterances)
+
+
+# --- SPEC 14-48: the third real-data run ---------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text, label, role",
+    [
+        ("１ なぜ公園の遊具は古いのか（探究テーマ設定理由）", "探究テーマ設定理由", "背景と課題"),
+        ("2. 店が減ったのはなぜか（研究仮説）", "研究仮説", "目的"),
+        ("1. 背景と課題 (Background and Issues)", "背景と課題", "背景と課題"),
+        ("5. 結論と展望 (Conclusion and Outlook)", "結論と展望", "結論と展望"),
+        ("１ なぜこのようなテーマにしたのか？", "なぜこのようなテーマにしたのか?", "背景と課題"),
+        ("1.なぜ手話？", "なぜ手話?", "背景と課題"),
+        ("２．なぜこのテーマにしたのか", "なぜこのテーマにしたのか", "背景と課題"),
+        ("2.研究仮設", "研究仮設", "目的"),
+        ("探究仮設", "探究仮設", "目的"),
+    ],
+)
+def test_third_run_heading_shapes(text, label, role):
+    assert heading_of(text) == Heading(label, role)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "なぜこのテーマにしたのか",  # A question without a number is body text.
+        "なぜ手話？",
+        "2. なぜ店が減ったのかを町の人に聞いて回った",  # Not a question: no か or ？ at the end.
+        "町の人に聞いた（結果）",  # Brackets without a number.
+    ],
+)
+def test_third_run_body_lines_are_not_headings(text):
+    assert heading_of(text) is None
+
+
+@pytest.mark.parametrize("text", ["1. なぜなら町に店がないからだ", "3. 町の人に聞いた（地域の人）"])
+def test_numbered_lines_outside_the_new_shapes_get_no_role(text):
+    # A short numbered line is still a heading of its own (SPEC 14-42), but neither
+    # 「なぜなら」 nor a bracket word outside the heading list gives it a role.
+    assert heading_of(text).role is None
+
+
+def test_question_and_hypothesis_on_one_line_become_two_columns():
+    text, xs = char_positions(("１．なぜこのテーマにしたのか", 50), (" ", 218), ("２．研究仮説", 300))
+    fragments = [
+        Fragment(STUDENT, 50, 10),
+        Fragment(text, 50, 60, xs),
+        Fragment("左の段の文。", 50, 80),
+        Fragment("右の段の文。", 300, 80),
+    ]
+    sections = [(s.label, s.role, s.text) for s in split_sections(fragments)]
+    assert sections == [
+        ("なぜこのテーマにしたのか", "背景と課題", "左の段の文。"),
+        ("研究仮説", "目的", "右の段の文。"),
+    ]
+
+
+def test_english_gloss_heading_is_not_split():
+    fragment = Fragment("1. 背景と課題 (Background and Issues)", 50, 60)
+    assert split_fragment(fragment) == [fragment]
+
+
+def test_why_question_is_the_third_purpose_source(poster_seat):
+    fragments = lines("1. なぜ手話？", "町に手話の分かる人が少ない。", "2. 調査活動", "十人に聞いた。")
+    examples = purpose_examples(ingest_poster_fragments(fragments, poster_seat))
+    assert [(u.section, u.heading) for u in examples] == [("背景と課題", "なぜ手話?")]
+
+
+def test_misspelled_hypothesis_is_a_hypothesis(poster_seat):
+    fragments = lines("1. なぜ手話？", "少ない。", "2.研究仮設", "教室を開けば広まる。")
+    examples = purpose_examples(ingest_poster_fragments(fragments, poster_seat))
+    assert [(u.section, u.heading) for u in examples] == [("目的", "研究仮設")]
+
+
+def write_third_run_poster(path):
+    """Topmost heading in a form that used to map to no role (SPEC 14-48)."""
+    return write_text_pdf(
+        path,
+        [
+            (50, 800, "【架空の町の手話を広める】"),
+            (380, 800, STUDENT),
+            (50, 740, "１．なぜこのテーマにしたのか ２．研究仮設"),
+            (50, 720, "町に手話の分かる人が少ない。"),
+            (290, 720, "教室を開けば広まる。"),
+            (50, 680, "3. 背景と課題 (Background and Issues)"),
+            (50, 660, "聞こえない人が町に住んでいる。"),
+            (50, 620, "４ なぜ教室なのか（探究テーマ設定理由）"),
+            (50, 600, "人が集まる場所だから。"),
+        ],
+    )
+
+
+def test_real_pdf_keeps_the_body_under_the_topmost_question(tmp_path, poster_seat):
+    utterances = ingest_poster(write_third_run_poster(tmp_path / "poster01.pdf"), poster_seat)
+    assert [(u.section, u.heading, u.text) for u in utterances] == [
+        ("背景と課題", "なぜこのテーマにしたのか", "町に手話の分かる人が少ない。"),
+        ("目的", "研究仮設", "教室を開けば広まる。"),
+        ("背景と課題", "背景と課題", "聞こえない人が町に住んでいる。"),
+        ("背景と課題", "探究テーマ設定理由", "人が集まる場所だから。"),
+    ]
+    everything = "".join(u.text + u.heading for u in utterances)
+    assert "川辺" not in everything and "手話を広める" not in everything
 
 
 def write_poster(path, pages=1):

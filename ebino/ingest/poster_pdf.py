@@ -36,7 +36,7 @@ ROLES = (ROLE_BACKGROUND, ROLE_PURPOSE, ROLE_METHOD, ROLE_RESULT, ROLE_OUTLOOK)
 # 成果と反省 → 結果, 成果と今後の展望 → 結論と展望, 実践後の課題 → 結論と展望,
 # 企画実践前の課題 → 背景と課題 (SPEC 14-44).
 _ROLE_KEYWORDS = (
-    (ROLE_PURPOSE, ("目的", "仮説", "目標")),
+    (ROLE_PURPOSE, ("目的", "仮説", "仮設", "目標")),  # 研究仮設: a real misspelling
     (
         ROLE_BACKGROUND,
         ("背景", "経緯", "テーマ設定", "設定理由", "初めに", "はじめに", "動機", "きっかけ", "前の課題"),
@@ -63,17 +63,21 @@ KNOWN_HEADINGS = frozenset(
         "テーマ設定", "テーマ設定理由", "テーマ設定の理由", "探究テーマ設定理由",
         "探究テーマ設定の理由", "はじめに", "初めに", "動機", "きっかけ", "目標",
         "企画実践前の課題", "実習活動",
+        # SPEC 14-48
+        "研究仮設", "探究仮設",
     }
 )
 _MAX_HEADING_CHARS = 16
 # 「スポーツイベントの開催による効果、研究仮説」: longer, but ends in a purpose word.
 # The upper bound keeps a wrapped body line from turning into a heading.
 _MAX_LONG_HEADING_CHARS = 30
-_LONG_HEADING_ENDINGS = ("研究仮説", "探究仮説", "目的")
+_LONG_HEADING_ENDINGS = ("研究仮説", "探究仮説", "研究仮設", "探究仮設", "目的")
 _NUMBER = re.compile(r"^(\d{1,2})(?!\d)([\s.,、:)）]*)")
 _TRAILING_NUMBER = re.compile(r"\d{1,2}$")  # 「探究テーマ設定理由①」 (① is 1 after NFKC)
 _GAP = re.compile(r"\s+")
 _THEME_REASON = re.compile(r"テーマ設定|設定理由")
+# 「１ なぜ○○なのか（探究テーマ設定理由）」: the role word is in the closing brackets.
+_WORD_IN_CLOSING_BRACKETS = re.compile(r"^.+\(([^()]+)\)$")
 _OPEN = "<〈《【[◎■●◆◇□▶▼★☆"
 _CLOSE = ">〉》】]"
 _OPENING = re.compile(rf"^[{re.escape(_OPEN)}\s]+")
@@ -135,8 +139,19 @@ def _starts_like_heading(label: str) -> bool:
     return label in KNOWN_HEADINGS or any(label.startswith(k) for k in keywords)
 
 
+def is_why_question(label: str) -> bool:
+    """「なぜこのテーマにしたのか？」「なぜ手話？」 — not 「なぜなら」."""
+    return (
+        label.startswith("なぜ")
+        and not label.startswith("なぜなら")
+        and label.endswith(("?", "か"))
+    )
+
+
 def heading_of(text: str) -> Heading | None:
     line = unicodedata.normalize("NFKC", text).strip()
+    # 「1. 背景と課題 (Background and Issues)」: the gloss does not count toward length.
+    line = _ENGLISH_GLOSS.sub("", line)
     length = len(re.sub(r"\s+", "", line))
     if not line or length > _MAX_LONG_HEADING_CHARS:
         return None
@@ -149,12 +164,21 @@ def heading_of(text: str) -> Heading | None:
     if bracketed and rest[:1].isdigit():
         # 「◎10:30〜スタート」「◆1:0.5:2」 are times and ratios, not headings.
         return None
-    rest = _ENGLISH_GLOSS.sub("", rest)
     rest = _CLOSING.sub("", rest)
     label = re.sub(r"\s+", "", rest)
     label = _TRAILING_NUMBER.sub("", label) or label
     if not label or "。" in label:
         return None
+    if number:
+        # Only numbered lines, so a 「なぜ」 or a bracket inside body text stays body.
+        inner = _WORD_IN_CLOSING_BRACKETS.match(label)
+        if inner:
+            word = _TRAILING_NUMBER.sub("", inner.group(1)) or inner.group(1)
+            if word in KNOWN_HEADINGS:
+                return Heading(word, role_of(word))
+        if is_why_question(label):
+            # Treated like テーマ設定の理由 (SPEC 14-48).
+            return Heading(label, ROLE_BACKGROUND)
     role = role_of(label)
     if length > _MAX_HEADING_CHARS:
         return Heading(label, role) if label.endswith(_LONG_HEADING_ENDINGS) else None
@@ -166,20 +190,42 @@ def heading_of(text: str) -> Heading | None:
     return Heading(label, role)
 
 
+def _can_start_a_split(heading: Heading | None) -> bool:
+    return heading is not None and (
+        heading.label in KNOWN_HEADINGS or is_why_question(heading.label)
+    )
+
+
+def _starts_with_number_or_bracket(text: str) -> bool:
+    line = unicodedata.normalize("NFKC", text).lstrip()
+    return bool(_NUMBER.match(line) or _OPENING.match(line))
+
+
 def split_fragment(fragment: Fragment) -> list[Fragment]:
-    """Split a line that holds a heading and more (SPEC 14-44).
+    """Split a line that holds a heading and more (SPEC 14-44, 14-48).
 
     「背景　自由な園児が…」 → heading 「背景」 + body. 「探究テーマ設定理由①　探究テーマ
-    設定理由②」 (two columns read as one line) → two headings. Only a heading word
-    from KNOWN_HEADINGS followed by a space starts a split.
+    設定理由②」 and 「１．なぜこのテーマにしたのか ２．研究仮説」 (two columns read as
+    one line) → two headings. Only a heading word from KNOWN_HEADINGS, or a
+    numbered 「なぜ」 question, followed by a space starts a split.
     """
-    if heading_of(fragment.text):
+    text = fragment.text
+    gaps = [gap for gap in _GAP.finditer(text) if gap.start() > 0 and gap.end() < len(text)]
+    # Two numbered headings first: the whole line could otherwise pass as one long
+    # heading ending in 研究仮説.
+    for gap in gaps:
+        rest = fragment.cut(gap.end())
+        if _can_start_a_split(heading_of(text[: gap.start()])) and _starts_with_number_or_bracket(
+            rest.text
+        ):
+            pieces = split_fragment(rest)
+            if heading_of(pieces[0].text):
+                return [fragment.cut(0, gap.start()), *pieces]
+    if heading_of(text):
         return [fragment]
-    for gap in _GAP.finditer(fragment.text):
-        heading = heading_of(fragment.text[: gap.start()])
-        if heading and heading.label in KNOWN_HEADINGS and gap.end() < len(fragment.text):
-            head = fragment.cut(0, gap.start())
-            return [head, *split_fragment(fragment.cut(gap.end()))]
+    for gap in gaps:
+        if _can_start_a_split(heading_of(text[: gap.start()])):
+            return [fragment.cut(0, gap.start()), *split_fragment(fragment.cut(gap.end()))]
     return [fragment]
 
 
@@ -223,7 +269,7 @@ def split_sections(fragments: list[Fragment]) -> list[Section]:
 
 PURPOSE_FROM_PURPOSE = 0  # 目的・目標
 PURPOSE_FROM_HYPOTHESIS = 1  # 研究仮説・探究仮説・経緯・目的
-PURPOSE_FROM_THEME_REASON = 2  # テーマ設定の理由 (role stays 背景と課題)
+PURPOSE_FROM_THEME_REASON = 2  # テーマ設定の理由・なぜの問い (role stays 背景と課題)
 
 
 def purpose_rank(section: str, heading: str) -> int | None:
@@ -231,7 +277,7 @@ def purpose_rank(section: str, heading: str) -> int | None:
     if section == ROLE_PURPOSE:
         direct = ("目的" in heading or "目標" in heading) and "経緯" not in heading
         return PURPOSE_FROM_PURPOSE if direct else PURPOSE_FROM_HYPOTHESIS
-    if _THEME_REASON.search(heading):
+    if _THEME_REASON.search(heading) or is_why_question(heading):
         return PURPOSE_FROM_THEME_REASON
     return None
 
