@@ -10,14 +10,21 @@ sitting and each prompt sent to the moderator is kept there (records.py).
 
 Nothing the student types is printed or logged here. The console shows the
 method, path and status of each request only.
+
+Each connection gets its own thread, so a browser's spare connection that
+sends nothing (or a page waiting on the moderator) cannot hold up the next
+request, and an idle connection is closed after CONNECTION_TIMEOUT seconds.
+The app is used by one student at a time: every request that touches the
+sitting goes through one lock, one after another.
 """
 
 import argparse
 import json
 import os
 import sys
+import threading
 from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -38,6 +45,9 @@ STATIC_FILES = {
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
 MAX_BODY = 16 * 1024
+# Seconds a connection may sit without sending or taking bytes. Waiting for
+# the model is not counted: that happens after the request is read.
+CONNECTION_TIMEOUT = 20
 
 
 class App:
@@ -51,6 +61,9 @@ class App:
         self.plant = plant
         self.rng = rng
         self.session: Session | None = None
+        # The sitting is touched by one request at a time. setup() reads only
+        # what never changes, so it does not wait here.
+        self.lock = threading.Lock()
         if records is not None:
             gate.on_send = self._on_send
 
@@ -74,6 +87,10 @@ class App:
         return {"purposes": session.next_purposes()}
 
     def handle(self, path: str, body: dict) -> dict:
+        with self.lock:
+            return self._handle(path, body)
+
+    def _handle(self, path: str, body: dict) -> dict:
         if path == "/api/start":
             return self.start(body)
         session = self.session
@@ -102,7 +119,7 @@ class App:
         raise Refused("unknown_path")
 
 
-def make_handler(app: App, port: int):
+def make_handler(app: App, port: int, timeout: float = CONNECTION_TIMEOUT):
     allowed_hosts = {f"{HOST}:{port}", f"localhost:{port}"}
 
     class Handler(BaseHTTPRequestHandler):
@@ -164,13 +181,15 @@ def make_handler(app: App, port: int):
                 return self._json(status, {"error": str(error)})
             self._json(HTTPStatus.OK, result)
 
+    Handler.timeout = timeout  # Socket timeout for each connection.
     return Handler
 
 
-def make_server(app: App, port: int = DEFAULT_PORT) -> HTTPServer:
+def make_server(app: App, port: int = DEFAULT_PORT, timeout: float = CONNECTION_TIMEOUT) -> ThreadingHTTPServer:
     """Port 0 picks a free port (tests); the handler learns the real one."""
-    server = HTTPServer((HOST, port), BaseHTTPRequestHandler)
-    server.RequestHandlerClass = make_handler(app, server.server_address[1])
+    server = ThreadingHTTPServer((HOST, port), BaseHTTPRequestHandler)
+    server.daemon_threads = True  # Ctrl+C does not wait for an open connection.
+    server.RequestHandlerClass = make_handler(app, server.server_address[1], timeout)
     return server
 
 

@@ -90,7 +90,7 @@ async function ask(event) {
   if (!question) return;
   const button = $("ask-button");
   button.disabled = true;
-  showMessage("席の言葉を探しています…");
+  showMessage(state.texts.waiting_ask);
   try {
     const round = await call("/api/ask", { question });
     hideMessage();
@@ -101,12 +101,13 @@ async function ask(event) {
     $("question").value = "";
     renderRound(round);
   } catch (error) {
-    showMessage("うまく送れませんでした（" + error.message + "）");
+    showMessage(sendFailed(error));
   } finally {
     button.disabled = false;
   }
 }
 
+function sendFailed(error) { return state.texts.send_failed.replace("{error}", error.message); }
 function showMessage(text) { $("ask-message").textContent = text; $("ask-message").hidden = false; }
 function hideMessage() { $("ask-message").hidden = true; }
 
@@ -275,14 +276,26 @@ async function reflectFirst(event) {
   const changed = picked("changed");
   const nowQuestion = $("now-question").value.trim();
   if (!changed || !nowQuestion) return;
-  const result = await call("/api/reflect/begin", { changed, now_question: nowQuestion });
+  const message = $("reflect-message");
+  const button = $("reflect-first").querySelector("button[type=submit]");
+  button.disabled = true;
+  message.textContent = state.texts.waiting_reflection;
+  message.hidden = false;
+  let result;
+  try {
+    result = await call("/api/reflect/begin", { changed, now_question: nowQuestion });
+  } catch (error) {
+    message.textContent = sendFailed(error);
+    button.disabled = false;
+    return;
+  }
   if (result.status === "ask_again") {
-    $("reflect-message").textContent = result.message;
-    $("reflect-message").hidden = false;
+    message.textContent = result.message;
+    button.disabled = false;
     return;
   }
   for (const node of $("reflect-first").querySelectorAll("input, textarea, button")) node.disabled = true;
-  $("reflect-message").hidden = true;
+  message.hidden = true;
   $("ask-back").textContent = result.ask_back;
   $("reflect-answer").hidden = false;
   $("answer").focus();

@@ -4,6 +4,7 @@ a fake model client, and a real server on 127.0.0.1 with a free port."""
 import http.client
 import json
 import random
+import socket
 import threading
 
 import pytest
@@ -19,7 +20,8 @@ from test_session import ANSWERED, SEATS, library
 def server():
     client = FakeClient(list(ANSWERED))
     the_app = App(library(), Gate(client, NameList.build(SEATS, {})), rng=random.Random(1))
-    server = make_server(the_app, 0)
+    server = make_server(the_app, 0, timeout=1)
+    server.the_app = the_app
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     yield server, client
@@ -27,9 +29,9 @@ def server():
     server.server_close()
 
 
-def request(server, method, path, body=None, headers=None):
+def request(server, method, path, body=None, headers=None, timeout=5):
     port = server.server_address[1]
-    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
     sent = {"Host": f"127.0.0.1:{port}"}
     data = None
     if body is not None:
@@ -95,6 +97,46 @@ def test_the_reflection_sheet_over_http(server):
     status, sheet = request(srv, "POST", "/api/reflect/finish",
                             {"chosen": "silent_seat", "meet_seat": "S03", "meet_reason": ""})
     assert status == 200 and sheet["move"]["label"] == "黙った席" and sheet["meet"]["title"] == "保育士"
+
+
+def test_a_connection_that_sends_nothing_does_not_hold_up_the_screen(server):
+    # Browsers open spare connections and may send nothing on them.
+    srv, _ = server
+    idle = socket.create_connection(srv.server_address, timeout=5)
+    try:
+        status, data = request(srv, "GET", "/api/setup", timeout=0.8)
+        assert status == 200 and data["seats"]
+    finally:
+        idle.close()
+
+
+def test_an_idle_connection_is_closed_after_the_timeout(server):
+    srv, _ = server
+    idle = socket.create_connection(srv.server_address, timeout=5)
+    try:
+        assert idle.recv(1) == b""  # The server closed it (timeout=1 here).
+    finally:
+        idle.close()
+
+
+def test_the_sitting_is_touched_by_one_request_at_a_time(server):
+    srv, _ = server
+    done = []
+    with srv.the_app.lock:  # As if a model call were still running.
+        worker = threading.Thread(
+            target=lambda: done.append(request(srv, "POST", "/api/start", {"lab": "quest"})))
+        worker.start()
+        worker.join(0.5)
+        assert not done  # The second request waits its turn ...
+        assert request(srv, "GET", "/api/setup", timeout=0.8)[0] == 200  # ... the page does not.
+    worker.join(5)
+    assert done and done[0][0] == 200
+
+
+def test_the_waiting_words_come_from_texts(server):
+    srv, _ = server
+    texts = request(srv, "GET", "/api/setup")[1]["texts"]
+    assert texts["waiting_ask"] and texts["waiting_reflection"] and "{error}" in texts["send_failed"]
 
 
 def test_a_bad_lab_choice_does_not_start(server):

@@ -26,11 +26,18 @@ WORK_QUESTIONS = "work_questions"  # The school's work questions, one per line.
 PURPOSE_HEADING = "purpose_heading"  # Above the poster purpose samples.
 # The question back when the moderator's fails the code check (SPEC 5-2, 6).
 ASK_BACK_FALLBACK = "ask_back_fallback"
+# Shown while the screen waits on the models: after a question is sent to
+# the table, and while the moderator reads the record for the reflection.
+WAITING_ASK = "waiting_ask"
+WAITING_REFLECTION = "waiting_reflection"
+# Shown when the screen could not reach the app; {error} is a reason code.
+SEND_FAILED = "send_failed"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
     HEAVY_TALK_NOTICE, SPLIT_NOTICE, START_NOTICE, LAB_QUESTION, ANSWERED_COUNT,
-    NOT_ASKED_YET, INPUT_EXAMPLE, PURPOSE_HEADING,
+    NOT_ASKED_YET, INPUT_EXAMPLE, PURPOSE_HEADING, WAITING_ASK, WAITING_REFLECTION,
+    SEND_FAILED,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 
