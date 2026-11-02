@@ -31,6 +31,8 @@ _SAY = "語[らりるれろっ]|話[さしすせそ]|言[わいうえおっ]|思
 _LAUGH = "笑[わいうえおっ]"
 # SPEC 14-50-2: 「…」だと語る, 「…」そう話す. だという・だそうだ・そんな do not match.
 _SAID_AFTER = re.compile(f"だと(?:{_SAY})|そう(?:{_SAY}|{_LAUGH})")
+# SPEC 14-50-4: an article piece made of only these says nothing.
+_EMPTY_PIECE_CHARS = str.maketrans("", "", "とや、。")
 
 
 class IngestError(Exception):
@@ -130,21 +132,28 @@ def _said_quotes(paragraph: str) -> list[re.Match]:
     return said
 
 
+def _has_content(article_text: str) -> bool:
+    """False for "", と, と。 and the like: nothing but と・や・、・。 and spaces."""
+    return bool(article_text.translate(_EMPTY_PIECE_CHARS).strip())
+
+
 def split_voice(paragraph: str) -> list[tuple[str, str]]:
     """Split into words said (inside 「」) and the article text around them.
 
-    A 「」 that is not speech stays in the article text, brackets and all."""
+    A 「」 that is not speech stays in the article text, brackets and all.
+    Article text left as only particles and marks, such as the と in
+    「…」と「…」と言われた, is not a piece (SPEC 14-50-4)."""
     pieces: list[tuple[str, str]] = []
     position = 0
     for match in _said_quotes(paragraph):
         before = paragraph[position : match.start()].strip()
-        if before:
+        if _has_content(before):
             pieces.append((VOICE_ARTICLE, before))
         if match.group(1).strip():
             pieces.append((VOICE_SPOKEN, match.group(1).strip()))
         position = match.end()
     rest = paragraph[position:].strip()
-    if rest:
+    if _has_content(rest):
         pieces.append((VOICE_ARTICLE, rest))
     return pieces
 

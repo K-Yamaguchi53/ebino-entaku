@@ -519,10 +519,7 @@ def test_quotes_in_a_row_follow_the_last_one(paragraph, pieces):
     [
         (
             "先輩に「焦るな」と「よく見ろ」と言われた。",
-            [
-                ("article", "先輩に"), ("spoken", "焦るな"), ("article", "と"),
-                ("spoken", "よく見ろ"), ("article", "と言われた。"),
-            ],
+            [("article", "先輩に"), ("spoken", "焦るな"), ("spoken", "よく見ろ"), ("article", "と言われた。")],
         ),
         ("「海」と「山」で迷い、店を開いた。", [("article", "「海」と「山」で迷い、店を開いた。")]),
         ("店の名前は「海」と「山」だ。", [("article", "店の名前は「海」と「山」だ。")]),
@@ -534,6 +531,26 @@ def test_quotes_in_a_row_follow_the_last_one(paragraph, pieces):
     ],
 )
 def test_quotes_joined_by_to_follow_the_last_one(paragraph, pieces):
+    assert split_voice(paragraph) == pieces
+
+
+# --- SPEC 14-50-4: article pieces of only particles and marks are dropped -------
+
+
+@pytest.mark.parametrize(
+    "paragraph, pieces",
+    [
+        (
+            "先輩に「焦るな」と「よく見ろ」と言われた。",
+            [("article", "先輩に"), ("spoken", "焦るな"), ("spoken", "よく見ろ"), ("article", "と言われた。")],
+        ),
+        ("最後に父が「ありがとう」と。", [("article", "最後に父が"), ("spoken", "ありがとう")]),
+        ("「行くぞ」と、「おう」と 。", [("spoken", "行くぞ"), ("spoken", "おう")]),
+        ("「好きにやれ」と言われた。", [("spoken", "好きにやれ"), ("article", "と言われた。")]),
+        ("朝が好きだと「店主」と話す。", [("article", "朝が好きだと"), ("spoken", "店主"), ("article", "と話す。")]),
+    ],
+)
+def test_article_pieces_of_only_particles_and_marks_are_dropped(paragraph, pieces):
     assert split_voice(paragraph) == pieces
 
 
