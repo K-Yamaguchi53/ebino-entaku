@@ -16,7 +16,32 @@ MODEL_UNAVAILABLE = "model_unavailable"
 # Waiting does not help, so it asks for the word to be left out or put
 # another way. It never says which word: that would show the name list.
 NAME_IN_QUESTION = "name_in_question"
+# The seven things told before a student starts (SPEC 2-1), one per line.
+START_NOTICE = "start_notice"
+LAB_QUESTION = "lab_question"  # The one question asked first (SPEC 2-1).
+ANSWERED_COUNT = "answered_count"  # {n} is the number of seats that answered.
+NOT_ASKED_YET = "not_asked_yet"  # On a related seat with no words (SPEC 14-12).
+INPUT_EXAMPLE = "input_example"  # An invented topic, never a script question.
+WORK_QUESTIONS = "work_questions"  # The school's work questions, one per line.
+PURPOSE_HEADING = "purpose_heading"  # Above the poster purpose samples.
+
+# Everything the screen shows from texts/, sent to it once.
+SCREEN_TEXTS = (
+    HEAVY_TALK_NOTICE, SPLIT_NOTICE, START_NOTICE, LAB_QUESTION, ANSWERED_COUNT,
+    NOT_ASKED_YET, INPUT_EXAMPLE, PURPOSE_HEADING,
+)
+SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 
 
 def load_text(name: str) -> str:
     return (TEXTS_DIR / f"{name}.txt").read_text(encoding="utf-8").strip()
+
+
+def load_lines(name: str) -> list[str]:
+    return [line.strip() for line in load_text(name).splitlines() if line.strip()]
+
+
+def screen_texts() -> dict:
+    texts: dict = {name: load_text(name) for name in SCREEN_TEXTS}
+    texts.update({name: load_lines(name) for name in SCREEN_LISTS})
+    return texts

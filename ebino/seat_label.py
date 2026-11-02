@@ -18,6 +18,16 @@ _FORM = "|".join(re.escape(form) for form in _LEGAL_FORMS)
 _HEAD_OR_TAIL = re.compile(rf"^(?:{_FORM})[\s　]*|[\s　]*(?:{_FORM})$")
 
 
+# The four kinds of seat, with the names on the explainer sheet (SPEC 14-6,
+# 14-41). The screen lists seats in this order.
+KIND_LABELS = {
+    "adult": "地域で働く大人",
+    "poster": "探究をした先輩",
+    "cross": "県外・海外に出た人",
+    "outsider_teacher": "外から来た大人・先生",
+}
+
+
 @dataclass(frozen=True)
 class SeatLabel:
     title: str  # First line, large.

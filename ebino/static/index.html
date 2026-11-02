@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>えびの円卓</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1>えびの円卓</h1>
+</header>
+
+<main>
+  <!-- Before starting: the seven notices and the one Lab question (SPEC 2-1). -->
+  <section id="start">
+    <ol id="start-notice" class="notice-list"></ol>
+    <p id="lab-question" class="lab-question"></p>
+    <div id="lab-choices" class="choices"></div>
+  </section>
+
+  <section id="table" hidden>
+    <p id="heavy-talk" class="heavy-talk"></p>
+
+    <form id="ask-form" class="ask">
+      <label for="question" class="visually-hidden">問い</label>
+      <textarea id="question" rows="2" maxlength="200"></textarea>
+      <button type="submit" id="ask-button">聞く</button>
+    </form>
+    <div id="work-questions" class="hints"></div>
+    <p id="ask-message" class="message" hidden></p>
+
+    <section id="purposes" class="purposes">
+      <h2 id="purpose-heading"></h2>
+      <ul id="purpose-list"></ul>
+      <button type="button" id="more-purposes" class="quiet">ほかの見本</button>
+    </section>
+
+    <section id="rounds"></section>
+
+    <section class="seats">
+      <h2>席</h2>
+      <p class="met">会った席：<span id="met-count">0</span></p>
+      <div id="seat-list"></div>
+    </section>
+  </section>
+</main>
+
+<template id="card-form-template">
+  <form class="card-form">
+    <label>この人に聞きたいこと
+      <textarea rows="2" maxlength="200"></textarea>
+    </label>
+    <button type="submit">質問カードにする</button>
+  </form>
+</template>
+
+<script src="/app.js"></script>
+</body>
+</html>

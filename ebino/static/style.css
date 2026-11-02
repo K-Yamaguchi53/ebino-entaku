@@ -1,0 +1,87 @@
+:root {
+  --ink: #2b2620;
+  --paper: #fbf7ef;
+  --line: #d9cfbf;
+  --soft: #6d6355;
+  --adult: #c8553d;
+  --poster: #2f7f6f;
+  --cross: #3d6bc8;
+  --outsider_teacher: #8a5bb0;
+  --lit: #f3c64b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "BIZ UDPGothic", "Yu Gothic", "Hiragino Sans", sans-serif;
+  font-size: 17px;
+  line-height: 1.7;
+}
+header, main { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+h1 { font-size: 1.5rem; margin: 16px 0 8px; }
+h2 { font-size: 1.1rem; margin: 20px 0 8px; }
+button {
+  font: inherit; cursor: pointer; border: 1px solid var(--ink); background: #fff;
+  border-radius: 8px; padding: 6px 14px;
+}
+button.quiet { border-color: var(--line); color: var(--soft); }
+button:disabled { opacity: .5; cursor: wait; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.notice-list { padding-left: 1.4em; }
+.lab-question { font-weight: bold; margin-top: 24px; }
+.choices { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.heavy-talk { color: var(--soft); border-left: 4px solid var(--line); padding-left: 8px; }
+.ask { display: flex; gap: 8px; align-items: stretch; }
+.ask textarea { flex: 1; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+.hints { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.hints button { border-color: var(--line); }
+.message { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+
+.purposes ul { list-style: none; padding: 0; margin: 0; }
+.purposes li { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
+
+.round { border-top: 2px solid var(--line); margin-top: 16px; padding-top: 8px; }
+.round-question { font-weight: bold; }
+.steps { color: var(--soft); font-size: .9rem; }
+.count { font-size: 1.2rem; font-weight: bold; }
+.quote { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin: 8px 0; }
+.quote.marked { border: 2px solid var(--lit); }
+.quote .words { margin: 0; }
+.quote .source { color: var(--soft); font-size: .9rem; }
+.quote .actions { display: flex; gap: 8px; margin-top: 4px; }
+.quote .actions button { font-size: .85rem; padding: 2px 10px; border-color: var(--line); }
+.quote .paragraph { color: var(--soft); font-size: .9rem; border-left: 3px solid var(--line); padding-left: 8px; }
+.planted { color: #9a2b2b; font-size: .9rem; }
+.planted s { color: var(--soft); }
+.split { background: #fff6dc; border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
+.split .notice { font-size: .85rem; color: var(--soft); margin: 0; }
+.split button { margin-top: 4px; }
+
+.kind-group h3 { font-size: 1rem; margin: 12px 0 4px; }
+.kind-group h3::before { content: "●"; margin-right: 4px; }
+.seat-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.seat {
+  background: #fff; border: 1px solid var(--line); border-radius: 10px;
+  padding: 6px 10px; min-width: 9em; max-width: 16em;
+}
+.seat .title { font-weight: bold; }
+.seat .detail { font-size: .8rem; color: var(--soft); }
+.seat .order { display: inline-block; min-width: 1.6em; text-align: center; border-radius: 50%; background: var(--lit); margin-right: 4px; }
+.seat.lit { box-shadow: 0 0 0 3px var(--lit); }
+.seat.met .title::after { content: " ✓"; color: var(--soft); }
+.seat .not-asked { font-size: .85rem; color: var(--soft); }
+.card-form { margin-top: 6px; }
+.card-form textarea { width: 100%; font: inherit; }
+.card-done { font-size: .85rem; color: var(--soft); }
+
+.kind-adult h3::before { color: var(--adult); }
+.kind-poster h3::before { color: var(--poster); }
+.kind-cross h3::before { color: var(--cross); }
+.kind-outsider_teacher h3::before { color: var(--outsider_teacher); }
+.seat.kind-adult { border-left: 6px solid var(--adult); }
+.seat.kind-poster { border-left: 6px solid var(--poster); }
+.seat.kind-cross { border-left: 6px solid var(--cross); }
+.seat.kind-outsider_teacher { border-left: 6px solid var(--outsider_teacher); }

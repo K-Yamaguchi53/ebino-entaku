@@ -1,0 +1,193 @@
+"""The round-table screen: a small local web server (SPEC 5-1, 14-51).
+
+    python -m ebino.app [--port 8765] [--plant]
+
+Standard library only, plain HTML and JS, listening on 127.0.0.1 alone. Until
+the map is drawn the screen is a seat list. The app reads EBINO_DATA_DIR and
+the key from .env, and does not start unless EBINO_RECORDS_DIR is set to a
+safe place (SPEC 2-1): there is no default place to fall back to.
+
+Nothing the student types is printed or logged here. The console shows the
+method, path and status of each request only.
+"""
+
+import argparse
+import json
+import os
+import sys
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+from urllib.parse import urlsplit
+
+from .config import PlaceError, data_dir, load_env_file, records_dir
+from .gate import Gate, load_names
+from .seat_label import KIND_LABELS, show_private_labels
+from .session import LAB_CHOICES, Library, Refused, Session
+from .texts import screen_texts
+
+HOST = "127.0.0.1"
+DEFAULT_PORT = 8765
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+STATIC_FILES = {
+    "/": ("index.html", "text/html; charset=utf-8"),
+    "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/style.css": ("style.css", "text/css; charset=utf-8"),
+}
+MAX_BODY = 16 * 1024
+
+
+class App:
+    """Holds the library, the gate and the one sitting in progress."""
+
+    def __init__(self, library: Library, gate: Gate, plant: bool = False, rng=None):
+        self.library = library
+        self.gate = gate
+        self.plant = plant
+        self.rng = rng
+        self.session: Session | None = None
+
+    def setup(self) -> dict:
+        return {
+            "texts": screen_texts(),
+            "kinds": KIND_LABELS,
+            "labs": LAB_CHOICES,
+            "seats": self.library.seat_list(),
+        }
+
+    def start(self, body: dict) -> dict:
+        session = Session(self.library, self.gate, plant=self.plant, rng=self.rng)
+        session.set_lab(body.get("lab", ""))
+        self.session = session
+        return {"purposes": session.next_purposes()}
+
+    def handle(self, path: str, body: dict) -> dict:
+        if path == "/api/start":
+            return self.start(body)
+        session = self.session
+        if session is None:
+            raise Refused("no_session")
+        if path == "/api/ask":
+            return session.ask(body.get("question", ""))
+        if path == "/api/card":
+            return session.write_card(body.get("seat_id", ""), body.get("text", ""))
+        if path == "/api/mark":
+            return {"marks": session.mark(body.get("round"), body.get("utterance_id", ""))}
+        if path == "/api/split":
+            return {"heading": session.press_split(body.get("round"), body.get("index"))}
+        if path == "/api/purposes":
+            return {"purposes": session.next_purposes()}
+        if path == "/api/paragraph":
+            return session.paragraph(body.get("utterance_id", ""))
+        raise Refused("unknown_path")
+
+
+def make_handler(app: App, port: int):
+    allowed_hosts = {f"{HOST}:{port}", f"localhost:{port}"}
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, format, *args):  # Path only: never a query or a body.
+            pass
+
+        def log_request(self, code="-", size="-"):
+            print(f"{self.command} {urlsplit(self.path).path} {getattr(code, 'value', code)}")
+
+        def _send(self, status: int, data: bytes, content_type: str) -> None:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Security-Policy", "default-src 'self'")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _json(self, status: int, value) -> None:
+            self._send(status, json.dumps(value, ensure_ascii=False).encode("utf-8"),
+                       "application/json; charset=utf-8")
+
+        def _host_ok(self) -> bool:
+            # Another site's page cannot reach this server through a name
+            # that points at 127.0.0.1.
+            return self.headers.get("Host", "") in allowed_hosts
+
+        def do_GET(self):
+            if not self._host_ok():
+                return self._json(HTTPStatus.FORBIDDEN, {"error": "bad_host"})
+            path = urlsplit(self.path).path
+            if path == "/api/setup":
+                return self._json(HTTPStatus.OK, app.setup())
+            if path in STATIC_FILES:
+                name, content_type = STATIC_FILES[path]
+                return self._send(HTTPStatus.OK, (STATIC_DIR / name).read_bytes(), content_type)
+            self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+
+        def do_POST(self):
+            if not self._host_ok():
+                return self._json(HTTPStatus.FORBIDDEN, {"error": "bad_host"})
+            # A form on another site cannot send JSON without asking first.
+            if not self.headers.get("Content-Type", "").startswith("application/json"):
+                return self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "json_only"})
+            length = int(self.headers.get("Content-Length") or 0)
+            if length > MAX_BODY:
+                return self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "too_large"})
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except ValueError:
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "bad_json"})
+            if not isinstance(body, dict):
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "bad_json"})
+            try:
+                result = app.handle(urlsplit(self.path).path, body)
+            except Refused as error:
+                status = HTTPStatus.CONFLICT if str(error) == "no_session" else HTTPStatus.BAD_REQUEST
+                return self._json(status, {"error": str(error)})
+            self._json(HTTPStatus.OK, result)
+
+    return Handler
+
+
+def make_server(app: App, port: int = DEFAULT_PORT) -> HTTPServer:
+    """Port 0 picks a free port (tests); the handler learns the real one."""
+    server = HTTPServer((HOST, port), BaseHTTPRequestHandler)
+    server.RequestHandlerClass = make_handler(app, server.server_address[1])
+    return server
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(prog="python -m ebino.app")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument("--plant", action="store_true", help="mix in the planted fake quote (SPEC 7-3)")
+    args = parser.parse_args(argv)
+    load_env_file()
+    try:
+        folder = data_dir()
+        records_dir()  # Checked before anything starts (SPEC 2-1).
+    except PlaceError as error:
+        print(error, file=sys.stderr)
+        return 2
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("ANTHROPIC_API_KEY is not set (put it in .env)", file=sys.stderr)
+        return 2
+    import anthropic
+
+    try:
+        library = Library.load(folder, show_private_labels())
+    except FileNotFoundError:
+        print("ingested pieces not found: run python -m ebino.ingest.run first", file=sys.stderr)
+        return 2
+    gate = Gate(anthropic.Anthropic(), load_names(folder, library.seats))
+    server = make_server(App(library, gate, plant=args.plant), args.port)
+    print(f"seats {len(library.seats)}  pieces {len(library.entries)}  purpose samples {len(library.purposes)}")
+    print(f"open http://{HOST}:{server.server_address[1]}/  (Ctrl+C to stop)")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

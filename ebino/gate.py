@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-from .ingest.masks import SeatMasks
+from .ingest.masks import SeatMasks, load_masks
 from .ingest.scrub import display_name_terms, normalize_for_match
 from .ingest.seats import Seat
 
@@ -100,6 +100,12 @@ class NameList:
             # A mark no name holds, so the text on each side cannot join up.
             body = body.replace(string, "\0")
         return [term for term in self.terms if term in body]
+
+
+def load_names(data_dir: Path, seats: list[Seat]) -> NameList:
+    """The name list for the real data: seats, masks.tsv and gate_ok.tsv."""
+    masks = load_masks(data_dir / "masks.tsv", {seat.seat_id for seat in seats})
+    return NameList.build(seats, masks, load_allowed(data_dir))
 
 
 def load_allowed(data_dir: Path) -> set[str]:
