@@ -5,7 +5,8 @@
 Standard library only, plain HTML and JS, listening on 127.0.0.1 alone. Until
 the map is drawn the screen is a seat list. The app reads EBINO_DATA_DIR and
 the key from .env, and does not start unless EBINO_RECORDS_DIR is set to a
-safe place (SPEC 2-1): there is no default place to fall back to.
+safe place (SPEC 2-1): there is no default place to fall back to. Each
+sitting and each prompt sent to the moderator is kept there (records.py).
 
 Nothing the student types is printed or logged here. The console shows the
 method, path and status of each request only.
@@ -22,6 +23,7 @@ from urllib.parse import urlsplit
 
 from .config import PlaceError, data_dir, load_env_file, records_dir
 from .gate import Gate, load_names
+from .records import Records
 from .seat_label import KIND_LABELS, show_private_labels
 from .session import LAB_CHOICES, Library, Refused, Session
 from .texts import screen_texts
@@ -40,12 +42,20 @@ MAX_BODY = 16 * 1024
 class App:
     """Holds the library, the gate and the one sitting in progress."""
 
-    def __init__(self, library: Library, gate: Gate, plant: bool = False, rng=None):
+    def __init__(self, library: Library, gate: Gate, records: Records | None = None,
+                 plant: bool = False, rng=None):
         self.library = library
         self.gate = gate
+        self.records = records
         self.plant = plant
         self.rng = rng
         self.session: Session | None = None
+        if records is not None:
+            gate.on_send = self._on_send
+
+    def _on_send(self, role: str, request: dict) -> None:
+        if self.session is not None:
+            self.records.save_prompt(self.session.session_id, role, request)
 
     def setup(self) -> dict:
         return {
@@ -56,8 +66,8 @@ class App:
         }
 
     def start(self, body: dict) -> dict:
-        session = Session(self.library, self.gate, plant=self.plant, rng=self.rng)
-        session.set_lab(body.get("lab", ""))
+        session = Session(self.library, self.gate, plant=self.plant, rng=self.rng, records=self.records)
+        session.set_lab(body.get("lab", ""))  # Saves the first record.
         self.session = session
         return {"purposes": session.next_purposes()}
 
@@ -162,7 +172,7 @@ def main(argv=None) -> int:
     load_env_file()
     try:
         folder = data_dir()
-        records_dir()  # Checked before anything starts (SPEC 2-1).
+        records = Records(records_dir())  # Checked before anything starts (SPEC 2-1).
     except PlaceError as error:
         print(error, file=sys.stderr)
         return 2
@@ -177,7 +187,7 @@ def main(argv=None) -> int:
         print("ingested pieces not found: run python -m ebino.ingest.run first", file=sys.stderr)
         return 2
     gate = Gate(anthropic.Anthropic(), load_names(folder, library.seats))
-    server = make_server(App(library, gate, plant=args.plant), args.port)
+    server = make_server(App(library, gate, records, plant=args.plant), args.port)
     print(f"seats {len(library.seats)}  pieces {len(library.entries)}  purpose samples {len(library.purposes)}")
     print(f"open http://{HOST}:{server.server_address[1]}/  (Ctrl+C to stop)")
     try:

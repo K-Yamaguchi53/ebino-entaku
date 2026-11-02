@@ -64,6 +64,9 @@ class Round:
     librarian_ended: str = ""
     guard_passed: int = 0
     guard_stopped: int = 0
+    # Seats the moderator picked whose every quote the guard stopped: neither
+    # answered nor silent. A count only, for the records.
+    guard_stopped_seats: int = 0
     # The planted fake (SPEC 7-3): its own text, shown as stopped.
     planted_stopped: list[str] = field(default_factory=list)
     planted_passed: int = 0
@@ -115,6 +118,7 @@ def run(
     if plant:
         quotes = plant_fake(quotes, load_text(PLANTED_FAKE_QUOTE))
     shown: dict[str, ShownQuote] = {}
+    stopped_seats: set[str] = set()
     for verdict in guard.screen(quotes):
         quote = verdict.quote
         if quote.planted:
@@ -129,9 +133,12 @@ def run(
             result.guard_passed += 1
         else:
             result.guard_stopped += 1
+            if quote.utterance_id in by_id:
+                stopped_seats.add(by_id[quote.utterance_id].seat_id)
     result.quotes = list(shown.values())
     result.splits, result.splits_dropped = _splits(plan.splits, shown, gate)
     answered = set(result.seat_order)
+    result.guard_stopped_seats = len(stopped_seats - answered)
     result.silent_seats = [s for s in plan.silent_seat_ids if s not in answered]
     result.status = ANSWERED if result.quotes else SILENT
     if result.status == SILENT:

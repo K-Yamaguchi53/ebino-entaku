@@ -24,6 +24,7 @@ from .index import Entry, build_index, load_topics, load_utterances
 from .ingest.seats import Seat, load_seats
 from .ingest.utterance import Utterance
 from .purpose import PurposeSample, PurposeShelf, samples
+from .records import Records, session_record, today
 from .seat_label import KIND_LABELS, seat_label
 
 MAX_QUESTION_CHARS = 200
@@ -84,6 +85,8 @@ class Session:
     marks: dict[str, str] = field(default_factory=dict)  # seat_id -> utterance_id
     pressed_splits: set[tuple[int, int]] = field(default_factory=set)  # (round, split)
     started: float = field(default_factory=time.monotonic)  # Seconds used, never clock time.
+    date: str = field(default_factory=today)
+    records: Records | None = None  # None: nothing is kept (tests only).
 
     def __post_init__(self):
         self.guard = Guard(self.library.utterances)
@@ -91,12 +94,18 @@ class Session:
         self._seats = {seat.seat_id: seat for seat in self.library.seats}
         self._utterances = {u.id: u for u in self.library.utterances}
 
+    def save(self) -> None:
+        """Kept after every step (SPEC 2-1: every action is recorded by itself)."""
+        if self.records is not None:
+            self.records.save_session(session_record(self))
+
     # --- what the student does ---
 
     def set_lab(self, choice: str) -> None:
         if choice not in LAB_CHOICES:
             raise Refused("unknown_lab_choice")
         self.lab = choice
+        self.save()
 
     def ask(self, question: str) -> dict:
         question = (question or "").strip()
@@ -109,6 +118,7 @@ class Session:
         self.rounds.append(result)
         if result.card:
             self.cards.append(result.card)
+        self.save()
         return self.round_view(len(self.rounds))
 
     def write_card(self, seat_id: str, text: str) -> dict:
@@ -121,6 +131,7 @@ class Session:
         if card is None:
             raise Refused("empty_card")
         self.cards.append(card)
+        self.save()
         return card.front()
 
     def mark(self, round_no: int, utterance_id: str) -> dict:
@@ -132,6 +143,7 @@ class Session:
             del self.marks[quote.seat_id]
         else:
             self.marks[quote.seat_id] = utterance_id
+        self.save()
         return dict(self.marks)
 
     def press_split(self, round_no: int, index: int) -> str:
@@ -140,6 +152,7 @@ class Session:
         if not isinstance(index, int) or not 0 <= index < len(splits):
             raise Refused("unknown_split")
         self.pressed_splits.add((round_no, index))
+        self.save()
         return splits[index].heading
 
     def next_purposes(self) -> list[dict]:
