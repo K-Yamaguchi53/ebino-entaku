@@ -12,6 +12,9 @@ VOICE_ARTICLE = "article"  # Interview article text, confirmed by the person.
 VOICE_COMPANY = "company"  # Company introduction, confirmed by the company.
 VOICE_SENIOR = "senior"  # Message from an unnamed senior employee.
 VOICE_OWN = "own"  # Written by the speaker: posters and slides.
+# An answer to a question card returned during the event (SPEC 2-2, 14-18).
+# Taken in as written; the guard counts it apart from the rest (SPEC 14-25).
+VOICE_ANSWER = "answer"
 
 # Shown with the source. Spoken words get quotation marks instead of a note.
 SOURCE_NOTES = {

@@ -7,6 +7,8 @@ SPLIT_NOTICE = "split_notice"  # Shown above every split (SPEC 14-39).
 # Always shown on the round-table input screen and the reflection sheet's
 # writing box (SPEC 2-1, 14-47).
 HEAVY_TALK_NOTICE = "heavy_talk_notice"
+# A sentence nobody said, mixed in to show the guard stopping it (SPEC 7-3).
+PLANTED_FAKE_QUOTE = "planted_fake_quote"
 
 
 def load_text(name: str) -> str:
