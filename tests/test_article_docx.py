@@ -14,7 +14,7 @@ from ebino.ingest.article_docx import (
 )
 from ebino.ingest.scrub import normalize_for_match
 from ebino.ingest.utterance import (
-    IngestError, VOICE_ARTICLE, VOICE_OWN, VOICE_SPOKEN, make_id,
+    IngestError, VOICE_ARTICLE, VOICE_OWN, VOICE_SPOKEN, make_id, split_voice,
 )
 
 
@@ -424,6 +424,55 @@ def test_teacher_name_is_masked_and_reading_row_is_dropped(teacher_utterances):
 def test_interview_articles_keep_their_note(utterances):
     assert {u.note for u in utterances if u.voice == VOICE_ARTICLE} == {"取材記事（本人確認済み）"}
     assert {u.note for u in utterances if u.voice == VOICE_SPOKEN} == {""}
+
+
+# --- SPEC 14-50: only a quoting と or って makes 「」 speech -----------------------
+
+
+@pytest.mark.parametrize(
+    "paragraph, pieces",
+    [
+        (
+            "先生に「好きにやれ」と言われた。",
+            [("article", "先生に"), ("spoken", "好きにやれ"), ("article", "と言われた。")],
+        ),
+        ("「店を継ぐ」と思った。", [("spoken", "店を継ぐ"), ("article", "と思った。")]),
+        ("「やるしかない」って笑う。", [("spoken", "やるしかない"), ("article", "って笑う。")]),
+        ("最後に話した。「また来てね」", [("article", "最後に話した。"), ("spoken", "また来てね")]),
+        ("「釣り部」というサークルに入った。", [("article", "「釣り部」というサークルに入った。")]),
+        ("君たちに「近道」を言わないと決めた。", [("article", "君たちに「近道」を言わないと決めた。")]),
+        ("「木工部」に入りたくて高校を選んだ。", [("article", "「木工部」に入りたくて高校を選んだ。")]),
+        ("「朝市」といった行事がある。", [("article", "「朝市」といった行事がある。")]),
+        ("「漁」とか「畑」とか、何でもやる。", [("article", "「漁」とか「畑」とか、何でもやる。")]),
+        ("「川の会」との縁が長い。", [("article", "「川の会」との縁が長い。")]),
+        ("「仕事」とは何か考えた。", [("article", "「仕事」とは何か考えた。")]),
+        ("店の名は「はるかぜ」。", [("article", "店の名は「はるかぜ」。")]),
+        (
+            "「木工部」で学び、「続けて」と言われた。",
+            [("article", "「木工部」で学び、"), ("spoken", "続けて"), ("article", "と言われた。")],
+        ),
+    ],
+)
+def test_only_a_quoting_to_or_tte_makes_a_quote_speech(paragraph, pieces):
+    assert split_voice(paragraph) == pieces
+
+
+def test_a_quote_kept_in_the_article_is_one_piece_with_one_id(seat):
+    paragraph = "「釣り部」というサークルに入った。君たちに「近道」を言わないと決めた。"
+    rows = {"1": [PERSON], "8": [paragraph]}
+    first, _ = ingest_article_rows(ArticleRows(rows), seat)
+    again, _ = ingest_article_rows(ArticleRows(rows), seat)
+    assert [(u.voice, u.text) for u in first] == [("article", paragraph)]
+    assert first[0].id == make_id(seat.kind, seat.source_file, paragraph)
+    assert [u.id for u in first] == [u.id for u in again]
+
+
+def test_ids_of_split_pieces_follow_the_same_rule(seat):
+    rows = {"1": [PERSON], "8": ["先生に「好きにやれ」と言われた。"]}
+    utterances, _ = ingest_article_rows(ArticleRows(rows), seat)
+    assert [u.id for u in utterances] == [
+        make_id(seat.kind, seat.source_file, text) for text in ("先生に", "好きにやれ", "と言われた。")
+    ]
 
 
 def test_address_constant_is_really_in_the_fixture():

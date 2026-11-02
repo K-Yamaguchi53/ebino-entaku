@@ -25,6 +25,7 @@ TEACHER_ARTICLE_NOTE = "先生が書いた記事"
 _SENTENCE = re.compile(r"[^。！？!?]+[。！？!?]*")
 _QUOTE = re.compile(r"「([^「」]*)」")
 _MIN_DEDUPE_CHARS = 8
+_NOT_QUOTING_TO = ("という", "といった", "とか", "との", "とは")
 
 
 class IngestError(Exception):
@@ -78,11 +79,29 @@ def dedupe_sentences(text: str) -> str:
     return "".join(kept)
 
 
+def is_said(after: str) -> bool:
+    """Whether a 「」 followed by `after` holds words said (SPEC 14-50).
+
+    Only a quoting と or って makes it speech: 「…」と言われ, 「…」と思っ,
+    「…」って. 「…」という・といった・とか・との・とは name or stress a word,
+    and so does any other follower (を・に・が・の・は・。). A 「」 that closes
+    the paragraph is speech, as before.
+    """
+    after = after.lstrip()
+    if not after or after.startswith("って"):
+        return True
+    return after.startswith("と") and not after.startswith(_NOT_QUOTING_TO)
+
+
 def split_voice(paragraph: str) -> list[tuple[str, str]]:
-    """Split into words said (inside 「」) and the article text around them."""
+    """Split into words said (inside 「」) and the article text around them.
+
+    A 「」 that is not speech stays in the article text, brackets and all."""
     pieces: list[tuple[str, str]] = []
     position = 0
     for match in _QUOTE.finditer(paragraph):
+        if not is_said(paragraph[match.end() :]):
+            continue
         before = paragraph[position : match.start()].strip()
         if before:
             pieces.append((VOICE_ARTICLE, before))
