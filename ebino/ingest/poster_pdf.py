@@ -17,6 +17,7 @@ from pathlib import Path
 import pdfplumber
 
 from .masks import SeatMasks
+from .pdf_chars import fold_radicals
 from .pdf_quiet import quiet_pdf_warnings
 from .scrub import forbidden_terms, mask_pairs, normalize_for_match
 from .seats import Seat
@@ -258,7 +259,9 @@ def read_fragments(path: Path) -> list[Fragment]:
             raise IngestError("poster_not_one_page")
         words = pdf.pages[0].extract_words(keep_blank_chars=True, return_chars=True)
     return [
-        Fragment(w["text"], w["x0"], w["top"], tuple(c["x0"] for c in w.get("chars", ())))
+        Fragment(
+            fold_radicals(w["text"]), w["x0"], w["top"], tuple(c["x0"] for c in w.get("chars", ()))
+        )
         for w in words
     ]
 

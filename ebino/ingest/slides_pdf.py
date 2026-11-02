@@ -9,6 +9,7 @@ from pathlib import Path
 import pdfplumber
 
 from .masks import SeatMasks
+from .pdf_chars import fold_radicals
 from .pdf_quiet import quiet_pdf_warnings
 from .scrub import forbidden_terms, normalize_for_match, scrub_slide_text
 from .seats import Seat
@@ -35,7 +36,7 @@ def read_pages(path: Path) -> list[list[str]]:
     with pdfplumber.open(path) as pdf:
         # dedupe_chars handles glyphs overprinted to fake bold or outlines.
         return [
-            (page.dedupe_chars().extract_text() or "").splitlines()
+            fold_radicals(page.dedupe_chars().extract_text() or "").splitlines()
             for page in pdf.pages
         ]
 

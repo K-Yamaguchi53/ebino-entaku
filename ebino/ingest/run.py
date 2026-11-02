@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .article_docx import ingest_article
 from .masks import SeatMasks, load_masks
+from .pdf_chars import leftover_supplement_chars
 from .poster_pdf import (
     PURPOSE_FROM_HYPOTHESIS,
     PURPOSE_FROM_THEME_REASON,
@@ -48,6 +49,7 @@ class Report:
     posters_purpose_from_theme_reason: int = 0
     multi_page_works_read: int = 0
     multi_page_works_skipped: int = 0
+    leftover_radical_chars: int = 0
 
     def lines(self) -> list[str]:
         return [
@@ -66,6 +68,8 @@ class Report:
             f"{self.posters_purpose_from_theme_reason}",
             "multi-page inquiry works (read / skipped, no rows in masks.tsv): "
             f"{self.multi_page_works_read} / {self.multi_page_works_skipped}",
+            "radical-supplement chars left (not in the table): "
+            f"{self.leftover_radical_chars}",
         ]
 
 
@@ -132,6 +136,9 @@ def run(data_dir: Path) -> Report:
         report.ingested_by_kind[seat.kind] += 1
         for utterance in result:
             report.utterances_by_voice[utterance.voice] += 1
+            report.leftover_radical_chars += leftover_supplement_chars(
+                utterance.text + utterance.heading
+            )
         utterances.extend(result)
 
     output = data_dir / OUTPUT_DIR
