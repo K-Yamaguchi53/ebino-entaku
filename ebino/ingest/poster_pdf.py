@@ -80,6 +80,9 @@ _MAX_HEADING_CHARS = 16
 _MAX_LONG_HEADING_CHARS = 30
 _LONG_HEADING_ENDINGS = ("研究仮説", "探究仮説", "研究仮設", "探究仮設", "目的")
 _NUMBER = re.compile(r"^(\d{1,2})(?!\d)([\s.,、:)）]*)")
+# 「9%」「3.9%」「12:25〜12:40」「1:1:0.5:2」「10:30〜」: a figure, a time or a ratio.
+# 「2：目的」 (a colon, then a word) is still a numbered heading.
+_FIGURE = re.compile(r"^\d+(?:\.\d+)?\s*(?:[%〜~]|:\s*\d)")
 _TRAILING_NUMBER = re.compile(r"\d{1,2}$")  # 「探究テーマ設定理由①」 (① is 1 after NFKC)
 _GAP = re.compile(r"\s+")
 _THEME_REASON = re.compile(r"テーマ設定|設定理由|テーマの理由")
@@ -175,12 +178,14 @@ def heading_of(text: str) -> Heading | None:
     # 「1. 背景と課題 (Background and Issues)」: the gloss does not count toward length.
     line = _ENGLISH_GLOSS.sub("", line)
     length = len(re.sub(r"\s+", "", line))
-    if not line or length > _MAX_LONG_HEADING_CHARS:
+    if not line or length > _MAX_LONG_HEADING_CHARS or _FIGURE.match(line):
         return None
     rest = line
     number = _NUMBER.match(rest)
     if number:
         rest = rest[number.end() :]
+        if _FIGURE.match(rest):  # 「1. 9%」
+            return None
     bracketed = bool(_OPENING.match(rest))
     rest = _OPENING.sub("", rest)
     if bracketed and rest[:1].isdigit():

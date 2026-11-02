@@ -576,6 +576,40 @@ def test_a_full_width_line_below_two_columns_is_not_cut():
     assert by_name(fragments)["結論と展望"] == text
 
 
+# --- After 506fb3a: figures, times and ratios at the head of a line --------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "９％",
+        "1%",
+        "3.9%",
+        "１．９％",
+        "1. 9%",
+        "12:25〜12:40 開会",
+        "10:30〜",
+        "１０：３０～",
+        "1:1:0.5:2",
+        "3〜5人",
+    ],
+)
+def test_a_figure_time_or_ratio_is_not_a_heading(text):
+    assert heading_of(text) is None
+
+
+def test_a_colon_and_a_word_is_still_a_heading():
+    assert heading_of("２：目的") == Heading("目的", "目的")
+
+
+def test_pie_chart_labels_do_not_become_sections(poster_seat):
+    fragments = lines("目的", "町の声を聞く。", "3.9%", "1. 1%", "結果", "増えた。")
+    assert [(u.section, u.text) for u in ingest_poster_fragments(fragments, poster_seat)] == [
+        ("目的", "町の声を聞く。3.9%1. 1%"),
+        ("結果", "増えた。"),
+    ]
+
+
 # --- After 506fb3a: headings set in from their columns --------------------------
 
 
