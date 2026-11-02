@@ -11,9 +11,13 @@ Two layers keep people's names away from the models:
      as 先輩 are not used. Company names are not used either: other seats'
      words can name a company, kindergarten or school as the place they worked,
      and that is part of what they said; each seat's own company was masked at
-     ingest. Words a person checked and found not to be names (a family name
-     that is also a place name) go one per line in EBINO_DATA_DIR/gate_ok.tsv.
-     Without that file nothing is let through.
+     ingest. Where a person checked a hit and found it is not a name (a
+     family name inside a place name), they write the string around it, one
+     per line, in EBINO_DATA_DIR/gate_ok.tsv. The gate takes those strings out
+     of the request first and then looks for names, so 〈山川公園〉 passes
+     while 〈山川〉 elsewhere is still stopped (SPEC 14-52). A line that is
+     just the name lets that name through everywhere. Without the file
+     nothing is let through.
 
 Failures never carry request text: GateError and ModelUnavailable hold reason
 codes only. No fallback model answers in place of the one named for a role
@@ -65,18 +69,19 @@ class ModelUnavailable(Exception):
 
 @dataclass(frozen=True)
 class NameList:
-    """Normalized names to look for, each with where it came from."""
+    """Normalized names to look for, each with where it came from, and the
+    strings a person let through."""
 
     terms: dict[str, str] = field(default_factory=dict)  # term -> KIND_*
+    allowed: tuple[str, ...] = ()  # Normalized, longest first.
 
     @classmethod
     def build(cls, seats: list[Seat], masks: dict[str, SeatMasks], allowed: set[str] = frozenset()):
-        allowed_normal = {normalize_for_match(word) for word in allowed}
         terms: dict[str, str] = {}
 
         def add(word: str, kind: str) -> None:
             term = normalize_for_match(word)
-            if len(term) < MIN_NAME_CHARS or term in LABEL_WORDS or term in allowed_normal:
+            if len(term) < MIN_NAME_CHARS or term in LABEL_WORDS:
                 return
             terms.setdefault(term, kind)
 
@@ -86,15 +91,19 @@ class NameList:
         for seat_masks in masks.values():
             for word in seat_masks.words:
                 add(word, KIND_MASK_WORD)
-        return cls(terms)
+        kept = {normalize_for_match(line) for line in allowed} - {""}
+        return cls(terms, tuple(sorted(kept, key=lambda s: (-len(s), s))))
 
     def hits(self, text: str) -> list[str]:
         body = normalize_for_match(text)
+        for string in self.allowed:
+            # A mark no name holds, so the text on each side cannot join up.
+            body = body.replace(string, "\0")
         return [term for term in self.terms if term in body]
 
 
 def load_allowed(data_dir: Path) -> set[str]:
-    """Words a person found not to be names. No file: nothing is let through."""
+    """Strings a person let through, one per line. No file: nothing is."""
     path = data_dir / GATE_OK_FILE
     if not path.exists():
         return set()

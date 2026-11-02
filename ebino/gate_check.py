@@ -8,8 +8,10 @@ seat's model-facing fields and each piece's text and heading.
 
 THIS OUTPUT SHOWS THE WORDS THAT WERE HIT, which may be names. It is for the
 teacher's own screen only (SPEC 14-51) and is not to be pasted into chat.
-The teacher looks at each word; words that are not names (a family name that
-is also a place name) go one per line into EBINO_DATA_DIR/gate_ok.tsv.
+The teacher looks at each word in its place; where it is not a name (a family
+name inside a place name), the string around it goes one per line into
+EBINO_DATA_DIR/gate_ok.tsv, so the same name elsewhere is still stopped
+(SPEC 14-52).
 """
 
 import json

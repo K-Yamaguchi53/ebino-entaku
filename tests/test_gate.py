@@ -47,6 +47,21 @@ def test_words_a_person_checked_are_let_through():
     assert names().hits("山川の河原で遊んだ。") == ["山川"]
 
 
+def test_a_name_inside_a_let_through_string_passes_but_not_outside_it():
+    # SPEC 14-52: the line is the string around the name, not the name.
+    allowed = names({"山川公園"})
+    assert allowed.hits("山川公園で遊んだ。") == []
+    assert allowed.hits("山 川 公 園で遊んだ。") == []  # Matched after normalizing.
+    assert allowed.hits("山川公園で山川さんと遊んだ。") == ["山川"]
+    assert allowed.hits("山川で遊んだ。") == ["山川"]
+
+
+def test_text_on_each_side_of_a_let_through_string_does_not_join_up():
+    # 谷 + [口公園] + 師匠 must not become 谷口師匠 once the string is taken out.
+    assert names({"口公園"}).hits("谷口公園師匠") == []
+    assert names({"山川公園"}).hits("谷口師匠と山川公園") == ["谷口師匠"]
+
+
 def test_gate_ok_file_is_read_and_missing_means_none(tmp_path):
     assert load_allowed(tmp_path) == set()
     (tmp_path / "gate_ok.tsv").write_text("山川\n\n 谷口 \n", encoding="utf-8")
