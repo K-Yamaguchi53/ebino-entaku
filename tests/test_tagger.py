@@ -82,6 +82,21 @@ def test_empty_answers_are_counted_apart_and_not_sent_again(tmp_path):
     assert (again.with_topics, again.empty_total, again.untagged) == (1, 2, 0)
 
 
+def test_tags_of_pieces_no_longer_ingested_are_removed_and_counted(tmp_path):
+    folder = setup(tmp_path, [piece(1), piece(2), piece(3)])
+    tagger.run(folder, FakeClient(tags_for))
+    # Re-ingest: piece 2 is gone (its page dropped, or its words changed).
+    setup_again = folder / "ingested" / "utterances.json"
+    setup_again.write_text(json.dumps([p.to_dict() for p in (piece(1), piece(3), piece(4))],
+                                      ensure_ascii=False), encoding="utf-8")
+    report = tagger.run(folder, FakeClient(tags_for))
+    assert (report.dropped, report.already, report.tagged) == (1, 2, 1)
+    assert "tags of pieces no longer ingested, removed: 1" in report.lines()
+    assert sorted(load_topics(folder)) == ["adult-001", "adult-003", "adult-004"]
+    again = tagger.run(folder, FakeClient(tags_for))
+    assert again.dropped == 0
+
+
 def test_no_company_or_display_name_reaches_the_tagger(tmp_path):
     folder = setup(tmp_path, [piece(1), piece(2, "P01", "川の水を調べた。")])
     client = FakeClient(tags_for)

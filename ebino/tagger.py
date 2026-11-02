@@ -6,7 +6,8 @@ Run by hand once .env holds the API key (SPEC 14-51). Reads the ingested
 pieces from EBINO_DATA_DIR, sends them in batches through the gate to the
 tagger model, and saves the topics with the model name and date to
 EBINO_DATA_DIR/ingested/topics.json. Pieces already tagged are skipped, so a
-second run fills only the gaps. Prints counts and reason codes only.
+second run fills only the gaps, and drops the tags of pieces that are no
+longer ingested. Prints counts and reason codes only.
 """
 
 import json
@@ -57,6 +58,7 @@ class TagReport:
     not sent again), or it has not been answered yet."""
 
     pieces: int = 0
+    dropped: int = 0  # Tags of pieces no longer ingested, taken out.
     already: int = 0  # Answered on an earlier run, with or without topics.
     tagged: int = 0  # Answered now with at least one topic.
     empty: int = 0  # Answered now with no topics.
@@ -69,6 +71,7 @@ class TagReport:
     def lines(self) -> list[str]:
         return [
             f"pieces: {self.pieces}",
+            f"tags of pieces no longer ingested, removed: {self.dropped}",
             f"answered before: {self.already}",
             f"answered now with topics: {self.tagged}",
             f"answered now with no topics: {self.empty}",
@@ -91,7 +94,11 @@ def _clean(topics: list) -> list[str]:
 def tag_pieces(
     gate: Gate, utterances: list[Utterance], known: dict[str, list[str]], report: TagReport
 ) -> dict[str, list[str]]:
-    topics = dict(known)
+    # A piece whose words changed at a re-ingest, or whose page was dropped,
+    # has a new ID or none; its old tags must not stay behind.
+    current = {u.id for u in utterances}
+    topics = {i: kept for i, kept in known.items() if i in current}
+    report.dropped = len(known) - len(topics)
     todo = [u for u in utterances if u.id not in topics]
     report.pieces = len(utterances)
     report.already = len(utterances) - len(todo)
