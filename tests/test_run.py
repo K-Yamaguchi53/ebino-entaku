@@ -51,6 +51,29 @@ def test_report_never_prints_file_names_or_text(tmp_path):
     assert "article01" not in printed
 
 
+def test_report_counts_short_article_pieces(tmp_path):
+    from test_article_docx import write_booklet_article
+
+    # 「先生に」 and 「と言われた。」 are scraps; the quote kept in the article is not.
+    write_booklet_article(tmp_path / "a1.docx", [
+        ("1", "名前", [PERSON]),
+        ("8", "本文", ["先生に「好きにやれ」と言われた。", "「釣り部」に入った。"]),
+    ])
+    write_booklet_article(tmp_path / "a2.docx", [
+        ("1", "名前", [PERSON]),
+        ("8", "本文", ["朝の店に立つのが好きだと話す。"]),
+    ])
+    teacher = make_seat(seat_id="O02", kind="outsider_teacher", company="", display_name="",
+                        source_file="t1.docx")
+    write_booklet_article(tmp_path / "t1.docx", [("1", "名前", [PERSON]), ("8", "本文", ["短い。"])])
+    report = run(setup_data(tmp_path, [
+        make_seat(source_file="a1.docx"), make_seat(seat_id="S02", source_file="a2.docx"), teacher,
+    ]))
+    assert not report.failed_seats
+    assert (report.short_article_pieces, report.short_article_seats) == (2, 1)
+    assert "article-voice pieces of 6 chars or less (seats): 2 (1)" in report.lines()
+
+
 def test_slides_wait_for_a_mask_list(tmp_path):
     (tmp_path / "slide01.pdf").write_bytes(b"")
     seat = make_seat(seat_id="C01", kind="cross", company="", source_file="slide01.pdf")

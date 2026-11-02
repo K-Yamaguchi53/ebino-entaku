@@ -27,10 +27,12 @@ from .poster_pdf import (
 )
 from .seats import Seat, load_seats
 from .slides_pdf import ingest_slides
-from .utterance import IngestError, Utterance
+from .utterance import IngestError, Utterance, VOICE_ARTICLE
 
 OUTPUT_DIR = "ingested"
 OUTPUT_FILE = "utterances.json"
+# Scraps left when 「」 cut an article into pieces (SPEC 14-50).
+SHORT_ARTICLE_CHARS = 6
 
 
 @dataclass
@@ -51,6 +53,8 @@ class Report:
     multi_page_works_skipped: int = 0
     leftover_radical_chars: int = 0
     pdf_text: PdfTextStats = field(default_factory=PdfTextStats)
+    short_article_pieces: int = 0
+    short_article_seats: int = 0
 
     def lines(self) -> list[str]:
         return [
@@ -72,6 +76,8 @@ class Report:
             "radical-supplement chars left (not in the table): "
             f"{self.leftover_radical_chars}",
             f"control chars removed from PDF text: {self.pdf_text.control_chars_removed}",
+            f"article-voice pieces of {SHORT_ARTICLE_CHARS} chars or less (seats): "
+            f"{self.short_article_pieces} ({self.short_article_seats})",
         ]
 
 
@@ -136,6 +142,11 @@ def run(data_dir: Path) -> Report:
         if result is None:
             continue
         report.ingested_by_kind[seat.kind] += 1
+        short = sum(
+            u.voice == VOICE_ARTICLE and len(u.text) <= SHORT_ARTICLE_CHARS for u in result
+        )
+        report.short_article_pieces += short
+        report.short_article_seats += short > 0
         for utterance in result:
             report.utterances_by_voice[utterance.voice] += 1
             report.leftover_radical_chars += leftover_supplement_chars(
