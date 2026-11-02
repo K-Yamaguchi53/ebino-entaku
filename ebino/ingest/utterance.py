@@ -102,15 +102,33 @@ def is_said(after: str) -> bool:
     return after.startswith("と") and not after.startswith(_NOT_QUOTING_TO)
 
 
+def _said_quotes(paragraph: str) -> list[re.Match]:
+    """The 「」 that hold words said.
+
+    「」 written one after another with nothing between them share the fate of
+    the last one (SPEC 14-50-2): 「…」「…」と言われた makes both speech, and
+    「…」「…」というお店 keeps both in the article."""
+    matches = list(_QUOTE.finditer(paragraph))
+    said: list[re.Match] = []
+    run: list[re.Match] = []
+    for index, match in enumerate(matches):
+        run.append(match)
+        following = matches[index + 1] if index + 1 < len(matches) else None
+        if following and not paragraph[match.end() : following.start()].strip():
+            continue  # The next 「」 follows at once; decide with the last one.
+        if is_said(paragraph[match.end() :]):
+            said.extend(run)
+        run = []
+    return said
+
+
 def split_voice(paragraph: str) -> list[tuple[str, str]]:
     """Split into words said (inside 「」) and the article text around them.
 
     A 「」 that is not speech stays in the article text, brackets and all."""
     pieces: list[tuple[str, str]] = []
     position = 0
-    for match in _QUOTE.finditer(paragraph):
-        if not is_said(paragraph[match.end() :]):
-            continue
+    for match in _said_quotes(paragraph):
         before = paragraph[position : match.start()].strip()
         if before:
             pieces.append((VOICE_ARTICLE, before))

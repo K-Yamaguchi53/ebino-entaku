@@ -484,6 +484,33 @@ def test_dato_and_sou_before_saying_make_a_quote_speech(paragraph, pieces):
     assert split_voice(paragraph) == pieces
 
 
+# --- SPEC 14-50-2: 「」 in a row follow the last one ------------------------------
+
+
+@pytest.mark.parametrize(
+    "paragraph, pieces",
+    [
+        (
+            "先輩に「焦るな」「よく見ろ」と言われた。",
+            [("article", "先輩に"), ("spoken", "焦るな"), ("spoken", "よく見ろ"), ("article", "と言われた。")],
+        ),
+        (
+            "「よし」「行こう」「今だ」そう笑う。",
+            [("spoken", "よし"), ("spoken", "行こう"), ("spoken", "今だ"), ("article", "そう笑う。")],
+        ),
+        ("最後にひと言。「ありがとう」「またね」", [("article", "最後にひと言。"), ("spoken", "ありがとう"), ("spoken", "またね")]),
+        ("「海」「山」というお店を開いた。", [("article", "「海」「山」というお店を開いた。")]),
+        ("「海」「山」の二つの店がある。", [("article", "「海」「山」の二つの店がある。")]),
+        (
+            "「海」や「山」で迷い、「両方やれ」と言われた。",
+            [("article", "「海」や「山」で迷い、"), ("spoken", "両方やれ"), ("article", "と言われた。")],
+        ),
+    ],
+)
+def test_quotes_in_a_row_follow_the_last_one(paragraph, pieces):
+    assert split_voice(paragraph) == pieces
+
+
 def test_a_quote_kept_in_the_article_is_one_piece_with_one_id(seat):
     paragraph = "「釣り部」というサークルに入った。君たちに「近道」を言わないと決めた。"
     rows = {"1": [PERSON], "8": [paragraph]}
