@@ -38,11 +38,57 @@
 
     <section id="rounds"></section>
 
+    <p class="to-reflect"><button type="button" id="to-reflect" hidden>ふりかえりへ</button></p>
+
     <section class="seats">
       <h2>席</h2>
       <p class="met">会った席：<span id="met-count">0</span></p>
       <div id="seat-list"></div>
     </section>
+  </section>
+
+  <!-- The reflection sheet (SPEC 5-2). The student writes first. -->
+  <section id="reflect" hidden>
+    <h2>ふりかえりの1枚</h2>
+    <p class="heavy-talk reflect-heavy-talk"></p>
+    <p class="first-question">最初の問い：<span id="first-question"></span></p>
+
+    <form id="reflect-first" class="step">
+      <p>最初の問いは変わった？</p>
+      <div id="changed-choices" class="choices"></div>
+      <label>いまの問い
+        <textarea id="now-question" rows="2" maxlength="200"></textarea>
+      </label>
+      <button type="submit">書いた</button>
+      <p id="reflect-message" class="message" hidden></p>
+    </form>
+
+    <form id="reflect-answer" class="step" hidden>
+      <p class="ask-back" id="ask-back"></p>
+      <input id="answer" type="text" maxlength="120" autocomplete="off">
+      <div class="choices">
+        <button type="submit">答える</button>
+        <button type="button" id="decline">答えない</button>
+      </div>
+    </form>
+
+    <form id="reflect-finish" class="step" hidden>
+      <p>次の一手</p>
+      <div id="moves" class="moves"></div>
+      <input id="own-move" type="text" maxlength="120" autocomplete="off" hidden>
+      <label>いまの問いを書き直す（書き直さなくてよい）
+        <textarea id="rewrite" rows="2" maxlength="200"></textarea>
+      </label>
+      <label>会いに行きたい1人
+        <select id="meet-seat"></select>
+      </label>
+      <label>理由（1行）
+        <input id="meet-reason" type="text" maxlength="120" autocomplete="off">
+      </label>
+      <button type="submit">この1枚にする</button>
+    </form>
+
+    <dl id="sheet" class="sheet" hidden></dl>
   </section>
 </main>
 

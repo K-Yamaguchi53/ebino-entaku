@@ -24,6 +24,8 @@ NOT_ASKED_YET = "not_asked_yet"  # On a related seat with no words (SPEC 14-12).
 INPUT_EXAMPLE = "input_example"  # An invented topic, never a script question.
 WORK_QUESTIONS = "work_questions"  # The school's work questions, one per line.
 PURPOSE_HEADING = "purpose_heading"  # Above the poster purpose samples.
+# The question back when the moderator's fails the code check (SPEC 5-2, 6).
+ASK_BACK_FALLBACK = "ask_back_fallback"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (

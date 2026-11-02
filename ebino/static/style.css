@@ -77,6 +77,20 @@ button:disabled { opacity: .5; cursor: wait; }
 .card-form textarea { width: 100%; font: inherit; }
 .card-done { font-size: .85rem; color: var(--soft); }
 
+.to-reflect { text-align: center; margin: 24px 0; }
+.step { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin: 12px 0; }
+.step label { display: block; margin: 8px 0; }
+.step textarea, .step input[type="text"], .step select { width: 100%; font: inherit; padding: 6px; }
+.choice { display: inline-block; border: 1px solid var(--line); border-radius: 8px; padding: 4px 12px; margin: 4px; min-width: 7em; }
+.moves .choice { display: block; min-width: 0; }
+.ask-back { font-weight: bold; }
+.sheet { display: grid; grid-template-columns: 11em 1fr; gap: 6px 12px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+.sheet dt { font-weight: bold; color: var(--soft); }
+.sheet dd { margin: 0; }
+.sheet .left { color: var(--soft); }
+.sheet .source { color: var(--soft); font-size: .85rem; }
+@media (max-width: 600px) { .sheet { grid-template-columns: 1fr; } }
+
 .kind-adult h3::before { color: var(--adult); }
 .kind-poster h3::before { color: var(--poster); }
 .kind-cross h3::before { color: var(--cross); }

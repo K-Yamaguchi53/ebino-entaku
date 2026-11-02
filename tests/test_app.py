@@ -79,6 +79,24 @@ def test_a_whole_round_over_http(server):
     assert request(srv, "POST", "/api/paragraph", {"utterance_id": "c1"}) == (400, {"error": "not_shown"})
 
 
+def test_the_reflection_sheet_over_http(server):
+    srv, client = server
+    from test_reflection import reflection_says
+    client._answers.append(reflection_says())
+    request(srv, "POST", "/api/start", {"lab": "creation"})
+    # The moves quote 「休みの日」, so the question must hold those words.
+    request(srv, "POST", "/api/ask", {"question": "休みの日って、みんな何してる？"})
+    status, data = request(srv, "GET", "/api/setup")
+    assert data["changed_choices"] == {"changed": "変わった", "a_little": "少し", "same": "変わらない"}
+    status, begun = request(srv, "POST", "/api/reflect/begin", {"changed": "same", "now_question": "休みの決め方"})
+    assert status == 200 and begun["status"] == "ok"
+    status, answered = request(srv, "POST", "/api/reflect/answer", {"declined": True})
+    assert [m["direction"] for m in answered["moves"]] == ["left_split", "silent_seat", "question_shift"]
+    status, sheet = request(srv, "POST", "/api/reflect/finish",
+                            {"chosen": "silent_seat", "meet_seat": "S03", "meet_reason": ""})
+    assert status == 200 and sheet["move"]["label"] == "黙った席" and sheet["meet"]["title"] == "保育士"
+
+
 def test_a_bad_lab_choice_does_not_start(server):
     srv, _ = server
     assert request(srv, "POST", "/api/start", {"lab": "x"}) == (400, {"error": "unknown_lab_choice"})

@@ -16,8 +16,10 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import editor, roundtable
+from . import editor, reflection, roundtable
 from .editor import QuestionCard
+from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
+from .texts import NAME_IN_QUESTION, load_text
 from .gate import Gate
 from .guard import Guard
 from .index import Entry, build_index, load_topics, load_utterances
@@ -40,6 +42,16 @@ LAB_CHOICES = {
 
 class Refused(Exception):
     """A screen request that cannot be done. Reason code only."""
+
+
+def _line(text, limit: int, empty_code: str, required: bool = True) -> str:
+    """One line the student wrote, trimmed and capped."""
+    text = " ".join((text if isinstance(text, str) else "").split())
+    if required and not text:
+        raise Refused(empty_code)
+    if len(text) > limit:
+        raise Refused("too_long")
+    return text
 
 
 @dataclass
@@ -87,6 +99,7 @@ class Session:
     started: float = field(default_factory=time.monotonic)  # Seconds used, never clock time.
     date: str = field(default_factory=today)
     records: Records | None = None  # None: nothing is kept (tests only).
+    reflection: Reflection | None = None
 
     def __post_init__(self):
         self.guard = Guard(self.library.utterances)
@@ -164,6 +177,91 @@ class Session:
             raise Refused("not_shown")
         utterance = self._utterances[utterance_id]
         return {"utterance_id": utterance_id, "paragraph": utterance.paragraph or utterance.text}
+
+    # --- the reflection sheet (SPEC 5-2) ---
+
+    def reflect_begin(self, changed: str, now_question: str) -> dict:
+        """The student writes first; then the moderator reads the record once."""
+        if not any(r.status in (roundtable.ANSWERED, roundtable.SILENT) for r in self.rounds):
+            raise Refused("no_round_yet")
+        if self.reflection is not None:
+            raise Refused("reflection_started")
+        if changed not in CHANGED_CHOICES:
+            raise Refused("unknown_changed_choice")
+        now_question = _line(now_question, MAX_QUESTION_CHARS, "empty_now_question")
+        if self.gate.names.hits(now_question):
+            return {"status": roundtable.ASK_AGAIN, "message": load_text(NAME_IN_QUESTION)}
+        self.reflection = reflection.begin(self.gate, self, changed, now_question)
+        self.save()
+        return {"status": "ok", "ask_back": self.reflection.ask_back}
+
+    def reflect_answer(self, answer: str, declined: bool = False) -> dict:
+        """One line, or 「答えない」. The next moves are shown after this."""
+        current = self._reflection()
+        if current.answered:
+            raise Refused("already_answered")
+        if declined:
+            current.declined = True
+        else:
+            current.answer = _line(answer, MAX_LINE_CHARS, "empty_answer")
+        current.answered = True
+        self.save()
+        return {"moves": [{"direction": m.direction, "label": DIRECTION_LABELS[m.direction], "text": m.text}
+                          for m in current.moves]}
+
+    def reflect_finish(self, chosen: str, own_move: str, rewrite: str, meet_seat: str, meet_reason: str) -> dict:
+        current = self._reflection()
+        if not current.answered or current.finished:
+            raise Refused("not_ready_to_finish")
+        if chosen not in [m.direction for m in current.moves] + [CHOSE_NONE, CHOSE_OWN]:
+            raise Refused("unknown_move")
+        if meet_seat not in self._seats:
+            raise Refused("unknown_seat")
+        current.chosen = chosen
+        if chosen == CHOSE_OWN:
+            current.own_move = _line(own_move, MAX_LINE_CHARS, "empty_own_move")
+        current.rewrite = _line(rewrite, MAX_QUESTION_CHARS, "", required=False)
+        current.meet_seat = meet_seat
+        current.meet_reason = _line(meet_reason, MAX_LINE_CHARS, "", required=False)
+        current.finished = True
+        self.save()
+        return self.sheet_view()
+
+    def _reflection(self) -> Reflection:
+        if self.reflection is None:
+            raise Refused("reflection_not_started")
+        return self.reflection
+
+    def sheet_view(self) -> dict:
+        """The sheet as the student keeps it (SPEC 5-2 table)."""
+        current = self._reflection()
+        shown = {q.utterance_id: q for r in self.rounds for q in r.quotes}
+        met_lives = []
+        for seat_id in self.met_seats():
+            utterance_id = self.marks.get(seat_id)
+            if utterance_id in shown:
+                utterance = self._utterances[utterance_id]
+                met_lives.append({"text": shown[utterance_id].text, "said": not utterance.note,
+                                  "source": self.source(seat_id, utterance)})
+        move = next((m for m in current.moves if m.direction == current.chosen), None)
+        meet = self.library.seat_view(self._seats[current.meet_seat]) if current.meet_seat else None
+        return {
+            "first_question": next((r.question for r in self.rounds if r.question), ""),
+            "met_lives": met_lives,
+            "splits": [{"heading": s.heading, "pressed": (n, i) in self.pressed_splits}
+                       for n, r in enumerate(self.rounds, start=1) for i, s in enumerate(r.splits)],
+            "cards": [card.text for card in self.cards],
+            "changed": CHANGED_CHOICES[current.changed],
+            "now_question": current.now_question,
+            "ask_back": current.ask_back,
+            "answer": current.answer,
+            "declined": current.declined,
+            "chosen": current.chosen,
+            "move": {"label": DIRECTION_LABELS[move.direction], "text": move.text} if move else None,
+            "own_move": current.own_move,
+            "rewrite": current.rewrite,
+            "meet": meet | {"reason": current.meet_reason} if meet else None,
+        }
 
     # --- what the sitting has gathered ---
 

@@ -24,6 +24,7 @@ from urllib.parse import urlsplit
 from .config import PlaceError, data_dir, load_env_file, records_dir
 from .gate import Gate, load_names
 from .records import Records
+from .reflection import CHANGED_CHOICES
 from .seat_label import KIND_LABELS, show_private_labels
 from .session import LAB_CHOICES, Library, Refused, Session
 from .texts import screen_texts
@@ -62,6 +63,7 @@ class App:
             "texts": screen_texts(),
             "kinds": KIND_LABELS,
             "labs": LAB_CHOICES,
+            "changed_choices": CHANGED_CHOICES,
             "seats": self.library.seat_list(),
         }
 
@@ -89,6 +91,14 @@ class App:
             return {"purposes": session.next_purposes()}
         if path == "/api/paragraph":
             return session.paragraph(body.get("utterance_id", ""))
+        if path == "/api/reflect/begin":
+            return session.reflect_begin(body.get("changed", ""), body.get("now_question", ""))
+        if path == "/api/reflect/answer":
+            return session.reflect_answer(body.get("answer", ""), body.get("declined") is True)
+        if path == "/api/reflect/finish":
+            return session.reflect_finish(body.get("chosen", ""), body.get("own_move", ""),
+                                          body.get("rewrite", ""), body.get("meet_seat", ""),
+                                          body.get("meet_reason", ""))
         raise Refused("unknown_path")
 
 

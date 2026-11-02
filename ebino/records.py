@@ -104,6 +104,35 @@ def session_record(session) -> dict:
                                      "rephrase": card.back.rephrase, "reason": card.back.reason}}
             for card in session.cards
         ],
+        "reflection": _reflection_record(session.reflection),
+    }
+
+
+def _reflection_record(reflection) -> dict | None:
+    """SPEC 2-1: the sheet's fields, the student's own answer to 「変わった？」,
+    the question back and the answer or 「答えない」, the moves shown and the
+    one chosen (or none, or the student's own). Failed model words are not
+    kept, only their reason codes."""
+    if reflection is None:
+        return None
+    return {
+        "changed": reflection.changed,
+        "now_question": reflection.now_question,
+        "ask_back": reflection.ask_back,
+        "ask_back_material": reflection.ask_back_material,
+        "ask_back_fallback": reflection.ask_back_fallback,
+        "unavailable": reflection.unavailable,
+        "moves_shown": [{"direction": m.direction, "material_id": m.material_id, "text": m.text}
+                        for m in reflection.moves],
+        "moves_stopped": dict(reflection.moves_stopped),
+        "answer": reflection.answer,
+        "declined": reflection.declined,
+        "chosen": reflection.chosen,
+        "own_move": reflection.own_move,
+        "rewrite": reflection.rewrite,
+        "meet_seat": reflection.meet_seat,
+        "meet_reason": reflection.meet_reason,
+        "finished": reflection.finished,
     }
 
 
