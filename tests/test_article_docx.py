@@ -511,6 +511,32 @@ def test_quotes_in_a_row_follow_the_last_one(paragraph, pieces):
     assert split_voice(paragraph) == pieces
 
 
+# --- SPEC 14-50-3: 「」 joined by と follow the last one --------------------------
+
+
+@pytest.mark.parametrize(
+    "paragraph, pieces",
+    [
+        (
+            "先輩に「焦るな」と「よく見ろ」と言われた。",
+            [
+                ("article", "先輩に"), ("spoken", "焦るな"), ("article", "と"),
+                ("spoken", "よく見ろ"), ("article", "と言われた。"),
+            ],
+        ),
+        ("「海」と「山」で迷い、店を開いた。", [("article", "「海」と「山」で迷い、店を開いた。")]),
+        ("店の名前は「海」と「山」だ。", [("article", "店の名前は「海」と「山」だ。")]),
+        ("店の名前は「海」 と　「山」だ。", [("article", "店の名前は「海」 と　「山」だ。")]),
+        (
+            "「海」や「山」で迷い、「両方やれ」と言われた。",
+            [("article", "「海」や「山」で迷い、"), ("spoken", "両方やれ"), ("article", "と言われた。")],
+        ),
+    ],
+)
+def test_quotes_joined_by_to_follow_the_last_one(paragraph, pieces):
+    assert split_voice(paragraph) == pieces
+
+
 def test_a_quote_kept_in_the_article_is_one_piece_with_one_id(seat):
     paragraph = "「釣り部」というサークルに入った。君たちに「近道」を言わないと決めた。"
     rows = {"1": [PERSON], "8": [paragraph]}

@@ -102,20 +102,28 @@ def is_said(after: str) -> bool:
     return after.startswith("と") and not after.startswith(_NOT_QUOTING_TO)
 
 
+def _joined(gap: str) -> bool:
+    """Whether two 「」 with `gap` between them belong to one run.
+
+    Nothing between them (spaces aside), or a lone と: 〈「海」と「山」〉 is the
+    と of "A and B", not a quoting と (SPEC 14-50-3)."""
+    return gap.strip() in ("", "と")
+
+
 def _said_quotes(paragraph: str) -> list[re.Match]:
     """The 「」 that hold words said.
 
-    「」 written one after another with nothing between them share the fate of
-    the last one (SPEC 14-50-2): 「…」「…」と言われた makes both speech, and
-    「…」「…」というお店 keeps both in the article."""
+    「」 written one after another share the fate of the last one (SPEC 14-50-2,
+    14-50-3): 「…」「…」と言われた and 「…」と「…」と言われた make both speech,
+    and 「…」「…」というお店 and 「…」と「…」で迷い keep both in the article."""
     matches = list(_QUOTE.finditer(paragraph))
     said: list[re.Match] = []
     run: list[re.Match] = []
     for index, match in enumerate(matches):
         run.append(match)
         following = matches[index + 1] if index + 1 < len(matches) else None
-        if following and not paragraph[match.end() : following.start()].strip():
-            continue  # The next 「」 follows at once; decide with the last one.
+        if following and _joined(paragraph[match.end() : following.start()]):
+            continue  # The next 「」 belongs to this run; decide with the last one.
         if is_said(paragraph[match.end() :]):
             said.extend(run)
         run = []
