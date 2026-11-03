@@ -53,7 +53,11 @@ python -m venv .venv
 - 生徒の氏名・取材した生徒の名前・電話番号・番地は、モデルに渡す前にコードで外しています。外し忘れがないかは、最後に関所で確かめます。
 - 人の名前は、画面にも動画にも出しません。席の札は肩書きだけです。校内で1年生が使う画面だけ、会社名を添えます。
 
-<!-- TODO 11/6: 地図の出典 © OpenStreetMap contributors -->
+### 地図
+
+- 地図（えびの市の境界・川内川・地名・学校の位置）は、OpenStreetMap のデータから作りました。**© OpenStreetMap contributors**。地図のデータ（`mapdata/ebino_osm.json`）は OpenStreetMap からの派生データで、ODbL 1.0（Open Database License）に従います。
+- 地図のデータは `python tools/fetch_osm_map.py` で1回だけ取ってきて、リポジトリに入れました。アプリは動いている間に外へ取りに行きません。
+- 手描き風の線は rough.js 4.6.6（MIT License）を同梱して描いています（`ebino/static/rough.js`、ライセンスの文は `ebino/static/rough.LICENSE.txt`）。
 
 ## 作る途中で変えたこと
 
