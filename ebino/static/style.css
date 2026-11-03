@@ -486,7 +486,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .pt .halo { fill: url(#lamp-glow); opacity: 0; transition: opacity .45s ease; }
 .pt.met .halo { fill: url(#paper-glow); opacity: .8; }
 .pt.lit .halo { fill: url(#lamp-glow); opacity: 1; }
-.pt:hover .shape, .pt:focus-visible .shape { stroke: var(--ink); stroke-width: 2.6; transform: none; }
+.pt.hover .shape, .pt:focus-visible .shape { stroke: var(--ink); stroke-width: 2.6; transform: none; }
 .pt .met-mark { display: none; }
 .pt .ask-mark { display: none; fill: var(--ink); font-family: var(--gothic); font-size: 15px; font-weight: bold;
   paint-order: stroke; stroke: var(--veil-thin); stroke-width: 3px; }
@@ -523,10 +523,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* Labels, cards and headings over the map, in CSS pixels. */
 .map-tip, .map-bubble, .split-tag, .table-label { position: absolute; max-width: min(70%, 18em);
   border-radius: 6px; padding: 3px 10px; font-size: .85rem; line-height: 1.5; }
+/* A seat's name, by its mark while the mouse or the keyboard is on it: a
+   small card of the night, in Gothic, edged in moonlight. */
 .map-tip { background: var(--veil); color: var(--ink); border: 1px solid var(--moon-soft);
-  box-shadow: 0 6px 18px var(--shadow); }
+  box-shadow: 0 6px 18px var(--shadow); font-family: var(--gothic); font-size: 14px; }
 .map-tip .title { font-weight: bold; }
-.map-tip .detail { font-size: .8rem; color: var(--soft); }
+.map-tip .detail { font-size: 13px; color: var(--soft); }
 /* 灯り札: a seat's voice on unbleached paper, a warm light round it, tied
    to its seat by a thin thread of light. The voice in large Mincho, about
    twenty characters to a line; under it, in small Gothic, which seat. */

@@ -66,6 +66,7 @@ const EbinoMap = (() => {
   let tableTop = null;  // The round table's top, a ring of spots of the drawing, while it is open.
   let roundSeats = [];  // The seats this round lights, in order.
   let soon = null;
+  let hovered = null;  // The seat under the mouse (the nearest of the marks it is over).
 
   const reduced = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = (id) => document.getElementById(id);
@@ -315,12 +316,42 @@ const EbinoMap = (() => {
     const ask = svgEl("text", { class: "ask-mark", x: 9, y: -6 });
     ask.textContent = "？";
     point.append(ask);
-    point.addEventListener("mouseenter", () => showTip(seat.seat_id));
+    // The mouse is followed over the whole layer (hoverAt); the keyboard here.
     point.addEventListener("focus", () => showTip(seat.seat_id));
-    point.addEventListener("mouseleave", restoreTip);
     point.addEventListener("blur", restoreTip);
-    pressable(point, () => press(seat.seat_id, point));
+    // A mouse's press goes to the seat whose name it shows; a touch, as before.
+    pressable(point, (event) => {
+      const id = event && event.pointerType === "mouse" && hovered ? hovered : seat.seat_id;
+      press(id, points[id].node);
+    });
     return point;
+  }
+
+  // Which seat the mouse is on: of the points it is over, the one whose mark
+  // is nearest (where seats are close their soft rings overlap, and the ring
+  // on top is not always the seat under the pointer). Its name card shows
+  // while the mouse is there and goes when it leaves. A touch is left as it was.
+  function hoverAt(event) {
+    if (event.pointerType !== "mouse" || event.buttons) return;
+    const id = nearestPoint(event.clientX, event.clientY);
+    if (id === hovered) return;
+    if (hovered && points[hovered]) points[hovered].node.classList.remove("hover");
+    hovered = id;
+    if (!id) return restoreTip();
+    points[id].node.classList.add("hover");
+    showTip(id);
+  }
+
+  function nearestPoint(x, y) {
+    let best = null, far = Infinity;
+    for (const node of document.elementsFromPoint(x, y)) {
+      const point = node.closest && node.closest(".points .pt");
+      if (!point || !points[point.dataset.seat]) continue;
+      const r = point.querySelector(".shape").getBoundingClientRect();
+      const d = Math.hypot(r.left + r.width / 2 - x, r.top + r.height / 2 - y);
+      if (d < far) { best = point.dataset.seat; far = d; }
+    }
+    return best;
   }
 
   function pressable(node, action) {
@@ -328,7 +359,7 @@ const EbinoMap = (() => {
     node.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        action();
+        action(event);
       }
     });
   }
@@ -526,6 +557,8 @@ const EbinoMap = (() => {
       // The click that follows this drag (if any) comes first; then presses count again.
       if (dragged) setTimeout(() => { dragged = false; }, 0);
     };
+    svg.addEventListener("pointermove", hoverAt);
+    svg.addEventListener("pointerleave", (event) => hoverAt({ pointerType: event.pointerType, buttons: 0, clientX: -1, clientY: -1 }));
     svg.addEventListener("pointerup", up);
     svg.addEventListener("pointercancel", up);
     // A drag is not a press on the point it started on.
@@ -882,6 +915,10 @@ const EbinoMap = (() => {
   function seatOf(seatId) { return app.state.seatById[seatId]; }
   function spotOf(seatId) { return points[seatId].at(); }
 
+  // A seat's name card: one at a time, by its mark, in the words the seat
+  // list shows (its title, and on the in-school screen its company and name;
+  // seat_label.py), set on the screen only. It covers no lamp card, heading
+  // or label on the map and keeps inside the frame; it moves none of them.
   function showTip(seatId) {
     const seat = seatOf(seatId);
     if (!seat || !points[seatId]) return;
@@ -893,12 +930,42 @@ const EbinoMap = (() => {
     if (isSilent(seatId)) tip.append(div("detail", app.state.texts.not_asked_yet));
     overlay.append(tip);
     const [x, y] = spotOf(seatId);
-    if (!inView(x, y)) { tip.classList.add("unplaced"); Object.assign(tip.dataset, { x, y, gap: 16 }); return; }
-    if (place(tip, x, y, 16)) return;
-    // No side free: a heading in the way moves to a side clear of the label.
-    for (const tag of overlay.querySelectorAll(".split-tag")) {
-      if (overlaps(tip, tag)) place(tag, Number(tag.dataset.x), Number(tag.dataset.y), 8);
+    Object.assign(tip.dataset, { x, y, gap: 14 });
+    if (!inView(x, y)) { tip.classList.add("unplaced"); return; }
+    const frameBox = overlay.getBoundingClientRect();
+    const [px, py] = toFrame(x, y);
+    const others = [...overlay.children].filter((other) => other !== tip && !other.classList.contains("unplaced"))
+      .map((other) => boxIn(other, frameBox));
+    const own = boxIn(points[seatId].node.querySelector(".shape"), frameBox);
+    const [left, top] = tipSpot({ w: frameBox.width, h: frameBox.height }, { ...measure(tip, frameBox), px, py, gap: 14 },
+      [...others, own], fixedBoxes(frameBox));
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+  }
+
+  // Where a seat's name card goes ({ w, h } by its mark at px, py, gap away)
+  // in a frame { w, h }: of the eight places round the mark (above first),
+  // the first that covers nothing; failing that, the one that covers least,
+  // what it must not cover (avoid: the cards, headings and labels on the map
+  // and the mark itself) counting far more than the map's words and seats
+  // (fixed). Always inside the frame. It reads nothing but what it is given.
+  function tipSpot(frame, box, avoid, fixed) {
+    const { w, h, px, py, gap } = box, d = gap * 0.7;
+    const clampX = (left) => Math.max(4, Math.min(left, frame.w - w - 4));
+    const clampY = (top) => Math.max(4, Math.min(top, frame.h - h - 4));
+    const spots = [[px - w / 2, py - h - gap], [px + gap, py - h / 2], [px - w / 2, py + gap], [px - w - gap, py - h / 2],
+      [px + d, py - h - d], [px - w - d, py - h - d], [px + d, py + d], [px - w - d, py + d]]
+      .map(([left, top]) => [clampX(left), clampY(top)]);
+    const area = ([left, top], boxes) => boxes.reduce((sum, [ol, ot, ow, oh]) =>
+      sum + Math.max(0, Math.min(left + w, ol + ow) - Math.max(left, ol)) *
+        Math.max(0, Math.min(top + h, ot + oh) - Math.max(top, ot)), 0);
+    let best = spots[0], least = Infinity;
+    for (const spot of spots) {
+      const cost = area(spot, avoid) * 1000 + area(spot, fixed);
+      if (cost < least) { best = spot; least = cost; }
+      if (!cost) break;
     }
+    return best;
   }
 
   function hideTip() { for (const tip of overlay.querySelectorAll(".map-tip")) tip.remove(); }
