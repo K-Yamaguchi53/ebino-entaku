@@ -32,6 +32,9 @@ const EbinoMap = (() => {
   // On a narrow map a seat's label at the table is cut here, with 「…」 (its
   // card below has the whole title).
   const NARROW = 560, LABEL_CHARS = 8;
+  // A split's heading goes on the table only on a map this wide or wider (CSS
+  // px); on a narrower one it is under the map only, over its cards.
+  const TAG_ON_MAP = 600;
   const CHAIR_R = 13, MIN_CHAIR_PX = 13;  // An empty chair: never under 26 px across to press.
   const DRAG_FROM = 5;  // px moved before a press becomes a drag.
   // Words drawn on the picture, in CSS px (they keep their size as it zooms).
@@ -544,6 +547,16 @@ const EbinoMap = (() => {
     };
     if (window.ResizeObserver) new ResizeObserver(changed).observe(frame);
     window.addEventListener("resize", changed);
+    // The screen's keyboard takes the lower part of the screen: the card
+    // being written in stays in sight.
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", keepCardInSight);
+    window.addEventListener("resize", keepCardInSight);
+  }
+
+  // The card of an empty chair, whole on screen when it opens and while one
+  // writes in it.
+  function keepCardInSight() {
+    if (card && !card.hidden && card.contains(document.activeElement)) card.scrollIntoView({ block: "nearest" });
   }
 
   // Draws the rim, then the river, as if by hand. Called when the map is on
@@ -583,63 +596,106 @@ const EbinoMap = (() => {
     return x >= vb.x && x <= vb.x + vb.w && y >= vb.y && y <= vb.y + vb.h;
   }
 
-  // Puts a label, bubble or heading by a spot of the drawing, always inside
-  // the map's frame: above it, below it, right or left, the first side that
-  // covers no other label, bubble, heading or button, and no seat or empty
-  // chair at the round table; failing that, the
-  // nearest spot in the frame that covers none. Returns false when there is
-  // no such spot even with the bubbles gone (it then takes the side that
-  // covers least). The spot is kept on the node, so it can be put again when
-  // the frame or the camera changes.
-  function place(node, x, y, gap) {
-    Object.assign(node.dataset, { x, y, gap });
-    node.classList.remove("unplaced");
-    const frameBox = overlay.getBoundingClientRect();
-    const [px, py] = toFrame(x, y);
-    // Fix the width first: a box set further right would wrap and grow taller.
-    node.style.width = "";
-    node.style.maxWidth = `${Math.floor(Math.min(frameBox.width * 0.7, 18 * 16, frameBox.width - 8))}px`;
-    const w0 = Math.ceil(node.getBoundingClientRect().width);
-    node.style.width = `${w0}px`;
-    const { width: w, height: h } = node.getBoundingClientRect();
-    const clampX = (left) => Math.max(4, Math.min(left, frameBox.width - w - 4));
-    const clampY = (top) => Math.max(4, Math.min(top, frameBox.height - h - 4));
+  // Where one box ({ w, h } by its spot px, py, gap apart) goes in a frame
+  // ({ w, h }), always inside it: above the spot, below it, right or left,
+  // the first side that covers none of the others ([left, top, width,
+  // height] in the frame); failing that, the nearest spot in the frame that
+  // covers none. Returns [[left, top], area covered]: with no free spot, the
+  // side that covers least. It reads nothing but what it is given.
+  function chooseSpot(frame, box, others) {
+    const { w, h, px, py, gap } = box;
+    const clampX = (left) => Math.max(4, Math.min(left, frame.w - w - 4));
+    const clampY = (top) => Math.max(4, Math.min(top, frame.h - h - 4));
     const sides = [
       [px - w / 2, py - h - gap], [px - w / 2, py + gap],
       [px + gap, py - h / 2], [px - w - gap, py - h / 2],
     ].map(([left, top]) => [clampX(left), clampY(top)]);
-    const buttons = [...frame.querySelectorAll(".map-controls button")].filter((b) => !b.hidden);
-    buttons.push(...tableLayer.querySelectorAll(".token .shape, .chair circle"));
-    const boxes = (nodes) => nodes.filter((other) => other !== node).map((other) => {
-      const r = other.getBoundingClientRect();
-      return [r.left - frameBox.left, r.top - frameBox.top, r.width, r.height];
-    });
-    const away = ([left, top]) => Math.hypot(left + w / 2 - px, top + h / 2 - py);
-    const spots = [];
-    for (let top = 4; top <= frameBox.height - h - 4; top += 6) {
-      for (let left = 4; left <= frameBox.width - w - 4; left += 6) spots.push([left, top]);
+    const covered = ([left, top]) => others.reduce((sum, [ol, ot, ow, oh]) =>
+      sum + Math.max(0, Math.min(left + w, ol + ow) - Math.max(left, ol)) *
+        Math.max(0, Math.min(top + h, ot + oh) - Math.max(top, ot)), 0);
+    let best = sides[0], least = Infinity;
+    for (const side of sides) {
+      const area = covered(side);
+      if (area < least) { best = side; least = area; }
+      if (!area) return [side, 0];
     }
-    spots.sort((a, b) => away(a) - away(b));
-    const choose = (others) => {
-      const covered = ([left, top]) => others.reduce((sum, [ol, ot, ow, oh]) =>
-        sum + Math.max(0, Math.min(left + w, ol + ow) - Math.max(left, ol)) *
-          Math.max(0, Math.min(top + h, ot + oh) - Math.max(top, ot)), 0);
-      let best = sides[0], least = Infinity;
-      for (const side of sides) {
-        const area = covered(side);
-        if (area < least) { best = side; least = area; }
-        if (!area) return [side, 0];
+    const away = ([left, top]) => Math.hypot(left + w / 2 - px, top + h / 2 - py);
+    let free = null, far = Infinity;
+    for (let top = 4; top <= frame.h - h - 4; top += 6) {
+      for (let left = 4; left <= frame.w - w - 4; left += 6) {
+        const spot = [left, top], d = away(spot);
+        if (d < far && !covered(spot)) { free = spot; far = d; }
       }
-      const free = spots.find((spot) => !covered(spot));
-      return free ? [free, 0] : [best, least];
-    };
-    let [best, least] = choose(boxes([...overlay.children, ...buttons]));
+    }
+    return free ? [free, 0] : [best, least];
+  }
+
+  // Where every heading and label goes, in order, from the frame as it is
+  // now and nothing before: the same width gives the same places, however
+  // the window came to it. Each box keeps clear of the fixed ones (the
+  // buttons, the seats and chairs at the table) and of the boxes put before
+  // it. null leaves a box out: its spot is off screen; it is the heading at
+  // the table on a map narrower than TAG_ON_MAP; or it is a label or heading
+  // at the table with no free spot.
+  function planLabels(frame, items, fixed) {
+    const taken = [...fixed];
+    return items.map((item) => {
+      if (!item.inView || (item.heading && item.atTable && frame.w < TAG_ON_MAP)) return null;
+      const [spot, least] = chooseSpot(frame, item, taken);
+      if (least && item.atTable) return null;
+      taken.push([spot[0], spot[1], item.w, item.h]);
+      return spot;
+    });
+  }
+
+  // A box's size as it will be put. It is measured from the frame's corner,
+  // not where it was (a box left further right wraps narrower and grows
+  // taller), and its width is then fixed, so it keeps that size wherever it
+  // goes.
+  function measure(node, frameBox) {
+    node.classList.remove("unplaced");
+    node.style.left = "0px";
+    node.style.top = "0px";
+    node.style.width = "";
+    node.style.maxWidth = `${Math.floor(Math.min(frameBox.width * 0.7, 18 * 16, frameBox.width - 8))}px`;
+    node.style.width = `${Math.ceil(node.getBoundingClientRect().width)}px`;
+    const { width, height } = node.getBoundingClientRect();
+    return { w: width, h: height };
+  }
+
+  function boxIn(node, frameBox) {
+    const r = node.getBoundingClientRect();
+    return [r.left - frameBox.left, r.top - frameBox.top, r.width, r.height];
+  }
+
+  // What a label never covers: the buttons, and the seats and empty chairs
+  // at the round table.
+  function fixedBoxes(frameBox) {
+    const nodes = [...frame.querySelectorAll(".map-controls button")].filter((b) => !b.hidden);
+    nodes.push(...tableLayer.querySelectorAll(".token .shape, .chair circle"));
+    return nodes.map((node) => boxIn(node, frameBox));
+  }
+
+  // Puts one label, bubble or heading by a spot of the drawing, clear of the
+  // fixed boxes and of every other box on the map (chooseSpot). Returns
+  // false when there is no free spot even with the bubbles gone (it then
+  // takes the side that covers least). The spot is kept on the node, so it
+  // can be put again when the frame or the camera changes.
+  function place(node, x, y, gap) {
+    Object.assign(node.dataset, { x, y, gap });
+    const frameBox = overlay.getBoundingClientRect();
+    const [px, py] = toFrame(x, y);
+    const box = { ...measure(node, frameBox), px, py, gap };
+    const size = { w: frameBox.width, h: frameBox.height };
+    const fixed = fixedBoxes(frameBox);
+    const others = (keep) => [...fixed, ...[...overlay.children]
+      .filter((other) => other !== node && keep(other)).map((other) => boxIn(other, frameBox))];
+    let [best, least] = chooseSpot(size, box, others(() => true));
     let dropBubbles = false;
     // Bubbles are short-lived: rather than cover a label or a heading, the
     // earlier bubbles in the way go.
     if (least) {
-      const [spot, rest] = choose(boxes([...overlay.children, ...buttons]
-        .filter((other) => !other.classList.contains("map-bubble"))));
+      const [spot, rest] = chooseSpot(size, box, others((other) => !other.classList.contains("map-bubble")));
       if (!rest) [best, least, dropBubbles] = [spot, 0, true];
     }
     node.style.left = `${best[0]}px`;
@@ -651,25 +707,33 @@ const EbinoMap = (() => {
   }
 
   // Every heading and label put again, in that order (headings first), after
-  // the frame's width or the camera changed. One whose spot is off screen
-  // waits hidden; bubbles go.
+  // the frame's width or the camera changed: each measured afresh, then all
+  // placed by planLabels. Bubbles go.
   function relayout() {
     if (!view) return;
     for (const node of overlay.querySelectorAll(".map-bubble")) node.remove();
     const nodes = [...overlay.querySelectorAll(".split-tag"), ...overlay.querySelectorAll(".table-label.empty"),
       ...overlay.querySelectorAll(".table-label:not(.empty)"), ...overlay.querySelectorAll(".map-tip")];
-    const narrow = overlay.clientWidth < NARROW;
-    for (const node of nodes) node.classList.add("unplaced");
-    for (const node of nodes) {
+    const frameBox = overlay.getBoundingClientRect();
+    const narrow = frameBox.width < NARROW;
+    const items = nodes.map((node) => {
       const x = Number(node.dataset.x), y = Number(node.dataset.y);
-      if (!inView(x, y)) continue;
-      const atTable = node.classList.contains("table-label") || node.classList.contains("on-table");
       if (node.classList.contains("table-label")) node.textContent = narrow ? node.dataset.short : node.dataset.full;
       node.classList.toggle("narrow", narrow);
-      // A label or heading at the table that would cover another, or a seat,
-      // is left out (the heading is under the map too, over its cards).
-      if (!place(node, x, y, Number(node.dataset.gap)) && atTable) node.classList.add("unplaced");
-    }
+      const [px, py] = toFrame(x, y);
+      return { ...measure(node, frameBox), px, py, gap: Number(node.dataset.gap), inView: inView(x, y),
+        heading: node.classList.contains("split-tag"),
+        atTable: node.classList.contains("table-label") || node.classList.contains("on-table") };
+    });
+    const spots = planLabels({ w: frameBox.width, h: frameBox.height }, items, fixedBoxes(frameBox));
+    nodes.forEach((node, k) => {
+      if (!spots[k]) {
+        node.classList.add("unplaced");
+        return;
+      }
+      node.style.left = `${spots[k][0]}px`;
+      node.style.top = `${spots[k][1]}px`;
+    });
   }
 
   function overlaps(a, b) {
@@ -849,8 +913,8 @@ const EbinoMap = (() => {
       if (!still()) return;
     }
     const center = tableCenter();
-    // Motion reduced: no camera, no flight; the table as it ends.
-    if (!reduced()) await moveTo(tableView(center), CAMERA_FOR);
+    // Motion reduced: the camera is at the table at once, nothing flies.
+    await moveTo(tableView(center), CAMERA_FOR);
     if (!still()) return;
     openTable(result, order, center, still);
   }
@@ -955,8 +1019,8 @@ const EbinoMap = (() => {
     if ($("map-back")) $("map-back").hidden = true;
   }
 
-  // 「地図にもどす」: the table goes, the camera goes back to the whole map.
-  // The lit seats and the marks stay.
+  // 「地図にもどす」: the table goes, the camera goes back to the whole map
+  // (at once when motion is reduced). The lit seats and the marks stay.
   function closeTable() {
     roundNo += 1;
     for (const flight of flights) flight.cancel();
@@ -1013,6 +1077,7 @@ const EbinoMap = (() => {
     }
     card.append(close);
     card.hidden = false;
+    card.scrollIntoView({ block: "nearest" });
   }
 
   return { init, show, round, refresh };

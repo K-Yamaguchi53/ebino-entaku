@@ -5,6 +5,7 @@ the sources on the screen and in the README, and nothing outside loaded."""
 import json
 import re
 import shutil
+import subprocess
 import threading
 from pathlib import Path
 
@@ -302,6 +303,100 @@ def test_a_map_buttons_table_missing_a_row_is_refused(tmp_path, monkeypatch):
     (tmp_path / "map_buttons.tsv").write_text("ID\t文字\t読み上げ\nback\t地図にもどす\t\n", encoding="utf-8")
     with pytest.raises(ValueError):
         texts.map_buttons()
+
+
+def _inner_function(script, name):
+    start = script.index(f"function {name}(")
+    return script[start:script.index("\n  }\n", start) + 5]
+
+
+# The map's frame at a width, as relayout measures it: the heading at the
+# table, two empty chairs' labels and four seats' labels round the table, and
+# the zoom buttons and the seats as fixed boxes. Sizes follow the width, as
+# the narrow labels and the frame's height do on the screen.
+_LAYOUT_RUN = """
+const TAG_ON_MAP = %(tag_on_map)s;
+%(source)s
+function at(width) {
+  const frame = { w: width, h: Math.round(width / 1.304) };
+  const narrow = width < 560, cx = frame.w / 2, cy = frame.h / 2, r = Math.min(frame.w, frame.h) * 0.3;
+  const label = narrow ? [70, 18] : [130, 20];
+  const items = [{ w: Math.min(frame.w * 0.7, 288), h: narrow ? 52 : 34, px: cx, py: cy + r * 0.3, gap: 0,
+    inView: true, heading: true, atTable: true }];
+  for (let k = 0; k < 6; k++) {
+    const a = k * Math.PI / 3;
+    items.push({ w: label[0], h: label[1], px: cx + r * Math.cos(a), py: cy + r * Math.sin(a), gap: 16,
+      inView: true, heading: false, atTable: true });
+  }
+  const fixed = [[frame.w - 120, frame.h - 40, 116, 36]];
+  for (let k = 0; k < 6; k++) {
+    const a = k * Math.PI / 3, s = Math.max(16, width / 40);
+    fixed.push([cx + r * Math.cos(a) - s / 2, cy + r * Math.sin(a) - s / 2, s, s]);
+  }
+  return { frame, items, fixed };
+}
+// The window's width changing step by step; the places at the end.
+function after(widths) {
+  let spots = null;
+  for (const width of widths) {
+    const { frame, items, fixed } = at(width);
+    spots = planLabels(frame, items, fixed);
+  }
+  return spots;
+}
+const runs = %(runs)s;
+process.stdout.write(JSON.stringify(runs.map(after)));
+"""
+
+
+def _layouts(runs):
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    tag_on_map = re.search(r"const TAG_ON_MAP = (\d+);", script).group(1)
+    source = _inner_function(script, "chooseSpot") + _inner_function(script, "planLabels")
+    program = _LAYOUT_RUN % {"tag_on_map": tag_on_map, "source": source, "runs": json.dumps(runs)}
+    done = subprocess.run(["node", "-e", program], capture_output=True, timeout=30)
+    assert done.returncode == 0, done.stderr.decode("utf-8", "replace")
+    return json.loads(done.stdout.decode("utf-8")), int(tag_on_map)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_the_headings_place_depends_on_the_width_now_not_on_the_widths_before():
+    # 768 -> 375 and 1440 -> 375 (and the long way round) end the same; so do
+    # two ways to 700.
+    (a, b, c, d, e), tag_on_map = _layouts([[768, 343], [1440, 343], [1440, 768, 520, 600, 343],
+                                            [343, 700], [1440, 700]])
+    assert tag_on_map == 600
+    assert a == b == c
+    assert d == e
+    # Narrower than TAG_ON_MAP the heading is not on the map; wider, it is.
+    assert a[0] is None and d[0] is not None
+    # The labels that are shown keep inside the frame and off one another.
+    for spots, width in ((a, 343), (d, 700)):
+        height = round(width / 1.304)
+        assert all(4 <= left and 4 <= top and left < width and top < height for left, top in filter(None, spots))
+
+
+def test_a_box_is_measured_from_the_frames_corner_and_put_by_planlabels_alone():
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    measure = _inner_function(script, "measure")
+    # Measured where it was, a box further right wraps narrower and taller.
+    assert measure.index('node.style.left = "0px"') < measure.index("getBoundingClientRect")
+    relayout = _inner_function(script, "relayout")
+    assert "measure(node, frameBox)" in relayout and "planLabels(" in relayout
+    assert "place(" not in relayout
+    plan = _inner_function(script, "planLabels") + _inner_function(script, "chooseSpot")
+    # Nothing from before: only what it is given.
+    for outside in ("overlay", "dataset", "document", "vb", "style", "classList"):
+        assert outside not in plan
+
+
+def test_with_motion_reduced_the_camera_still_goes_to_the_table_at_once():
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    table = _inner_function(script, "tableRound")
+    assert "await moveTo(tableView(center), CAMERA_FOR);" in table
+    assert "if (!reduced()) await moveTo(tableView" not in table
+    move = _inner_function(script, "moveTo")
+    assert "if (reduced() || !ms) {" in move and "setView(target);" in move  # At once, no steps.
 
 
 def test_the_screen_moves_points_on_the_screen_only_and_keeps_its_fallbacks():
