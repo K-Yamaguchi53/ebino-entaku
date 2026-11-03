@@ -83,6 +83,22 @@ def test_a_summary_that_fails_the_check_is_not_shown():
         assert "P01" not in view(Saved({"P01": summary}, {"P01": ["p1"]}))
 
 
+def test_a_quote_in_a_summary_never_runs_across_a_line_break_or_into_the_next_piece():
+    rows = "上流では水が足りていた→下流では田んぼが乾いた\n雨の少ない年→川の水も減った"
+    long = rows + "\n" + "川の水の量を毎日はかり、雨の量と比べて、これからの守り方を考えたい。" * 3
+    sample = samples([u("p1", "P01", long), u("p4", "P01", "町の人に聞いて考えた。")], SEATS)[0]
+    assert purpose_summary.is_long(sample)
+    for crossing in ("「田んぼが乾いた雨の少ない年」", "「考えたい。町の人に聞いて」"):
+        assert purpose_summary.stopped(f"{crossing}から、川の水を確かめたい。", sample, names())
+    for inside in ("「田んぼが乾いた」", "「雨の少ない年→川の水も減った」", "「町の人に聞いて考えた。」"):
+        assert not purpose_summary.stopped(f"{inside}から、川の水を確かめたい。", sample, names())
+
+
+def test_line_breaks_are_not_counted_toward_the_length():
+    rows = "\n".join(["水"] * 61)  # 61 characters on 61 rows: 121 with the breaks.
+    assert not purpose_summary.is_long(samples([u("p1", "P01", rows)], SEATS)[0])
+
+
 def test_a_summary_made_from_other_pieces_is_not_shown():
     # The sample was ingested again and its pieces changed: the summary is stale.
     assert "P01" not in view(Saved({"P01": SUMMARY}, {"P01": ["p1-old"]}))

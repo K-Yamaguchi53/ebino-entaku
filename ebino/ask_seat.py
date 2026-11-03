@@ -76,7 +76,9 @@ ANSWERED = "answered"
 NOT_FOUND = "not_found"
 UNAVAILABLE = "unavailable"
 
-_FIRST_SENTENCE = re.compile(r"[^。！？!?]+[。！？!?]*")
+# A sentence ends at 。！？!? or at a line break, as for the guard (SPEC 14-51):
+# a copied poster's table row is never run into the next one.
+_FIRST_SENTENCE = re.compile(r"[^。！？!?\r\n  ]+[。！？!?]*")
 
 
 @dataclass(frozen=True)

@@ -24,6 +24,7 @@ fails the check, or one made from other pieces is not shown.
 
 import json
 import os
+import re
 import sys
 from collections import Counter
 from dataclasses import dataclass, field, replace
@@ -60,17 +61,22 @@ def sample_text(sample: PurposeSample) -> str:
 
 
 def is_long(sample: PurposeSample) -> bool:
-    return len(sample_text(sample)) > MAX_SAMPLE_CHARS
+    """Line breaks (a copied poster's rows) are not counted as characters."""
+    return len(re.sub(r"[\r\n  ]", "", sample_text(sample))) > MAX_SAMPLE_CHARS
 
 
 class _Original:
-    """The sample's own words, for the check of 「」『』 in a summary."""
+    """The sample's own words, for the check of 「」『』 in a summary: a part
+    of one line of one piece, or whole sentences of one piece (the guard's
+    rule). Never across a line break (a copied poster's row, SPEC 14-51) or
+    from one piece into the next, though the screen shows them joined."""
 
-    def __init__(self, text: str):
-        self.text = text
+    def __init__(self, texts: tuple[str, ...]):
+        self.texts = texts
+        self.lines = [line for text in texts for line in text.splitlines()]
 
     def holds(self, part: str) -> bool:
-        return part in self.text or check(part, self.text).passed
+        return any(part in line for line in self.lines) or any(check(part, text).passed for text in self.texts)
 
 
 @dataclass(frozen=True)
@@ -80,7 +86,7 @@ class _Names:
 
 def stopped(summary: str, sample: PurposeSample, names: NameList) -> str:
     """"" when the summary may be shown, else a reason code."""
-    return checked(summary, _Original(sample_text(sample)), _Names(names), MAX_SAMPLE_CHARS)
+    return checked(summary, _Original(sample.texts), _Names(names), MAX_SAMPLE_CHARS)
 
 
 @dataclass

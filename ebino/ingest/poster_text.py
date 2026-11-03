@@ -2,9 +2,10 @@
 
 Some posters are only an image. The teacher's side copies them to UTF-8 text,
 section by section: a line starting with 「## 」 is a heading, and the lines up
-to the next heading are its body. Lines before the first heading (a title, the
-students' names) are dropped. The mark alone decides a heading; its name and
-role are found as for a PDF heading (poster_pdf.copied_heading).
+to the next heading are its body, kept apart by line breaks. Lines before the
+first heading (a title, the students' names) are dropped. The mark alone
+decides a heading; its name and role are found as for a PDF heading
+(poster_pdf.copied_heading).
 
 From the sections on, a copied poster takes the same path as a PDF one
 (poster_pdf.poster_utterances): words hidden, the purpose sample required, the
@@ -33,8 +34,12 @@ def heading_text(line: str) -> str | None:
 
 
 def text_sections(text: str) -> list[Section]:
-    """Body lines are joined as they are, each stripped, with nothing added:
-    the same as a PDF poster's lines. A heading with no body is no section."""
+    """Body lines are kept apart by a line break (\\n), each stripped, with no
+    character added; blank lines are left out. A copied line is a paragraph,
+    a list item or a table row, not a printed wrap (the teacher's call on
+    11/3), so its end is a sentence break for the guard (SPEC 14-51): a quote
+    cannot run from one row into the next. A PDF poster's lines are printed
+    wraps and stay joined. A heading with no body is no section."""
     found: list[tuple[str, str | None, list[str]]] = []
     for line in text.splitlines():
         words = heading_text(line)
@@ -43,15 +48,11 @@ def text_sections(text: str) -> list[Section]:
             if heading is None:
                 raise IngestError("poster_heading_empty")
             found.append((heading.label, heading.role, []))
-        elif found:
+        elif found and line.strip():
             found[-1][2].append(line.strip())
     if not found:
         raise IngestError("poster_heading_missing")
-    return [
-        Section(label, role, "".join(body))
-        for label, role, body in found
-        if "".join(body)
-    ]
+    return [Section(label, role, "\n".join(body)) for label, role, body in found if body]
 
 
 def read_text(path: Path) -> str:

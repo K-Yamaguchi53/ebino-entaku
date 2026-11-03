@@ -6,6 +6,8 @@ import json
 import pytest
 
 from conftest import make_seat, write_seats
+from ebino.ask_seat import first_sentence
+from ebino.guard import check
 from ebino.ingest.masks import SeatMasks
 from ebino.ingest.poster_pdf import ROLE_BACKGROUND, ROLE_RESULT, heading_of, purpose_examples
 from ebino.ingest.poster_text import ingest_text_poster, text_sections
@@ -46,9 +48,24 @@ def test_two_headings_make_two_sections_and_the_purpose_comes_from_the_theme_rea
     assert purpose_examples(utterances) == [utterances[0]]
 
 
-def test_body_lines_are_joined_with_nothing_added():
+def test_body_lines_are_kept_apart_by_a_line_break_with_nothing_added():
     sections = text_sections("## 成果\n・周りを見て動いた\n・進んで取り組めた\n")
-    assert [s.text for s in sections] == ["・周りを見て動いた・進んで取り組めた"]
+    assert [s.text for s in sections] == ["・周りを見て動いた\n・進んで取り組めた"]
+
+
+ROW_1 = "迷っていた→聞けるようになった"
+ROW_2 = "一人でやっていた→頼れるようになった"
+TABLE = f"## 目的\n働くと何が変わるかを知りたい。\n## 実習の成果\n{ROW_1}\n{ROW_2}\n"
+
+
+def test_a_tables_rows_stay_apart_and_a_quote_cannot_run_across_them(tmp_path, seat):
+    rows = ingest_text_poster(write(tmp_path, TABLE), seat)[1]
+    assert rows.text == f"{ROW_1}\n{ROW_2}"  # The line break is kept in the piece.
+    assert not check("聞けるようになった一人でやっていた", rows.text).passed  # Across the rows.
+    assert not check("迷っていた→聞けるようになった一人でやっていた", rows.text).passed
+    assert check(ROW_2, rows.text).shown == ROW_2  # One row on its own passes.
+    assert check(ROW_1, rows.text).shown == ROW_1
+    assert first_sentence(rows.text) == ROW_1  # The question's quote stops at the row's end.
 
 
 def test_lines_before_the_first_heading_are_in_no_utterance(tmp_path, seat):
