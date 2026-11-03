@@ -160,16 +160,23 @@ def make_handler(app: App, port: int, timeout: float = CONNECTION_TIMEOUT):
             self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
         def do_POST(self):
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = -1
+            if not 0 <= length <= MAX_BODY:
+                self.close_connection = True
+                return self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "too_large"})
+            # Read the body before any answer: closing a socket with bytes
+            # left unread resets it, and the browser would see no answer.
+            raw = self.rfile.read(length)
             if not self._host_ok():
                 return self._json(HTTPStatus.FORBIDDEN, {"error": "bad_host"})
             # A form on another site cannot send JSON without asking first.
             if not self.headers.get("Content-Type", "").startswith("application/json"):
                 return self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "json_only"})
-            length = int(self.headers.get("Content-Length") or 0)
-            if length > MAX_BODY:
-                return self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "too_large"})
             try:
-                body = json.loads(self.rfile.read(length) or b"{}")
+                body = json.loads(raw or b"{}")
             except ValueError:
                 return self._json(HTTPStatus.BAD_REQUEST, {"error": "bad_json"})
             if not isinstance(body, dict):

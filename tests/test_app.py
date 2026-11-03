@@ -160,6 +160,27 @@ def test_posts_must_be_json(server):
     connection.close()
 
 
+def test_a_refused_post_still_gets_its_answer_every_time(server):
+    # The body is read before refusing, so the socket is not reset.
+    srv, _ = server
+    for _ in range(20):
+        status, _ = request(srv, "POST", "/api/start", {"lab": "quest"}, headers={"Content-Type": "text/plain"})
+        assert status == 415
+
+
+def test_a_bad_body_length_is_refused(server):
+    srv, _ = server
+    port = srv.server_address[1]
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    connection.putrequest("POST", "/api/start", skip_host=True)
+    for name, value in (("Host", f"127.0.0.1:{port}"), ("Content-Type", "application/json"),
+                        ("Content-Length", "x")):
+        connection.putheader(name, value)
+    connection.endheaders()
+    assert connection.getresponse().status == 413
+    connection.close()
+
+
 def test_the_console_shows_the_path_but_never_the_question(server, capsys):
     srv, _ = server
     request(srv, "POST", "/api/start", {"lab": "not_said"})
