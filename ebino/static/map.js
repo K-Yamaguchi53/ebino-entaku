@@ -702,15 +702,16 @@ const EbinoMap = (() => {
   // map, not over it): the seats this round lights, on the map (all of them
   // from the start, so a seat lit later is not under an earlier bubble), or,
   // while the table is open, its seats and empty chairs with the square that
-  // takes a press; the shelves with their rows of points; and the words drawn
-  // on the map: the place names, the shelves' names and the school's name.
+  // takes a press; the shelves with their rows of points; and what is drawn
+  // on the map in words: the place names, the shelves' names, the school's
+  // name and its mark.
   function fixedBoxes(frameBox) {
     const nodes = [...tableLayer.querySelectorAll(".token .shape, .chair circle, .chair .hit")];
     // A seat of the round at the size it has once lit (not met yet, it is drawn smaller).
     const reach = 9.5 * pointScale() * frameBox.width / vb.w;
     const seats = tableTop ? [] : roundSeats.map((id) => toFrame(...spotOf(id)))
       .map(([px, py]) => [px - reach, py - reach, 2 * reach, 2 * reach]);
-    const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text")]
+    const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text, .school > :not(text)")]
       .map((node) => boxIn(node, frameBox));
     const cover = tableTop && tableTop.map(([x, y]) => toFrame(x, y));
     const shelfBoxes = shelfAreas().map(([x0, y0, x1, y1]) => {
@@ -794,6 +795,7 @@ const EbinoMap = (() => {
   // placed by planLabels. Bubbles go.
   function relayout() {
     if (!view) return;
+    clearSchoolName();
     for (const node of overlay.querySelectorAll(".map-bubble")) node.remove();
     const nodes = [...overlay.querySelectorAll(".split-tag"), ...overlay.querySelectorAll(".table-label.empty"),
       ...overlay.querySelectorAll(".table-label:not(.empty)"), ...overlay.querySelectorAll(".map-tip")];
@@ -828,7 +830,7 @@ const EbinoMap = (() => {
     if (!marks.length) return;
     const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text")]
       .map((node) => node.getBoundingClientRect()).filter((r) => r.width)
-      .map((r) => [r.left, r.top, r.width, r.height]);
+      .map((r) => [r.left - WORD_PAD, r.top - WORD_PAD, r.width + 2 * WORD_PAD, r.height + 2 * WORD_PAD]);
     for (const mark of marks) {
       const boxes = ASK_CORNERS.map(([x, y, anchor]) => {
         Object.entries({ x, y, "text-anchor": anchor }).forEach(([key, value]) => mark.setAttribute(key, value));
@@ -837,6 +839,25 @@ const EbinoMap = (() => {
       });
       const [x, y, anchor] = ASK_CORNERS[leastCovered(boxes, words)];
       Object.entries({ x, y, "text-anchor": anchor }).forEach(([key, value]) => mark.setAttribute(key, value));
+    }
+  }
+
+  // The school's name stays under its mark; a place name in its way moves up
+  // or down (whichever is nearer its own side), just clear of it, as the zoom is now.
+  function clearSchoolName() {
+    const label = svg.querySelector(".school text");
+    const names = [...svg.querySelectorAll(".place-names text")];
+    for (const name of names) name.removeAttribute("dy");
+    const school = label && label.getBoundingClientRect();
+    if (!school || !school.width) return;
+    const perPx = vb.h / (overlay.clientHeight || 1);
+    for (const name of names) {
+      const r = name.getBoundingClientRect();
+      if (!(r.left < school.right + WORD_PAD && school.left - WORD_PAD < r.right &&
+        r.top < school.bottom + WORD_PAD && school.top - WORD_PAD < r.bottom)) continue;
+      const below = r.top + r.bottom >= school.top + school.bottom;
+      const shift = below ? school.bottom + WORD_PAD - r.top : school.top - WORD_PAD - r.bottom;
+      name.setAttribute("dy", shift * perPx);
     }
   }
 
@@ -993,7 +1014,9 @@ const EbinoMap = (() => {
       if (!points[a] || !points[b] || a === b) continue;
       const [ax, ay] = spotOf(a), [bx, by] = spotOf(b);
       splitLayer.append(svgEl("line", { x1: ax, y1: ay, x2: bx, y2: by }));
-      const tag = div("split-tag", app.shownQuotes(split.heading));
+      // It wraps after its 「：」 or between its 「…」, never inside one (app.phrased).
+      const tag = div("split-tag");
+      tag.append(app.phrased(app.shownQuotes(split.heading)));
       tag.classList.toggle("narrow", overlay.clientWidth < NARROW);
       overlay.append(tag);
       place(tag, (ax + bx) / 2, (ay + by) / 2, 8);

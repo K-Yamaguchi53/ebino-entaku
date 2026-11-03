@@ -786,3 +786,16 @@ def test_cards_keep_off_the_shelves_and_a_seats_mark_off_the_maps_words():
         assert outside not in plan
     # No mark on a card for words that are not the person's own (the teacher's answer).
     assert "lamp_note_mark" not in script and not (REPO / "texts" / "lamp_note_mark.txt").exists()
+
+
+def test_the_flat_maps_heading_wraps_between_pieces_and_labels_keep_off_the_schools_mark_and_name():
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    assert "tag.append(app.phrased(app.shownQuotes(split.heading)));" in _inner_function(script, "drawSplits")
+    assert ".school text, .school > :not(text)" in _inner_function(script, "fixedBoxes")
+    # The school's name stays under its mark: a place name in its way moves, before the labels are put.
+    clear = _inner_function(script, "clearSchoolName")
+    assert 'name.setAttribute("dy",' in clear and 'name.removeAttribute("dy")' in clear
+    relayout = _inner_function(script, "relayout")
+    assert relayout.index("clearSchoolName();") < relayout.index("fixedBoxes(frameBox)")
+    # A seat's 「？」 keeps a little room round the words, not only off them.
+    assert "r.width + 2 * WORD_PAD" in _inner_function(script, "placeAskMarks")
