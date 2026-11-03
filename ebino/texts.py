@@ -32,12 +32,14 @@ WAITING_ASK = "waiting_ask"
 WAITING_REFLECTION = "waiting_reflection"
 # Shown when the screen could not reach the app; {error} is a reason code.
 SEND_FAILED = "send_failed"
+# The sheet's 出会った生き方 when the student marked no words (SPEC 5-2).
+MET_LIVES_EMPTY = "met_lives_empty"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
     HEAVY_TALK_NOTICE, SPLIT_NOTICE, START_NOTICE, LAB_QUESTION, ANSWERED_COUNT,
     NOT_ASKED_YET, INPUT_EXAMPLE, PURPOSE_HEADING, WAITING_ASK, WAITING_REFLECTION,
-    SEND_FAILED,
+    SEND_FAILED, MET_LIVES_EMPTY,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 

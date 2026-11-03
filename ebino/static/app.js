@@ -340,9 +340,11 @@ function renderSheet(sheet) {
     box.append(el("dt", { text: label }), cell);
   };
   row("最初の問い", sheet.first_question);
-  row("出会った生き方", ...sheet.met_lives.map((life) => el("div", {},
+  const lives = sheet.met_lives.map((life) => el("div", {},
     el("div", { text: life.said ? `「${life.text}」` : life.text }),
-    el("div", { class: "source", text: sourceLine(life.source) }))));
+    el("div", { class: "source", text: sourceLine(life.source) })));
+  // No words marked: one line from texts/ instead of an empty row.
+  row("出会った生き方", ...(lives.length ? lives : [el("div", { class: "left", text: state.texts.met_lives_empty })]));
   row("割れたところ", ...sheet.splits.map((split) =>
     el("div", { class: split.pressed ? "" : "left", text: (split.pressed ? "" : "置いてきた：") + split.heading })));
   row("残した質問カード", ...sheet.cards);

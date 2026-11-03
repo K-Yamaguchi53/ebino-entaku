@@ -149,6 +149,13 @@ def test_the_waiting_words_come_from_texts(server):
     assert texts["waiting_ask"] and texts["waiting_reflection"] and "{error}" in texts["send_failed"]
 
 
+def test_the_line_for_no_marked_words_comes_from_texts(server):
+    srv, _ = server
+    assert request(srv, "GET", "/api/setup")[1]["texts"]["met_lives_empty"]
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert "state.texts.met_lives_empty" in script
+
+
 def test_a_bad_lab_choice_does_not_start(server):
     srv, _ = server
     assert request(srv, "POST", "/api/start", {"lab": "x"}) == (400, {"error": "unknown_lab_choice"})
