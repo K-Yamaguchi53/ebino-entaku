@@ -38,8 +38,9 @@ def sitting(rounds, tmp_path=None, wide=False):
 
 
 def finish(session, meet="S02", rewrite="", answer=None, now="休みをどう決めるかを知りたい",
-           chosen="none", own="", reason="", moves=None):
-    session.client._answers.append(reflection_says(**({"moves": moves} if moves else {})))
+           chosen="none", own="", reason="", moves=None, ask=None):
+    said = ({"moves": moves} if moves else {}) | ({"ask_text": ask} if ask else {})
+    session.client._answers.append(reflection_says(**said))
     session.reflect_begin("a_little", now)
     session.reflect_answer(answer or "", declined=answer is None)
     return session.reflect_finish(chosen, own, rewrite, meet, reason)
@@ -99,17 +100,39 @@ def test_an_answer_about_going_to_meet_someone_is_the_fourth_force_and_comes_fir
     assert "保育士さん" not in json.dumps(record["reflection"]["harvest_moves"], ensure_ascii=False)
 
 
-@pytest.mark.parametrize("field", ["now", "answer", "own", "rewrite", "reason"])
+@pytest.mark.parametrize("field", ["now", "answer", "own", "rewrite"])
 def test_every_field_the_student_wrote_is_read_for_going(field):
     words = {"now": "畑を見に行ったら、何を聞けばよいか", "answer": "農家さんの話を聞いてみたい",
-             "own": "理容師さんを訪ねてみる", "rewrite": "店に聞きに行くなら、何を聞くか",
-             "reason": "畑に行ってみたいから"}[field]
+             "own": "理容師さんを訪ねてみる", "rewrite": "店に聞きに行くなら、何を聞くか"}[field]
     session = sitting([(FIRST, ANSWERED)])
     kwargs = {field: words} | ({"chosen": "own"} if field == "own" else {})
     finish(session, meet="", **kwargs)
-    expected = {"now": "now_question", "own": "own_move", "reason": "meet_reason"}.get(field, field)
+    expected = {"now": "now_question", "own": "own_move"}.get(field, field)
     assert session.reflection.harvest_moves[0] == "wrote_to_go"
     assert session.reflection.harvest_go_field == expected
+
+
+def test_the_reason_for_the_seat_is_an_answer_to_the_sheet_and_is_not_read():
+    session = sitting([(FIRST, ANSWERED)])
+    finish(session, meet="S02", reason="もっと話を聞いてみたいから")
+    assert session.reflection.meet_reason == "もっと話を聞いてみたいから"
+    assert "wrote_to_go" not in found_codes(session)
+    assert session.reflection.harvest_go_field == ""
+
+
+def test_an_answer_to_a_question_back_about_meeting_is_not_read():
+    session = sitting([(FIRST, ANSWERED)])
+    finish(session, meet="", ask="その人に会ってみたい？", answer="会ってみたい")
+    assert session.reflection.ask_back == "その人に会ってみたい？"  # Shown as asked.
+    assert "wrote_to_go" not in found_codes(session)
+
+
+def test_an_answer_to_a_question_back_with_no_such_word_is_read():
+    session = sitting([(FIRST, ANSWERED)])
+    finish(session, meet="", ask="休みの日は、何をしていると思う？",
+           answer="今度〇〇さんに会ってみようと思った")
+    assert session.reflection.harvest_moves[0] == "wrote_to_go"
+    assert session.reflection.harvest_go_field == "answer"
 
 
 @pytest.mark.parametrize("answer", [
@@ -176,7 +199,7 @@ def test_going_written_down_pairs_with_a_pressed_split():
     session.press_split(1, 0)
     session.client._answers.extend(SILENT)
     session.ask(HEADING)
-    finish(session, reason="割れた所を、本人に聞きに行きたい")
+    finish(session, answer="割れた所を、本人に聞きに行きたい")
     assert session.harvest("none")["moves"] == (
         "今日の動き：「割れた所を、本人に聞きに行きたい」と自分で書いた（④ 向かう力の、手前の動き）"
         "／割れた見出しを押して、もう一度聞いた（⑤ 解き明かす力）")

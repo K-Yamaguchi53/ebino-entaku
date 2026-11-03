@@ -72,8 +72,11 @@ ROWS = {row.code: row for row in MOVE_TABLE}
 # The sheet's fields the student wrote, read in this order for words about
 # going to meet someone. Never the round-table questions or the cards, and
 # never a move the moderator offered (own_move is set only when the student
-# wrote one).
-GO_FIELDS = ("now_question", "answer", "own_move", "rewrite", "meet_reason")
+# wrote one). Words given because the sheet asked about meeting are not the
+# student's own move (the teacher's call): the reason for the seat picked is
+# never read, and the answer is not read when the question back itself held
+# such a word.
+GO_FIELDS = ("now_question", "answer", "own_move", "rewrite")
 # After the word, in the same sentence: the student is not going. When in
 # doubt the sentence is not counted.
 NOT_GOING = ("ない", "なかっ", "なく", "ません")
@@ -133,7 +136,10 @@ def found_moves(session, sheet_heading) -> list[Found]:
     found: dict[str, Found] = {}
 
     go_words = load_lines(GO_WORDS)
+    asked_about_going = any(word in current.ask_back for word in go_words)
     for field in GO_FIELDS:
+        if field == "answer" and asked_about_going:
+            continue
         sentence = going_sentence(getattr(current, field), go_words)
         if sentence:
             found["wrote_to_go"] = Found("wrote_to_go", sentence, field=field)
