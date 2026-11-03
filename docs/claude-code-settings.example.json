@@ -1,0 +1,20 @@
+{
+  "model": "opus",
+  "effortLevel": "high",
+  "permissions": {
+    "deny": [
+      "Read(//<学校の同期フォルダ>/**)",
+      "Edit(//<学校の同期フォルダ>/**)",
+      "Read(//<EBINO_DATA_DIR>/**)",
+      "Read(//<EBINO_RECORDS_DIR>/**)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Bash(*<学校の同期フォルダ>*)",
+      "Bash(*<EBINO_DATA_DIR>*)",
+      "Bash(*<EBINO_RECORDS_DIR>*)",
+      "PowerShell(*<学校の同期フォルダ>*)",
+      "PowerShell(*<EBINO_DATA_DIR>*)",
+      "PowerShell(*<EBINO_RECORDS_DIR>*)"
+    ]
+  }
+}
