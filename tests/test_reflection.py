@@ -11,15 +11,16 @@ from conftest import COMPANY, DISPLAY_NAME
 from ebino.banned_words import banned_in
 from ebino.gate import Gate, NameList
 from ebino.records import Records
-from ebino.session import Refused, Session
+from ebino.session import Library, Refused, Session
 from ebino.texts import ASK_BACK_FALLBACK, NAME_IN_QUESTION, TEXTS_DIR, load_text
-from test_session import ANSWERED, SEATS, SPLIT, editor_says, library
+from test_session import (ANSWERED, SEATS, SPLIT, UTTERANCES, editor_says, librarian_finds, library,
+                          moderator_says, u)
 
 FALLBACK = load_text(ASK_BACK_FALLBACK)
 GOOD_ASK = '『休みを"決めて取る"／"空いたら取る"』で割れたまま、次の問いへ進んでいる。いまのあなたは、どちらに近い？'
 MOVES = [
     {"direction": "question_shift", "material_id": "Q1", "text": "「休みの日」の何を知りたいのかを絞る"},
-    {"direction": "silent_seat", "material_id": "S:S03", "text": "保育士の席で、まだ誰も答えていない所を確かめる"},
+    {"direction": "silent_seat", "material_id": "S:S03", "text": "まだ誰も聞いていない「保育士」の席で、休みの取り方を確かめる"},
     {"direction": "left_split", "material_id": "P1-1", "text": "「休みは決めて取ります。」と言う人の決め手を確かめる"},
 ]
 
@@ -58,7 +59,10 @@ def test_a_question_back_and_moves_that_hold_the_records_words_are_shown_in_fixe
     ("「休みは決めて取ります。」の人のように、決めて取るべき？", "banned_word"),
     ("谷口さんの言葉を読んで、いまのあなたは？", "name"),
     ("「休みは決めて取ります。と言う人がいた。いまのあなたは？", "unbalanced_quote_marks"),
-    ("あ" * 121, "too_long"),
+    ("あ" * 161, "too_long"),
+    ("「畑は天気しだいなので」と言う人がいた。いまのあなたは？", "quote_not_in_record"),  # Cut mid-sentence.
+    ("「大工」の席の言葉を読んで、いまのあなたは？", "quote_not_in_record"),  # No such seat in the materials.
+    ("「休みは決めて取ります。」の人のように、頑張って決める？", "banned_word"),  # Outside 「」.
 ])
 def test_a_question_back_that_fails_the_check_becomes_the_fixed_sentence(text, reason):
     session, _ = sitting([reflection_says(ask_text=text)])
@@ -66,9 +70,33 @@ def test_a_question_back_that_fails_the_check_becomes_the_fixed_sentence(text, r
     assert session.reflection.ask_back_fallback == reason
 
 
-def test_a_quote_from_a_shown_quote_passes_when_it_is_whole_sentences():
-    session, _ = sitting([reflection_says(ask_text="「休みは決めて取ります。」と言う人がいた。いまのあなたは、どう取りたい？")])
-    assert begin(session)["ask_back"].startswith("「休みは決めて取ります。」")
+@pytest.mark.parametrize("text", [
+    "「休みは決めて取ります。」と言う人がいた。いまのあなたは、どう取りたい？",
+    # One whole sentence of a long quote: more than the old 120 characters.
+    "「畑は天気しだいなので、休みは空いたら取ります。」と話す人と、「休みは決めて取ります。」と話す人がいた。"
+    "二人の休みの取り方の違いは、仕事のどんなところから生まれていると思う？"
+    "いまのあなたが休みの日を考えるなら、どちらの取り方に近くて、それはなぜ？",
+    "まだ誰も聞いていない「農家」の席は、休みをどう決めていると思う？",  # A seat's title.
+    "「保育士」の席には、まだ誰も聞いていない。そこで何を聞きたい？",  # A silent seat's title.
+])
+def test_a_question_back_that_holds_the_records_words_passes(text):
+    assert len(text) <= 160
+    session, _ = sitting([reflection_says(ask_text=text)])
+    assert begin(session)["ask_back"] == text
+    assert session.reflection.ask_back_fallback == ""
+
+
+def test_a_banned_word_inside_a_quote_from_the_record_does_not_stop_the_question_back():
+    # An adult's own words may hold 頑張って; code has matched them to the record.
+    said = "頑張っても、休みは決めて取ります。"
+    answers = [librarian_finds("a3"), moderator_says([("a3", said)])]
+    client = FakeClient(answers + [reflection_says(ask_text=f"「{said}」と話す人がいた。いまのあなたは？",
+                                                   ask_material="U:a3")])
+    lib = Library.build(SEATS, UTTERANCES + [u("a3", "S01", said, voice="spoken")], {}, False)
+    session = Session(lib, Gate(client, NameList.build(SEATS, {})), rng=random.Random(1))
+    session.ask("休みの日って、みんな何してる？")
+    assert begin(session)["ask_back"] == f"「{said}」と話す人がいた。いまのあなたは？"
+    assert banned_in(said)  # The same words outside 「」 would stop it.
 
 
 def test_moves_that_fail_are_not_shown_and_only_their_reasons_are_kept():

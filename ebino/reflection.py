@@ -11,9 +11,13 @@ question, and picks one seat to go and meet.
 Nothing a model writes reaches the screen before code checks it (SPEC 5-2,
 14-14), like the guard does for quotes:
   - every 「」 or 『』 in it must hold the record's own words: a part of a
-    question, card or split heading the student saw, or a sentence-bounded
-    part of a quote shown (the guard's rule). 『A／B』 is checked part by part.
-  - no word from banned_words, and no name from the gate's list.
+    question, card, split heading or the title of a seat in the materials,
+    or a sentence-bounded part of a quote shown (the guard's rule).
+    『A／B』 is checked part by part.
+  - no name from the gate's list anywhere, and no word from banned_words
+    outside 「」『』: those are the moderator's own words. Inside them code
+    has already matched the record's words, so an adult's quote with a
+    word like 頑張って does not stop the text.
   - a next move points at a material of its own direction, is not a
     question (no ？), and only one move per direction is kept, in the fixed
     order of DIRECTIONS, never the model's order.
@@ -41,7 +45,7 @@ DIRECTION_LABELS = {
 }
 CHOSE_NONE = "none"  # 「どれも選ばない」
 CHOSE_OWN = "own"  # 「自分で書く」
-MAX_ASK_BACK_CHARS = 120
+MAX_ASK_BACK_CHARS = 160  # Room for one whole sentence of a quote.
 MAX_MOVE_CHARS = 80
 MAX_LINE_CHARS = 120  # Each line the student writes (SPEC 5-2: one line).
 
@@ -129,7 +133,8 @@ class Record:
 
     def __init__(self, session):
         self.materials: list[Material] = []
-        self.own_words: list[str] = []  # Questions, cards and headings.
+        # Questions, cards, headings and the titles of seats in the materials.
+        self.own_words: list[str] = []
         self.quote_texts: list[str] = []  # Quotes shown: sentence-bounded only.
         names = session.gate.names
         seats = {seat.seat_id: seat for seat in session.library.seats}
@@ -152,6 +157,7 @@ class Record:
         for quote in entries.values():
             material_id = f"U:{quote.utterance_id}"
             self.quote_texts.append(quote.text)
+            self.own_words.append(seats[quote.seat_id].title)
             self.materials.append(Material(material_id, "quote", quote.text, {
                 "id": material_id, "kind": "quote", "seat": seats[quote.seat_id].for_model(),
                 "text": quote.text, "marked": quote.utterance_id in marked,
@@ -159,6 +165,7 @@ class Record:
         for seat_id in session.silent_seats():
             if seat_id in session.met_seats():
                 continue
+            self.own_words.append(seats[seat_id].title)
             self.materials.append(Material(f"S:{seat_id}", "silent_seat", "", {
                 "id": f"S:{seat_id}", "kind": "silent_seat", "seat": seats[seat_id].for_model(),
             }))
@@ -189,13 +196,13 @@ def checked(text: str, record: Record, gate: Gate, limit: int) -> str:
         return STOP_EMPTY
     if len(text) > limit:
         return STOP_TOO_LONG
-    if gate.names.hits(text):
+    if gate.names.hits(text):  # The whole text, quotes too.
         return STOP_NAME
-    if banned_in(text):
-        return STOP_BANNED
     outside = _QUOTED.sub("", text)
     if any(mark in outside for mark in "「」『』"):
         return STOP_UNBALANCED
+    if banned_in(outside):  # The moderator's own words only.
+        return STOP_BANNED
     for match in _QUOTED.finditer(text):
         for part in _PART_BREAK.split(match.group(1) or match.group(2) or ""):
             if part.strip() and not record.holds(part.strip()):
