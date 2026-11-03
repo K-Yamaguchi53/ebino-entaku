@@ -97,6 +97,18 @@ def test_title_above_the_first_role_heading_goes_with_the_name(poster_seat):
     assert "朝市を調べる" not in "".join(u.text + u.heading for u in utterances)
 
 
+@pytest.mark.parametrize("body, kept", [
+    ("下流の問題の解決に努めた。2.", "下流の問題の解決に努めた。"),
+    ("下流も測れるようになった。６．７.", "下流も測れるようになった。"),
+    ("下流も測れるようになった。 １２．", "下流も測れるようになった。"),
+    ("十か所で測った。結果は3.", "十か所で測った。結果は3."),  # Not after a sentence end.
+    ("上流は3.5倍だった。", "上流は3.5倍だった。"),
+])
+def test_the_next_headings_number_is_dropped_from_a_sections_end(body, kept):
+    fragments = [Fragment(STUDENT, 50, 10), *lines("目的", "なぜ減ったのかを確かめる。", "手法", body)]
+    assert by_name(fragments)["手法"] == kept
+
+
 def test_old_style_sections():
     sections = by_name(old_style())
     assert sections["目的"] == "なぜ減ったのかを確かめる。"

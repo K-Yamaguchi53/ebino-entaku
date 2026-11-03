@@ -93,6 +93,7 @@ _CLOSE = ">〉》】]"
 _OPENING = re.compile(rf"^[{re.escape(_OPEN)}\s]+")
 _CLOSING = re.compile(rf"[{re.escape(_CLOSE)}\s:：]+$")
 _ENGLISH_GLOSS = re.compile(r"\s*\(\s*[A-Za-z][A-Za-z\s&/-]*\)\s*$")
+_TRAILING_HEADING_NUMBERS = re.compile(r"(?<=[。！？!?])(?:\s*[0-9０-９]{1,2}\s*[.．])+\s*$")
 _WORD_GAP = 3  # pdfplumber's default x_tolerance: a wider gap starts a new word.
 _X_TOLERANCE = 5
 _Y_TOLERANCE = 2
@@ -407,11 +408,20 @@ def section_texts(layout: Layout) -> list[str]:
     ]
 
 
+def drop_trailing_numbers(text: str) -> str:
+    """「…努めた。2.」「…なった。６．７.」 → the next heading's number goes.
+
+    A heading's number can land at the end of the section above it. Only
+    numbers after a sentence end are taken: 1 or 2 digits and a dot, repeated."""
+    return _TRAILING_HEADING_NUMBERS.sub("", text)
+
+
 def split_sections(fragments: list[Fragment]) -> list[Section]:
     layout = read_layout(fragments)
     sections: list[Section] = []
     for head, text in zip(layout.headings, section_texts(layout)):
         heading = layout.found[head]
+        text = drop_trailing_numbers(text)
         if text:
             sections.append(Section(heading.label, heading.role, text))
     return sections
