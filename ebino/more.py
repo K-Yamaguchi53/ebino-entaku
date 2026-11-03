@@ -2,7 +2,9 @@
 11/3).
 
 Each press shows the next piece of the same seat and the same section, in
-reading order, as it was recorded: no model is used, and the source is shown
+reading order, as it was recorded, passing over every piece this student has
+already been shown (a piece quoted in the round is never shown again here):
+no model is used, and the source is shown
 by the piece's voice. One piece can be pressed from at most twice, the
 second press going on from the piece the first one showed. When the section
 has no next piece, the screen says 「ここから先は、まだ聞いていない」, and a press
@@ -35,19 +37,22 @@ class More:
         return not self.ended and self.presses < MAX_PRESSES
 
 
-def next_after(utterances: list[Utterance], piece_id: str) -> Utterance | None:
-    """The next piece of the same seat and section, in reading order."""
+def next_after(utterances: list[Utterance], piece_id: str, skip=frozenset()) -> Utterance | None:
+    """The next piece of the same seat and section, in reading order, passing
+    over the pieces in skip."""
     position = next((i for i, u in enumerate(utterances) if u.id == piece_id), None)
     if position is None:
         return None
     piece = utterances[position]
     return next((u for u in utterances[position + 1:]
-                 if u.seat_id == piece.seat_id and u.section == piece.section), None)
+                 if u.seat_id == piece.seat_id and u.section == piece.section and u.id not in skip), None)
 
 
-def press(state: More, utterances: list[Utterance]) -> Utterance | None:
-    """One press: the next piece, or None when the section has ended."""
-    piece = next_after(utterances, state.shown[-1] if state.shown else state.origin_id)
+def press(state: More, utterances: list[Utterance], seen=frozenset()) -> Utterance | None:
+    """One press: the next piece this student has not been shown (seen: the
+    round's quotes, last words, pieces heard here and the seats' answers), or
+    None when the section has ended."""
+    piece = next_after(utterances, state.shown[-1] if state.shown else state.origin_id, seen)
     state.presses += 1
     if piece is None:
         state.ended = True

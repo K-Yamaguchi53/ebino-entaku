@@ -312,7 +312,7 @@ class Session:
             state = self.mores[utterance_id] = more.More(utterance_id, origins[utterance_id], seat_id)
         if not state.can_press:
             raise Refused("no_more_presses")
-        piece = more.press(state, self.library.utterances)
+        piece = more.press(state, self.library.utterances, self.seen_ids())
         self.save()
         shown = None
         if piece is not None:
@@ -474,8 +474,8 @@ class Session:
 
     def seen_ids(self) -> set[str]:
         """Every piece this student was shown: the rounds' quotes, the
-        rounds' last words and what 「もっと聞く」 showed. Never shown twice in
-        a last word."""
+        rounds' last words, what 「もっと聞く」 showed and the seats' answers.
+        Never shown again in a last word, a seat's answer or 「もっと聞く」."""
         closings = {w.utterance_id for r in self.rounds if r.closing for w in r.closing.words}
         heard = {piece_id for state in self.mores.values() for piece_id in state.shown}
         answers = {r.ask_seat.answer_id for r in self.rounds if r.ask_seat and r.ask_seat.answer_id}

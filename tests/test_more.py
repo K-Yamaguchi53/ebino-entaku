@@ -2,14 +2,17 @@
 Every seat and piece here is invented."""
 
 import json
+import random
 
 import pytest
+from fake_client import FakeClient
 
 from ebino import editor, harvest
+from ebino.gate import Gate, NameList
 from ebino.reflection import Reflection
-from ebino.session import Refused
+from ebino.session import Library, Refused, Session
 from ebino.texts import MORE_CARD_DONE, MORE_END, load_text
-from test_closing import QUESTION, says, sitting
+from test_closing import ALL_SEATS, QUESTION, says, sitting
 from test_session import ANSWERED, UTTERANCES, editor_says, u
 
 PIECES = [
@@ -41,6 +44,35 @@ def test_a_press_shows_the_next_piece_of_the_same_seat_and_section_as_recorded()
     assert not heard["piece"]["said"] and heard["piece"]["source"]["note"] == "取材記事（本人確認済み）"
     assert heard["can_press"] and not heard["ended"]
     assert len(client.requests) == before  # No model is used.
+
+
+def before_and_after_the_quotes(answers, *pieces_around):
+    """A sitting whose S01 本文 reads a0, a1, a2 (both quoted in the round), a3."""
+    first, *rest = pieces_around
+    lib = Library.build(ALL_SEATS, [first, *UTTERANCES, *rest], {}, False, {"a0": "refresh"})
+    client = FakeClient(list(answers))
+    session = Session(lib, Gate(client, NameList.build(ALL_SEATS, {})), rng=random.Random(1))
+    session.ask(QUESTION)
+    session.close_round(1)
+    return session
+
+
+def test_a_piece_quoted_in_the_round_is_passed_over():
+    session = before_and_after_the_quotes(
+        ANSWERED + [says(("a0", "休みの日は、店の仲間と話します。"))],
+        u("a0", "S01", "休みの日は、店の仲間と話します。", voice="spoken"),
+        u("a3", "S01", "家族と出かける日もあります。", voice="spoken"))
+    assert {"a1", "a2"} <= session.shown_ids()
+    heard = session.hear_more("a0")
+    assert heard["piece"]["utterance_id"] == "a3"  # Not a1, not a2: shown in the round.
+    assert session.mores["a0"].shown == ["a3"]
+
+
+def test_when_only_shown_pieces_are_left_the_section_has_ended():
+    session = before_and_after_the_quotes(
+        ANSWERED + [says(("a0", "休みの日は、店の仲間と話します。"))],
+        u("a0", "S01", "休みの日は、店の仲間と話します。", voice="spoken"))
+    assert session.hear_more("a0") == {"utterance_id": "a0", "piece": None, "ended": True, "can_press": False}
 
 
 def test_two_presses_from_one_piece_and_no_more():
