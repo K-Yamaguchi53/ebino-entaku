@@ -254,11 +254,13 @@ function moreButton(utteranceId, node) {
       button.disabled = false;
       return;
     }
-    if (heard.piece) {
+    // One press reads to the end of the sentence: one or more pieces, each
+    // with the source of its own voice.
+    for (const piece of heard.pieces) {
       node.insertBefore(el("div", { class: "more-piece" },
-        rankingTitle(heard.piece),
-        el("p", { class: "words", text: heard.piece.said ? `「${heard.piece.text}」` : heard.piece.text }),
-        el("span", { class: "source", text: sourceLine(heard.piece.source) })), button);
+        rankingTitle(piece),
+        el("p", { class: "words", text: piece.said ? `「${piece.text}」` : piece.text }),
+        el("span", { class: "source", text: sourceLine(piece.source) })), button);
     }
     if (heard.ended) {
       const end = el("button", { type: "button", class: "quiet not-heard", text: state.texts.more_end });

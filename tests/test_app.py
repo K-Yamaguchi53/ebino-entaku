@@ -160,7 +160,7 @@ def test_the_rounds_last_word_over_http(server):
 def test_a_ranking_title_is_shown_over_the_last_word_the_more_piece_and_the_answer():
     script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
     assert "rankingTitle(word)" in script and "rankingTitle(asked.piece)" in script
-    assert "rankingTitle(heard.piece)" in script or "rankingTitle(piece)" in script
+    assert "rankingTitle(piece)" in script
     css = (app_module.STATIC_DIR / "style.css").read_text(encoding="utf-8")
     assert ".ranking-title" in css
 

@@ -39,17 +39,18 @@ def test_a_press_shows_the_next_piece_of_the_same_seat_and_section_as_recorded()
     session, client = closed()
     before = len(client.requests)
     heard = session.hear_more("a9")
-    assert heard["piece"]["utterance_id"] == "a9b"  # x1 is in another section.
-    assert heard["piece"]["text"] == "だから、外に出る前に、町を歩いてほしい。"
-    assert not heard["piece"]["said"] and heard["piece"]["source"]["note"] == "取材記事（本人確認済み）"
+    assert heard["pieces"][0]["utterance_id"] == "a9b"  # x1 is in another section.
+    assert heard["pieces"][0]["text"] == "だから、外に出る前に、町を歩いてほしい。"
+    assert not heard["pieces"][0]["said"] and heard["pieces"][0]["source"]["note"] == "取材記事（本人確認済み）"
     assert heard["can_press"] and not heard["ended"]
     assert len(client.requests) == before  # No model is used.
 
 
-def before_and_after_the_quotes(answers, *pieces_around):
-    """A sitting whose S01 本文 reads a0, a1, a2 (both quoted in the round), a3."""
-    first, *rest = pieces_around
-    lib = Library.build(ALL_SEATS, [first, *UTTERANCES, *rest], {}, False, {"a0": "refresh"})
+def before_and_after_the_quotes(answers, *pieces_around, before=1):
+    """A sitting whose S01 本文 reads the first `before` pieces given, then a1
+    and a2 (both quoted in the round), then the rest."""
+    lead, rest = list(pieces_around[:before]), list(pieces_around[before:])
+    lib = Library.build(ALL_SEATS, [*lead, *UTTERANCES, *rest], {}, False, {"a0": "refresh"})
     client = FakeClient(list(answers))
     session = Session(lib, Gate(client, NameList.build(ALL_SEATS, {})), rng=random.Random(1))
     session.ask(QUESTION)
@@ -64,7 +65,7 @@ def test_a_piece_quoted_in_the_round_is_passed_over():
         u("a3", "S01", "家族と出かける日もあります。", voice="spoken"))
     assert {"a1", "a2"} <= session.shown_ids()
     heard = session.hear_more("a0")
-    assert heard["piece"]["utterance_id"] == "a3"  # Not a1, not a2: shown in the round.
+    assert heard["pieces"][0]["utterance_id"] == "a3"  # Not a1, not a2: shown in the round.
     assert session.mores["a0"].shown == ["a3"]
 
 
@@ -72,14 +73,83 @@ def test_when_only_shown_pieces_are_left_the_section_has_ended():
     session = before_and_after_the_quotes(
         ANSWERED + [says(("a0", "休みの日は、店の仲間と話します。"))],
         u("a0", "S01", "休みの日は、店の仲間と話します。", voice="spoken"))
-    assert session.hear_more("a0") == {"utterance_id": "a0", "piece": None, "ended": True, "can_press": False}
+    assert session.hear_more("a0") == {"utterance_id": "a0", "pieces": [], "ended": True, "can_press": False}
+
+
+def heard_after(origin, *following):
+    """One press under the last word `origin` (S01, 本文), the pieces after it."""
+    pieces = [origin, *following]
+    session, client = sitting(ANSWERED + [says((origin.id, origin.text))], kinds={origin.id: "joy"}, pieces=pieces)
+    session.ask(QUESTION)
+    session.close_round(1)
+    before = len(client.requests)
+    heard = session.hear_more(origin.id)
+    assert len(client.requests) == before  # No model.
+    return session, heard
+
+
+def test_one_press_reads_on_to_the_end_of_the_sentence():
+    session, heard = heard_after(u("m0", "S01", "作業がうまくいくと楽しく、"),
+                                 u("m1", "S01", "ありがとう", voice="spoken"),
+                                 u("m2", "S01", "と言われるとうれしい。"),
+                                 u("m3", "S01", "次の日も、また店に立ちます。"))
+    assert [(p["utterance_id"], p["said"]) for p in heard["pieces"]] == [("m1", True), ("m2", False)]
+    assert heard["pieces"][1]["source"]["note"] == "取材記事（本人確認済み）"
+    assert session.mores["m0"].shown == ["m1", "m2"] and session.mores["m0"].presses == 1
+    assert heard["can_press"]
+
+
+def test_after_the_persons_words_it_goes_on_only_into_to_or_tte():
+    _, heard = heard_after(u("m0", "S01", "先輩からは、よくこう言われました。"),
+                           u("m1", "S01", "がんばれ", voice="spoken"),
+                           u("m2", "S01", "失敗してもいい", voice="spoken"))
+    assert [p["utterance_id"] for p in heard["pieces"]] == ["m1"]
+
+
+def test_a_piece_ending_in_a_closing_mark_goes_on_only_into_to_or_tte():
+    _, heard = heard_after(u("m0", "S01", "店の名前の話をしてくれた。"),
+                           u("m1", "S01", "名前は「はるかぜ」"),
+                           u("m2", "S01", "って決めたのは祖父だそうだ。"))
+    assert [p["utterance_id"] for p in heard["pieces"]] == ["m1", "m2"]
+    _, heard = heard_after(u("m0", "S01", "店の名前の話をしてくれた。"),
+                           u("m1", "S01", "名前は「はるかぜ」"),
+                           u("m2", "S01", "祖父が決めたそうだ。"))
+    assert [p["utterance_id"] for p in heard["pieces"]] == ["m1"]
+
+
+def test_one_press_shows_four_pieces_at_most():
+    following = [u(f"m{i}", "S01", text) for i, text in
+                 enumerate(["朝は早く起きて、", "道具をそろえて、", "店の前を掃いて、", "お湯をわかして、", "店を開けます。"],
+                           start=1)]
+    session, heard = heard_after(u("m0", "S01", "一日の始まりは、こうです。"), *following)
+    assert [p["utterance_id"] for p in heard["pieces"]] == ["m1", "m2", "m3", "m4"]
+    second = session.hear_more("m0")
+    assert [p["utterance_id"] for p in second["pieces"]] == ["m5"]
+
+
+def test_a_ranking_title_goes_over_the_first_of_its_items_in_one_press():
+    _, heard = heard_after(u("m0", "S01", "好きな場所を三つ教えてくれた。"),
+                           u("m1", "S01", "好きな場所ベスト3"),
+                           u("m2", "S01", "１位　川の駅の足湯、"), u("m3", "S01", "２位　山の上の展望台。"))
+    assert [(p["utterance_id"], p["ranking_title"]) for p in heard["pieces"]] == [
+        ("m1", ""), ("m2", "好きな場所ベスト3"), ("m3", "")]
+
+
+def test_the_sentence_stops_before_a_piece_already_shown():
+    session = before_and_after_the_quotes(
+        ANSWERED + [says(("a0", "休みの決め方を聞きました。"))],
+        u("a0", "S01", "休みの決め方を聞きました。"), u("m1", "S01", "答えは、"),
+        u("a3", "S01", "家族と出かける日もあります。", voice="spoken"), before=2)
+    heard = session.hear_more("a0")  # m1 goes on into a1, which the round showed.
+    assert [p["utterance_id"] for p in heard["pieces"]] == ["m1"]
+    assert [p["utterance_id"] for p in session.hear_more("a0")["pieces"]] == ["a3"]
 
 
 def test_two_presses_from_one_piece_and_no_more():
     session, _ = closed()
     session.hear_more("a9")
     second = session.hear_more("a9")
-    assert second["piece"]["utterance_id"] == "a9c" and second["piece"]["said"]
+    assert [p["utterance_id"] for p in second["pieces"]] == ["a9c"] and second["pieces"][0]["said"]
     assert not second["can_press"]
     with pytest.raises(Refused, match="no_more_presses"):
         session.hear_more("a9")
@@ -88,7 +158,7 @@ def test_two_presses_from_one_piece_and_no_more():
 def test_the_end_of_the_section_says_not_heard_yet_and_a_press_makes_a_card():
     session, client = closed(more_answers=[editor_says(["S02"])])
     heard = session.hear_more("b9")
-    assert heard == {"utterance_id": "b9", "piece": None, "ended": True, "can_press": False}
+    assert heard == {"utterance_id": "b9", "pieces": [], "ended": True, "can_press": False}
     assert load_text(MORE_END) == "ここから先は、まだ聞いていない"
     assert load_text(MORE_CARD_DONE)
     card = session.more_card("b9")
@@ -155,12 +225,12 @@ def test_more_shows_the_title_over_a_ranking_item_and_nothing_over_other_pieces(
     session.ask(QUESTION)
     session.close_round(1)
     heard = session.hear_more("r2")
-    assert heard["piece"]["utterance_id"] == "r3" and heard["piece"]["ranking_title"] == "好きな場所ベスト3"
+    assert heard["pieces"][0]["utterance_id"] == "r3" and heard["pieces"][0]["ranking_title"] == "好きな場所ベスト3"
     assert "r0" not in session.seen_ids() and session.mores["r2"].shown == ["r3"]
     session, _ = sitting(ANSWERED + [says(("n1", "畑の朝は、静かで気持ちがいい。"))], kinds={"n1": "joy"}, pieces=pieces)
     session.ask(QUESTION)
     session.close_round(1)
-    assert session.hear_more("n1")["piece"]["ranking_title"] == ""
+    assert session.hear_more("n1")["pieces"][0]["ranking_title"] == ""
 
 
 def test_presses_and_the_card_are_recorded_without_words_and_are_not_moves(tmp_path):

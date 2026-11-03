@@ -5,8 +5,10 @@ Each press shows the next piece of the same seat and the same section, in
 reading order, as it was recorded, passing over every piece this student has
 already been shown (a piece quoted in the round is never shown again here):
 no model is used, and the source is shown
-by the piece's voice. One piece can be pressed from at most twice, the
-second press going on from the piece the first one showed. When the section
+by each piece's voice. The pieces are cut small at every 「」, so one press
+reads on to the end of the sentence: up to 4 pieces (see goes_on). One piece
+can be pressed from at most twice, the second press going on from the last
+piece the first one showed. When the section
 has no next piece, the screen says 「ここから先は、まだ聞いていない」, and a press
 on it makes a question card to that seat (SPEC 2-2), holding the round's
 question.
@@ -17,9 +19,13 @@ harvest card's moves (the teacher decides whether they should be).
 
 from dataclasses import dataclass, field
 
+from .closing import FRAGMENT_LEADS
 from .ingest.utterance import Utterance
 
 MAX_PRESSES = 2
+MAX_PIECES_PER_PRESS = 4
+_SENTENCE_END = ("。", "！", "？", "!", "?")
+_QUOTE_END = ("」", "』")
 
 
 @dataclass
@@ -48,14 +54,32 @@ def next_after(utterances: list[Utterance], piece_id: str, skip=frozenset()) -> 
                  if u.seat_id == piece.seat_id and u.section == piece.section and u.id not in skip), None)
 
 
-def press(state: More, utterances: list[Utterance], seen=frozenset()) -> Utterance | None:
+def goes_on(piece: Utterance, following: Utterance) -> bool:
+    """Whether the sentence goes on into the following piece. A piece shown in
+    「」 (the person's own words) or ending in 」』 goes on only into a quoting
+    「と」「って」; any other piece goes on unless it ends a sentence."""
+    text = piece.text.rstrip()
+    if not piece.note or text.endswith(_QUOTE_END):
+        return following.text.lstrip().startswith(FRAGMENT_LEADS)
+    return not text.endswith(_SENTENCE_END)
+
+
+def press(state: More, utterances: list[Utterance], seen=frozenset()) -> list[Utterance]:
     """One press: the next piece this student has not been shown (seen: the
-    round's quotes, last words, pieces heard here and the seats' answers), or
-    None when the section has ended."""
+    round's quotes, last words, pieces heard here and the seats' answers),
+    and the pieces after it to the end of its sentence, MAX_PIECES_PER_PRESS
+    at most; the sentence is cut short before a piece already shown. Empty
+    when the section has ended."""
     piece = next_after(utterances, state.shown[-1] if state.shown else state.origin_id, seen)
     state.presses += 1
     if piece is None:
         state.ended = True
-    else:
-        state.shown.append(piece.id)
-    return piece
+        return []
+    shown = [piece]
+    while len(shown) < MAX_PIECES_PER_PRESS:
+        following = next_after(utterances, shown[-1].id)
+        if following is None or following.id in seen or not goes_on(shown[-1], following):
+            break
+        shown.append(following)
+    state.shown += [p.id for p in shown]
+    return shown

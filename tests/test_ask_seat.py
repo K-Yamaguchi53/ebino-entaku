@@ -146,7 +146,7 @@ def test_more_can_be_pressed_under_the_answer():
     session, _ = round_one([librarian_finds("b7")], pieces=pieces)
     session.ask_the_seat(1)
     heard = session.hear_more("b7")
-    assert heard["piece"]["utterance_id"] == "b6"  # Next in the same section, as recorded.
+    assert heard["pieces"][0]["utterance_id"] == "b6"  # Next in the same section, as recorded.
 
 
 def test_a_silent_round_has_no_card():

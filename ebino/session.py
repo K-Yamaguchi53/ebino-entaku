@@ -302,7 +302,9 @@ class Session:
         return origins
 
     def hear_more(self, utterance_id: str) -> dict:
-        """「もっと聞く」: the next piece of the same seat and section, as recorded."""
+        """「もっと聞く」: the next pieces of the same seat and section, to the
+        end of the sentence, as recorded; each with the source of its voice.
+        A ranking's title goes over the first of its items only."""
         origins = self.more_origins()
         if not isinstance(utterance_id, str) or utterance_id not in origins:
             raise Refused("not_a_last_word")
@@ -312,14 +314,17 @@ class Session:
             state = self.mores[utterance_id] = more.More(utterance_id, origins[utterance_id], seat_id)
         if not state.can_press:
             raise Refused("no_more_presses")
-        piece = more.press(state, self.library.utterances, self.seen_ids())
+        pieces = more.press(state, self.library.utterances, self.seen_ids())
         self.save()
-        shown = None
-        if piece is not None:
-            shown = {"utterance_id": piece.id, "seat_id": piece.seat_id, "text": piece.text,
-                     "ranking_title": self.library.ranking_titles.get(piece.id, ""),
-                     "said": not piece.note, "source": self.source(piece.seat_id, piece)}
-        return {"utterance_id": utterance_id, "piece": shown, "ended": state.ended,
+        shown = []
+        title_over = ""
+        for piece in pieces:
+            title = self.library.ranking_titles.get(piece.id, "")
+            shown.append({"utterance_id": piece.id, "seat_id": piece.seat_id, "text": piece.text,
+                          "ranking_title": title if title != title_over else "",
+                          "said": not piece.note, "source": self.source(piece.seat_id, piece)})
+            title_over = title
+        return {"utterance_id": utterance_id, "pieces": shown, "ended": state.ended,
                 "can_press": state.can_press}
 
     def more_card(self, utterance_id: str) -> dict:
