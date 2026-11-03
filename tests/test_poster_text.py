@@ -98,6 +98,22 @@ def test_heading_names_are_found_as_for_a_pdf(line, label):
     assert text_sections(f"## {line}\n本文。\n")[0].label == label
 
 
+@pytest.mark.parametrize("line, label", [
+    ("企画・実践　【花壇づくり】", "企画・実践【花壇づくり】"),  # Its 【 is inside: the 】 stays.
+    ("企画・実践【花壇づくり】 ：", "企画・実践【花壇づくり】"),
+    ("【窓そうじ】", "窓そうじ"),  # Bracketed from the head: both go, as before.
+    ("【窓そうじ】】", "窓そうじ"),
+])
+def test_a_closing_bracket_stays_when_its_opening_one_is_inside_the_name(line, label):
+    assert text_sections(f"## 目的\n知りたい。\n## {line}\n本文。\n")[1].label == label
+
+
+def test_a_pdf_heading_keeps_a_closing_bracket_the_same_way():
+    assert heading_of("1. 企画・実践　【花壇づくり】").label == "企画・実践【花壇づくり】"
+    assert heading_of("【窓そうじ】").label == "窓そうじ"
+    assert heading_of("＜ 反省・展望 ＞").label == "反省・展望"
+
+
 def test_a_heading_with_no_body_is_no_section_and_a_blank_line_adds_nothing():
     sections = text_sections("## 目的\n\n知りたい。\n\n## まとめ\n\n")
     assert [(s.role, s.text) for s in sections] == [("目的", "知りたい。")]

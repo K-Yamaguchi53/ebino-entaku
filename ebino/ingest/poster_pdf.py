@@ -92,6 +92,7 @@ _OPEN = "<〈《【[◎■●◆◇□▶▼★☆"
 _CLOSE = ">〉》】]"
 _OPENING = re.compile(rf"^[{re.escape(_OPEN)}\s]+")
 _CLOSING = re.compile(rf"[{re.escape(_CLOSE)}\s:：]+$")
+_PAIRS = {">": "<", "〉": "〈", "》": "《", "】": "【", "]": "["}  # Closing -> opening.
 _ENGLISH_GLOSS = re.compile(r"\s*\(\s*[A-Za-z][A-Za-z\s&/-]*\)\s*$")
 _TRAILING_HEADING_NUMBERS = re.compile(r"(?<=[。！？!?])(?:\s*[0-9０-９]{1,2}\s*[.．])+\s*$")
 _WORD_GAP = 3  # pdfplumber's default x_tolerance: a wider gap starts a new word.
@@ -165,6 +166,28 @@ def _starts_like_heading(label: str) -> bool:
     return label in KNOWN_HEADINGS or any(label.startswith(k) for k in keywords)
 
 
+def strip_closing(text: str) -> str:
+    """The brackets, spaces and colons at the end taken off, except a closing
+    bracket whose opening one is inside the words: 「企画・実践　【花壇づくり】」
+    keeps its 】, while 「窓そうじ】」 (its 【 taken off at the head) does not."""
+    match = _CLOSING.search(text)
+    if not match:
+        return text
+    body, tail = text[: match.start()], match.group(0)
+    still_open: list[str] = []
+    for char in body:
+        if char in _PAIRS.values():
+            still_open.append(char)
+        elif char in _PAIRS and still_open and still_open[-1] == _PAIRS[char]:
+            still_open.pop()
+    keep = 0
+    for index, char in enumerate(tail):
+        if char in _PAIRS and still_open and still_open[-1] == _PAIRS[char]:
+            still_open.pop()
+            keep = index + 1
+    return body + tail[:keep]
+
+
 def is_why_question(label: str) -> bool:
     """「なぜこのテーマにしたのか？」「なぜ手話？」 — not 「なぜなら」."""
     return (
@@ -192,7 +215,7 @@ def heading_of(text: str) -> Heading | None:
     if bracketed and rest[:1].isdigit():
         # 「◎10:30〜スタート」「◆1:0.5:2」 are times and ratios, not headings.
         return None
-    rest = _CLOSING.sub("", rest)
+    rest = strip_closing(rest)
     label = re.sub(r"\s+", "", rest)
     label = _TRAILING_NUMBER.sub("", label) or label
     if not label or "。" in label:
@@ -231,7 +254,7 @@ def copied_heading(text: str) -> Heading | None:
     number = None if _FIGURE.match(line) else _NUMBER.match(line)
     if number and number.group(2):  # 「1. 背景」, not 「3つの課題」.
         line = line[number.end() :]
-    label = re.sub(r"\s+", "", _CLOSING.sub("", _OPENING.sub("", line)))
+    label = re.sub(r"\s+", "", strip_closing(_OPENING.sub("", line)))
     label = _TRAILING_NUMBER.sub("", label) or label
     if not label:
         return None
