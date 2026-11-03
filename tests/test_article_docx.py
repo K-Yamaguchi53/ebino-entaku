@@ -167,11 +167,11 @@ def test_repeated_paragraph_becomes_one(seat):
     assert len(utterances) == 1
 
 
-# A PDF's printed lines, each kept as a paragraph (13 characters to a line).
-WRAP_1 = "うちの店では、職員一人ひと"
-WRAP_2 = "りの暮らしに合わせて休みを"
+# A PDF's printed lines, each kept as a paragraph (20 characters to a line).
+WRAP_1 = "うちの店では、季節ごとに働く職員一人ひと"
+WRAP_2 = "りの暮らしに合わせて、よく話し合い休みを"
 WRAP_END = "決めています。"
-FULL_LINE = "休みは店で決めて取ります。"  # The width, but it ends a sentence.
+FULL_LINE = "休みは店で話し合い、決めて取っています。"  # The width, but it ends a sentence.
 
 
 def body_texts(body):
@@ -180,7 +180,7 @@ def body_texts(body):
 
 
 def test_lines_of_the_line_width_become_one_paragraph():
-    assert len(WRAP_1) == len(WRAP_2) == len(FULL_LINE) == 13
+    assert len(WRAP_1) == len(WRAP_2) == len(FULL_LINE) == 20
     texts, stats = body_texts([WRAP_1, WRAP_2, WRAP_END])
     assert texts == [WRAP_1 + WRAP_2 + WRAP_END]
     assert stats.wrapped_lines_joined == 2
@@ -208,6 +208,60 @@ def test_rows_are_not_joined_into_each_other():
     rows = {"1": [PERSON], "3": [WRAP_1], "8": [WRAP_2, WRAP_END]}
     utterances, _ = ingest_article_rows(ArticleRows(rows), make_seat())
     assert [u.text for u in utterances] == [WRAP_1, WRAP_2 + WRAP_END]
+
+
+# Lines of the width that start with a list or heading mark.
+MARKED = [
+    "①　季節ごとに働く職員の暮らしに合わせる", "1.季節ごとに働く職員の暮らしに合わせる",
+    "1．季節ごとに働く職員の暮らしに合わせる", "1、季節ごとに働く職員の暮らしに合わせる",
+    "1）季節ごとに働く職員の暮らしに合わせる", "(1)季節ごとに働く職員の暮らしに合わせ",
+    "（1）季節ごとに働く職員の暮らしに合わせ", "1位　季節ごとに働く職員の暮らしに合わせ",
+    "【季節ごとに働く職員の暮らしに合わせる", "・季節ごとに働く職員の暮らしに合わせる",
+    "●季節ごとに働く職員の暮らしに合わせる", "※季節ごとに働く職員の暮らしに合わせる",
+    "▶季節ごとに働く職員の暮らしに合わせる", "Q　季節ごとに働く職員の暮らしに合わせる",
+    "Ｑ季節ごとに働く職員の暮らしに合わせる", "A:季節ごとに働く職員の暮らしに合わせる",
+    "Ａ：季節ごとに働く職員の暮らしに合わせる", "⑳季節ごとに働く職員の暮らしに合わせる",
+]
+
+
+@pytest.mark.parametrize("marked", MARKED)
+def test_a_line_starting_with_a_mark_does_not_join_the_next(marked):
+    assert abs(len(marked) - len(WRAP_1)) <= 1
+    texts, _ = body_texts([WRAP_1, WRAP_2, marked, WRAP_1, WRAP_2, WRAP_END])
+    assert texts == [WRAP_1 + WRAP_2, marked, WRAP_1 + WRAP_2 + WRAP_END]
+
+
+@pytest.mark.parametrize("marked", ["①　職員の暮らしに合わせる", "・職員の暮らしに合わせる", "1.職員の暮らし"])
+def test_a_line_starting_with_a_mark_is_not_joined_onto_the_line_before(marked):
+    texts, stats = body_texts([WRAP_1, WRAP_2, marked])
+    assert texts == [WRAP_1 + WRAP_2, marked]
+    assert stats.wrapped_lines_joined == 1
+
+
+@pytest.mark.parametrize("line", [
+    "3月に季節ごとに働く職員の暮らしに合わせ", "10年、季節ごとに働く職員の暮らしに合わ",
+    "5%の季節ごとに働く職員の暮らしに合わせ", "1.5倍、季節ごとに働く職員の暮らしに合",
+    "QRコードで季節ごとに働く職員の暮らしに",
+])
+def test_a_number_with_a_unit_or_a_word_after_it_is_not_a_mark(line):
+    assert abs(len(line) - len(WRAP_1)) <= 1
+    texts, _ = body_texts([WRAP_1, line, WRAP_END])
+    assert texts == [WRAP_1 + line + WRAP_END]
+
+
+def test_a_left_line_shorter_than_fifteen_does_not_join():
+    short_a, short_b = "朝は店の前を掃除してから開", "昼は交代で休んで、夜に閉め"  # 13 each: the width.
+    fourteen = "朝は店の前を掃除してから開け"
+    assert len(fourteen) == 14
+    texts, stats = body_texts([short_a, short_b, fourteen, "る"])
+    assert texts == [short_a, short_b, fourteen, "る"]
+    assert stats.wrapped_lines_joined == 0
+
+
+def test_unmarked_lines_of_twenty_still_join():
+    texts, stats = body_texts([WRAP_1, WRAP_2, WRAP_1, WRAP_2, WRAP_END])
+    assert texts == [WRAP_1 + WRAP_2 + WRAP_1 + WRAP_2 + WRAP_END]
+    assert stats.wrapped_lines_joined == 4
 
 
 @pytest.mark.parametrize(

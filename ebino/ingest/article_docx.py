@@ -68,6 +68,19 @@ _SENTENCE_ENDS = "。．.！？!?」』）)…"
 # Shorter paragraphs are headings or list items; they never set the line width.
 _MIN_LINE_WIDTH = 10
 _WIDTH_SLACK = 1
+# A line shorter than this never joins the next: short lines of one length
+# can be notes taken while listening, not a printed paragraph cut in two.
+_MIN_JOIN_LENGTH = 15
+# A line starting with a list or heading mark never joins, on either side.
+# A number is a mark only with 「.」「、」「）」 or 「位」 after it (「3月に」 is
+# not); 「1.5倍」 is not either. Q only when no letter follows (「QRコード」).
+_LIST_MARK = re.compile(
+    r"(?:[①-⑳【・●○■□◆◇※★☆▼▶]"
+    r"|[QＱ](?![A-Za-zＡ-Ｚａ-ｚ])"
+    r"|[AＡ][:：]"
+    r"|[(（][0-9０-９]+[)）]"
+    r"|[0-9０-９]+(?:[.．](?![0-9０-９])|[、）)]|位))"
+)
 
 
 @dataclass
@@ -151,12 +164,18 @@ def line_width(paragraphs: list[str]) -> int | None:
     return width if count >= 2 else None
 
 
+def _starts_with_mark(paragraph: str) -> bool:
+    return _LIST_MARK.match(paragraph) is not None
+
+
 def join_wrapped(rows: dict[str, list[str]]) -> tuple[dict[str, list[str]], int]:
     """Join each printed line back onto the paragraph it was cut from.
 
     A paragraph of the file's line width (±1) that does not end a sentence
     is a wrapped line, and the next paragraph of the same row continues it.
     Headings (shorter) and paragraphs that end a sentence stay as they are.
+    Never joined: a line shorter than _MIN_JOIN_LENGTH on the left, and a
+    line starting with a list or heading mark on either side.
     Only the rows that are shown take part: the name row keeps one paragraph
     per person. Returns the rows and how many lines were joined.
     """
@@ -169,12 +188,15 @@ def join_wrapped(rows: dict[str, list[str]]) -> tuple[dict[str, list[str]], int]
         kept: list[str] = []
         carry = False
         for paragraph in rows.get(key, []):
-            if carry:
+            if carry and not _starts_with_mark(paragraph):
                 kept[-1] += paragraph
                 joined += 1
             else:
                 kept.append(paragraph)
-            carry = not _ends_a_sentence(paragraph) and abs(len(paragraph) - width) <= _WIDTH_SLACK
+            carry = (not _ends_a_sentence(paragraph)
+                     and abs(len(paragraph) - width) <= _WIDTH_SLACK
+                     and len(paragraph) >= _MIN_JOIN_LENGTH
+                     and not _starts_with_mark(paragraph))
         if key in rows:
             joined_rows[key] = kept
     return joined_rows, joined
