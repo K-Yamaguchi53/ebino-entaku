@@ -414,7 +414,11 @@ def test_rough_js_and_its_license_are_served(tmp_path):
 
 
 def test_the_static_files_load_nothing_from_outside():
-    for name in STATIC_SERVED:
+    texts = [name for name, kind in app_module.STATIC_FILES.values() if kind.startswith(("text/", "application/"))]
+    assert set(STATIC_SERVED) - set(texts) == {"title.woff"}  # The font: binary, nothing to load.
+    # The pictures from mapdata/ are files, not pages: nothing in them loads anything.
+    assert {kind for _, kind in app_module.MAP_FILES.values()} == {"image/webp"}
+    for name in texts:
         text = (app_module.STATIC_DIR / name).read_text(encoding="utf-8")
         found = [url for url in URL.findall(text) if not url.startswith(NAMESPACES)]
         assert not found, (name, found[:3])

@@ -18,7 +18,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import (ask_seat, closing, coach, config, editor, harvest, more, purpose_summary, reflection, roundtable,
+from . import (ask_seat, closing, coach, config, editor, harvest, more, purpose_summary, reflection, relief,
+               roundtable,
                seat_map, subjects, talk_kinds)
 from .editor import QuestionCard
 from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
@@ -99,11 +100,14 @@ class Library:
     # and the screen keeps the seat list alone. The points are for `seats`.
     map_data: seat_map.MapData | None = None
     placement: seat_map.Placement | None = None
+    # The basin drawn as a model under the map (relief.py): None keeps the
+    # flat map. The points stay where seat_map.py put them.
+    relief: dict | None = None
 
     @classmethod
     def build(cls, seats, utterances, topics, show_private=False, saved_kinds=None,
               saved_summaries=None, names=None, subject_catalog=None, coach_seats=None,
-              coach_on=None, map_data=None) -> "Library":
+              coach_on=None, map_data=None, relief_data=None) -> "Library":
         """coach_seats: coach.tsv as {seat ID: shown on the map}. A seat kept
         off the map is left out of the seat list and of everything the
         librarian and the moderator can pick; its pieces are the coach's only."""
@@ -124,16 +128,21 @@ class Library:
                    closing.ranking_titles(shown_utterances), subject_catalog, list(seats),
                    [entry.text for entry in every_entry if entry.seat_id in coach_seats],
                    config.coach_on() if coach_on is None else coach_on,
-                   map_data, seat_map.place_seats(map_data, shown_seats) if map_data else None)
+                   map_data, seat_map.place_seats(map_data, shown_seats) if map_data else None,
+                   relief_data if map_data else None)
 
     @classmethod
-    def load(cls, data_dir: Path, show_private: bool = False, map_file: Path | None = None) -> "Library":
+    def load(cls, data_dir: Path, show_private: bool = False, map_file: Path | None = None,
+             relief_dir: Path | None = None) -> "Library":
         seats = load_seats(data_dir / "seats.tsv")
+        map_data = seat_map.load_map(map_file)
         return cls.build(seats, load_utterances(data_dir), load_topics(data_dir), show_private,
                          talk_kinds.load_saved(data_dir), purpose_summary.load_saved(data_dir),
                          load_names(data_dir, seats), subjects.load_catalog(data_dir),
                          coach.load_coach(data_dir, {seat.seat_id for seat in seats}),
-                         map_data=seat_map.load_map(map_file))
+                         map_data=map_data,
+                         relief_data=(relief.load_relief((map_data.width, map_data.height), relief_dir)
+                                      if map_data else None))
 
     def seat_view(self, seat: Seat) -> dict:
         label = seat_label(seat, self.show_private)
@@ -143,11 +152,17 @@ class Library:
         """The map part of /api/setup, or None: no map, the seat list alone."""
         if self.map_data is None or self.placement is None:
             return None
-        return seat_map.map_view(self.map_data, self.placement, load_optional_text(SCHOOL_LABEL))
+        view = seat_map.map_view(self.map_data, self.placement, load_optional_text(SCHOOL_LABEL))
+        view["relief"] = self.relief  # None: the flat map.
+        return view
 
     def map_report(self) -> str:
         """The start-up line about the map: counts only."""
         return self.placement.report() if self.placement is not None else "地図なし"
+
+    def relief_report(self) -> str:
+        """The start-up line about the picture under the map."""
+        return "立体の絵あり" if self.relief else "立体の絵なし（平らな地図）"
 
     def seat_list(self) -> list[dict]:
         order = list(KIND_LABELS)

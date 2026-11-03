@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header>
+<header class="masthead">
   <h1>えびの円卓</h1>
 </header>
 
@@ -36,10 +36,20 @@
       <div id="map-frame" class="map-frame">
         <svg id="map-svg" role="group" aria-label="えびのの地図と席の点" xmlns="http://www.w3.org/2000/svg"></svg>
         <div id="map-overlay" class="map-overlay"></div>
+        <!-- 地図にもどす and the zoom buttons; their words come from texts/map_buttons.tsv. -->
+        <div class="map-controls">
+          <button type="button" id="map-back" class="map-back" hidden></button>
+          <div class="map-zoom">
+            <button type="button" id="map-zoom-in"></button>
+            <button type="button" id="map-zoom-out"></button>
+            <button type="button" id="map-zoom-all"></button>
+          </div>
+        </div>
       </div>
       <div class="map-foot">
         <p class="map-met">会った席 <span id="map-met-count">0</span></p>
-        <p id="map-source" class="map-source"></p>
+        <!-- The map's sources: OpenStreetMap, and Copernicus for the picture. -->
+        <p class="map-source"><span id="map-source"></span><span id="map-dem" hidden></span></p>
       </div>
       <div id="map-card" class="map-card" hidden></div>
     </section>

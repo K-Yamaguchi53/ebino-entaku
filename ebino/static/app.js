@@ -155,14 +155,21 @@ function renderRound(round) {
   box.append(el("p", { class: "count", text: state.texts.answered_count.replace("{n}", round.answered_seats) }));
 
   const byId = {};
-  round.quotes.forEach((quote, index) => {
-    const node = renderQuote(round.round, quote);
-    byId[quote.utterance_id] = quote;
-    box.append(node);
-    if (index === 0) for (const text of round.planted_stopped) box.append(renderPlanted(text));
+  for (const quote of round.quotes) byId[quote.utterance_id] = quote;
+  // A split's two sides stand side by side, each its seats' titles over its
+  // quotes as paper cards (one under the other on a narrow screen). A quote
+  // goes under the first split that holds it; the others stand apart above.
+  const placed = new Set();
+  const take = (ids) => ids.filter((id) => byId[id] && !placed.has(id) && placed.add(id)).map((id) => byId[id]);
+  const sides = round.splits.map((split) => [take(split.side_a), take(split.side_b)]);
+  const loose = el("div", { class: "cards" });
+  const planted = round.planted_stopped.map(renderPlanted);
+  round.quotes.filter((quote) => !placed.has(quote.utterance_id)).forEach((quote, index) => {
+    loose.append(renderQuote(round.round, quote));
+    if (index === 0) loose.append(...planted.splice(0));
   });
-
-  for (const split of round.splits) box.append(renderSplit(round.round, split, byId));
+  box.append(...planted, loose);
+  round.splits.forEach((split, index) => box.append(renderSplit(round.round, split, byId, sides[index])));
   if (round.card) box.append(el("p", { class: "card-done", text: "この問いを質問カードにしました" }));
   $("rounds").prepend(box);
   renderSeats();
@@ -422,12 +429,15 @@ function shownQuotes(text) {
   return text.replace(/["“”]([^"“”\n]*)["“”]/g, "「$1」");
 }
 
-function renderSplit(roundNo, split, byId) {
+function renderSplit(roundNo, split, byId, [quotesA, quotesB]) {
   const titles = (ids) => [...new Set(ids.map((id) => state.seatById[byId[id].seat_id].title))].join("・");
+  const side = (ids, quotes) => el("div", { class: "side" },
+    el("p", { class: "side-head", text: titles(ids) }),
+    ...quotes.map((quote) => renderQuote(roundNo, quote)));
   return el("div", { class: "split" },
     el("p", { class: "notice", text: state.texts.split_notice }),
     el("p", { class: "heading", text: shownQuotes(split.heading) }),
-    el("p", { class: "sides", text: `${titles(split.side_a)}　／　${titles(split.side_b)}` }),
+    el("div", { class: "sides" }, side(split.side_a, quotesA), side(split.side_b, quotesB)),
     el("button", { type: "button", class: "quiet", text: "この割れ目を次の問いにする", onclick: async () => {
       fill((await call("/api/split", { round: roundNo, index: split.index })).heading);
     } }));

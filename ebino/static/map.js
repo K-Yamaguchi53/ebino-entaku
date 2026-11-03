@@ -1,7 +1,16 @@
-// The hand-drawn map of the basin, over the seat list (SPEC 5-1, 14-65). The
-// seat list stays as it is: the map adds to it. Lines are drawn with rough.js
-// (bundled, MIT). Every word is set with textContent, never as HTML, and the
-// map shows seat labels and quotes only, never a person's name.
+// The map of the basin, over the seat list (SPEC 5-1, 14-65, 14-66). The seat
+// list stays as it is: the map adds to it.
+//
+// With the picture (relief.py: the basin drawn as a model, seen from the
+// north), the map is laid over it: every (x, y) of seat_map.py is moved onto
+// the picture here, on the screen only. A round lights the seats that
+// answered, the camera comes closer, a round table opens over the basin and
+// the lit seats fly to it. Without the picture (none, or it does not load),
+// the flat hand-drawn map; without a map, the seat list alone.
+//
+// Lines are drawn with rough.js (bundled, MIT). Every word is set with
+// textContent, never as HTML, and the map shows seat labels and quotes only,
+// never a person's name.
 "use strict";
 
 const EbinoMap = (() => {
@@ -11,17 +20,41 @@ const EbinoMap = (() => {
   const BUBBLE_CHARS = 36;  // A longer quote is cut here, with 「…」.
   const DRAW_FOR = 1800;  // ms to draw the rim; the river follows.
   const MOUNTAINS = 16;
+  // The round table (the picture only): round the basin's middle, flat at
+  // the height of the ground there, in map units.
+  const TABLE_RX = 150, TABLE_RY = 110, TABLE_LIFT = 7, SEAT_OUT = 48;
+  const CAMERA_FOR = 1100, FLY_FOR = 1100, FLY_GAP = 160, BACK_FOR = 700;
+  const CLOSEST = 3.5;  // The nearest zoom shows this part of the whole across.
+  const ZOOM_STEP = 1.4;
+  const POINT_R = 7.5;  // A point's radius at scale 1 (see shape()).
+  const MIN_POINT_PX = 3;  // A point is never smaller than this on screen.
+  const TOKEN = 1.3;  // A seat at the table, larger than its point.
+  // On a narrow map a seat's label at the table is cut here, with 「…」 (its
+  // card below has the whole title).
+  const NARROW = 560, LABEL_CHARS = 8;
+  const CHAIR_R = 13, MIN_CHAIR_PX = 13;  // An empty chair: never under 26 px across to press.
+  const DRAG_FROM = 5;  // px moved before a press becomes a drag.
+  // Words drawn on the picture, in CSS px (they keep their size as it zooms).
+  const TEXT_PX = { place: 11, school: 12, shelf: 11 };
 
   let map = null;  // The drawing from /api/setup.
   let app = null;  // What app.js lends: state, cardEntry, renderSeats, shownQuotes.
-  let svg, overlay, splitLayer, card;
-  const points = {};  // Seat ID -> the point's <g>.
-  let timers = [];
+  let svg, overlay, frame, card;
+  let view = null;  // How the map's (x, y) reach the drawing (flatView, reliefView).
+  let vb = null;  // The part of the drawing on screen.
+  let splitLayer, tableLayer, schoolGroup = null;
+  const points = {};  // Seat ID -> { node, seat, at() }.
+  let shelves = [];  // The picture's shelves: { shelf, rect, name, seats }.
+  let tokens = [];  // Seats and empty chairs at the table: { node, at, scale }.
+  let timers = [], flights = [];
   let sticky = null;  // The seat whose label stays (the last to light up).
-  let drawn = false;
+  let drawn = false, wantShow = false, pending = null;
+  let camera = null, roundNo = 0, returnFocus = null;
+  let soon = null;
 
   const reduced = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = (id) => document.getElementById(id);
+  const wait = (ms) => new Promise((done) => timers.push(setTimeout(done, ms)));
 
   function svgEl(tag, attrs = {}) {
     const node = document.createElementNS(NS, tag);
@@ -61,39 +94,183 @@ const EbinoMap = (() => {
     return [cx + far * dx, cy + far * dy];
   }
 
+  // A line with a point every `every` map units, so that on the picture it
+  // follows the ground between its corners.
+  function dense(line, closed, every = 6) {
+    const out = [];
+    const last = closed ? line.length : line.length - 1;
+    for (let k = 0; k < last; k++) {
+      const [x0, y0] = line[k], [x1, y1] = line[(k + 1) % line.length];
+      const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / every));
+      for (let t = 0; t < n; t++) out.push([x0 + (x1 - x0) * t / n, y0 + (y1 - y0) * t / n]);
+    }
+    if (!closed) out.push(line[line.length - 1]);
+    return out;
+  }
+
+  // The flat map: the drawing is the map's own viewBox.
+  function flatView() {
+    const [, , width, height] = map.viewbox;
+    return { relief: false, W: width, H: height, S: 1, proj: (x, y) => [x, y] };
+  }
+
+  // The picture: map (x, y, height) -> its pixel, through the projection
+  // tools/render_relief.py wrote. The ground's height comes from the coarse
+  // grid, read between its four nearest values.
+  function reliefView(relief) {
+    const [W, H] = relief.res;
+    const { rows, step, px, py, z } = relief;
+    const heightAt = (x, y) => {
+      const fx = Math.min(Math.max(x / step, 0), rows[0].length - 1.001);
+      const fy = Math.min(Math.max(y / step, 0), rows.length - 1.001);
+      const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j;
+      return rows[j][i] * (1 - u) * (1 - v) + rows[j][i + 1] * u * (1 - v)
+        + rows[j + 1][i] * (1 - u) * v + rows[j + 1][i + 1] * u * v;
+    };
+    const zAt = (x, y) => (heightAt(x, y) - z.base_m) / z.m_per_unit * z.exag;
+    // lift: above the ground; level: a fixed height instead of the ground's.
+    const proj = (x, y, lift = 0, level = null) => {
+      const h = (level === null ? zAt(x, y) : level) + lift;
+      return [px[0] * x + px[1] * y + px[2] * h + px[3], py[0] * x + py[1] * y + py[2] * h + py[3]];
+    };
+    return { relief: true, W, H, S: Math.hypot(px[0], px[1]), proj, zAt };
+  }
+
   // --- drawing ---
 
+  // The picture is loaded first; when it fails, the flat map is drawn.
   function init(drawing, seats, lent) {
     map = drawing;
     app = lent;
-    const [, , width, height] = map.viewbox;
     svg = $("map-svg");
     overlay = $("map-overlay");
+    frame = $("map-frame");
     card = $("map-card");
-    svg.setAttribute("viewBox", map.viewbox.join(" "));
-    $("map-frame").style.aspectRatio = `${width} / ${height}`;
+    controls();
+    if (!map.relief) return build(seats, false);
+    const picture = new Image();
+    picture.onload = () => build(seats, true);
+    picture.onerror = () => build(seats, false);
+    picture.src = map.relief.image;
+  }
+
+  function build(seats, withRelief) {
+    try {
+      draw(seats, withRelief);
+    } catch (error) {
+      if (withRelief) return build(seats, false);
+      $("map").hidden = true;  // The seat list alone, as before.
+      return;
+    }
+    if (wantShow) show();
+    if (pending) {
+      const result = pending;
+      pending = null;
+      round(result);
+    }
+  }
+
+  function draw(seats, withRelief) {
+    svg.replaceChildren();
+    overlay.replaceChildren();
+    for (const id of Object.keys(points)) delete points[id];
+    shelves = [];
+    tokens = [];
+    schoolGroup = null;
+    view = withRelief ? reliefView(map.relief) : flatView();
+    vb = { x: 0, y: 0, w: view.W, h: view.H };
+    svg.setAttribute("viewBox", `0 0 ${view.W} ${view.H}`);
+    frame.classList.toggle("relief", view.relief);
+    $("map").style.setProperty("--ratio", String(view.W / view.H));
+    frame.style.aspectRatio = `${view.W} / ${view.H}`;
     const rc = rough.svg(svg);
     const layer = (className) => svg.appendChild(svgEl("g", { class: className }));
+    const P = view.proj, S = view.S;
     // Colours come from style.css (a CSS rule beats rough's attributes). No
     // fill option: rough would hatch the inside.
     const ink = { stroke: "#000", seed: 7 };
 
+    if (view.relief) {
+      const image = layer("relief-image");
+      image.append(svgEl("image", { href: map.relief.image, width: view.W, height: view.H }));
+    }
     const fill = layer("basin-fill");
-    fill.append(svgEl("polygon", { points: map.boundary.map((p) => p.join(",")).join(" ") }));
+    const rimLine = view.relief ? dense(map.boundary, true).map(([x, y]) => P(x, y, 1)) : map.boundary;
+    fill.append(svgEl("polygon", { points: rimLine.map((p) => p.join(",")).join(" ") }));
 
     const river = layer("river draw-later");
     for (const line of map.river) {
-      river.append(rc.linearPath(line, { ...ink, strokeWidth: 3, roughness: 0.9, bowing: 0.6 }));
+      const shown = view.relief ? dense(line, false).map(([x, y]) => P(x, y, 0.5)) : line;
+      river.append(rc.linearPath(shown, { ...ink, strokeWidth: 3 * S, roughness: 0.9, bowing: 0.6 }));
     }
     const rim = layer("rim draw-first");
-    rim.append(rc.polygon(map.boundary, { ...ink, strokeWidth: 2.2, roughness: 1.3, bowing: 0.8 }));
+    rim.append(rc.polygon(rimLine, { ...ink, strokeWidth: 2.2 * S, roughness: 1.3, bowing: 0.8 }));
 
-    // Mountains: a decoration, not data. Small peaks just beyond the rim.
-    const hills = layer("mountains");
-    const middle = centroid(map.boundary);
     const seatXY = seats.filter((s) => s.x !== undefined).map((s) => [s.x, s.y]);
-    const shelves = map.shelves || [];
-    const onShelf = (x, y) => shelves.some(({ box: [x0, y0, x1, y1] }) =>
+    const mapShelves = map.shelves || [];
+    if (!view.relief) drawMountains(rc, layer("mountains"), ink, seatXY, mapShelves);
+
+    // Each kind's shelf: its name, faint, the same words as the seat list's
+    // heading for that kind. On the picture, the shelves sit in its corners.
+    const shelfBoxes = layer("shelf-boxes");
+    const shelfNames = layer("shelf-names");
+    for (const shelf of mapShelves) {
+      const words = app.state.kinds[shelf.kind];
+      if (!words) continue;
+      const text = svgEl("text", { x: shelf.label[0], y: shelf.label[1] });
+      text.textContent = words;
+      shelfNames.append(text);
+      if (!view.relief) continue;
+      const rect = svgEl("rect", { rx: 6 * S });
+      shelfBoxes.append(rect);
+      const onIt = seats.filter((s) => s.outer && s.kind === shelf.kind && s.x !== undefined);
+      shelves.push({ shelf, rect, name: text, seats: onIt.map((s) => s.seat_id) });
+    }
+
+    if (map.crossing) {
+      const line = layer("crossing");
+      const [from, to] = [map.crossing.from, map.crossing.to].map(([x, y]) => P(x, y, 1));
+      line.append(rc.line(...from, ...to, { ...ink, strokeWidth: 2 * S, roughness: 1.1 }));
+      line.append(svgEl("circle", { cx: from[0], cy: from[1], r: 5 * S }));
+    }
+
+    splitLayer = layer("split-lines");
+    const seatLayer = layer("points");
+    for (const seat of seats) {
+      if (seat.x === undefined) continue;
+      const node = drawPoint(seat);
+      const spot = !view.relief ? [seat.x, seat.y] : seat.outer ? null : P(seat.x, seat.y, 1.5);
+      points[seat.seat_id] = { node, seat, at: spot ? () => spot : () => shelfSpot(seat.seat_id) };
+      seatLayer.append(node);
+    }
+    // Over the points, outlined, so a point never hides a place name.
+    const names = layer("place-names");
+    for (const place of map.places) {
+      const [x, y] = P(place.x, place.y, 2);
+      const text = svgEl("text", { x, y, "text-anchor": "middle", "data-px": TEXT_PX.place });
+      text.textContent = place.name;
+      names.append(text);
+    }
+    for (const text of shelfNames.children) text.dataset.px = TEXT_PX.shelf;
+    // Over the points so its label reads; it takes no presses (not a seat).
+    if (map.school) drawSchool(layer("school"), map.school);
+    tableLayer = layer("table");
+
+    $("map-source").textContent = map.source;
+    $("map-dem").textContent = view.relief ? map.relief.source : "";
+    $("map-dem").hidden = !view.relief;
+    $("map").hidden = false;
+    watchSize();
+    setView(vb);
+    refresh();
+  }
+
+  // Mountains on the flat map: a decoration, not data. Small peaks just
+  // beyond the rim.
+  function drawMountains(rc, hills, ink, seatXY, mapShelves) {
+    const [, , width, height] = map.viewbox;
+    const middle = centroid(map.boundary);
+    const onShelf = (x, y) => mapShelves.some(({ box: [x0, y0, x1, y1] }) =>
       x > x0 - 24 && x < x1 + 24 && y > y0 - 16 && y < y1 + 16);
     for (let k = 0; k < MOUNTAINS; k++) {
       const angle = (k + 0.5) * 2 * Math.PI / MOUNTAINS;
@@ -105,48 +282,11 @@ const EbinoMap = (() => {
       hills.append(rc.linearPath([[x - 13, y + 7], [x - 4, y - 8], [x + 1, y - 1], [x + 6, y - 6], [x + 14, y + 7]],
         { ...ink, strokeWidth: 1.4, roughness: 0.8, seed: 11 + k }));
     }
-
-    // Each kind's shelf: its name, faint, the same words as the seat list's
-    // heading for that kind.
-    const shelfNames = layer("shelf-names");
-    for (const shelf of shelves) {
-      const words = app.state.kinds[shelf.kind];
-      if (!words) continue;
-      const text = svgEl("text", { x: shelf.label[0], y: shelf.label[1] });
-      text.textContent = words;
-      shelfNames.append(text);
-    }
-
-    if (map.crossing) {
-      const line = layer("crossing");
-      line.append(rc.line(...map.crossing.from, ...map.crossing.to, { ...ink, strokeWidth: 2, roughness: 1.1 }));
-      line.append(svgEl("circle", { cx: map.crossing.from[0], cy: map.crossing.from[1], r: 5 }));
-    }
-
-    splitLayer = layer("split-lines");
-    const seatLayer = layer("points");
-    for (const seat of seats) {
-      if (seat.x === undefined) continue;
-      const point = drawPoint(seat);
-      points[seat.seat_id] = point;
-      seatLayer.append(point);
-    }
-    // Over the points, outlined, so a point never hides a place name.
-    const names = layer("place-names");
-    for (const place of map.places) {
-      const text = svgEl("text", { x: place.x, y: place.y, "text-anchor": "middle" });
-      text.textContent = place.name;
-      names.append(text);
-    }
-    // Over the points so its label reads; it takes no presses (not a seat).
-    if (map.school) drawSchool(layer("school"), map.school);
-    $("map-source").textContent = map.source;
-    $("map").hidden = false;
-    refresh();
   }
 
   function drawSchool(group, school) {
-    group.setAttribute("transform", `translate(${school.x} ${school.y})`);
+    const [x, y] = view.proj(school.x, school.y, 1);
+    schoolGroup = { node: group, x, y };
     group.setAttribute("role", "img");
     group.setAttribute("aria-label", school.label);
     group.append(
@@ -165,14 +305,11 @@ const EbinoMap = (() => {
     if (kind === "poster") return svgEl("rect", { class: "shape", x: -7, y: -7, width: 14, height: 14 });
     if (kind === "cross") return svgEl("polygon", { class: "shape", points: "0,-9 8.5,6.5 -8.5,6.5" });
     if (kind === "outsider_teacher") return svgEl("polygon", { class: "shape", points: "0,-9.5 9.5,0 0,9.5 -9.5,0" });
-    return svgEl("circle", { class: "shape", r: 7.5 });
+    return svgEl("circle", { class: "shape", r: POINT_R });
   }
 
   function drawPoint(seat) {
-    const point = svgEl("g", {
-      class: `pt kind-${seat.kind}`, transform: `translate(${seat.x} ${seat.y})`,
-      tabindex: 0, role: "button", "data-seat": seat.seat_id,
-    });
+    const point = svgEl("g", { class: `pt kind-${seat.kind}`, tabindex: 0, role: "button", "data-seat": seat.seat_id });
     point.append(svgEl("circle", { class: "halo", r: 14 }), shape(seat.kind),
       svgEl("circle", { class: "met-mark", cx: 8, cy: -8, r: 3.5 }));
     const ask = svgEl("text", { class: "ask-mark", x: 9, y: -6 });
@@ -182,20 +319,240 @@ const EbinoMap = (() => {
     point.addEventListener("focus", () => showTip(seat.seat_id));
     point.addEventListener("mouseleave", restoreTip);
     point.addEventListener("blur", restoreTip);
-    point.addEventListener("click", () => press(seat.seat_id));
-    point.addEventListener("keydown", (event) => {
+    pressable(point, () => press(seat.seat_id, point));
+    return point;
+  }
+
+  function pressable(node, action) {
+    node.addEventListener("click", action);
+    node.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        press(seat.seat_id);
+        action();
       }
     });
-    return point;
+  }
+
+  // --- sizes that follow the zoom: points, words on the picture, shelves ---
+
+  // A point's scale: its size on the drawing, never under MIN_POINT_PX on screen.
+  function pointScale() {
+    const across = frame.clientWidth || 1;
+    return Math.max(view.S, MIN_POINT_PX * (vb.w / across) / POINT_R);
+  }
+
+  // The picture's shelves, one per corner (the zoom buttons' corner last),
+  // spaced so their points never touch at any width.
+  function layoutShelves(f) {
+    const margin = 14 * f;
+    const corners = [[0, 0], [1, 0], [0, 1], [1, 1]];
+    shelves.forEach((entry, k) => {
+      const [x0, y0, x1, y1] = entry.shelf.box;
+      const w = (x1 - x0) * f, h = (y1 - y0) * f;
+      const [cx, cy] = corners[k % corners.length];
+      const left = cx ? view.W - w - margin : margin, top = cy ? view.H - h - margin : margin;
+      entry.origin = [left, top];
+      entry.scale = f;
+      Object.entries({ x: left, y: top, width: w, height: h }).forEach(([key, value]) => entry.rect.setAttribute(key, value));
+      entry.name.setAttribute("x", left + (entry.shelf.label[0] - x0) * f);
+      entry.name.setAttribute("y", top + (entry.shelf.label[1] - y0) * f);
+    });
+  }
+
+  function shelfSpot(seatId) {
+    const seat = points[seatId].seat;
+    const entry = shelves.find((s) => s.seats.includes(seatId));
+    if (!entry || !entry.origin) return [seat.x * view.S, seat.y * view.S];
+    const [x0, y0] = entry.shelf.box;
+    return [entry.origin[0] + (seat.x - x0) * entry.scale, entry.origin[1] + (seat.y - y0) * entry.scale];
+  }
+
+  function rescale() {
+    const f = pointScale();
+    const perPx = vb.w / (frame.clientWidth || 1);
+    if (view.relief) layoutShelves(f);
+    for (const { node, at } of Object.values(points)) {
+      const [x, y] = at();
+      node.setAttribute("transform", `translate(${x} ${y}) scale(${f})`);
+    }
+    for (const token of tokens) {
+      const k = token.chair ? Math.max(f * token.scale, MIN_CHAIR_PX * perPx / CHAIR_R) : f * token.scale;
+      token.node.setAttribute("transform", `translate(${token.at[0]} ${token.at[1]}) scale(${k})`);
+    }
+    if (schoolGroup) {
+      const k = view.relief ? Math.max(view.S, TEXT_PX.school * perPx / 20) : 1;
+      schoolGroup.node.setAttribute("transform", `translate(${schoolGroup.x} ${schoolGroup.y}) scale(${k})`);
+    }
+    if (!view.relief) return;  // The flat map keeps its words' sizes from style.css.
+    for (const text of svg.querySelectorAll("text[data-px]")) {
+      text.style.fontSize = `${Number(text.dataset.px) * perPx}px`;
+      text.style.strokeWidth = `${3 * perPx}px`;
+    }
+  }
+
+  // --- the camera: the part of the drawing on screen ---
+
+  function clampView(v) {
+    const w = Math.min(view.W, Math.max(view.W / CLOSEST, v.w)), h = w * view.H / view.W;
+    return { x: Math.min(view.W - w, Math.max(0, v.x)), y: Math.min(view.H - h, Math.max(0, v.y)), w, h };
+  }
+
+  function setView(v, settle = true) {
+    vb = clampView(v);
+    svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+    frame.classList.toggle("zoomed", vb.w < view.W - 0.5);
+    rescale();
+    if (settle) relayout();
+  }
+
+  function stopCamera() {
+    if (camera) cancelAnimationFrame(camera);
+    camera = null;
+    frame.classList.remove("moving");
+  }
+
+  // Moves the camera there; at once when motion is reduced.
+  function moveTo(target, ms) {
+    stopCamera();
+    target = clampView(target);
+    if (reduced() || !ms) {
+      setView(target);
+      return Promise.resolve();
+    }
+    const from = { ...vb }, start = performance.now();
+    frame.classList.add("moving");
+    return new Promise((done) => {
+      const step = (now) => {
+        const t = Math.min(1, (now - start) / ms), e = 1 - Math.pow(1 - t, 3);
+        const mix = (key) => from[key] + (target[key] - from[key]) * e;
+        setView({ x: mix("x"), y: mix("y"), w: mix("w"), h: mix("h") }, false);
+        if (t < 1) {
+          camera = requestAnimationFrame(step);
+          return;
+        }
+        camera = null;
+        frame.classList.remove("moving");
+        relayout();
+        done();
+      };
+      camera = requestAnimationFrame(step);
+    });
+  }
+
+  function zoomAround(factor, x = vb.x + vb.w / 2, y = vb.y + vb.h / 2) {
+    return { x: x - (x - vb.x) / factor, y: y - (y - vb.y) / factor, w: vb.w / factor, h: vb.h / factor };
+  }
+
+  function fromScreen(clientX, clientY) {
+    const r = svg.getBoundingClientRect();
+    return [vb.x + (clientX - r.left) / r.width * vb.w, vb.y + (clientY - r.top) / r.height * vb.h];
+  }
+
+  // Labels move once a drag or a wheel stops, not on every step.
+  function settleSoon() {
+    clearTimeout(soon);
+    for (const node of overlay.querySelectorAll(".map-bubble")) node.remove();
+    frame.classList.add("moving");
+    soon = setTimeout(() => { frame.classList.remove("moving"); relayout(); }, 140);
+  }
+
+  // The buttons, the wheel, a drag and a two-finger pinch.
+  function controls() {
+    const words = app.state.texts.map_buttons;
+    for (const [id, key] of [["map-back", "back"], ["map-zoom-in", "zoom_in"], ["map-zoom-out", "zoom_out"],
+      ["map-zoom-all", "zoom_all"]]) {
+      $(id).textContent = words[key].text;
+      if (words[key].label !== words[key].text) $(id).setAttribute("aria-label", words[key].label);
+    }
+    $("map-zoom-in").addEventListener("click", () => moveTo(zoomAround(ZOOM_STEP), 300));
+    $("map-zoom-out").addEventListener("click", () => moveTo(zoomAround(1 / ZOOM_STEP), 300));
+    $("map-zoom-all").addEventListener("click", () => moveTo({ x: 0, y: 0, w: view.W, h: view.H }, 500));
+    $("map-back").addEventListener("click", closeTable);
+
+    svg.addEventListener("wheel", (event) => {
+      if (!view) return;
+      event.preventDefault();
+      stopCamera();
+      const [x, y] = fromScreen(event.clientX, event.clientY);
+      setView(zoomAround(event.deltaY < 0 ? 1.18 : 1 / 1.18, x, y), false);
+      settleSoon();
+    }, { passive: false });
+
+    const down = new Map();
+    let dragged = false, pinch = null;
+    svg.addEventListener("pointerdown", (event) => {
+      down.set(event.pointerId, { x: event.clientX, y: event.clientY, start: [event.clientX, event.clientY] });
+      dragged = false;
+      pinch = null;
+    });
+    svg.addEventListener("pointermove", (event) => {
+      const before = down.get(event.pointerId);
+      if (!before || !view) return;
+      const r = svg.getBoundingClientRect();
+      if (!dragged && Math.hypot(event.clientX - before.start[0], event.clientY - before.start[1]) < DRAG_FROM) return;
+      if (!dragged) {
+        dragged = true;
+        stopCamera();
+        svg.setPointerCapture(event.pointerId);
+        svg.classList.add("dragging");
+      }
+      if (down.size === 1) {
+        const dx = (event.clientX - before.x) / r.width * vb.w, dy = (event.clientY - before.y) / r.height * vb.h;
+        setView({ ...vb, x: vb.x - dx, y: vb.y - dy }, false);
+      } else if (down.size === 2) {
+        const [a, b] = [...down.values()].map((p) => (p === before ? { x: event.clientX, y: event.clientY } : p));
+        const apart = Math.hypot(a.x - b.x, a.y - b.y);
+        if (pinch) {
+          const [x, y] = fromScreen((a.x + b.x) / 2, (a.y + b.y) / 2);
+          setView(zoomAround(apart / pinch, x, y), false);
+        }
+        pinch = apart;
+      }
+      before.x = event.clientX;
+      before.y = event.clientY;
+      settleSoon();
+    });
+    const up = (event) => {
+      down.delete(event.pointerId);
+      pinch = null;
+      if (down.size) return;
+      svg.classList.remove("dragging");
+      // The click that follows this drag (if any) comes first; then presses count again.
+      if (dragged) setTimeout(() => { dragged = false; }, 0);
+    };
+    svg.addEventListener("pointerup", up);
+    svg.addEventListener("pointercancel", up);
+    // A drag is not a press on the point it started on.
+    svg.addEventListener("click", (event) => {
+      if (!dragged) return;
+      dragged = false;
+      event.stopPropagation();
+      event.preventDefault();
+    }, true);
+  }
+
+  // When the frame's width changes, the sizes and every label follow.
+  function watchSize() {
+    if (watchSize.on) return;
+    watchSize.on = true;
+    let width = frame.clientWidth;
+    const changed = () => {
+      if (!view || frame.clientWidth === width) return;
+      width = frame.clientWidth;
+      rescale();
+      relayout();
+    };
+    if (window.ResizeObserver) new ResizeObserver(changed).observe(frame);
+    window.addEventListener("resize", changed);
   }
 
   // Draws the rim, then the river, as if by hand. Called when the map is on
   // screen (a path's length needs it laid out).
   function show() {
-    if (!map || drawn) return;
+    if (!view) { wantShow = true; return; }
+    rescale();
+    relayout();
+    if (drawn) return;
     drawn = true;
     if (reduced()) return;
     for (const [selector, delay] of [[".draw-first path", 0], [".draw-later path", DRAW_FOR * 0.6]]) {
@@ -217,34 +574,50 @@ const EbinoMap = (() => {
 
   // --- labels and bubbles, over the map in CSS pixels ---
 
-  // Puts a label, bubble or heading by a spot on the map, always inside the
-  // map's frame: above it, below it, right or left, the first side that
-  // covers no other label, bubble or heading; failing that, the nearest spot
-  // in the frame that covers none. Returns false when there is no such spot
-  // even with the bubbles gone (it then takes the side that covers least).
+  // Where a spot of the drawing is in the frame, in CSS pixels.
+  function toFrame(x, y) {
+    return [(x - vb.x) / vb.w * overlay.clientWidth, (y - vb.y) / vb.h * overlay.clientHeight];
+  }
+
+  function inView(x, y) {
+    return x >= vb.x && x <= vb.x + vb.w && y >= vb.y && y <= vb.y + vb.h;
+  }
+
+  // Puts a label, bubble or heading by a spot of the drawing, always inside
+  // the map's frame: above it, below it, right or left, the first side that
+  // covers no other label, bubble, heading or button, and no seat or empty
+  // chair at the round table; failing that, the
+  // nearest spot in the frame that covers none. Returns false when there is
+  // no such spot even with the bubbles gone (it then takes the side that
+  // covers least). The spot is kept on the node, so it can be put again when
+  // the frame or the camera changes.
   function place(node, x, y, gap) {
-    const [, , width, height] = map.viewbox;
-    const frame = overlay.getBoundingClientRect();
-    const px = x / width * frame.width, py = y / height * frame.height;
+    Object.assign(node.dataset, { x, y, gap });
+    node.classList.remove("unplaced");
+    const frameBox = overlay.getBoundingClientRect();
+    const [px, py] = toFrame(x, y);
     // Fix the width first: a box set further right would wrap and grow taller.
-    node.style.maxWidth = `${Math.floor(Math.min(frame.width * 0.7, 18 * 16, frame.width - 8))}px`;
+    node.style.width = "";
+    node.style.maxWidth = `${Math.floor(Math.min(frameBox.width * 0.7, 18 * 16, frameBox.width - 8))}px`;
     const w0 = Math.ceil(node.getBoundingClientRect().width);
     node.style.width = `${w0}px`;
     const { width: w, height: h } = node.getBoundingClientRect();
-    const clampX = (left) => Math.max(4, Math.min(left, frame.width - w - 4));
-    const clampY = (top) => Math.max(4, Math.min(top, frame.height - h - 4));
+    const clampX = (left) => Math.max(4, Math.min(left, frameBox.width - w - 4));
+    const clampY = (top) => Math.max(4, Math.min(top, frameBox.height - h - 4));
     const sides = [
       [px - w / 2, py - h - gap], [px - w / 2, py + gap],
       [px + gap, py - h / 2], [px - w - gap, py - h / 2],
     ].map(([left, top]) => [clampX(left), clampY(top)]);
+    const buttons = [...frame.querySelectorAll(".map-controls button")].filter((b) => !b.hidden);
+    buttons.push(...tableLayer.querySelectorAll(".token .shape, .chair circle"));
     const boxes = (nodes) => nodes.filter((other) => other !== node).map((other) => {
       const r = other.getBoundingClientRect();
-      return [r.left - frame.left, r.top - frame.top, r.width, r.height];
+      return [r.left - frameBox.left, r.top - frameBox.top, r.width, r.height];
     });
     const away = ([left, top]) => Math.hypot(left + w / 2 - px, top + h / 2 - py);
     const spots = [];
-    for (let top = 4; top <= frame.height - h - 4; top += 6) {
-      for (let left = 4; left <= frame.width - w - 4; left += 6) spots.push([left, top]);
+    for (let top = 4; top <= frameBox.height - h - 4; top += 6) {
+      for (let left = 4; left <= frameBox.width - w - 4; left += 6) spots.push([left, top]);
     }
     spots.sort((a, b) => away(a) - away(b));
     const choose = (others) => {
@@ -260,12 +633,13 @@ const EbinoMap = (() => {
       const free = spots.find((spot) => !covered(spot));
       return free ? [free, 0] : [best, least];
     };
-    let [best, least] = choose(boxes([...overlay.children]));
+    let [best, least] = choose(boxes([...overlay.children, ...buttons]));
     let dropBubbles = false;
     // Bubbles are short-lived: rather than cover a label or a heading, the
     // earlier bubbles in the way go.
     if (least) {
-      const [spot, rest] = choose(boxes([...overlay.children].filter((other) => !other.classList.contains("map-bubble"))));
+      const [spot, rest] = choose(boxes([...overlay.children, ...buttons]
+        .filter((other) => !other.classList.contains("map-bubble"))));
       if (!rest) [best, least, dropBubbles] = [spot, 0, true];
     }
     node.style.left = `${best[0]}px`;
@@ -276,16 +650,39 @@ const EbinoMap = (() => {
     return least === 0;
   }
 
+  // Every heading and label put again, in that order (headings first), after
+  // the frame's width or the camera changed. One whose spot is off screen
+  // waits hidden; bubbles go.
+  function relayout() {
+    if (!view) return;
+    for (const node of overlay.querySelectorAll(".map-bubble")) node.remove();
+    const nodes = [...overlay.querySelectorAll(".split-tag"), ...overlay.querySelectorAll(".table-label.empty"),
+      ...overlay.querySelectorAll(".table-label:not(.empty)"), ...overlay.querySelectorAll(".map-tip")];
+    const narrow = overlay.clientWidth < NARROW;
+    for (const node of nodes) node.classList.add("unplaced");
+    for (const node of nodes) {
+      const x = Number(node.dataset.x), y = Number(node.dataset.y);
+      if (!inView(x, y)) continue;
+      const atTable = node.classList.contains("table-label") || node.classList.contains("on-table");
+      if (node.classList.contains("table-label")) node.textContent = narrow ? node.dataset.short : node.dataset.full;
+      node.classList.toggle("narrow", narrow);
+      // A label or heading at the table that would cover another, or a seat,
+      // is left out (the heading is under the map too, over its cards).
+      if (!place(node, x, y, Number(node.dataset.gap)) && atTable) node.classList.add("unplaced");
+    }
+  }
+
   function overlaps(a, b) {
     const r = a.getBoundingClientRect(), q = b.getBoundingClientRect();
     return r.left < q.right && q.left < r.right && r.top < q.bottom && q.top < r.bottom;
   }
 
   function seatOf(seatId) { return app.state.seatById[seatId]; }
+  function spotOf(seatId) { return points[seatId].at(); }
 
   function showTip(seatId) {
     const seat = seatOf(seatId);
-    if (!seat) return;
+    if (!seat || !points[seatId]) return;
     hideTip();
     const tip = div("map-tip");
     tip.dataset.seat = seatId;
@@ -293,7 +690,9 @@ const EbinoMap = (() => {
     if (seat.detail) tip.append(div("detail", seat.detail));
     if (isSilent(seatId)) tip.append(div("detail", app.state.texts.not_asked_yet));
     overlay.append(tip);
-    if (place(tip, seat.x, seat.y, 16)) return;
+    const [x, y] = spotOf(seatId);
+    if (!inView(x, y)) { tip.classList.add("unplaced"); Object.assign(tip.dataset, { x, y, gap: 16 }); return; }
+    if (place(tip, x, y, 16)) return;
     // No side free: a heading in the way moves to a side clear of the label.
     for (const tag of overlay.querySelectorAll(".split-tag")) {
       if (overlaps(tip, tag)) place(tag, Number(tag.dataset.x), Number(tag.dataset.y), 8);
@@ -306,11 +705,13 @@ const EbinoMap = (() => {
   function bubble(seatId, quote) {
     const seat = seatOf(seatId);
     if (!seat || !quote) return;
+    const [x, y] = spotOf(seatId);
+    if (!inView(x, y)) return;
     const chars = [...quote.text];
     const cut = chars.length > BUBBLE_CHARS ? chars.slice(0, BUBBLE_CHARS).join("") + "…" : quote.text;
     const node = div("map-bubble", quote.said ? `「${cut}」` : cut);
     overlay.append(node);
-    place(node, seat.x, seat.y, 18);
+    place(node, x, y, 18);
     timers.push(setTimeout(() => node.remove(), BUBBLE_FOR));
   }
 
@@ -319,35 +720,42 @@ const EbinoMap = (() => {
   function isSilent(seatId) { return app.state.silent.has(seatId) && !app.state.met.has(seatId); }
 
   function clearRound() {
+    roundNo += 1;
     for (const timer of timers) clearTimeout(timer);
     timers = [];
+    for (const flight of flights) flight.cancel();
+    flights = [];
     sticky = null;
     hideTip();
-    for (const node of overlay.querySelectorAll(".map-bubble, .split-tag")) node.remove();
+    for (const node of overlay.querySelectorAll(".map-bubble, .split-tag, .table-label")) node.remove();
     splitLayer.replaceChildren();
-    for (const point of Object.values(points)) point.classList.remove("lit");
+    clearTable();
+    for (const { node } of Object.values(points)) node.classList.remove("lit");
   }
 
   // The seats quoted light up one after another, each with its first quote
-  // in a short bubble; then the splits. No seat answered: nothing lights.
+  // in a short bubble. On the picture the round table follows; on the flat
+  // map, the splits. No seat answered: nothing lights.
   function round(result) {
     if (!map) return;
+    if (!view) { pending = result; return; }
     clearRound();
     refresh();
     const first = {};
     for (const quote of result.quotes) if (!(quote.seat_id in first)) first[quote.seat_id] = quote;
     const order = result.seat_order.filter((id) => points[id]);
     if (!order.length) return;
+    if (view.relief) return tableRound(result, order, first, roundNo);
     const last = order[order.length - 1];
     if (reduced()) {  // Everything at once: no order, no bubbles.
-      for (const id of order) points[id].classList.add("lit");
+      for (const id of order) points[id].node.classList.add("lit");
       sticky = last;
       showTip(last);
       drawSplits(result);
       return;
     }
     order.forEach((id, k) => timers.push(setTimeout(() => {
-      points[id].classList.add("lit");
+      points[id].node.classList.add("lit");
       bubble(id, first[id]);
     }, k * LIGHT_EVERY)));
     const end = (order.length - 1) * LIGHT_EVERY;
@@ -360,46 +768,238 @@ const EbinoMap = (() => {
     const seatOfQuote = {};
     for (const quote of result.quotes) seatOfQuote[quote.utterance_id] = quote.seat_id;
     for (const split of result.splits) {
-      const a = points[seatOfQuote[split.side_a[0]]] && seatOf(seatOfQuote[split.side_a[0]]);
-      const b = points[seatOfQuote[split.side_b[0]]] && seatOf(seatOfQuote[split.side_b[0]]);
-      if (!a || !b || a === b) continue;
-      splitLayer.append(svgEl("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y }));
+      const a = seatOfQuote[split.side_a[0]], b = seatOfQuote[split.side_b[0]];
+      if (!points[a] || !points[b] || a === b) continue;
+      const [ax, ay] = spotOf(a), [bx, by] = spotOf(b);
+      splitLayer.append(svgEl("line", { x1: ax, y1: ay, x2: bx, y2: by }));
       const tag = div("split-tag", app.shownQuotes(split.heading));
-      Object.assign(tag.dataset, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+      tag.classList.toggle("narrow", overlay.clientWidth < NARROW);
       overlay.append(tag);
-      place(tag, (a.x + b.x) / 2, (a.y + b.y) / 2, 8);
+      place(tag, (ax + bx) / 2, (ay + by) / 2, 8);
     }
+  }
+
+  // --- the round table (the picture only) ---
+
+  const tableCenter = () => {
+    const [x, y] = centroid(map.boundary);
+    return { x, y, level: view.zAt(x, y) };
+  };
+
+  function onTable(center, angle, out, lift = TABLE_LIFT) {
+    const a = angle * Math.PI / 180;
+    return view.proj(center.x + (TABLE_RX + out) * Math.cos(a), center.y + (TABLE_RY + out) * Math.sin(a),
+      lift, center.level);
+  }
+
+  function ring(center, out, lift) {
+    return Array.from({ length: 72 }, (_, k) => onTable(center, k * 5, out, lift));
+  }
+
+  // Who sits where. Seen from the north, the map's east (0°) is on the
+  // picture's left and its north (270°) in front: the two sides of the first
+  // split face each other across the dashed line, the other seats sit at the
+  // back, and the empty chairs in front.
+  function seating(result, order) {
+    const seatOfQuote = {};
+    for (const quote of result.quotes) seatOfQuote[quote.utterance_id] = quote.seat_id;
+    const sideOf = (ids) => new Set(ids.map((id) => seatOfQuote[id]).filter((id) => order.includes(id)));
+    const split = result.splits.map((s) => ({ split: s, a: sideOf(s.side_a), b: sideOf(s.side_b) }))
+      .find(({ a, b }) => a.size && b.size && [...a].some((id) => !b.has(id)));
+    const groups = { a: [], b: [], back: [], front: [] };
+    for (const id of order) {
+      if (split && split.a.has(id)) groups.a.push(id);
+      else if (split && split.b.has(id)) groups.b.push(id);
+      else groups.back.push(id);
+    }
+    groups.front = result.silent_seats.filter((id) => points[id] && isSilent(id));
+    const arcs = { a: [0, 80], b: [180, 80], back: [90, split ? 70 : 170], front: [270, 90] };
+    const seats = [];
+    for (const [name, ids] of Object.entries(groups)) {
+      const [middle, arc] = arcs[name];
+      const gap = ids.length > 1 ? Math.min(26, arc / (ids.length - 1)) : 0;
+      ids.forEach((id, k) => seats.push({ id, group: name, angle: middle + (k - (ids.length - 1) / 2) * gap }));
+    }
+    return { split: split && split.split, seats };
+  }
+
+  function tableView(center) {
+    const spots = ring(center, SEAT_OUT + 70, TABLE_LIFT);
+    const xs = spots.map((p) => p[0]), ys = spots.map((p) => p[1]);
+    let w = (Math.max(...xs) - Math.min(...xs)) * 1.2, h = (Math.max(...ys) - Math.min(...ys)) * 1.3;
+    if (w / h < view.W / view.H) w = h * view.W / view.H; else h = w * view.H / view.W;
+    return { x: (Math.max(...xs) + Math.min(...xs)) / 2 - w / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 - h / 2, w, h };
+  }
+
+  async function tableRound(result, order, first, mine) {
+    const still = () => mine === roundNo;
+    // From the whole map, so every seat that lights can be seen.
+    if (vb.w < view.W - 0.5) await moveTo({ x: 0, y: 0, w: view.W, h: view.H }, reduced() ? 0 : 500);
+    if (!still()) return;
+    if (reduced()) {
+      for (const id of order) points[id].node.classList.add("lit");
+    } else {
+      for (const id of order) {
+        points[id].node.classList.add("lit");
+        bubble(id, first[id]);
+        await wait(LIGHT_EVERY);
+        if (!still()) return;
+      }
+      await wait(300);
+      if (!still()) return;
+    }
+    const center = tableCenter();
+    // Motion reduced: no camera, no flight; the table as it ends.
+    if (!reduced()) await moveTo(tableView(center), CAMERA_FOR);
+    if (!still()) return;
+    openTable(result, order, center, still);
+  }
+
+  async function openTable(result, order, center, still) {
+    const motion = !reduced();
+    const { split, seats } = seating(result, order);
+    svg.classList.add("dim");
+    $("map-back").hidden = false;
+    const rc = rough.svg(svg);
+    const S = view.S;
+    tableLayer.append(
+      svgEl("polygon", { class: "table-glow", points: ring(center, SEAT_OUT + 26, 0).map((p) => p.join(",")).join(" ") }),
+      svgEl("polygon", { class: "table-shadow", points: ring(center, 0, 0).map((p) => p.join(",")).join(" ") }));
+    const top = rc.polygon(ring(center, 0, TABLE_LIFT), { stroke: "#000", fill: "#000", fillStyle: "solid",
+      strokeWidth: 2.4 * S, roughness: 1.3, seed: 11 });
+    top.classList.add("table-top");
+    tableLayer.append(top);
+    if (motion) {
+      top.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, easing: "ease-out" });
+      await wait(350);
+      if (!still()) return;
+    }
+    // The split: a dashed line down the table's middle, between the sides.
+    if (split) {
+      const [n0, n1] = [view.proj(center.x, center.y - TABLE_RY + 6, TABLE_LIFT, center.level),
+        view.proj(center.x, center.y + TABLE_RY - 6, TABLE_LIFT, center.level)];
+      const line = rc.line(n0[0], n0[1], n1[0], n1[1], { stroke: "#000", strokeWidth: 1.8 * S, roughness: 0.9,
+        seed: 5 });
+      line.classList.add("table-split");
+      tableLayer.append(line);
+    }
+    const landed = [];
+    seats.forEach((sitting, k) => {
+      const at = onTable(center, sitting.angle, SEAT_OUT);
+      if (sitting.group === "front") return landed.push(chair(sitting.id, at));
+      const kind = points[sitting.id].seat.kind;
+      const node = svgEl("g", { class: `token pt lit kind-${kind}`, "aria-hidden": "true" });
+      node.append(svgEl("circle", { class: "halo", r: 14 }), shape(kind));
+      tableLayer.append(node);
+      const token = { node, at, scale: TOKEN, id: sitting.id };
+      tokens.push(token);
+      if (!motion) return landed.push(Promise.resolve(token));
+      const f = pointScale();
+      const [x0, y0] = spotOf(sitting.id);
+      const mx = (x0 + at[0]) / 2, my = Math.max(vb.y + 30 * S, Math.min(y0, at[1]) - 70 * S);
+      const flight = node.animate([
+        { transform: `translate(${x0}px, ${y0}px) scale(${f * 0.8})` },
+        { transform: `translate(${mx}px, ${my}px) scale(${f * TOKEN * 1.25})`, offset: 0.5 },
+        { transform: `translate(${at[0]}px, ${at[1]}px) scale(${f * TOKEN})` },
+      ], { duration: FLY_FOR, delay: k * FLY_GAP, easing: "cubic-bezier(.3,.7,.2,1)", fill: "both" });
+      flights.push(flight);
+      landed.push(flight.finished.then(() => token, () => token));
+    });
+    rescale();
+    const done = await Promise.all(landed);
+    if (!still()) return;
+    for (const flight of flights) flight.cancel();  // The transform attribute holds the spot now.
+    flights = [];
+    rescale();
+    for (const item of done) {
+      if (!item || !item.id) continue;
+      const title = seatOf(item.id).title, chars = [...title];
+      const label = div("table-label", title);
+      if (item.chair) label.classList.add("empty");
+      overlay.append(label);
+      Object.assign(label.dataset, { x: item.at[0], y: item.at[1], gap: 16, full: title,
+        short: chars.length > LABEL_CHARS ? chars.slice(0, LABEL_CHARS).join("") + "…" : title });
+    }
+    if (split) {
+      const tag = div("split-tag on-table", app.shownQuotes(split.heading));
+      overlay.append(tag);
+      // On the table, in its far half, clear of the seats round it.
+      const on = view.proj(center.x, center.y + TABLE_RY * 0.4, TABLE_LIFT, center.level);
+      Object.assign(tag.dataset, { x: on[0], y: on[1], gap: 0 });
+    }
+    for (const chairNode of tableLayer.querySelectorAll(".chair")) chairNode.classList.add("ready");
+    relayout();
+  }
+
+  // An empty chair 「？」: a seat nobody asked yet. Pressing it (or Enter or
+  // Space on it) opens the same 「聞きたいことを書く」 as the seat list.
+  function chair(seatId, at) {
+    const seat = seatOf(seatId);
+    const node = svgEl("g", { class: "chair", tabindex: 0, role: "button",
+      "aria-label": [seat.title, app.state.texts.not_asked_yet].join("　") });
+    node.append(svgEl("circle", { r: CHAIR_R }));
+    const mark = svgEl("text", { y: 5.5, "text-anchor": "middle" });
+    mark.textContent = "？";
+    node.append(mark);
+    pressable(node, () => press(seatId, node));
+    tableLayer.append(node);
+    const token = { node, at, scale: 1.2, id: seatId, chair: true };
+    tokens.push(token);
+    return Promise.resolve(token);
+  }
+
+  function clearTable() {
+    tokens = [];
+    if (tableLayer) tableLayer.replaceChildren();
+    if (svg) svg.classList.remove("dim");
+    if ($("map-back")) $("map-back").hidden = true;
+  }
+
+  // 「地図にもどす」: the table goes, the camera goes back to the whole map.
+  // The lit seats and the marks stay.
+  function closeTable() {
+    roundNo += 1;
+    for (const flight of flights) flight.cancel();
+    flights = [];
+    for (const node of overlay.querySelectorAll(".split-tag, .table-label, .map-bubble")) node.remove();
+    clearTable();
+    $("map-zoom-all").focus();
+    moveTo({ x: 0, y: 0, w: view.W, h: view.H }, BACK_FOR);
   }
 
   // --- marks that stay: met seats, and 「？」 on seats nobody asked yet ---
 
   function refresh() {
-    if (!map) return;
-    for (const [id, point] of Object.entries(points)) {
-      point.classList.toggle("met", app.state.met.has(id));
-      point.classList.toggle("silent", isSilent(id));
+    if (!map || !view) return;
+    for (const [id, { node }] of Object.entries(points)) {
+      node.classList.toggle("met", app.state.met.has(id));
+      node.classList.toggle("silent", isSilent(id));
       const seat = seatOf(id);
       const words = [seat.title, seat.detail, isSilent(id) ? app.state.texts.not_asked_yet : ""];
-      point.setAttribute("aria-label", words.filter(Boolean).join("　"));
+      node.setAttribute("aria-label", words.filter(Boolean).join("　"));
     }
     $("map-met-count").textContent = String(app.state.met.size);
   }
 
   // Pressing a 「？」 opens the same 「聞きたいことを書く」 as the seat list.
   // Pressing any other point keeps its label shown.
-  function press(seatId) {
+  function press(seatId, from) {
     if (!isSilent(seatId)) {
       sticky = seatId;
       showTip(seatId);
       return;
     }
+    returnFocus = from;
     const seat = seatOf(seatId);
     card.replaceChildren(div("title", seat.title), div("not-asked", app.state.texts.not_asked_yet));
     const close = document.createElement("button");
     close.type = "button";
     close.className = "quiet close";
     close.textContent = "閉じる";
-    close.addEventListener("click", () => { card.hidden = true; points[seatId].focus(); });
+    close.addEventListener("click", () => {
+      card.hidden = true;
+      if (returnFocus && returnFocus.isConnected) returnFocus.focus();
+    });
     if (app.state.carded.has(seatId)) {
       card.append(div("card-done", "質問カードにしました"));
     } else {

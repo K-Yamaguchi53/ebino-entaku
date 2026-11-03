@@ -29,6 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from . import relief
 from .config import PlaceError, data_dir, load_env_file, records_dir
 from .gate import Gate, load_names
 from .records import Records
@@ -48,6 +49,13 @@ STATIC_FILES = {
     # Hand-drawn lines on the map (MIT), bundled: nothing is loaded from outside.
     "/rough.js": ("rough.js", "text/javascript; charset=utf-8"),
     "/rough.LICENSE.txt": ("rough.LICENSE.txt", "text/plain; charset=utf-8"),
+    # The title's characters only, cut out of Shippori Mincho B1 (OFL, its
+    # text beside it in title.OFL.txt).
+    "/title.woff": ("title.woff", "font/woff"),
+}
+# Served from mapdata/, made once by the tools (relief.py). A missing file is 404.
+MAP_FILES = {
+    relief.IMAGE_PATH: (relief.RELIEF_DIR / relief.IMAGE, "image/webp"),
 }
 MAX_BODY = 16 * 1024
 # Seconds a connection may sit without sending or taking bytes. Waiting for
@@ -183,6 +191,12 @@ def make_handler(app: App, port: int, timeout: float = CONNECTION_TIMEOUT):
             if path in STATIC_FILES:
                 name, content_type = STATIC_FILES[path]
                 return self._send(HTTPStatus.OK, (STATIC_DIR / name).read_bytes(), content_type)
+            if path in MAP_FILES:
+                file, content_type = MAP_FILES[path]
+                try:
+                    return self._send(HTTPStatus.OK, file.read_bytes(), content_type)
+                except OSError:
+                    pass  # No picture: the screen keeps the flat map.
             self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
         def do_POST(self):
@@ -258,6 +272,8 @@ def main(argv=None) -> int:
     print(f"coach band {'on' if library.coach_on else 'off'}  coach pieces {len(library.coach_sources)}  "
           f"seats off the map {len(library.all_seats) - len(library.seats)}")
     print(library.map_report())  # 「地図なし」 when the map file is missing or broken.
+    if library.placement is not None:
+        print(library.relief_report())  # No picture: the flat map.
     print(library.subject_catalog.report())  # The harvest card's ③: counts only.
     print(f"open http://{HOST}:{server.server_address[1]}/  (Ctrl+C to stop)")
     try:

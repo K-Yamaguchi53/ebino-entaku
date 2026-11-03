@@ -98,6 +98,11 @@ OBSERVER_VIEW = "observer_view"
 # or empty: no landmark.
 SCHOOL_LABEL = "school_label"
 
+# The map's buttons (map.js): 地図にもどす and the zoom buttons. Columns
+# ID・文字・読み上げ; an empty 読み上げ reads the 文字 itself.
+MAP_BUTTONS = "map_buttons"
+MAP_BUTTON_IDS = ("back", "zoom_in", "zoom_out", "zoom_all")
+
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
     HEAVY_TALK_NOTICE, SPLIT_NOTICE, START_NOTICE, LAB_QUESTION, ANSWERED_COUNT,
@@ -149,4 +154,14 @@ def read_table(path: Path, columns: tuple[str, ...], may_be_empty: tuple[str, ..
 def screen_texts() -> dict:
     texts: dict = {name: load_text(name) for name in SCREEN_TEXTS}
     texts.update({name: load_lines(name) for name in SCREEN_LISTS})
+    texts[MAP_BUTTONS] = map_buttons()
     return texts
+
+
+def map_buttons() -> dict[str, dict[str, str]]:
+    """{ID: {"text": what the button shows, "label": what it reads out}}."""
+    rows = {row["ID"]: row for row in load_table(MAP_BUTTONS, ("ID", "文字", "読み上げ"), may_be_empty=("読み上げ",))}
+    if set(rows) != set(MAP_BUTTON_IDS):
+        raise ValueError(f"{MAP_BUTTONS}.tsv must have the rows {', '.join(MAP_BUTTON_IDS)}")
+    return {key: {"text": rows[key]["文字"], "label": rows[key]["読み上げ"] or rows[key]["文字"]}
+            for key in MAP_BUTTON_IDS}
