@@ -160,7 +160,10 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .lab-choice:disabled:not([aria-pressed="true"]) { opacity: .45; }
 
 /* --- asking --- */
-.heavy-talk { color: var(--soft); border-left: 2px solid var(--moon-soft); padding-left: 12px; font-size: 1rem; }
+/* しんどい話の案内: quiet, in moonlight, plain to read; never an alarm. */
+.heavy-talk { margin: 10px 0 0; padding: 8px 14px; font-size: 16px; line-height: 1.7; color: var(--soft);
+  background: var(--moon-faint); border-left: 3px solid var(--moon-soft); border-radius: 0 6px 6px 0; }
+.heavy-talk:empty { display: none; }
 /* The student's own words, written on one sheet of unbleached paper, its
    lines faintly ruled; beside it 「聞く」, the one thing in honey here. */
 .ask { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: end; margin-top: 22px; }
@@ -306,38 +309,106 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .seat.lit { box-shadow: 0 0 0 2px var(--lamp), 0 0 18px var(--lamp-soft); }
 .seat.met .title::after { content: " ✓"; }
 .seat .not-asked { font-size: 14px; color: var(--soft); }
-.card-form { margin-top: 6px; }
-.card-form label { display: block; font-size: .92rem; }
-.card-form textarea { width: 100%; padding: 6px 8px; }
-.card-form button { margin-top: 4px; }
-.card-done { font-size: .88rem; color: var(--soft); }
+/* 質問カード: one paper card, the student's question written on it. */
+.card-form { margin-top: 10px; max-width: 26rem; padding: 14px 16px 16px; border-radius: 4px; color: var(--paper-ink);
+  background: var(--paper); box-shadow: 0 0 0 1px var(--paper-line), 0 0 18px var(--lamp-faint), 0 10px 24px var(--shadow); }
+.card-form label { display: block; font-family: var(--mincho); font-size: 17px; font-weight: 600; line-height: 1.6; }
+.card-form textarea { --rule: calc(17px * 1.7); display: block; width: 100%; margin-top: 8px; padding: 6px 10px; resize: vertical;
+  font: 17px/1.7 var(--gothic); color: var(--paper-ink); border: 1px solid var(--paper-line); border-radius: 3px;
+  background: linear-gradient(to bottom, transparent calc(var(--rule) - 1px), var(--paper-line) 0) 0 6px / 100% var(--rule) local,
+    var(--paper-light); }
+.card-form button { margin-top: 10px; color: var(--paper-ink); background: var(--paper-light); border-color: var(--paper-soft); }
+.card-form button:hover { background: var(--paper-2); }
+.card-done { font-size: 14px; color: var(--soft); }
 
-/* --- the reflection sheet --- */
+/* --- the reflection: one card at a time, in the middle, unhurried --- */
 .to-reflect { text-align: center; margin: 36px 0; }
 #to-reflect { padding: 12px 30px; min-height: 52px; border-color: var(--moon-soft); background: var(--night-2); letter-spacing: .12em; }
 #to-reflect:hover { border-color: var(--moon); background: var(--night-3); }
-.first-question { font-family: var(--mincho); }
-.step { background: var(--night-2); border: 1px solid var(--moon-faint); border-radius: 8px; padding: 16px 20px; margin: 14px 0; }
-.step label { display: block; margin: 8px 0; }
-.step textarea, .step input[type="text"], .step select { width: 100%; padding: 6px 8px; }
-.choice { display: inline-block; border: 1px solid var(--moon-faint); border-radius: 6px; padding: 4px 12px; margin: 4px; min-width: 7em; }
-.choice:has(input:checked) { border-color: var(--lamp); background: var(--lamp-faint); }
-.moves .choice { display: block; min-width: 0; }
-.ask-back { font-family: var(--mincho); font-weight: 600; }
-.sheet { display: grid; grid-template-columns: 11em 1fr; gap: 8px 14px; background: var(--paper); border-radius: 4px;
-  padding: 18px 22px; box-shadow: 0 12px 30px var(--shadow); }
-.sheet dt { font-weight: bold; color: var(--paper-soft); }
-.sheet dd { margin: 0; font-family: var(--mincho); }
+#reflect { max-width: 760px; margin: 0 auto; }
+#reflect > h2 { text-align: center; font-size: clamp(1.5rem, 3vw, 1.9rem); letter-spacing: .24em; margin: 36px 0 10px; }
+#reflect > .heavy-talk { max-width: 34em; margin: 0 auto 6px; }
+.first-question { text-align: center; font-family: var(--mincho); font-size: 1.05rem; color: var(--soft); margin: 14px 0 0; }
+.step { background: linear-gradient(180deg, var(--night-2), var(--night)); border: 1px solid var(--moon-faint); border-radius: 12px;
+  padding: clamp(20px, 3.4vw, 34px) clamp(18px, 4vw, 40px); margin: 28px 0; box-shadow: 0 18px 40px var(--shadow); }
+/* Each card's question: Mincho, large. */
+.step > p:first-child { font-family: var(--mincho); font-weight: 600; font-size: clamp(1.25rem, 2.4vw, 1.5rem); line-height: 1.6;
+  margin: 0 0 18px; color: var(--ink); }
+.step label:not(.choice) { display: block; margin: 18px 0 6px; color: var(--soft); font-size: 16px; }
+/* Where the student writes: a field of unbleached paper. */
+.step textarea, .step input[type="text"], .step select {
+  display: block; width: 100%; margin-top: 6px; padding: 10px 14px; font: 17px/1.7 var(--gothic); color: var(--paper-ink);
+  background: var(--paper); border: 0; border-radius: 4px; box-shadow: 0 0 0 1px var(--paper-line), 0 6px 16px var(--shadow);
+}
+.step select { min-height: 48px; }
+.step textarea { resize: vertical; }
+.step textarea::placeholder, .step input::placeholder { color: var(--paper-soft); }
+.step button[type="submit"] { margin-top: 18px; min-height: 48px; padding: 8px 26px; letter-spacing: .1em;
+  border-color: var(--lamp-soft); background: var(--night-2); }
+.step button[type="submit"]:hover { border-color: var(--lamp); }
+.step .choices button { margin-top: 18px; min-height: 48px; padding: 8px 22px; }
+/* What the student picks: buttons of the Lab buttons' shape, a dot that lights when chosen. */
+.choice { position: relative; display: inline-flex; align-items: center; gap: 12px; min-height: 52px; min-width: 8em; margin: 4px 8px 4px 0;
+  padding: 10px 18px; border: 1px solid var(--moon-soft); border-radius: 10px; background: var(--night-2); color: var(--ink);
+  cursor: pointer; line-height: 1.5; transition: border-color .2s, background-color .2s; }
+.choice::before { content: ""; flex: none; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--moon);
+  transition: background-color .2s, box-shadow .2s; }
+.choice input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.choice:hover { border-color: var(--moon); background: var(--night-3); }
+.choice:has(input:checked) { border-color: var(--lamp); background: var(--lamp-faint); color: var(--paper-light); }
+.choice:has(input:checked)::before { background: var(--lamp); border-color: var(--lamp); box-shadow: 0 0 12px var(--lamp-glow); }
+.choice:has(input:focus-visible) { outline: 2px solid var(--lamp); outline-offset: 3px; }
+.choice:has(input:disabled) { cursor: default; }
+.choice:has(input:disabled):not(:has(input:checked)) { opacity: .5; }
+.moves .choice { display: flex; min-width: 0; margin: 0 0 10px; }
+.ask-back { font-family: var(--mincho); }
+.uses { display: grid; gap: 10px; }
+.uses button { display: block; min-height: 60px; padding: 12px 18px; text-align: left; border-radius: 10px; background: var(--night-2); }
+.uses button:hover { background: var(--night-3); }
+.uses .force { display: block; font-size: 14px; color: var(--soft); }
+
+/* 持ち帰りの1枚: what the student takes home. One sheet of unbleached
+   paper, set quietly in Mincho: today's harvest at its head, the sheet's
+   rows under it. It prints as that one sheet. */
+.harvest, .sheet { max-width: 720px; margin: 32px auto 0; background: var(--paper); color: var(--paper-ink);
+  box-shadow: 0 0 0 1px var(--paper-line), 0 0 40px var(--lamp-faint), 0 22px 50px var(--shadow); }
+.harvest { border-radius: 4px; padding: clamp(24px, 4vw, 44px) clamp(22px, 5vw, 56px) 22px; font-family: var(--mincho); }
+.harvest h3 { margin: 0 0 16px; text-align: center; font-size: 1.45rem; letter-spacing: .3em; font-weight: 600; }
+.harvest h3::after { content: ""; display: block; width: 48px; height: 1px; margin: 14px auto 0; background: var(--lamp); }
+.harvest p { margin: 6px 0; font-size: 17px; line-height: 1.9; }
+#harvest-subject { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--paper-line); }
+#harvest-subject-note { color: var(--paper-soft); font-size: 16px; }
+#harvest-subject-more { margin-top: 10px; font-family: var(--gothic); font-size: 15px; }
+.sheet { display: grid; grid-template-columns: 10em 1fr; gap: 0 22px; border-radius: 4px;
+  padding: clamp(18px, 3vw, 30px) clamp(22px, 5vw, 56px) clamp(24px, 4vw, 40px); }
+/* The harvest and the sheet are one sheet of paper when both are there. */
+.harvest:not([hidden]):has(+ .sheet:not([hidden])) { border-radius: 4px 4px 0 0; padding-bottom: 18px; }
+.harvest:not([hidden]) + .sheet { margin-top: 0; border-radius: 0 0 4px 4px; border-top: 1px dashed var(--paper-line);
+  clip-path: inset(0 -90px -90px -90px); }
+.sheet dt, .sheet dd { padding: 12px 0; border-top: 1px solid var(--paper-line); }
+.sheet dt:first-of-type, .sheet dt:first-of-type + dd { border-top: 0; }
+.sheet dt { font-family: var(--gothic); font-size: 14px; font-weight: bold; letter-spacing: .08em; color: var(--paper-soft); line-height: 1.8; }
+.sheet dd { margin: 0; font-family: var(--mincho); font-size: 17px; line-height: 1.85; }
+.sheet dd > div + div { margin-top: 6px; }
 .sheet .left { color: var(--paper-soft); }
-.sheet .source { color: var(--paper-soft); font-size: .85rem; font-family: var(--gothic); }
-@media (max-width: 600px) { .sheet { grid-template-columns: 1fr; } }
-.uses { display: grid; gap: 8px; }
-.uses button { text-align: left; }
-.uses .force { display: block; font-size: .82rem; color: var(--soft); }
-.harvest { background: var(--paper); border: 2px solid var(--lamp); border-radius: 4px; padding: 16px 20px; margin: 14px 0; }
-.harvest h3 { margin: 0 0 6px; font-size: 1.05rem; }
-.harvest p { margin: 4px 0; }
-#harvest-subject { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--lamp); }
+.sheet .source { color: var(--paper-soft); font-size: 14px; font-family: var(--gothic); }
+@media (max-width: 600px) {
+  .sheet { grid-template-columns: 1fr; }
+  .sheet dt { padding-bottom: 0; }
+  .sheet dd { border-top: 0; padding-top: 2px; }
+}
+/* Printed once the sheet is there: the one sheet alone, ink on the page's white. */
+@media print {
+  html:has(#sheet:not([hidden])), html:has(#sheet:not([hidden])) body { background: none; color: var(--paper-ink); }
+  body:has(#sheet:not([hidden])) :is(.masthead, #start, #table, #reflect > :not(.harvest):not(.sheet), #harvest-subject-more) {
+    display: none !important;
+  }
+  #reflect { max-width: none; }
+  .harvest, .sheet { max-width: none; margin: 0; box-shadow: none; background: none; }
+  .harvest:not([hidden]) + .sheet { border-top: 1px dashed var(--paper-soft); }
+  .harvest h3::after { background: var(--paper-soft); }
+  .sheet dt, .sheet dd { break-inside: avoid; }
+}
 
 .kind-adult { --kind: var(--kind-adult); }
 .kind-poster { --kind: var(--kind-poster); }
@@ -516,11 +587,13 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   #ask-button { justify-self: end; }
   .masthead { padding-top: 20px; }
   #lab-choices { grid-template-columns: 1fr; }
+  .choice { min-width: 0; }
   .promises { padding: 8px 18px; }
 }
 /* Motion reduced: nothing moves; everything is at once as it ends. */
 @media (prefers-reduced-motion: reduce) {
   .pt .halo, .pt .shape, .drawing path, .chair, .relief-image, .basin-fill, .river, .rim, .points, .place-names,
-  .school, .shelf-boxes, .shelf-names, .crossing, button, .lab-choice::before, .map-bubble, .seat { transition: none !important; }
+  .school, .shelf-boxes, .shelf-names, .crossing, button, .lab-choice::before, .map-bubble, .seat,
+  .choice, .choice::before { transition: none !important; }
   .map-bubble, .map-bubble .thread { animation: none !important; }
 }

@@ -849,3 +849,44 @@ def test_the_purposes_are_tiles_of_the_lab_buttons_shape_and_a_met_seat_is_lit_l
     met = _rule(css, ".seat.met")
     assert "background: var(--paper)" in met and "var(--lamp-faint)" in met
     assert "var(--lamp)" in _rule(css, ".seat.lit")
+
+
+def test_the_reflection_is_one_card_at_a_time_its_question_in_mincho_its_fields_paper():
+    css = _css()
+    assert "margin: 0 auto" in _rule(css, "#reflect")
+    question = _rule(css, ".step > p:first-child")
+    assert "var(--mincho)" in question and "font-size: clamp(" in question
+    field = _rule(css, ".step textarea, .step input[type=\"text\"], .step select")
+    assert "background: var(--paper)" in field and "var(--gothic)" in field and re.search(r"font: 1[7-9]px/", field)
+    # The choices are buttons of the Lab buttons' shape, the radio kept for the keyboard.
+    choice = _rule(css, ".choice")
+    assert "border-radius: 10px" in choice and "min-height: 52px" in choice
+    assert "position: absolute; opacity: 0;" in _rule(css, ".choice input")
+    assert "outline: 2px solid var(--lamp)" in _rule(css, ".choice:has(input:focus-visible)")
+    assert ".step label:not(.choice) {" in css  # A block label would undo the choice's shape.
+
+
+def test_the_harvest_and_the_sheet_are_one_sheet_of_paper_in_mincho_and_print_as_it():
+    css = _css()
+    paper = _rule(css, ".harvest, .sheet")
+    assert "background: var(--paper)" in paper and "margin: 32px auto 0" in paper
+    assert "var(--mincho)" in _rule(css, ".sheet dd") and "var(--mincho)" in _rule(css, ".harvest")
+    assert ".harvest:not([hidden]) + .sheet {" in css
+    printed = css[css.index("@media print"):]
+    assert "body:has(#sheet:not([hidden]))" in printed and "#reflect > :not(.harvest):not(.sheet)" in printed
+    assert "box-shadow: none" in printed
+    html = (app_module.STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    assert html.index('id="harvest"') < html.index('id="sheet"')  # The harvest heads the sheet.
+
+
+def test_the_question_card_is_a_paper_card_and_the_heavy_talk_notice_is_quiet():
+    css = _css()
+    card = _rule(css, ".card-form")
+    assert "background: var(--paper)" in card and "box-shadow:" in card
+    assert "var(--gothic)" in _rule(css, ".card-form textarea") and "var(--mincho)" in _rule(css, ".card-form label")
+    heavy = _rule(css, ".heavy-talk")
+    assert "color: var(--soft)" in heavy and "var(--lamp" not in heavy and "var(--warn" not in heavy
+    assert "font-size: 16px" in heavy
+    assert ".heavy-talk:empty { display: none; }" in css  # No empty box when its words are missing.
+    reduced = css[css.index("@media (prefers-reduced-motion: reduce)"):]
+    assert ".choice, .choice::before { transition: none !important; }" in reduced
