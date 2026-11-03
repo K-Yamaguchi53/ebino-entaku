@@ -23,18 +23,16 @@ class SavedOutput:
         return f"{self.model}・{self.created.isoformat()} に作った出力"
 
 
-def save_output(path: Path, model: str, output: Any, created: date | None = None) -> SavedOutput:
+def save_output(path: Path, model: str, output: Any, created: date | None = None,
+                extra: dict | None = None) -> SavedOutput:
+    """extra: more top-level keys written after output (never model,
+    created or output), such as what each output was made from."""
     if not model.strip():
         raise ValueError("saved output needs a model name")
     saved = SavedOutput(model.strip(), created or date.today(), output)
-    path.write_text(
-        json.dumps(
-            {"model": saved.model, "created": saved.created.isoformat(), "output": output},
-            ensure_ascii=False,
-            indent=1,
-        ),
-        encoding="utf-8",
-    )
+    data = {"model": saved.model, "created": saved.created.isoformat(), "output": output}
+    data |= {key: value for key, value in (extra or {}).items() if key not in data}
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     return saved
 
 

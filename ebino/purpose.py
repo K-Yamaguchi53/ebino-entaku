@@ -6,9 +6,12 @@ This is part of the core and is never dropped (SPEC 8).
 
 Which section is the purpose is decided by code at ingest
 (poster_pdf.purpose_examples: 目的, else 研究仮説 and the like, else テーマ設定の
-理由). No model picks, writes or rewords a sample: what is shown is the
+理由). No model picks a sample. A sample of 120 characters or fewer is the
 stored piece itself, and it goes through the guard's check like every quote
-on the screen. Samples are not counted in the guard's tally of round quotes.
+on the screen. A longer one is shown only as its summary, made once after
+ingest by purpose_summary.py and checked there, and the screen marks it as
+summarized (the teacher's call on 11/3); without a usable summary it is not
+shown. Samples are not counted in the guard's tally of round quotes.
 """
 
 import random
@@ -27,6 +30,9 @@ class PurposeSample:
     seat_id: str
     utterance_ids: tuple[str, ...]
     texts: tuple[str, ...]  # The pieces' own words, in poster order.
+    # True when texts holds the saved summary of a long sample instead
+    # (purpose_summary.py); the screen marks it so.
+    summarized: bool = False
 
 
 def samples(utterances: list[Utterance], seats: list[Seat]) -> list[PurposeSample]:

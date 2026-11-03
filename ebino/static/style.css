@@ -44,7 +44,7 @@ button:disabled { opacity: .5; cursor: wait; }
 
 .purposes ul { list-style: none; padding: 0; margin: 0; }
 .purposes li { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
-
+.purposes .summarized { font-size: .8rem; color: var(--soft); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; }
 .round { border-top: 2px solid var(--line); margin-top: 16px; padding-top: 8px; }
 .round-question { font-weight: bold; }
 .steps { color: var(--soft); font-size: .9rem; }

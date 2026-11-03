@@ -81,7 +81,10 @@ function renderPurposes(purposes) {
   const list = $("purpose-list");
   list.replaceChildren();
   for (const sample of purposes) {
+    // A long sample is shown as its summary, marked so it never reads as
+    // the senior's own words.
     list.append(el("li", {},
+      sample.summarized ? el("span", { class: "summarized", text: state.texts.sample_summarized }) : null,
       el("p", { class: "words", text: sample.texts.join("") }),
       el("span", { class: "source", text: sourceLine(sample.source) })));
   }

@@ -70,13 +70,16 @@ ASK_OTHER_SIDE_COMPANY = "ask_other_side_company"
 ASK_ANSWER_SAID = "ask_answer_said"
 ASK_ANSWER_WRITTEN = "ask_answer_written"
 ASK_NOT_ANSWERED = "ask_not_answered"
+# The small mark on a purpose sample shown as its summary (purpose_summary.py),
+# so it is never taken for the senior's own words.
+SAMPLE_SUMMARIZED = "sample_summarized"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
     HEAVY_TALK_NOTICE, SPLIT_NOTICE, START_NOTICE, LAB_QUESTION, ANSWERED_COUNT,
     NOT_ASKED_YET, INPUT_EXAMPLE, PURPOSE_HEADING, WAITING_ASK, WAITING_REFLECTION,
     SEND_FAILED, MET_LIVES_EMPTY, HARVEST_HEADING, HARVEST_USE_QUESTION, MEET_QUESTION,
-    HARVEST_MEET_PREFIX, MORE_END, MORE_CARD_DONE,
+    HARVEST_MEET_PREFIX, MORE_END, MORE_CARD_DONE, SAMPLE_SUMMARIZED,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 

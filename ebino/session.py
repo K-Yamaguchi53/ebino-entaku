@@ -18,12 +18,12 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import ask_seat, closing, editor, harvest, more, reflection, roundtable, talk_kinds
+from . import ask_seat, closing, editor, harvest, more, purpose_summary, reflection, roundtable, talk_kinds
 from .editor import QuestionCard
 from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
 from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_SEAT_HEADER, CLOSING_KIND_LABELS,
                     CLOSING_QUESTION, MODEL_UNAVAILABLE, NAME_IN_QUESTION, load_table, load_text)
-from .gate import Gate
+from .gate import Gate, NameList, load_names
 from .guard import Guard
 from .index import Entry, build_index, load_topics, load_utterances
 from .ingest.seats import Seat, load_seats
@@ -86,11 +86,16 @@ class Library:
     ranking_titles: dict[str, str] = field(default_factory=dict)
 
     @classmethod
-    def build(cls, seats, utterances, topics, show_private=False, saved_kinds=None) -> "Library":
+    def build(cls, seats, utterances, topics, show_private=False, saved_kinds=None,
+              saved_summaries=None, names=None) -> "Library":
         entries = build_index(utterances, seats, topics)
         kinds = talk_kinds.load_kinds()
         kind_of = {u.id: talk_kinds.kind_of(saved_kinds or {}, u.id, kinds) for u in utterances}
-        return cls(seats, utterances, entries, samples(utterances, seats), show_private,
+        # A long sample shows only as its saved summary, checked again here.
+        purposes = purpose_summary.shown_samples(samples(utterances, seats),
+                                                 saved_summaries or purpose_summary.Saved(),
+                                                 names or NameList.build(seats, {}))
+        return cls(seats, utterances, entries, purposes, show_private,
                    closing.pieces_by_seat(entries, kind_of), [kind.kind_id for kind in kinds],
                    closing.ranking_titles(utterances))
 
@@ -98,7 +103,8 @@ class Library:
     def load(cls, data_dir: Path, show_private: bool = False) -> "Library":
         seats = load_seats(data_dir / "seats.tsv")
         return cls.build(seats, load_utterances(data_dir), load_topics(data_dir), show_private,
-                         talk_kinds.load_saved(data_dir))
+                         talk_kinds.load_saved(data_dir), purpose_summary.load_saved(data_dir),
+                         load_names(data_dir, seats))
 
     def seat_view(self, seat: Seat) -> dict:
         label = seat_label(seat, self.show_private)
@@ -548,5 +554,5 @@ class Session:
     def purpose_view(self, sample: PurposeSample) -> dict:
         seat = self._seats[sample.seat_id]
         label = seat_label(seat, self.library.show_private)
-        return {"seat_id": sample.seat_id, "texts": list(sample.texts),
+        return {"seat_id": sample.seat_id, "texts": list(sample.texts), "summarized": sample.summarized,
                 "source": {"title": label.title, "detail": label.detail, "note": ""}}
