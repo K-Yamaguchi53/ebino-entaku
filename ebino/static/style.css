@@ -627,7 +627,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* Motion reduced: nothing moves; everything is at once as it ends. */
 @media (prefers-reduced-motion: reduce) {
   .pt .halo, .pt .shape, .drawing path, .chair, .relief-image, .basin-fill, .river, .rim, .points, .place-names,
-  .school, .school-picture, .shelf-boxes, .shelf-names, .crossing, button, .lab-choice::before, .map-bubble, .seat,
+  .school, .school-picture, .map-compass, .map-around, .shelf-boxes, .shelf-names, .crossing, button, .lab-choice::before, .map-bubble, .seat,
   .choice, .choice::before { transition: none !important; }
   .map-bubble, .map-bubble .thread { animation: none !important; }
 }

@@ -123,3 +123,9 @@ def test_a_ways_name_goes_by_its_edge_slid_off_what_is_there_and_inside_the_fram
     shelves = [[0, 0, 150, 60], [450, 0, 150, 120], [0, 340, 200, 60], [400, 350, 200, 50]]
     assert not any(hit([left, top, 56, 56], shelf) for shelf in shelves)
     assert 8 <= left <= 536 and 8 <= top <= 336
+
+
+def test_with_less_motion_the_arrow_and_the_names_do_not_fade():
+    reduced = CSS[CSS.index("@media (prefers-reduced-motion: reduce)"):]
+    reduced = reduced[:reduced.index("transition: none !important")]
+    assert ".map-compass" in reduced and ".map-around" in reduced
