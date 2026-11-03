@@ -155,7 +155,11 @@ button:disabled { opacity: .5; cursor: wait; }
 .river path { stroke: var(--river); fill: none; }
 .mountains path { stroke: var(--hill); fill: none; }
 .drawing path { transition-property: stroke-dashoffset; transition-timing-function: ease-in-out; }
-.place-names text { fill: var(--soft); font-size: 22px; letter-spacing: .1em; }
+/* Place names lie over the points, outlined so they read; still faint. */
+.place-names { pointer-events: none; }
+.place-names text { fill: var(--soft); font-size: 22px; letter-spacing: .1em;
+  paint-order: stroke; stroke: var(--basin); stroke-width: 5px; stroke-linejoin: round; }
+.shelf-names text { fill: var(--soft); font-size: 17px; }
 .school rect, .school polygon:not(.flag) { fill: #fff; stroke: var(--ink); stroke-width: 1.6; }
 .school .pole { stroke: var(--ink); stroke-width: 1.6; }
 .school .flag { fill: var(--adult); stroke: var(--ink); stroke-width: 1; }

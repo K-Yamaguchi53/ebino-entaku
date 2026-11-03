@@ -111,37 +111,125 @@ def test_a_seat_in_another_town_sits_just_beyond_the_rim_in_its_direction(data):
     assert south.y > CENTER[1] + RADIUS and abs(south.x - CENTER[0]) < POINT_GAP
 
 
-def test_an_empty_district_and_a_place_not_found_go_round_the_outside(data):
+def test_an_empty_district_and_a_place_not_found_go_on_the_shelves_off_the_basin(data):
     placement = place_seats(data, seats(("S01", "adult", "えびの市大字どこにもない"),
                                         ("P01", "poster", ""), ("S02", "adult", "架空市架空原")))
     assert placement.not_found == 2  # The empty one is not counted as not found.
     for seat_id in ("S01", "P01", "S02"):
         point = placement.points[seat_id]
         assert point.outer
-        assert rim_distance(point) > RADIUS  # Between the rim and the edge.
+        assert rim_distance(point) > RADIUS + seat_map.SHELF_CLEARANCE  # Off the basin.
         assert 0 <= point.x <= 1000 and 0 <= point.y <= 800
     assert placement.outer == 3
+    # A place not found stays on its kind's shelf: one shelf for the adults.
+    assert [shelf.kind for shelf in placement.shelves] == ["adult", "poster"]
 
 
-def test_the_outside_keeps_each_kind_together(data):
+def test_each_kind_has_one_shelf_with_its_seats_in_a_block(data):
     specs = [(f"P{n:02}", "poster", "") for n in range(6)] + [(f"C{n:02}", "cross", "") for n in range(4)]
     specs += [(f"O{n:02}", "outsider_teacher", "") for n in range(3)]
     placement = place_seats(data, seats(*reversed(specs)))
-    # Clockwise from the top left: the kinds come in the seat list's order.
-    order = sorted(placement.points.items(), key=lambda item: _clockwise(item[1]))
-    kinds = [seat_id[0] for seat_id, _ in order]
-    assert kinds == ["P"] * 6 + ["C"] * 4 + ["O"] * 3
+    assert [shelf.kind for shelf in placement.shelves] == ["poster", "cross", "outsider_teacher"]
+    for shelf in placement.shelves:
+        mine = [p for seat_id, p in placement.points.items() if seat_id[0] == shelf.kind[0].upper()]
+        assert all(within(p, shelf.box) for p in mine)
+        assert not any(within(p, shelf.box) for seat_id, p in placement.points.items()
+                       if seat_id[0] != shelf.kind[0].upper())
+        # A grid, POINT_GAP apart, in seat ID order row by row.
+        first, second = mine[0], mine[1]
+        assert (second.x - first.x, second.y - first.y) == (POINT_GAP, 0)
 
 
-def _clockwise(point):
-    x, y = point.x, point.y
-    if y < 30:
-        return x
-    if x > 970:
-        return 1000 + y
-    if y > 770:
-        return 2000 + (1000 - x)
-    return 3000 + (800 - y)
+def within(point, box):
+    x0, y0, x1, y1 = box
+    return x0 <= point.x <= x1 and y0 <= point.y <= y1
+
+
+def apart_boxes(a, b, gap=0.0):
+    return a[2] + gap <= b[0] or b[2] + gap <= a[0] or a[3] + gap <= b[1] or b[3] + gap <= a[1]
+
+
+def _many_seats():
+    """About 170 invented seats, much like the real ones: most in the city,
+    a few in the next towns, many posters and some others with no place."""
+    rng = random.Random(11)
+    places = ["えびの市大字架空原", "えびの市架空台", "えびの市架空丘", "えびの市架空町", "小林市架空野"]
+    specs = [(f"A{n:03}", "adult", rng.choice(places)) for n in range(95)]
+    specs += [(f"A9{n:02}", "adult", "") for n in range(6)]
+    specs += [(f"A8{n:02}", "adult", "えびの市大字どこにもない") for n in range(2)]
+    specs += [(f"P{n:03}", "poster", "") for n in range(52)]
+    specs += [(f"C{n:02}", "cross", "") for n in range(12)]
+    specs += [(f"O{n:02}", "outsider_teacher", "") for n in range(3)]
+    return specs
+
+
+def test_with_about_170_seats_the_shelves_keep_off_each_other_and_the_basin_and_come_out_the_same(data):
+    specs = _many_seats()
+    assert len(specs) == 170
+    first = place_seats(data, seats(*specs))
+    shuffled = seats(*specs)
+    random.Random(4).shuffle(shuffled)
+    second = place_seats(data, shuffled)
+    assert first.points == second.points and first.shelves == second.shelves  # The same every time.
+    assert len(first.points) == 170
+    assert apart(first.points.values()) >= POINT_GAP - 1e-6
+    shelves = first.shelves
+    assert [shelf.kind for shelf in shelves] == ["adult", "poster", "cross", "outsider_teacher"]
+    for i, a in enumerate(shelves):
+        for b in shelves[i + 1:]:
+            assert apart_boxes(a.box, b.box, seat_map.SHELF_GAP)
+    shelf_points = [p for p in first.points.values() if p.outer]
+    assert len(shelf_points) == 6 + 2 + 52 + 12 + 3
+    river = data.river[0]
+    for shelf in shelves:
+        x0, y0, x1, y1 = shelf.box
+        corners = [(x0, y0), (x1, y0), (x0, y1), (x1, y1)]
+        assert x0 >= seat_map.SHELF_EDGE and y0 >= seat_map.SHELF_EDGE  # Inside the screen.
+        assert x1 <= 1000 - seat_map.SHELF_EDGE and y1 <= 800 - seat_map.SHELF_EDGE
+        assert not any(seat_map.inside(c, data.boundary) for c in corners)  # Off the basin.
+        assert seat_map.distance_to_ring(((x0 + x1) / 2, (y0 + y1) / 2), data.boundary) > 0
+        assert not within(seat_map.SeatPoint(*data.school, False), shelf.box)  # Not on the school.
+        for place in seat_map.place_names(data):
+            assert not within(seat_map.SeatPoint(place["x"], place["y"], False), shelf.box)
+        assert all(distance_to_line(c, river) > seat_map.RIVER_CLEARANCE for c in corners)
+        for p in (p for p in first.points.values() if not p.outer):
+            assert not within(p, shelf.box)  # No point on the basin side comes onto a shelf.
+    for p in shelf_points:
+        assert not seat_map.inside((p.x, p.y), data.boundary)
+        assert rim_distance(p) > RADIUS + seat_map.SHELF_CLEARANCE
+        assert distance_to_line((p.x, p.y), river) > seat_map.RIVER_CLEARANCE
+
+
+def distance_to_line(point, line):
+    return min(seat_map.distance_to_ring(point, (a, b)) for a, b in zip(line, line[1:]))
+
+
+def test_with_no_room_for_a_block_the_seats_still_never_overlap():
+    # A basin that fills the screen: no block fits; the seats still get points.
+    full = raw(viewbox=[0, 0, 300, 260], boundary=[[5, 5], [295, 5], [295, 255], [5, 255]],
+               river=[], school=None, places={HOME: {"架空原": [150, 130, "village"]}})
+    placement = place_seats(parse_map(full), seats(*[(f"P{n:02}", "poster", "") for n in range(12)]))
+    assert len(placement.points) == 12 and placement.shelves == []
+    assert apart(placement.points.values()) >= POINT_GAP - 1e-6
+
+
+def test_the_shelf_names_are_the_seat_lists_headings_from_the_same_place(data):
+    library, _ = _library(data)
+    setup = App(library, Gate(FakeClient([]), NameList.build(library.seats, {}))).setup()
+    shelves = setup["map"]["shelves"]
+    assert [shelf["kind"] for shelf in shelves] == ["poster"]
+    assert set(shelves[0]) == {"kind", "box", "label"}  # The words are not here twice ...
+    assert shelves[0]["kind"] in setup["kinds"]  # ... the screen takes them from setup's kinds.
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    assert "app.state.kinds[shelf.kind]" in script
+
+
+def test_the_place_names_are_drawn_over_the_points_and_outlined():
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    assert script.index('layer("points")') < script.index('layer("place-names")')
+    css = (app_module.STATIC_DIR / "style.css").read_text(encoding="utf-8")
+    rule = re.search(r"\.place-names text \{([^}]*)\}", css).group(1)
+    assert "paint-order: stroke" in rule and "fill: var(--soft)" in rule
 
 
 def test_many_seats_at_one_place_never_overlap_and_come_out_the_same_every_time(data):

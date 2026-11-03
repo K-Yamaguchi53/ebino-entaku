@@ -17,8 +17,10 @@ A place in えびの市 puts the point there; several seats at one place spread
 round it in a spiral, in seat ID order, so the point shows a district, never
 an address (SPEC 4). A place in another municipality puts the point just
 beyond the basin's rim, in that place's direction from the basin's middle.
-A seat with no 地区, or whose place is not found, goes round the outside of
-the map (between the rim and the screen's edge), its kind together.
+A seat with no 地区, or whose place is not found, goes on its kind's shelf: one
+block per kind, row by row in seat ID order, off the basin where the viewBox
+is free (away from the rim, the river, the school's landmark, the place names,
+the other points and the screen's edge), nearest a corner that has room.
 
 No point is closer than POINT_GAP to another, and the same seats always give
 the same points. Nothing here holds a company or a display name: the screen
@@ -37,10 +39,18 @@ MAP_FILE = Path(__file__).resolve().parent.parent / "mapdata" / "ebino_osm.json"
 POINT_GAP = 19.0  # Centre to centre, in viewBox units.
 SPIRAL_STEP = 11.0
 OUTSIDE_STEP = 26.0  # How far beyond the rim a seat of another municipality sits.
-EDGE_INSET = 22.0  # The first track round the outside, from the screen's edge.
-TRACK_STEP = 22.0
-KIND_GAP_SLOTS = 2  # Empty slots between two kinds on the outside track.
-RIM_CLEARANCE = 12.0  # An outside slot this close to the rim is skipped.
+# The shelves: one block per kind, off the basin, for the seats with no place.
+CELL = 5.0  # The grid that tells which parts of the viewBox are taken.
+SHELF_CLEARANCE = 20.0  # Kept free round the rim.
+RIVER_CLEARANCE = 16.0
+SHELF_EDGE = 12.0  # Kept free along the screen's edge.
+SHELF_PAD = 12.0  # From a block's outer points to its edge.
+SHELF_GAP = 16.0  # Between two shelves.
+POINT_ROOM = 14.0  # Kept free round a point placed on the basin or beyond the rim.
+SHELF_NAME_HEIGHT = 26.0  # The kind's name above the block.
+SHELF_NAME_CHAR = 18.0  # One character of the kind's name (style.css: 17px).
+SHELF_SCAN = 10.0
+PLACE_NAME_CHAR = 24.5  # One character of a place name (style.css: 22px, spaced .1em).
 # The few place names drawn faintly on the map: these kinds, the larger first.
 BIG_PLACE_KINDS = ("town", "suburb", "village", "quarter")
 MAX_PLACE_NAMES = 8
@@ -193,7 +203,7 @@ def edge_point(center: Point, toward: Point, width: float, height: float) -> Poi
 class SeatPoint:
     x: float
     y: float
-    outer: bool
+    outer: bool  # On its kind's shelf, off the basin (the startup line's 外周).
 
 
 @dataclass
@@ -202,6 +212,7 @@ class Placement:
     not_found: int = 0
     # The one crossing line (SPEC 5-1): from the edge to that seat's point.
     crossing: dict | None = None
+    shelves: list["Shelf"] = field(default_factory=list)
 
     @property
     def outer(self) -> int:
@@ -242,26 +253,138 @@ class _Board:
         raise ValueError("no room on the map")
 
 
-def _track_slots(width: float, height: float, inset: float) -> list[Point]:
-    """Slots POINT_GAP apart round a rectangle inset from the screen's edge,
-    clockwise from the top left corner."""
-    corners = [(inset, inset), (width - inset, inset), (width - inset, height - inset), (inset, height - inset)]
-    slots = []
-    for (x1, y1), (x2, y2) in zip(corners, corners[1:] + corners[:1]):
-        steps = max(1, int(math.hypot(x2 - x1, y2 - y1) // POINT_GAP))
-        slots += [(x1 + (x2 - x1) * k / steps, y1 + (y2 - y1) * k / steps) for k in range(steps)]
-    return slots
+class _Room:
+    """Which parts of the viewBox are taken, on a grid of CELL units: the
+    basin and a margin round it, the river, the school's landmark, the place
+    names, the screen's edge, the points placed so far, and the shelves."""
+
+    def __init__(self, data: MapData):
+        self.cols, self.rows = math.ceil(data.width / CELL), math.ceil(data.height / CELL)
+        self.taken = bytearray(self.cols * self.rows)
+        self._sums = None
+        self._fill_basin(data.boundary)
+        ring = data.boundary + data.boundary[:1]
+        for a, b in zip(ring, ring[1:]):
+            self.segment(a, b, SHELF_CLEARANCE)
+        for line in data.river:
+            for a, b in zip(line, line[1:]):
+                self.segment(a, b, RIVER_CLEARANCE)
+        if data.school:
+            x, y = data.school
+            self.rect(x - 50, y - 32, x + 50, y + 38)
+        for place in place_names(data):
+            half = len(place["name"]) * PLACE_NAME_CHAR / 2 + 4
+            self.rect(place["x"] - half, place["y"] - 24, place["x"] + half, place["y"] + 8)
+        self.rect(0, 0, data.width, SHELF_EDGE)
+        self.rect(0, data.height - SHELF_EDGE, data.width, data.height)
+        self.rect(0, 0, SHELF_EDGE, data.height)
+        self.rect(data.width - SHELF_EDGE, 0, data.width, data.height)
+
+    def _cells(self, x0, y0, x1, y1):
+        return (max(0, int(x0 // CELL)), max(0, int(y0 // CELL)),
+                min(self.cols - 1, int(x1 // CELL)), min(self.rows - 1, int(y1 // CELL)))
+
+    def _row(self, row, c0, c1):
+        if c1 >= c0:
+            self.taken[row * self.cols + c0: row * self.cols + c1 + 1] = b"\x01" * (c1 - c0 + 1)
+
+    def rect(self, x0, y0, x1, y1):
+        c0, r0, c1, r1 = self._cells(x0, y0, x1, y1)
+        for row in range(r0, r1 + 1):
+            self._row(row, c0, c1)
+        self._sums = None
+
+    def segment(self, a: Point, b: Point, reach: float):
+        (x1, y1), (x2, y2) = a, b
+        c0, r0, c1, r1 = self._cells(min(x1, x2) - reach, min(y1, y2) - reach,
+                                     max(x1, x2) + reach, max(y1, y2) + reach)
+        dx, dy = x2 - x1, y2 - y1
+        length = dx * dx + dy * dy
+        for row in range(r0, r1 + 1):
+            py = (row + 0.5) * CELL
+            for col in range(c0, c1 + 1):
+                px = (col + 0.5) * CELL
+                t = 0.0 if not length else max(0.0, min(1.0, ((px - x1) * dx + (py - y1) * dy) / length))
+                if math.hypot(px - (x1 + t * dx), py - (y1 + t * dy)) <= reach:
+                    self.taken[row * self.cols + col] = 1
+        self._sums = None
+
+    def _fill_basin(self, ring: tuple[Point, ...]):
+        edges = list(zip(ring, ring[1:] + ring[:1]))
+        for row in range(self.rows):
+            y = (row + 0.5) * CELL
+            xs = sorted((x2 - x1) * (y - y1) / (y2 - y1) + x1
+                        for (x1, y1), (x2, y2) in edges if (y1 > y) != (y2 > y))
+            for left, right in zip(xs[::2], xs[1::2]):
+                self._row(row, max(0, int(left // CELL)), min(self.cols - 1, int(right // CELL)))
+        self._sums = None
+
+    def free(self, x0, y0, x1, y1) -> bool:
+        """Nothing in the rectangle, which lies wholly on the screen."""
+        if x0 < 0 or y0 < 0 or x1 >= self.cols * CELL or y1 >= self.rows * CELL:
+            return False
+        width = self.cols + 1
+        if self._sums is None:  # Sums over rectangles, so each look is quick.
+            sums = [0] * (width * (self.rows + 1))
+            for row in range(self.rows):
+                running = 0
+                for col in range(self.cols):
+                    running += self.taken[row * self.cols + col]
+                    sums[(row + 1) * width + col + 1] = sums[row * width + col + 1] + running
+            self._sums = sums
+        sums = self._sums
+        c0, r0, c1, r1 = int(x0 // CELL), int(y0 // CELL), int(x1 // CELL) + 1, int(y1 // CELL) + 1
+        return not (sums[r1 * width + c1] - sums[r0 * width + c1] - sums[r1 * width + c0] + sums[r0 * width + c0])
 
 
-def _outside_slots(data: MapData):
-    """Every slot round the outside, track after track inward, skipping slots
-    on or too near the basin."""
-    inset = EDGE_INSET
-    while inset < min(data.width, data.height) / 2:
-        for slot in _track_slots(data.width, data.height, inset):
-            if not inside(slot, data.boundary) and distance_to_ring(slot, data.boundary) >= RIM_CLEARANCE:
-                yield slot
-        inset += TRACK_STEP
+@dataclass(frozen=True)
+class Shelf:
+    """One kind's seats off the basin, in a block, its kind's name above it."""
+    kind: str
+    box: tuple[float, float, float, float]  # The block and its name: x0, y0, x1, y1.
+    label: Point  # Where the name starts (left end, baseline).
+
+
+def _shelf_shapes(count: int) -> list[tuple[int, int]]:
+    """(columns, rows) for a block of count points, neither too long nor too tall."""
+    shapes = {}
+    for columns in range(1, count + 1):
+        rows = math.ceil(count / columns)
+        if rows <= 3 * columns and columns <= 4 * rows and rows not in shapes:
+            shapes[rows] = columns
+    return sorted((columns, rows) for rows, columns in shapes.items()) or [(1, 1)]
+
+
+def _place_shelf(room: _Room, kind: str, count: int, width: float, height: float):
+    """The block nearest a corner of the screen that has room for it and its
+    name, as (Shelf, slots in seat order), or None. Each point is POINT_GAP
+    from the next, row by row. The same room always gives the same block."""
+    name_width = len(KIND_LABELS[kind]) * SHELF_NAME_CHAR + 8
+    corners = ((0, 0), (width, 0), (0, height), (width, height))
+    best = None
+    for columns, rows in _shelf_shapes(count):
+        span_x, span_y = (columns - 1) * POINT_GAP, (rows - 1) * POINT_GAP
+        ax = SHELF_EDGE + SHELF_PAD
+        while ax + span_x + SHELF_PAD < width:
+            ay = SHELF_EDGE + SHELF_PAD + SHELF_NAME_HEIGHT
+            while ay + span_y + SHELF_PAD < height:
+                block = (ax - SHELF_PAD, ay - SHELF_PAD, ax + span_x + SHELF_PAD, ay + span_y + SHELF_PAD)
+                name = (block[0], block[1] - SHELF_NAME_HEIGHT, block[0] + name_width, block[1])
+                middle = ((block[0] + max(block[2], name[2])) / 2, (name[1] + block[3]) / 2)
+                score = (round(min(math.hypot(middle[0] - cx, middle[1] - cy) for cx, cy in corners), 3),
+                         ay, ax, columns)
+                if (best is None or score < best[0]) and room.free(*block) and room.free(*name):
+                    best = (score, ax, ay, columns, block, name)
+                ay += SHELF_SCAN
+            ax += SHELF_SCAN
+    if best is None:
+        return None
+    _, ax, ay, columns, block, name = best
+    box = (block[0], name[1], max(block[2], name[2]), block[3])
+    room.rect(box[0] - SHELF_GAP, box[1] - SHELF_GAP, box[2] + SHELF_GAP, box[3] + SHELF_GAP)
+    slots = [(ax + (k % columns) * POINT_GAP, ay + (k // columns) * POINT_GAP) for k in range(count)]
+    shelf = Shelf(kind, tuple(round(v, 1) for v in box), (round(block[0], 1), round(block[1] - 7, 1)))
+    return shelf, slots
 
 
 def place_seats(data: MapData, seats) -> Placement:
@@ -289,24 +412,22 @@ def place_seats(data: MapData, seats) -> Placement:
         px, py = board.near((x, y))
         placement.points[seat.seat_id] = SeatPoint(px, py, False)
 
-    slots = _outside_slots(data)
-    started = False
-    for kind in KIND_LABELS:
-        group = [seat for seat in outer if seat.kind == kind]
-        if not group:
-            continue
-        if started:  # A few empty slots between two kinds.
-            for _ in range(KIND_GAP_SLOTS):
-                next(slots, None)
-        started = True
-        for seat in group:
-            for slot in slots:
-                if board.free((round(slot[0], 1), round(slot[1], 1))):
-                    px, py = board.take(slot)
-                    placement.points[seat.seat_id] = SeatPoint(px, py, True)
-                    break
-            else:
-                raise ValueError("no room round the map")
+    room = _Room(data)
+    for x, y in board.taken:
+        room.rect(x - POINT_ROOM, y - POINT_ROOM, x + POINT_ROOM, y + POINT_ROOM)
+    groups = [[seat for seat in outer if seat.kind == kind] for kind in KIND_LABELS]
+    # The largest shelf first, so it gets the most room; then the list's order.
+    for group in sorted((g for g in groups if g), key=lambda g: -len(g)):
+        found = _place_shelf(room, group[0].kind, len(group), data.width, data.height)
+        if found is None:  # No block fits: round a corner, still never overlapping.
+            slots = [board.near((SHELF_EDGE + SHELF_PAD, SHELF_EDGE + SHELF_PAD)) for _ in group]
+        else:
+            shelf, slots = found
+            placement.shelves.append(shelf)
+            slots = [board.take(slot) for slot in slots]
+        for seat, (px, py) in zip(group, slots):
+            placement.points[seat.seat_id] = SeatPoint(px, py, True)
+    placement.shelves.sort(key=lambda shelf: list(KIND_LABELS).index(shelf.kind))
 
     target = next((seat.seat_id for seat in seats if seat.is_crossing_target), None)
     if target is not None:
@@ -343,4 +464,8 @@ def map_view(data: MapData, placement: Placement, school_label: str) -> dict:
         "school": ({"x": data.school[0], "y": data.school[1], "label": school_label}
                    if data.school and school_label else None),
         "crossing": placement.crossing,
+        # Where each kind's block and name sit; the screen takes the name
+        # itself from the same place as the seat list's headings.
+        "shelves": [{"kind": shelf.kind, "box": list(shelf.box), "label": list(shelf.label)}
+                    for shelf in placement.shelves],
     }

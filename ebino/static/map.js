@@ -92,22 +92,29 @@ const EbinoMap = (() => {
     const hills = layer("mountains");
     const middle = centroid(map.boundary);
     const seatXY = seats.filter((s) => s.x !== undefined).map((s) => [s.x, s.y]);
+    const shelves = map.shelves || [];
+    const onShelf = (x, y) => shelves.some(({ box: [x0, y0, x1, y1] }) =>
+      x > x0 - 24 && x < x1 + 24 && y > y0 - 16 && y < y1 + 16);
     for (let k = 0; k < MOUNTAINS; k++) {
       const angle = (k + 0.5) * 2 * Math.PI / MOUNTAINS;
       const dir = [Math.cos(angle), Math.sin(angle)];
       const [rx, ry] = rimPoint(middle, dir, map.boundary);
       const x = rx + 40 * dir[0], y = ry + 40 * dir[1];
       if (x < 20 || y < 20 || x > width - 20 || y > height - 20) continue;
-      if (seatXY.some(([sx, sy]) => Math.hypot(sx - x, sy - y) < 22)) continue;
+      if (seatXY.some(([sx, sy]) => Math.hypot(sx - x, sy - y) < 22) || onShelf(x, y)) continue;
       hills.append(rc.linearPath([[x - 13, y + 7], [x - 4, y - 8], [x + 1, y - 1], [x + 6, y - 6], [x + 14, y + 7]],
         { ...ink, strokeWidth: 1.4, roughness: 0.8, seed: 11 + k }));
     }
 
-    const names = layer("place-names");
-    for (const place of map.places) {
-      const text = svgEl("text", { x: place.x, y: place.y, "text-anchor": "middle" });
-      text.textContent = place.name;
-      names.append(text);
+    // Each kind's shelf: its name, faint, the same words as the seat list's
+    // heading for that kind.
+    const shelfNames = layer("shelf-names");
+    for (const shelf of shelves) {
+      const words = app.state.kinds[shelf.kind];
+      if (!words) continue;
+      const text = svgEl("text", { x: shelf.label[0], y: shelf.label[1] });
+      text.textContent = words;
+      shelfNames.append(text);
     }
 
     if (map.crossing) {
@@ -123,6 +130,13 @@ const EbinoMap = (() => {
       const point = drawPoint(seat);
       points[seat.seat_id] = point;
       seatLayer.append(point);
+    }
+    // Over the points, outlined, so a point never hides a place name.
+    const names = layer("place-names");
+    for (const place of map.places) {
+      const text = svgEl("text", { x: place.x, y: place.y, "text-anchor": "middle" });
+      text.textContent = place.name;
+      names.append(text);
     }
     // Over the points so its label reads; it takes no presses (not a seat).
     if (map.school) drawSchool(layer("school"), map.school);
@@ -203,16 +217,68 @@ const EbinoMap = (() => {
 
   // --- labels and bubbles, over the map in CSS pixels ---
 
+  // Puts a label, bubble or heading by a spot on the map, always inside the
+  // map's frame: above it, below it, right or left, the first side that
+  // covers no other label, bubble or heading; failing that, the nearest spot
+  // in the frame that covers none. Returns false when there is no such spot
+  // even with the bubbles gone (it then takes the side that covers least).
   function place(node, x, y, gap) {
     const [, , width, height] = map.viewbox;
     const frame = overlay.getBoundingClientRect();
     const px = x / width * frame.width, py = y / height * frame.height;
-    const box = node.getBoundingClientRect();
-    const left = Math.max(4, Math.min(px - box.width / 2, frame.width - box.width - 4));
-    let top = py - box.height - gap;
-    if (top < 4) top = py + gap;
-    node.style.left = `${left}px`;
-    node.style.top = `${Math.min(top, Math.max(4, frame.height - box.height - 4))}px`;
+    // Fix the width first: a box set further right would wrap and grow taller.
+    node.style.maxWidth = `${Math.floor(Math.min(frame.width * 0.7, 18 * 16, frame.width - 8))}px`;
+    const w0 = Math.ceil(node.getBoundingClientRect().width);
+    node.style.width = `${w0}px`;
+    const { width: w, height: h } = node.getBoundingClientRect();
+    const clampX = (left) => Math.max(4, Math.min(left, frame.width - w - 4));
+    const clampY = (top) => Math.max(4, Math.min(top, frame.height - h - 4));
+    const sides = [
+      [px - w / 2, py - h - gap], [px - w / 2, py + gap],
+      [px + gap, py - h / 2], [px - w - gap, py - h / 2],
+    ].map(([left, top]) => [clampX(left), clampY(top)]);
+    const boxes = (nodes) => nodes.filter((other) => other !== node).map((other) => {
+      const r = other.getBoundingClientRect();
+      return [r.left - frame.left, r.top - frame.top, r.width, r.height];
+    });
+    const away = ([left, top]) => Math.hypot(left + w / 2 - px, top + h / 2 - py);
+    const spots = [];
+    for (let top = 4; top <= frame.height - h - 4; top += 6) {
+      for (let left = 4; left <= frame.width - w - 4; left += 6) spots.push([left, top]);
+    }
+    spots.sort((a, b) => away(a) - away(b));
+    const choose = (others) => {
+      const covered = ([left, top]) => others.reduce((sum, [ol, ot, ow, oh]) =>
+        sum + Math.max(0, Math.min(left + w, ol + ow) - Math.max(left, ol)) *
+          Math.max(0, Math.min(top + h, ot + oh) - Math.max(top, ot)), 0);
+      let best = sides[0], least = Infinity;
+      for (const side of sides) {
+        const area = covered(side);
+        if (area < least) { best = side; least = area; }
+        if (!area) return [side, 0];
+      }
+      const free = spots.find((spot) => !covered(spot));
+      return free ? [free, 0] : [best, least];
+    };
+    let [best, least] = choose(boxes([...overlay.children]));
+    let dropBubbles = false;
+    // Bubbles are short-lived: rather than cover a label or a heading, the
+    // earlier bubbles in the way go.
+    if (least) {
+      const [spot, rest] = choose(boxes([...overlay.children].filter((other) => !other.classList.contains("map-bubble"))));
+      if (!rest) [best, least, dropBubbles] = [spot, 0, true];
+    }
+    node.style.left = `${best[0]}px`;
+    node.style.top = `${best[1]}px`;
+    if (dropBubbles) {
+      for (const other of overlay.querySelectorAll(".map-bubble")) if (other !== node && overlaps(node, other)) other.remove();
+    }
+    return least === 0;
+  }
+
+  function overlaps(a, b) {
+    const r = a.getBoundingClientRect(), q = b.getBoundingClientRect();
+    return r.left < q.right && q.left < r.right && r.top < q.bottom && q.top < r.bottom;
   }
 
   function seatOf(seatId) { return app.state.seatById[seatId]; }
@@ -227,7 +293,11 @@ const EbinoMap = (() => {
     if (seat.detail) tip.append(div("detail", seat.detail));
     if (isSilent(seatId)) tip.append(div("detail", app.state.texts.not_asked_yet));
     overlay.append(tip);
-    place(tip, seat.x, seat.y, 16);
+    if (place(tip, seat.x, seat.y, 16)) return;
+    // No side free: a heading in the way moves to a side clear of the label.
+    for (const tag of overlay.querySelectorAll(".split-tag")) {
+      if (overlaps(tip, tag)) place(tag, Number(tag.dataset.x), Number(tag.dataset.y), 8);
+    }
   }
 
   function hideTip() { for (const tip of overlay.querySelectorAll(".map-tip")) tip.remove(); }
@@ -295,6 +365,7 @@ const EbinoMap = (() => {
       if (!a || !b || a === b) continue;
       splitLayer.append(svgEl("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y }));
       const tag = div("split-tag", app.shownQuotes(split.heading));
+      Object.assign(tag.dataset, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
       overlay.append(tag);
       place(tag, (a.x + b.x) / 2, (a.y + b.y) / 2, 8);
     }
