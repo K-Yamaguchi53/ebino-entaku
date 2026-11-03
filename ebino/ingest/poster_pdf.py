@@ -218,6 +218,33 @@ def heading_of(text: str) -> Heading | None:
     return Heading(label, role)
 
 
+def copied_heading(text: str) -> Heading | None:
+    """A heading a person marked by hand in a copied poster (poster_text).
+
+    The mark alone makes it a heading: no length limit, no KNOWN_HEADINGS.
+    Its name and role are found as for a PDF heading: NFKC, a leading number
+    with a separator, the brackets and spaces at either end and an English
+    gloss are taken off; a numbered PDF heading's 「（探究テーマ設定理由）」 and
+    「なぜ〜か」 rules apply too. None when nothing is left.
+    """
+    line = _ENGLISH_GLOSS.sub("", unicodedata.normalize("NFKC", text).strip())
+    number = None if _FIGURE.match(line) else _NUMBER.match(line)
+    if number and number.group(2):  # 「1. 背景」, not 「3つの課題」.
+        line = line[number.end() :]
+    label = re.sub(r"\s+", "", _CLOSING.sub("", _OPENING.sub("", line)))
+    label = _TRAILING_NUMBER.sub("", label) or label
+    if not label:
+        return None
+    inner = _WORD_IN_CLOSING_BRACKETS.match(label)
+    if inner:
+        word = _TRAILING_NUMBER.sub("", inner.group(1)) or inner.group(1)
+        if word in KNOWN_HEADINGS:
+            return Heading(word, role_of(word))
+    if is_why_question(label):
+        return Heading(label, ROLE_BACKGROUND)
+    return Heading(label, role_of(label))
+
+
 def _can_start_a_split(heading: Heading | None) -> bool:
     return heading is not None and (
         heading.label in KNOWN_HEADINGS or is_why_question(heading.label)
@@ -505,13 +532,18 @@ def read_fragments(path: Path, stats: PdfTextStats | None = None) -> list[Fragme
     return [fragment for word in words for fragment in fragments_from_word(word, stats)]
 
 
-def ingest_poster_fragments(
-    fragments: list[Fragment], seat: Seat, masks: SeatMasks = SeatMasks()
-) -> list[Utterance]:
+def whole_page_masked(masks: SeatMasks) -> bool:
+    """A poster is one page; masks.tsv may drop it whole."""
     masks.check_pages(1)
-    if 1 in masks.pages:
-        return []
-    sections = split_sections(fragments)
+    return 1 in masks.pages
+
+
+def poster_utterances(
+    sections: list[Section], seat: Seat, masks: SeatMasks = SeatMasks()
+) -> list[Utterance]:
+    """A poster's sections → utterances: words hidden, IDs made, the purpose
+    sample required and the leak check run. Posters read from a PDF and
+    posters copied to text (poster_text) both go through here."""
     pairs = masks.pairs(seat)
     utterances: list[Utterance] = []
     for section in sections:
@@ -536,6 +568,14 @@ def ingest_poster_fragments(
         raise IngestError("purpose_heading_missing")
     assert_clean(utterances, forbidden_terms(term for term, _ in pairs))
     return utterances
+
+
+def ingest_poster_fragments(
+    fragments: list[Fragment], seat: Seat, masks: SeatMasks = SeatMasks()
+) -> list[Utterance]:
+    if whole_page_masked(masks):
+        return []
+    return poster_utterances(split_sections(fragments), seat, masks)
 
 
 def ingest_poster(

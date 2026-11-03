@@ -25,6 +25,7 @@ from .poster_pdf import (
     purpose_examples,
     purpose_rank,
 )
+from . import poster_text
 from .seats import Seat, load_seats
 from .slides_pdf import ingest_slides
 from .utterance import IngestError, Utterance, VOICE_ARTICLE
@@ -56,6 +57,7 @@ class Report:
     pdf_text: PdfTextStats = field(default_factory=PdfTextStats)
     short_article_pieces: int = 0
     short_article_seats: int = 0
+    copied_posters: int = 0  # Read from a hand-made text copy (poster_text).
 
     def lines(self) -> list[str]:
         return [
@@ -69,6 +71,7 @@ class Report:
             f"one-character name parts (check by hand): {self.single_char_names}",
             f"table rows dropped: {self.dropped_rows}",
             f"article lines joined back into paragraphs: {self.wrapped_lines_joined}",
+            f"copied posters (text) read: {self.copied_posters}",
             f"poster sections by role: {dict(self.poster_sections_by_role)}",
             f"posters whose purpose comes from 仮説/経緯: {self.posters_purpose_from_hypothesis}",
             "posters whose purpose comes from テーマ設定の理由: "
@@ -81,6 +84,20 @@ class Report:
             f"article-voice pieces of {SHORT_ARTICLE_CHARS} chars or less (seats): "
             f"{self.short_article_pieces} ({self.short_article_seats})",
         ]
+
+
+def _count_poster(utterances: list[Utterance], report: Report) -> list[Utterance]:
+    """Sections by role and where the purpose sample came from, for a one-page
+    poster read from a PDF or copied to text."""
+    for utterance in utterances:
+        role = utterance.section if utterance.section in ROLES else "(other)"
+        report.poster_sections_by_role[role] += 1
+    examples = purpose_examples(utterances)
+    if examples:
+        rank = purpose_rank(examples[0].section, examples[0].heading)
+        report.posters_purpose_from_hypothesis += rank == PURPOSE_FROM_HYPOTHESIS
+        report.posters_purpose_from_theme_reason += rank == PURPOSE_FROM_THEME_REASON
+    return utterances
 
 
 def _ingest_seat(
@@ -105,15 +122,10 @@ def _ingest_seat(
             utterances = ingest_slides(path, seat, masks, report.pdf_text)
             report.multi_page_works_read += 1
             return utterances
-        utterances = ingest_poster(path, seat, masks, report.pdf_text)
-        for utterance in utterances:
-            role = utterance.section if utterance.section in ROLES else "(other)"
-            report.poster_sections_by_role[role] += 1
-        examples = purpose_examples(utterances)
-        if examples:
-            rank = purpose_rank(examples[0].section, examples[0].heading)
-            report.posters_purpose_from_hypothesis += rank == PURPOSE_FROM_HYPOTHESIS
-            report.posters_purpose_from_theme_reason += rank == PURPOSE_FROM_THEME_REASON
+        return _count_poster(ingest_poster(path, seat, masks, report.pdf_text), report)
+    if suffix == poster_text.SUFFIX and seat.kind == "poster":
+        utterances = _count_poster(poster_text.ingest_text_poster(path, seat, masks), report)
+        report.copied_posters += 1
         return utterances
     if suffix == ".pdf" and seat.kind in ("cross", "outsider_teacher"):
         if not masks:
