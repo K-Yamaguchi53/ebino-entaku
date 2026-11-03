@@ -150,11 +150,25 @@ def test_the_rounds_last_word_over_http(server):
     assert 'call("/api/closing"' in script and "closeRound(round.round, closingBox)" in script
     # 「司会が○○に聞いてみる」: the card is fetched, asked only on a press, before the last word.
     assert request(srv, "POST", "/api/ask_card", {"round": 1})[1]["card"]["form"] == "other_side"
-    assert request(srv, "POST", "/api/ask_seat_card", {"round": 1}) == (400, {"error": "not_ready_for_card"})
+    assert request(srv, "POST", "/api/ask_seat_card", {"round": 1})[0] != 200  # The way is gone.
     assert script.index("loadAskCard(round.round, askBox)") < script.index("closeRound(round.round, closingBox)")
-    assert 'call("/api/ask_seat"' in script and 'call("/api/ask_seat_card"' in script
+    assert 'call("/api/ask_seat"' in script and "/api/ask_seat_card" not in script
     assert 'call("/api/more"' in script and 'call("/api/more_card"' in script
     assert "state.texts.more_end" in script and "state.texts.more_card_done" in script
+
+
+def test_not_answered_yet_is_shown_only_with_the_seats_empty_card_box_under_it():
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    asked = script[script.index("function renderAsked"):script.index("async function closeRound")]
+    assert 'el("p", { class: "not-answered", text: asked.not_answered })' in asked
+    assert 'el("button"' not in asked[asked.index("asked.not_answered"):asked.index("asked.message")]
+    assert "cardEntry(asked.seat_id," in asked and "asked.question" not in asked[asked.index("cardEntry"):]
+    entry = script[script.index("function cardEntry"):]
+    entry = entry[:entry.index("\n}\n")]
+    # The box is the template's, empty; nothing is put in it.
+    assert "card-form-template" in entry and ".value =" not in entry
+    # 「ここから先は、まだ聞いていない」 under 「もっと聞く」 still makes a card.
+    assert 'call("/api/more_card"' in script
 
 
 def test_a_ranking_title_is_shown_over_the_last_word_the_more_piece_and_the_answer():

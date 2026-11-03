@@ -194,21 +194,12 @@ function renderAsked(roundNo, box, asked) {
     answer.append(moreButton(asked.piece.utterance_id, answer));
     node.append(answer);
   } else if (asked.not_answered) {
-    if (asked.card_made) {
-      node.append(el("p", { class: "card-done", text: state.texts.more_card_done }));
-    } else {
-      const toCard = el("button", { type: "button", class: "quiet not-heard", text: asked.not_answered });
-      toCard.onclick = async () => {
-        toCard.disabled = true;
-        try {
-          await call("/api/ask_seat_card", { round: roundNo });
-          toCard.replaceWith(el("p", { class: "card-done", text: state.texts.more_card_done }));
-        } catch (error) {
-          toCard.disabled = false;
-        }
-      };
-      node.append(toCard);
-    }
+    // Shown only, never a button: the question is the app's sentence, not
+    // the student's. Under it, the seat's 「聞きたいことを書く」, box empty.
+    node.append(el("p", { class: "not-answered", text: asked.not_answered }));
+    const done = () => el("p", { class: "card-done", text: "質問カードにしました" });
+    if (asked.carded || state.carded.has(asked.seat_id)) node.append(done());
+    else node.append(cardEntry(asked.seat_id, (form) => form.replaceWith(done())));
   } else if (asked.message) {
     node.append(el("p", { class: "message", text: asked.message }));
   }
@@ -373,6 +364,13 @@ function renderNotAsked(seat) {
     box.append(el("div", { class: "card-done", text: "質問カードにしました" }));
     return box;
   }
+  box.append(cardEntry(seat.seat_id, renderSeats));
+  return box;
+}
+
+// 「聞きたいことを書く」: opens an empty box; the card holds the student's
+// words only (SPEC 2-2).
+function cardEntry(seatId, done) {
   const open = el("button", { type: "button", class: "quiet", text: "聞きたいことを書く" });
   open.addEventListener("click", () => {
     const form = $("card-form-template").content.firstElementChild.cloneNode(true);
@@ -380,15 +378,14 @@ function renderNotAsked(seat) {
       event.preventDefault();
       const text = form.querySelector("textarea").value.trim();
       if (!text) return;
-      await call("/api/card", { seat_id: seat.seat_id, text });
-      state.carded.add(seat.seat_id);
-      renderSeats();
+      await call("/api/card", { seat_id: seatId, text });
+      state.carded.add(seatId);
+      done(form);
     });
     open.replaceWith(form);
     form.querySelector("textarea").focus();
   });
-  box.append(open);
-  return box;
+  return open;
 }
 
 // --- the reflection sheet (SPEC 5-2) ---

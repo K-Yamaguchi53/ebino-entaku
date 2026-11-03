@@ -28,8 +28,10 @@ ID (or none), and the copy goes through the guard. Its line says
 whose words they are, by the piece's voice: the person's own words get
 「この人が、別の所で話したこと」, an article's or a senior employee's words
 another line, so an article never reads as the person speaking. When nothing
-is found, 「まだ答えていない」; a press on it makes a question card to that
-seat holding the question (SPEC 2-2).
+is found, 「まだ答えていない」, which cannot be pressed: the question is the
+app's sentence, not the student's, and a question card is the student's own
+question to an adult (the teacher's call on 11/3). Under it, the seat's
+「聞きたいことを書く」 opens with an empty box (SPEC 2-2).
 """
 
 import json
@@ -81,7 +83,6 @@ class AskSeat:
     answer_text: str = ""
     reason: str = ""  # Reason code when unavailable.
     guard_stopped: int = 0
-    card_id: str = ""
 
 
 def first_sentence(text: str) -> str:

@@ -35,9 +35,6 @@ ORIGIN_STUDENT = "student"
 # The student pressed 「ここから先は、まだ聞いていない」 under 「もっと聞く」: the
 # round's question goes to that seat (SPEC 2-2).
 ORIGIN_NOT_HEARD = "not_heard_yet"
-# 「司会が○○に聞いてみる」 found nothing and the student pressed 「まだ答えていない」:
-# the moderator's question goes to that seat (SPEC 14-53 B, 2-2).
-ORIGIN_ASK_SEAT = "ask_seat"
 MAX_ASK = 3
 MAX_REPHRASE_CHARS = 80
 
@@ -66,7 +63,7 @@ class QuestionCard:
     card_id: str
     origin: str
     text: str  # The student's words, unchanged.
-    seat_id: str = ""  # The silent seat the student pressed (student cards).
+    seat_id: str = ""  # The seat the card is to (student cards and 「まだ聞いていない」).
     back: Back = field(default_factory=Back)
 
     def front(self) -> dict:
@@ -104,7 +101,7 @@ def card_for_no_answer(gate: Gate, question: str, seats: list[Seat]) -> Question
 
 def card_for_seat(gate: Gate, origin: str, seat_id: str, text: str, seats: list[Seat]) -> QuestionCard:
     """A card to one seat the student pressed for (「まだ聞いていない」 under
-    「もっと聞く」, or 「まだ答えていない」 on 「司会が○○に聞いてみる」; SPEC 2-2)."""
+    「もっと聞く」, holding the question the student wrote; SPEC 2-2)."""
     return QuestionCard(new_card_id(), origin, text, seat_id, write_back(gate, text, seats))
 
 

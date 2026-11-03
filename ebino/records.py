@@ -129,7 +129,6 @@ def _ask_seat_record(asked) -> dict | None:
         "reason": asked.reason,
         "answer_id": asked.answer_id,
         "guard_stopped": asked.guard_stopped,
-        "card_id": asked.card_id,
     }
 
 

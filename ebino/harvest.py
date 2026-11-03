@@ -153,8 +153,10 @@ def found_moves(session, sheet_heading) -> list[Found]:
             if index + 1 < len(asked):
                 found.setdefault("asked_after_silence", Found("asked_after_silence", asked[index + 1].question))
     # Only a card the student wrote at a silent seat; one made from 「まだ
-    # 聞いていない」 under 「もっと聞く」 is not a move (the teacher's call to make).
-    card = next((c for c in session.cards if c.origin == ORIGIN_STUDENT), None)
+    # 聞いていない」 under 「もっと聞く」, or written under 「まだ答えていない」 at a
+    # seat that spoke, is not this move (the teacher's call to make).
+    silent = set(session.silent_seats())
+    card = next((c for c in session.cards if c.origin == ORIGIN_STUDENT and c.seat_id in silent), None)
     if card is not None:
         found["card_at_silent_seat"] = Found("card_at_silent_seat", card.text, seat=titles[card.seat_id])
     for number, result in enumerate(session.rounds, start=1):

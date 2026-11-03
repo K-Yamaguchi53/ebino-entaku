@@ -160,8 +160,10 @@ class Session:
         return self.round_view(len(self.rounds))
 
     def write_card(self, seat_id: str, text: str) -> dict:
-        """A card the student writes at a seat shown as 「まだ誰も聞いていない」."""
-        if seat_id not in self.silent_seats():
+        """A card the student writes at a seat shown as 「まだ誰も聞いていない」,
+        or at a seat 「司会が○○に聞いてみる」 found no answer from (the box
+        opens empty: the card holds the student's words only)."""
+        if seat_id not in self.silent_seats() and seat_id not in self.not_answered_seats():
             raise Refused("not_a_silent_seat")
         if len((text or "").strip()) > MAX_CARD_CHARS:
             raise Refused("card_too_long")
@@ -263,7 +265,9 @@ class Session:
         title = seat_label(self._seats[asked.seat_id], self.library.show_private).title
         view = {"round": round_no, "status": asked.status, "seat_id": asked.seat_id,
                 "header": load_text(ASK_SEAT_HEADER).format(seat=title), "question": asked.text,
-                "label": "", "piece": None, "not_answered": "", "message": "", "card_made": bool(asked.card_id)}
+                "label": "", "piece": None, "not_answered": "", "message": "",
+                # Whether the student already wrote a card to this seat.
+                "carded": any(c.origin == editor.ORIGIN_STUDENT and c.seat_id == asked.seat_id for c in self.cards)}
         if asked.status == ask_seat.ANSWERED:
             utterance = self._utterances[asked.answer_id]
             said = not utterance.note
@@ -273,22 +277,17 @@ class Session:
                              "ranking_title": self.library.ranking_titles.get(asked.answer_id, ""),
                              "said": said, "source": self.source(asked.seat_id, utterance)}
         elif asked.status == ask_seat.NOT_FOUND:
+            # Shown only: it makes no card. The screen opens the seat's
+            # 「聞きたいことを書く」 under it, with an empty box.
             view["not_answered"] = load_text(ASK_NOT_ANSWERED)
         else:
             view["message"] = load_text(MODEL_UNAVAILABLE)
         return view
 
-    def ask_card_to_seat(self, round_no: int) -> dict:
-        """「まだ答えていない」 pressed: the question becomes a card to that seat."""
-        asked = self._round(round_no).ask_seat
-        if asked is None or asked.status != ask_seat.NOT_FOUND or asked.card_id:
-            raise Refused("not_ready_for_card")
-        card = editor.card_for_seat(self.gate, editor.ORIGIN_ASK_SEAT, asked.seat_id, asked.text,
-                                    self.library.seats)
-        self.cards.append(card)
-        asked.card_id = card.card_id
-        self.save()
-        return card.front()
+    def not_answered_seats(self) -> list[str]:
+        """Seats 「司会が○○に聞いてみる」 found no answer from."""
+        return [r.ask_seat.seat_id for r in self.rounds
+                if r.ask_seat is not None and r.ask_seat.status == ask_seat.NOT_FOUND]
 
     def more_origins(self) -> dict[str, int]:
         """Pieces 「もっと聞く」 may be pressed under, with their round: the
