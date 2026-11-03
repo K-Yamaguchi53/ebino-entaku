@@ -522,13 +522,35 @@ function renderNotAsked(seat) {
     box.append(el("div", { class: "card-done", text: "質問カードにしました" }));
     return box;
   }
-  box.append(cardEntry(seat.seat_id, renderSeats));
+  box.append(cardEntry(seat.seat_id, renderSeats, (form, open) => putUnderLine(seat, form, open)));
   return box;
 }
 
+// In the seat list an open card goes right under its seat's line of seats,
+// the list's full width, so the seat keeps its size (直し25-4). It says
+// whose seat it is for, in the seat list's own words. One open at a time:
+// another one closes, its button back.
+function putUnderLine(seat, form, open) {
+  for (const other of document.querySelectorAll("#seat-list .card-form")) other.closeCard();
+  const node = open.closest(".seat");
+  let last = node;
+  for (const next of node.parentElement.children) {
+    if (next.classList.contains("seat") && next.offsetTop === node.offsetTop) last = next;
+  }
+  form.prepend(el("p", { class: "card-for", text: [seat.title, seat.detail].filter(Boolean).join("　") }));
+  form.closeCard = () => {
+    form.remove();
+    open.hidden = false;
+    node.classList.remove("writing");
+  };
+  open.hidden = true;
+  node.classList.add("writing");
+  last.after(form);
+}
+
 // 「聞きたいことを書く」: opens an empty box; the card holds the student's
-// words only (SPEC 2-2).
-function cardEntry(seatId, done) {
+// words only (SPEC 2-2). put: where the open card goes (in the button's place).
+function cardEntry(seatId, done, put = (form, open) => open.replaceWith(form)) {
   const open = el("button", { type: "button", class: "quiet", text: "聞きたいことを書く" });
   open.addEventListener("click", () => {
     const form = $("card-form-template").content.firstElementChild.cloneNode(true);
@@ -540,7 +562,7 @@ function cardEntry(seatId, done) {
       state.carded.add(seatId);
       done(form);
     });
-    open.replaceWith(form);
+    put(form, open);
     form.querySelector("textarea").focus();
   });
   return open;

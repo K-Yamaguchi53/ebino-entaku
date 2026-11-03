@@ -320,6 +320,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .card-form button { margin-top: 10px; color: var(--paper-ink); background: var(--paper-light); border-color: var(--paper-soft); }
 .card-form button:hover { background: var(--paper-2); }
 .card-done { font-size: 14px; color: var(--soft); }
+/* In the seat list, the open card spans the list under its seat's line;
+   its seat is marked while it is open. */
+.seat-row > .card-form { flex: 1 0 100%; max-width: none; margin-top: 2px; }
+.card-form .card-for { margin: 0 0 4px; font-family: var(--gothic); font-size: 14px; font-weight: bold;
+  color: var(--paper-soft); }
+.seat.writing { box-shadow: 0 0 0 1px var(--lamp), 0 0 12px var(--lamp-faint); }
 
 /* --- the reflection: one card at a time, in the middle, unhurried --- */
 .to-reflect { text-align: center; margin: 36px 0; }
