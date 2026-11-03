@@ -193,11 +193,17 @@ function renderPlanted(text) {
   return line;
 }
 
+// A split heading's "…" or ”…” shown as 「…」: on the screen only. The record
+// and what the models are sent keep the heading as it was written.
+function shownQuotes(text) {
+  return text.replace(/["“”]([^"“”\n]*)["“”]/g, "「$1」");
+}
+
 function renderSplit(roundNo, split, byId) {
   const titles = (ids) => [...new Set(ids.map((id) => state.seatById[byId[id].seat_id].title))].join("・");
   return el("div", { class: "split" },
     el("p", { class: "notice", text: state.texts.split_notice }),
-    el("p", { class: "heading", text: split.heading }),
+    el("p", { class: "heading", text: shownQuotes(split.heading) }),
     el("p", { class: "sides", text: `${titles(split.side_a)}　／　${titles(split.side_b)}` }),
     el("button", { type: "button", class: "quiet", text: "この割れ目を次の問いにする", onclick: async () => {
       fill((await call("/api/split", { round: roundNo, index: split.index })).heading);
@@ -417,7 +423,7 @@ function renderSheet(sheet) {
   // No words marked: one line from texts/ instead of an empty row.
   row("出会った生き方", ...(lives.length ? lives : [el("div", { class: "left", text: state.texts.met_lives_empty })]));
   row("割れたところ", ...sheet.splits.map((split) =>
-    el("div", { class: split.pressed ? "" : "left", text: (split.pressed ? "" : "置いてきた：") + split.heading })));
+    el("div", { class: split.pressed ? "" : "left", text: (split.pressed ? "" : "置いてきた：") + shownQuotes(split.heading) })));
   // No card left: the row is not shown at all.
   if (sheet.cards.length) row("残した質問カード", ...sheet.cards);
   row("最初の問いは変わった？", sheet.changed);

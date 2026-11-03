@@ -5,7 +5,9 @@ import http.client
 import json
 import random
 import re
+import shutil
 import socket
+import subprocess
 import threading
 
 import pytest
@@ -156,6 +158,31 @@ def test_the_sheet_has_no_card_row_when_no_card_was_left():
     sheet = script[script.index("function renderSheet"):]
     assert 'if (sheet.cards.length) row("残した質問カード"' in sheet
     assert sheet.count('row("残した質問カード"') == 1
+
+
+def _run_shown_quotes(texts):
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    start = script.index("function shownQuotes")
+    source = script[start:script.index("\n}\n", start) + 3]
+    program = source + "process.stdout.write(JSON.stringify(%s.map(shownQuotes)));" % json.dumps(texts)
+    done = subprocess.run(["node", "-e", program], capture_output=True, timeout=30)
+    return json.loads(done.stdout.decode("utf-8"))
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_a_split_headings_quote_marks_are_shown_as_kagi():
+    texts = ['"休み"をどう決める', "”休み”と“仕事”の分け方", "休みは自分で決める", '片方だけ"の見出し']
+    assert _run_shown_quotes(texts) == [
+        "「休み」をどう決める", "「休み」と「仕事」の分け方", "休みは自分で決める", '片方だけ"の見出し']
+
+
+def test_the_quote_marks_change_on_the_screen_only():
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    # The round's heading and the sheet's row are shown through it ...
+    assert 'text: shownQuotes(split.heading)' in script
+    assert '"置いてきた：") + shownQuotes(split.heading)' in script
+    # ... but the heading put back into the question box (sent to the models) is not.
+    assert 'fill((await call("/api/split", { round: roundNo, index: split.index })).heading)' in script
 
 
 def test_a_connection_that_sends_nothing_does_not_hold_up_the_screen(server):
