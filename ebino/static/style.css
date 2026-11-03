@@ -1,9 +1,10 @@
-/* 「夜の円卓」 (SPEC 14-66): a navy night, the basin's rim in gold, a large
-   Mincho title. Whatever a student reads of a seat's words is on light paper
-   cards, the easiest to read; the AI's questions stay on the night, apart. */
+/* 「夜の灯り」: a night of deep indigo; the one colour that stands out is the
+   warm honey of a lamp; the cards a student reads are unbleached paper; the
+   lines are pale moonlight. Every colour is named here, once, and used by
+   its name everywhere else. */
 
 /* The title's characters only, cut out of Shippori Mincho B1 (OFL; the text
-   is in title.OFL.txt). Any other character falls back to BIZ UDP明朝. */
+   is in title.OFL.txt). Any other character falls back to the Mincho below. */
 @font-face {
   font-family: "Ebino Title";
   src: url("/title.woff") format("woff");
@@ -12,34 +13,49 @@
 }
 
 :root {
-  --night: #0b1524;
-  --night-2: #12213a;
-  --night-3: #1a2c4a;
-  --ink: #f3ead6;  /* Words on the night. */
-  --soft: #a9b8cc;
-  --faint: #8597b0;
-  --gold: #d6b46c;
-  --gold-soft: rgba(214, 180, 108, .38);
-  --lamp: #ffd47e;
-  --paper: #f6efdf;  /* The cards a student reads. */
-  --paper-2: #ece2cb;
-  --paper-ink: #1c2433;
-  --paper-soft: #545c6e;
-  --paper-line: #cdbf9f;
-  --line: rgba(255, 255, 255, .14);
-  --adult: #ef9273;
-  --poster: #6fc9a4;
-  --cross: #8ab1f2;
-  --outsider_teacher: #cba3ea;
-  --lit: var(--lamp);
-  /* The flat map (map.js), when there is no picture. */
-  --basin: rgba(214, 180, 108, .07);
-  --river: #5c9dc4;
-  --hill: #5d6f8c;
-  --display: "Ebino Title", "BIZ UDPMincho", "BIZ UDMincho", "Yu Mincho", serif;
-  --read: "BIZ UDPMincho", "BIZ UDMincho", "Yu Mincho", "Hiragino Mincho ProN", serif;
-  --ui: "BIZ UDPGothic", "Yu Gothic UI", "Yu Gothic", "Meiryo", sans-serif;
+  /* --- the colours: the only place that holds a colour value --- */
+  --night: #0b1326;  /* The ground: night indigo. */
+  --night-2: #111c36;  /* A raised surface on the night. */
+  --night-3: #18264a;
+  --night-deep: #060b18;
+  --veil: rgba(9, 15, 32, .86);  /* A box over the map. */
+  --veil-thin: rgba(9, 15, 32, .55);  /* The thin halo round a word on the map. */
+  --lamp: #f5b95f;  /* The lamp's honey: the one colour that stands out. */
+  --lamp-bright: #ffd99a;
+  --lamp-soft: rgba(245, 185, 95, .42);
+  --lamp-faint: rgba(245, 185, 95, .13);
+  --lamp-glow: rgba(245, 185, 95, .5);
+  --paper: #f4ecda;  /* Unbleached paper: the cards a student reads. */
+  --paper-2: #ebe1c9;
+  --paper-light: #fbf6ea;
+  --paper-ink: #24252d;
+  --paper-soft: #5c5955;
+  --paper-line: #d5c7a7;
+  --moon: #9fb8dc;  /* Moonlight: lines, and the quieter words. */
+  --moon-soft: rgba(159, 184, 220, .36);
+  --moon-faint: rgba(159, 184, 220, .15);
+  --river: #86b3dd;
+  --ink: #ece6d8;  /* Words on the night. */
+  --soft: #a9bdd9;  /* Quieter words on the night. */
+  --faint: #7d8fae;
+  --shadow: rgba(1, 4, 12, .6);
+  --star: rgba(255, 255, 255, .7);
+  --warn: #f2a493;
+  /* The four kinds of seat: one family, the same lightness; the shape tells them apart too. */
+  --kind-adult: #dba590;
+  --kind-poster: #9ec6aa;
+  --kind-cross: #a2b6e2;
+  --kind-outsider_teacher: #c4add9;
+
+  /* --- the type: what each machine already has; nothing is loaded from outside --- */
+  --mincho: "Hiragino Mincho ProN", "Yu Mincho", "BIZ UDPMincho", "Noto Serif CJK JP", serif;
+  --gothic: "Hiragino Sans", "BIZ UDPGothic", "Yu Gothic UI", "Noto Sans CJK JP", sans-serif;
+  --display: "Ebino Title", var(--mincho);
+  /* The window's height (the iPad's bars left out where the browser can). */
+  --vh: 100vh;
 }
+@supports (height: 100svh) { :root { --vh: 100svh; } }
+
 * { box-sizing: border-box; }
 /* A class that sets display (.sheet is a grid) must not show a hidden box. */
 [hidden] { display: none !important; }
@@ -48,217 +64,259 @@ body {
   margin: 0;
   min-height: 100vh;
   color: var(--ink);
-  font-family: var(--ui);
+  font-family: var(--gothic);
   font-size: 17px;
-  line-height: 1.7;
-  /* A few stars over a sky that is lighter at the top. */
+  line-height: 1.75;
+  -webkit-text-size-adjust: 100%;
+  /* A few stars, and the sky a little lighter at the top. */
   background:
-    radial-gradient(1px 1px at 12% 3%, #ffffff88 50%, transparent 51%),
-    radial-gradient(1px 1px at 31% 1.5%, #ffffff66 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 58% 2.5%, #ffffff99 50%, transparent 51%),
-    radial-gradient(1px 1px at 77% 4%, #ffffff55 50%, transparent 51%),
-    radial-gradient(1px 1px at 91% 2%, #ffffff77 50%, transparent 51%),
-    radial-gradient(ellipse 120% 520px at 50% 0%, #1a2d50 0%, var(--night) 70%) var(--night);
+    radial-gradient(1px 1px at 12% 3%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 31% 1.5%, var(--star) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 58% 2.5%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 77% 4%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 91% 2%, var(--star) 50%, transparent 51%),
+    radial-gradient(ellipse 120% 560px at 50% 0%, var(--night-3) 0%, var(--night) 72%) var(--night);
   background-repeat: no-repeat;
 }
-header, main { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
-main { padding-bottom: 64px; }
-.masthead { padding-top: 28px; }
+header, main { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+main { padding-bottom: 72px; }
+
+/* --- the title: large at the entrance, small once the table is open --- */
+.masthead { padding-top: clamp(20px, 5vh, 64px); }
 .masthead h1 {
   font-family: var(--display);
   font-weight: 800;
-  font-size: clamp(44px, 9vw, 88px);
+  font-size: clamp(56px, min(10vw, 16vh), 132px);
   line-height: 1;
-  letter-spacing: .08em;
-  margin: 0 0 18px;
+  letter-spacing: .1em;
+  margin: 0 0 clamp(16px, 3.5vh, 40px);
   color: var(--ink);
-  text-shadow: 0 0 40px rgba(214, 180, 108, .22);
+  text-shadow: 0 0 48px var(--lamp-faint);
 }
-h2 { font-family: var(--read); font-size: 1.15rem; letter-spacing: .06em; margin: 26px 0 10px; color: var(--ink); }
-h3 { font-family: var(--read); }
+body:has(#start[hidden]) .masthead { padding-top: 20px; }
+body:has(#start[hidden]) .masthead h1 { font-size: 36px; letter-spacing: .12em; margin-bottom: 4px; }
+
+h2 { font-family: var(--mincho); font-size: 1.25rem; font-weight: 600; letter-spacing: .08em; margin: 28px 0 10px; color: var(--ink); }
+h3 { font-family: var(--mincho); }
 button {
   font: inherit; cursor: pointer; color: var(--ink); background: transparent;
-  border: 1px solid var(--gold-soft); border-radius: 4px; padding: 6px 14px;
+  border: 1px solid var(--moon-soft); border-radius: 6px; padding: 6px 14px;
+  transition: border-color .2s, background-color .2s, color .2s;
 }
-button:hover { border-color: var(--gold); }
-button.quiet { border-color: var(--line); color: var(--soft); }
-button.quiet:hover { color: var(--ink); border-color: var(--gold-soft); }
+button:hover { border-color: var(--moon); }
+button.quiet { border-color: var(--moon-faint); color: var(--soft); }
+button.quiet:hover { color: var(--ink); border-color: var(--moon-soft); }
 button:disabled { opacity: .5; cursor: wait; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 2px solid var(--lamp); outline-offset: 2px;
+  outline: 2px solid var(--lamp); outline-offset: 3px;
 }
 input[type="text"], textarea, select {
-  font: inherit; color: var(--ink); background: #0e1a2e; border: 1px solid var(--gold-soft); border-radius: 4px;
+  font: inherit; color: var(--ink); background: var(--night-deep); border: 1px solid var(--moon-soft); border-radius: 6px;
 }
 input::placeholder, textarea::placeholder { color: var(--faint); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
-.notice-list { padding-left: 1.4em; color: var(--ink); }
-.notice-list li { margin: 4px 0; }
-.lab-question { font-family: var(--read); font-weight: bold; font-size: 1.2rem; margin-top: 28px; }
+/* --- the entrance: the seven notices on one card, then the Lab --- */
+#start { display: grid; gap: 32px 56px; align-items: start; }
+@media (min-width: 1000px) { #start { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); } }
+.promises {
+  background: linear-gradient(180deg, var(--night-2), var(--night));
+  border: 1px solid var(--moon-faint); border-radius: 10px; padding: 14px 30px;
+  box-shadow: 0 18px 40px var(--shadow);
+}
+.notice-list { list-style: none; margin: 0; padding: 0; counter-reset: notice; }
+.notice-list li {
+  counter-increment: notice; display: grid; grid-template-columns: 2.4em 1fr; align-items: baseline;
+  padding: 10px 0; line-height: 1.8; border-top: 1px solid var(--moon-faint);
+}
+.notice-list li:first-child { border-top: 0; }
+.notice-list li::before {
+  content: counter(notice); font-family: var(--mincho); font-size: 1.45rem; line-height: 1; color: var(--moon);
+}
+.lab-question { font-family: var(--mincho); font-weight: 600; font-size: 1.35rem; line-height: 1.6; margin: 6px 0 18px; }
 .choices { display: flex; flex-wrap: wrap; gap: 10px; }
-#lab-choices button { padding: 10px 22px; border-color: var(--gold); }
-#lab-choices button:hover { background: rgba(214, 180, 108, .12); }
+#lab-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.lab-choice {
+  display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 12px 18px; text-align: left;
+  font-family: var(--gothic); font-size: 1.08rem; line-height: 1.4; color: var(--ink);
+  background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: 10px;
+}
+.lab-choice::before {
+  content: ""; flex: none; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--moon);
+  transition: background-color .2s, box-shadow .2s;
+}
+.lab-choice:hover { border-color: var(--moon); background: var(--night-3); }
+.lab-choice[aria-pressed="true"] { border-color: var(--lamp); background: var(--lamp-faint); color: var(--paper-light); }
+.lab-choice[aria-pressed="true"]::before { background: var(--lamp); border-color: var(--lamp); box-shadow: 0 0 12px var(--lamp-glow); }
+.lab-choice:disabled { cursor: wait; opacity: 1; }
+.lab-choice:disabled:not([aria-pressed="true"]) { opacity: .45; }
 
-.heavy-talk { color: var(--soft); border-left: 2px solid var(--gold-soft); padding-left: 10px; font-size: .95rem; }
-.ask { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: end; margin-top: 22px; }
+/* --- asking --- */
+.heavy-talk { color: var(--soft); border-left: 2px solid var(--moon-soft); padding-left: 12px; font-size: 1rem; }
+.ask { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: end; margin-top: 22px; }
 .ask textarea {
   width: 100%; resize: vertical; min-height: 64px; padding: 10px 2px;
-  font: 500 clamp(20px, 3vw, 26px)/1.5 var(--read); background: transparent;
-  border: 0; border-bottom: 1.5px solid var(--gold-soft); border-radius: 0;
+  font: 500 clamp(21px, 2.6vw, 27px)/1.55 var(--mincho); background: transparent;
+  border: 0; border-bottom: 1.5px solid var(--moon-soft); border-radius: 0;
 }
-.ask textarea:focus { outline: none; border-bottom-color: var(--gold); }
+.ask textarea:focus { outline: none; border-bottom-color: var(--lamp); }
 #ask-button {
-  font-weight: 700; letter-spacing: .2em; color: var(--night); background: var(--gold); border: 0;
-  padding: 14px 24px 14px 28px; box-shadow: 0 8px 24px rgba(214, 180, 108, .22);
+  min-height: 52px; font-weight: 700; letter-spacing: .3em; color: var(--night); background: var(--lamp); border: 0;
+  border-radius: 8px; padding: 12px 26px 12px 32px; box-shadow: 0 8px 26px var(--lamp-faint);
 }
-#ask-button:hover { background: var(--lamp); }
-.hints { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-.hints button { border-color: var(--line); color: var(--soft); font-size: .9rem; border-radius: 999px; padding: 4px 14px; }
-.hints button:hover { color: var(--ink); border-color: var(--gold-soft); }
-.message { background: var(--night-2); border: 1px solid var(--gold-soft); border-radius: 4px; padding: 8px 12px; }
+#ask-button:hover { background: var(--lamp-bright); }
+.hints { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.hints button {
+  min-height: 40px; border-color: var(--moon-faint); color: var(--soft); font-size: .92rem; border-radius: 999px; padding: 4px 16px;
+}
+.hints button:hover { color: var(--ink); border-color: var(--moon-soft); }
+.message { background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: 6px; padding: 8px 14px; }
 
 /* --- paper: the words a student reads --- */
-.quote, .closing-word, .purposes li, .sheet, .harvest {
-  color: var(--paper-ink);
-}
+.quote, .closing-word, .purposes li, .sheet, .harvest { color: var(--paper-ink); }
 .quote, .purposes li {
-  background: var(--paper); border-radius: 3px; padding: 16px 20px 12px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, .45);
+  background: var(--paper); border-radius: 4px; padding: 18px 22px 14px;
+  box-shadow: 0 0 0 1px var(--paper-line), 0 12px 30px var(--shadow);
 }
 .quote button, .closing-word button, .purposes li button, .sheet button, .harvest button {
-  color: var(--paper-ink); border-color: var(--paper-line); background: #fffaf0;
+  color: var(--paper-ink); border-color: var(--paper-line); background: var(--paper-light);
 }
 .quote button:hover, .closing-word button:hover, .harvest button:hover { border-color: var(--paper-soft); }
 
-.purposes ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
-.purposes li .words { font-family: var(--read); margin: 0 0 4px; }
+.purposes ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); }
+.purposes li .words { font-family: var(--mincho); font-size: 17px; line-height: 1.8; max-width: 21em; margin: 0 0 6px; }
 .purposes li .source { color: var(--paper-soft); font-size: .85rem; }
 .purposes .summarized { font-size: .8rem; color: var(--paper-soft); border: 1px solid var(--paper-line); border-radius: 3px; padding: 0 6px; }
 
-.round { border-top: 1px solid var(--gold-soft); margin-top: 28px; padding-top: 14px; }
-.round-question { font-family: var(--read); font-weight: bold; font-size: clamp(1.15rem, 2.4vw, 1.45rem); margin: 4px 0; }
+.round { border-top: 1px solid var(--moon-soft); margin-top: 32px; padding-top: 16px; }
+.round-question { font-family: var(--mincho); font-weight: 600; font-size: clamp(1.2rem, 2.2vw, 1.5rem); margin: 4px 0; }
 .steps { color: var(--faint); font-size: .85rem; margin: 0; }
-.count { font-size: 1.05rem; font-weight: bold; color: var(--lamp); margin: 6px 0 10px; }
-.cards { display: grid; gap: 14px; }
+.count { font-size: 1.05rem; font-weight: bold; color: var(--lamp); margin: 6px 0 12px; }
+/* A voice's card: Mincho, large and open, about twenty characters to a line. */
+.cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); }
 .quote { margin: 0; }
-.quote.marked { box-shadow: 0 0 0 3px var(--lamp), 0 10px 28px rgba(0, 0, 0, .45); }
-.quote .words { margin: 0 0 8px; font-family: var(--read); font-size: 1.12rem; line-height: 1.85; }
+.quote.marked { box-shadow: 0 0 0 3px var(--lamp), 0 0 26px var(--lamp-soft), 0 12px 30px var(--shadow); }
+.quote .words { margin: 0 0 8px; font-family: var(--mincho); font-size: 18px; line-height: 1.8; max-width: 21em; }
 .quote .source { color: var(--paper-soft); font-size: .88rem; }
-.quote .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.quote .actions button { font-size: .82rem; padding: 2px 10px; }
-.quote .paragraph { color: var(--paper-soft); font-size: .9rem; border-left: 3px solid var(--paper-line); padding-left: 10px; }
-.planted { color: #ffb0a0; font-size: .9rem; }
+.quote .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.quote .actions button { font-size: .85rem; padding: 3px 12px; min-height: 34px; }
+.quote .paragraph { color: var(--paper-soft); font-size: .95rem; border-left: 3px solid var(--paper-line); padding-left: 10px; }
+.planted { color: var(--warn); font-size: .95rem; }
 .planted s { color: var(--soft); }
 
 /* A split: its heading, then its two sides, each side's seats over its cards. */
-.split { margin: 22px 0 8px; }
-.split .notice { font-size: .85rem; color: var(--soft); margin: 0; }
-.split .heading { font-family: var(--read); font-weight: bold; color: var(--lamp); font-size: 1.15rem; margin: 2px 0 12px; }
-.split .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 22px; align-items: start; }
+.split { margin: 24px 0 8px; }
+.split .notice { font-size: .88rem; color: var(--soft); margin: 0; }
+.split .heading { font-family: var(--mincho); font-weight: 600; color: var(--lamp); font-size: 1.25rem; margin: 2px 0 14px; }
+.split .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; align-items: start; }
 .split .side { display: grid; gap: 12px; align-content: start; min-width: 0; }
 .split .side-head {
-  margin: 0; font-size: .85rem; font-weight: bold; letter-spacing: .12em; color: var(--gold);
-  border-bottom: 1px solid var(--gold-soft); padding-bottom: 6px;
+  margin: 0; font-size: .88rem; font-weight: bold; letter-spacing: .14em; color: var(--moon);
+  border-bottom: 1px solid var(--moon-soft); padding-bottom: 6px;
 }
 .split > button { margin-top: 12px; }
 @media (max-width: 640px) { .split .sides { grid-template-columns: 1fr; } }
 
 /* The round's last word (SPEC 14-53 A): set apart from the quotes. */
-.closing { border-top: 1px dashed var(--gold-soft); margin-top: 18px; padding-top: 12px; }
-.closing-question { font-family: var(--read); font-weight: bold; margin: 0 0 8px; }
-.closing-word { background: var(--paper-2); border-radius: 3px; padding: 12px 18px; margin: 8px 0; box-shadow: 0 6px 18px rgba(0, 0, 0, .35); }
-.closing-word .label { font-size: .82rem; color: var(--paper-soft); margin: 0; }
-.closing-word .words { margin: 2px 0; font-family: var(--read); font-size: 1.08rem; line-height: 1.8; }
+.closing { border-top: 1px dashed var(--moon-soft); margin-top: 20px; padding-top: 12px; }
+.closing-question { font-family: var(--mincho); font-weight: 600; margin: 0 0 8px; }
+.closing-word { background: var(--paper-2); border-radius: 4px; padding: 14px 20px; margin: 8px 0; box-shadow: 0 8px 20px var(--shadow); }
+.closing-word .label { font-size: .85rem; color: var(--paper-soft); margin: 0; }
+.closing-word .words { margin: 2px 0; font-family: var(--mincho); font-size: 17px; line-height: 1.8; max-width: 21em; }
 .closing-word .source { color: var(--paper-soft); font-size: .88rem; }
-.ask-seat { border-top: 1px dashed var(--gold-soft); margin-top: 18px; padding-top: 12px; }
-.ask-seat > .label { font-size: .85rem; color: var(--soft); margin: 0; }
-.ask-seat > .words { font-family: var(--read); font-weight: bold; margin: 2px 0 8px; }
+.ask-seat { border-top: 1px dashed var(--moon-soft); margin-top: 20px; padding-top: 12px; }
+.ask-seat > .label { font-size: .88rem; color: var(--soft); margin: 0; }
+.ask-seat > .words { font-family: var(--mincho); font-weight: 600; margin: 2px 0 8px; }
 /* 「まだ答えていない」: shown only, never a button. */
 .ask-seat > .not-answered { color: var(--soft); margin: 4px 0; }
 .more-piece { border-left: 3px solid var(--paper-line); padding-left: 10px; margin: 8px 0 4px; }
-.more-piece .words { margin: 2px 0; font-family: var(--read); }
+.more-piece .words { margin: 2px 0; font-family: var(--mincho); line-height: 1.8; }
 .more-piece .source { color: var(--paper-soft); font-size: .88rem; }
 /* A ranking item's title, small over the item. */
 .ranking-title { font-size: .8rem; color: var(--paper-soft); margin: 0; }
 .closing-word button.more, .closing-word button.not-heard { display: block; margin-top: 8px; }
 /* コーチとオブザーバー: apart from the seats' words, two cards of the same size, on the night. */
-.ai-band { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-top: 1px solid var(--gold-soft);
-  margin-top: 18px; padding-top: 12px; }
+.ai-band { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-top: 1px solid var(--moon-soft);
+  margin-top: 20px; padding-top: 12px; }
 @media (max-width: 560px) { .ai-band { grid-template-columns: 1fr; } }
-.ai-card { border: 1px dashed var(--faint); border-radius: 4px; padding: 10px 14px; background: var(--night-2); }
-.ai-card .label { font-size: .85rem; color: var(--soft); margin: 0; }
+.ai-card { border: 1px dashed var(--faint); border-radius: 6px; padding: 12px 16px; background: var(--night-2); }
+.ai-card .label { font-size: .88rem; color: var(--soft); margin: 0; }
 .ai-card .badge { font-size: .8rem; color: var(--soft); margin: 0 0 4px; }
 .ai-card .words { margin: 2px 0 8px; }
-.ai-card.answered { border-style: solid; border-color: var(--gold-soft); }
+.ai-card.answered { border-style: solid; border-color: var(--moon-soft); }
 .ai-answer { display: flex; gap: 6px; }
 .ai-answer input { flex: 1; min-width: 0; padding: 4px 8px; }
-.ai-asked { color: var(--soft); font-size: .9rem; margin: 0 0 2px; }
+.ai-asked { color: var(--soft); font-size: .95rem; margin: 0 0 2px; }
 .ai-asked .label { margin-right: 8px; }
 
 /* --- the seat list, under the map (keyboard and screen readers) --- */
-.seats h2 { margin-top: 36px; }
+.seats h2 { margin-top: 40px; }
 .seats .met { color: var(--soft); }
-.kind-group h3 { font-size: 1rem; margin: 14px 0 6px; color: var(--ink); }
-.kind-group h3::before { content: "●"; margin-right: 4px; }
+.kind-group h3 { font-size: 1.02rem; margin: 16px 0 6px; color: var(--ink); }
+.kind-group h3::before { content: "●"; margin-right: 6px; }
 .seat-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .seat {
-  background: var(--night-2); border: 1px solid var(--line); border-radius: 4px;
-  padding: 6px 10px; min-width: 9em; max-width: 16em;
+  background: var(--night-2); border: 1px solid var(--moon-faint); border-radius: 6px;
+  padding: 6px 12px; min-width: 9em; max-width: 16em;
 }
 .seat .title { font-weight: bold; }
-.seat .detail { font-size: .8rem; color: var(--soft); }
+.seat .detail { font-size: .82rem; color: var(--soft); }
 .seat .order { display: inline-block; min-width: 1.6em; text-align: center; border-radius: 50%; background: var(--lamp); color: var(--night); margin-right: 4px; }
-.seat.lit { box-shadow: 0 0 0 2px var(--lamp); }
+.seat.lit { box-shadow: 0 0 0 2px var(--lamp), 0 0 16px var(--lamp-faint); }
 .seat.met .title::after { content: " ✓"; color: var(--soft); }
-.seat .not-asked { font-size: .85rem; color: var(--soft); }
+.seat .not-asked { font-size: .88rem; color: var(--soft); }
 .card-form { margin-top: 6px; }
-.card-form label { display: block; font-size: .9rem; }
+.card-form label { display: block; font-size: .92rem; }
 .card-form textarea { width: 100%; padding: 6px 8px; }
 .card-form button { margin-top: 4px; }
-.card-done { font-size: .85rem; color: var(--soft); }
+.card-done { font-size: .88rem; color: var(--soft); }
 
 /* --- the reflection sheet --- */
-.to-reflect { text-align: center; margin: 32px 0; }
-#to-reflect { padding: 10px 26px; border-color: var(--gold); letter-spacing: .1em; }
-.first-question { font-family: var(--read); }
-.step { background: var(--night-2); border: 1px solid var(--line); border-radius: 4px; padding: 14px 18px; margin: 14px 0; }
+.to-reflect { text-align: center; margin: 36px 0; }
+#to-reflect { padding: 12px 30px; min-height: 48px; border-color: var(--lamp-soft); letter-spacing: .12em; }
+#to-reflect:hover { border-color: var(--lamp); }
+.first-question { font-family: var(--mincho); }
+.step { background: var(--night-2); border: 1px solid var(--moon-faint); border-radius: 8px; padding: 16px 20px; margin: 14px 0; }
 .step label { display: block; margin: 8px 0; }
 .step textarea, .step input[type="text"], .step select { width: 100%; padding: 6px 8px; }
-.choice { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 4px 12px; margin: 4px; min-width: 7em; }
-.choice:has(input:checked) { border-color: var(--gold); background: rgba(214, 180, 108, .1); }
+.choice { display: inline-block; border: 1px solid var(--moon-faint); border-radius: 6px; padding: 4px 12px; margin: 4px; min-width: 7em; }
+.choice:has(input:checked) { border-color: var(--lamp); background: var(--lamp-faint); }
 .moves .choice { display: block; min-width: 0; }
-.ask-back { font-family: var(--read); font-weight: bold; }
-.sheet { display: grid; grid-template-columns: 11em 1fr; gap: 8px 14px; background: var(--paper); border-radius: 3px;
-  padding: 16px 20px; box-shadow: 0 10px 28px rgba(0, 0, 0, .45); }
+.ask-back { font-family: var(--mincho); font-weight: 600; }
+.sheet { display: grid; grid-template-columns: 11em 1fr; gap: 8px 14px; background: var(--paper); border-radius: 4px;
+  padding: 18px 22px; box-shadow: 0 12px 30px var(--shadow); }
 .sheet dt { font-weight: bold; color: var(--paper-soft); }
-.sheet dd { margin: 0; font-family: var(--read); }
+.sheet dd { margin: 0; font-family: var(--mincho); }
 .sheet .left { color: var(--paper-soft); }
-.sheet .source { color: var(--paper-soft); font-size: .85rem; font-family: var(--ui); }
+.sheet .source { color: var(--paper-soft); font-size: .85rem; font-family: var(--gothic); }
 @media (max-width: 600px) { .sheet { grid-template-columns: 1fr; } }
 .uses { display: grid; gap: 8px; }
 .uses button { text-align: left; }
-.uses .force { display: block; font-size: .8rem; color: var(--soft); }
-.harvest { background: var(--paper); border: 2px solid var(--gold); border-radius: 3px; padding: 14px 18px; margin: 14px 0; }
-.harvest h3 { margin: 0 0 6px; font-size: 1rem; }
+.uses .force { display: block; font-size: .82rem; color: var(--soft); }
+.harvest { background: var(--paper); border: 2px solid var(--lamp); border-radius: 4px; padding: 16px 20px; margin: 14px 0; }
+.harvest h3 { margin: 0 0 6px; font-size: 1.05rem; }
 .harvest p { margin: 4px 0; }
-#harvest-subject { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--gold); }
+#harvest-subject { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--lamp); }
 
-.kind-adult h3::before { color: var(--adult); }
-.kind-poster h3::before { color: var(--poster); }
-.kind-cross h3::before { color: var(--cross); }
-.kind-outsider_teacher h3::before { color: var(--outsider_teacher); }
-.seat.kind-adult { border-left: 5px solid var(--adult); }
-.seat.kind-poster { border-left: 5px solid var(--poster); }
-.seat.kind-cross { border-left: 5px solid var(--cross); }
-.seat.kind-outsider_teacher { border-left: 5px solid var(--outsider_teacher); }
+.kind-adult { --kind: var(--kind-adult); }
+.kind-poster { --kind: var(--kind-poster); }
+.kind-cross { --kind: var(--kind-cross); }
+.kind-outsider_teacher { --kind: var(--kind-outsider_teacher); }
+.kind-group h3::before { color: var(--kind); }
+.seat { border-left: 4px solid var(--kind, var(--moon-soft)); }
 
 /* --- the map (SPEC 5-1, 14-65, 14-66): over the seat list, which stays --- */
-/* Never taller than most of the window: the width follows the drawing's shape. */
-.map { width: min(100%, calc(78vh * var(--ratio, 1.3))); margin: 20px auto 12px; }
-.map-frame { position: relative; width: 100%; overflow: hidden; border-radius: 6px 6px 0 0;
-  background: radial-gradient(ellipse at 50% 30%, #13233d, #08111e 70%); box-shadow: inset 0 0 0 1px var(--line);
-  touch-action: pan-y; }
+/* As large as the window lets it be, with its buttons and sources under it
+   on screen too; wider than the words' column when there is room. */
+.map {
+  --map-w: min(max(100%, 100vw - 64px), calc((var(--vh) - 164px) * var(--ratio, 1.3)));
+  width: var(--map-w);
+  margin: 24px 0 12px calc((100% - var(--map-w)) / 2);
+}
+.map-frame { position: relative; width: 100%; overflow: hidden; border-radius: 10px 10px 0 0;
+  background: radial-gradient(ellipse at 50% 30%, var(--night-3), var(--night-deep) 72%);
+  box-shadow: inset 0 0 0 1px var(--moon-faint); touch-action: pan-y; }
 /* Zoomed in, a finger moves the map rather than the page. */
 .map-frame.zoomed { touch-action: none; }
 .map-frame svg { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-select: none; }
@@ -266,110 +324,161 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .map-frame svg.dragging { cursor: grabbing; }
 .map-overlay { position: absolute; inset: 0; pointer-events: none; }
 .moving .map-overlay { visibility: hidden; }
-.basin-fill polygon { fill: var(--basin); stroke: none; }
-.relief .basin-fill polygon { fill: rgba(255, 212, 126, .05); }
-.rim path { stroke: var(--gold); fill: none; }
+
+/* The glows the map's lamps are drawn with (map.js adds them to the drawing). */
+.glow-in { stop-color: var(--lamp); stop-opacity: .85; }
+.glow-out { stop-color: var(--lamp); stop-opacity: 0; }
+.paper-in { stop-color: var(--paper); stop-opacity: .5; }
+.paper-out { stop-color: var(--paper); stop-opacity: 0; }
+.top-in { stop-color: var(--lamp); stop-opacity: .26; }
+.top-mid { stop-color: var(--night-3); stop-opacity: 1; }
+.top-out { stop-color: var(--night-2); stop-opacity: 1; }
+
+.basin-fill polygon { fill: var(--moon-faint); stroke: none; }
+.relief .basin-fill polygon { fill: var(--lamp-faint); opacity: .4; }
+.rim path { stroke: var(--moon); fill: none; opacity: .8; }
 .river path { stroke: var(--river); fill: none; }
-.mountains path { stroke: var(--hill); fill: none; }
 .drawing path { transition-property: stroke-dashoffset; transition-timing-function: ease-in-out; }
 /* While the round table is open, the map steps back under it. */
 .relief-image, .basin-fill, .river, .rim, .points, .place-names, .school, .shelf-boxes, .shelf-names, .crossing {
   transition: opacity .9s ease;
 }
-.dim .relief-image { opacity: .5; }
+.dim .relief-image { opacity: .42; }
 .dim .basin-fill, .dim .river, .dim .rim, .dim .points, .dim .place-names, .dim .school,
-.dim .shelf-boxes, .dim .shelf-names, .dim .crossing { opacity: .28; }
-/* Place names lie over the points, outlined so they read; still faint. */
+.dim .shelf-boxes, .dim .shelf-names, .dim .crossing { opacity: .26; }
+/* Place names: small, a little spaced out, in moonlight; a thin halo only. */
 .place-names { pointer-events: none; }
-.place-names text { fill: var(--soft); font-size: 22px; letter-spacing: .1em;
-  paint-order: stroke; stroke: var(--night); stroke-width: 5px; stroke-linejoin: round; }
-.shelf-names text { fill: var(--soft); font-size: 17px; paint-order: stroke; stroke: var(--night); stroke-width: 0; }
-.shelf-boxes rect { fill: rgba(8, 17, 30, .74); stroke: rgba(255, 255, 255, .14); }
-.school rect, .school polygon:not(.flag) { fill: var(--night); stroke: var(--ink); stroke-width: 1.6; }
-.school .pole { stroke: var(--ink); stroke-width: 1.6; }
-.school .flag { fill: var(--gold); stroke: var(--ink); stroke-width: 1; }
-.school text { fill: var(--ink); font-size: 20px; font-weight: bold; paint-order: stroke; stroke: var(--night); stroke-width: 4px; }
-.crossing path { stroke: var(--cross); fill: none; }
-.crossing circle { fill: var(--cross); }
-.split-lines line { stroke: var(--lamp); stroke-width: 2.4; stroke-dasharray: 7 6; }
+.place-names text { fill: var(--soft); font-family: var(--gothic); font-size: 22px; letter-spacing: .18em;
+  paint-order: stroke; stroke: var(--veil-thin); stroke-width: 2px; stroke-linejoin: round; }
+.shelf-names text { fill: var(--soft); font-family: var(--gothic); font-size: 17px; letter-spacing: .06em; }
+.shelf-boxes rect { fill: var(--veil); stroke: var(--moon-faint); }
+.school rect, .school polygon:not(.flag) { fill: var(--night); stroke: var(--ink); stroke-width: 1.4; }
+.school .pole { stroke: var(--ink); stroke-width: 1.4; }
+.school .flag { fill: var(--moon); stroke: var(--ink); stroke-width: 1; }
+.school text { fill: var(--ink); font-family: var(--gothic); font-size: 20px; font-weight: bold;
+  paint-order: stroke; stroke: var(--veil-thin); stroke-width: 3px; }
+.crossing path { stroke: var(--moon-soft); fill: none; }
+.crossing circle { fill: var(--moon); }
+.split-lines line { stroke: var(--lamp); stroke-width: 2.2; stroke-dasharray: 7 6; opacity: .85; }
 
+/* The seats: one family. Not met yet: dark and small. Met: lit like paper
+   by a lamp. Lit by this round: the honey lamp itself. The shape tells the
+   kind, its thin ring the kind's own tint. */
 .pt { cursor: pointer; outline: none; }
-.pt .shape { stroke: var(--night); stroke-width: 1.6; }
-.pt.kind-adult .shape { fill: var(--adult); }
-.pt.kind-poster .shape { fill: var(--poster); }
-.pt.kind-cross .shape { fill: var(--cross); }
-.pt.kind-outsider_teacher .shape { fill: var(--outsider_teacher); }
-.pt .halo { fill: var(--lamp); opacity: 0; transition: opacity .25s; }
-.pt.lit .halo { opacity: .55; }
-.pt.lit .shape { stroke: var(--lamp); stroke-width: 2.4; }
-.pt:hover .shape, .pt:focus-visible .shape { stroke: var(--ink); stroke-width: 3; }
-.pt .met-mark { fill: var(--ink); stroke: var(--night); stroke-width: 1.2; display: none; }
-.pt.met .met-mark { display: inline; }
-.pt .ask-mark { display: none; fill: var(--lamp); font-size: 16px; font-weight: bold;
-  paint-order: stroke; stroke: var(--night); stroke-width: 3px; }
+.pt .shape { fill: var(--night-3); stroke: var(--kind); stroke-width: 1.4; transform: scale(.72);
+  transition: transform .45s ease, fill .45s ease; }
+.pt.met .shape { fill: var(--paper); transform: none; }
+.pt.lit .shape { fill: var(--lamp-bright); stroke: var(--lamp); stroke-width: 1.6; transform: none; }
+.pt .halo { fill: url(#lamp-glow); opacity: 0; transition: opacity .45s ease; }
+.pt.met .halo { fill: url(#paper-glow); opacity: .8; }
+.pt.lit .halo { fill: url(#lamp-glow); opacity: 1; }
+.pt:hover .shape, .pt:focus-visible .shape { stroke: var(--ink); stroke-width: 2.6; transform: none; }
+.pt .met-mark { display: none; }
+.pt .ask-mark { display: none; fill: var(--ink); font-family: var(--gothic); font-size: 15px; font-weight: bold;
+  paint-order: stroke; stroke: var(--veil-thin); stroke-width: 3px; }
 .pt.silent .ask-mark { display: inline; }
+/* The soft ring a seat sends out, once, when its voice lights. */
+.ripple { fill: none; stroke: var(--lamp); stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; opacity: 0; }
 
-/* The round table, over the basin. */
-.table-glow { fill: rgba(255, 212, 126, .07); }
-.table-shadow { fill: #000; opacity: .35; }
-.table-top path { stroke: var(--gold); fill: none; }
-.table-top path:first-child { fill: #1c3050; stroke: none; }
-.table-split path { stroke: var(--lamp); fill: none; stroke-dasharray: 18 16; }
+/* The round table, over the basin: a top with a rim of light, a lamp in
+   the middle, the chairs round it. Only the chairs of the seats speaking
+   are lit; an empty chair 「？」 waits in a dotted line. */
+.table-glow { fill: url(#lamp-glow); opacity: .22; }
+.table-shadow { fill: var(--night-deep); opacity: .55; }
+.table-edge { fill: var(--night-deep); stroke: var(--lamp-soft); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.table-top { fill: url(#table-light); stroke: var(--lamp); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.table-rim-glow { fill: none; stroke: var(--lamp-soft); stroke-width: 7; vector-effect: non-scaling-stroke; opacity: .55; }
+.table-inner { fill: none; stroke: var(--moon-faint); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.table-lamp .light { fill: url(#lamp-glow); opacity: .7; }
+.table-lamp .core { fill: var(--lamp-bright); }
+.table-split path { stroke: var(--lamp-soft); fill: none; stroke-dasharray: 14 12; }
 .token { pointer-events: none; }
-.token .halo { opacity: .6; }
+.token .cushion { fill: var(--lamp-faint); stroke: var(--lamp-soft); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .chair { cursor: pointer; outline: none; opacity: 0; transition: opacity .5s; }
 .chair.ready { opacity: 1; }
-.chair circle { fill: rgba(11, 21, 36, .8); stroke: var(--lamp); stroke-width: 2; stroke-dasharray: 4 4; }
-.chair text { fill: var(--lamp); font-family: var(--read); font-size: 17px; font-weight: bold; }
-.chair:hover circle { fill: rgba(255, 212, 126, .28); stroke-width: 3; stroke-dasharray: none; }
-/* Where the keyboard is: a solid light ring, not only the fill. */
-.chair:focus-visible circle { fill: rgba(255, 212, 126, .4); stroke: var(--ink); stroke-width: 3.5; stroke-dasharray: none; }
+/* The part that takes a press: 44px square or more (map.js sizes it). */
+.chair .hit { fill: transparent; stroke: none; }
+.chair circle { fill: var(--veil-thin); stroke: var(--moon); stroke-width: 1.4; stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke; }
+.chair text { fill: var(--ink); font-family: var(--mincho); font-size: 16px; }
+.chair:hover circle { fill: var(--moon-faint); stroke: var(--ink); stroke-dasharray: none; }
+/* Where the keyboard is: a solid ring of light round the whole part that takes a press. */
+.chair:focus-visible .hit { stroke: var(--lamp); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.chair:focus-visible circle { fill: var(--lamp-faint); stroke: var(--lamp); stroke-dasharray: none; }
 
-/* Labels, bubbles and headings over the map, in CSS pixels. */
+/* Labels, cards and headings over the map, in CSS pixels. */
 .map-tip, .map-bubble, .split-tag, .table-label { position: absolute; max-width: min(70%, 18em);
-  border-radius: 4px; padding: 2px 8px; font-size: .85rem; line-height: 1.5; }
-.map-tip { background: var(--night-2); color: var(--ink); border: 1px solid var(--gold-soft);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .5); }
+  border-radius: 6px; padding: 3px 10px; font-size: .85rem; line-height: 1.5; }
+.map-tip { background: var(--veil); color: var(--ink); border: 1px solid var(--moon-soft);
+  box-shadow: 0 6px 18px var(--shadow); }
 .map-tip .title { font-weight: bold; }
 .map-tip .detail { font-size: .8rem; color: var(--soft); }
-/* A quote's bubble is paper, like its card. */
-.map-bubble { background: var(--paper); color: var(--paper-ink); border: 2px solid var(--lamp);
-  font-family: var(--read); box-shadow: 0 6px 18px rgba(0, 0, 0, .5); }
-.split-tag { background: rgba(8, 17, 30, .9); color: var(--lamp); border: 1px dashed var(--lamp);
-  font-family: var(--read); font-weight: bold; font-size: .85rem; }
-.table-label { background: rgba(8, 17, 30, .82); color: var(--ink); border: 1px solid rgba(255, 255, 255, .16);
-  font-size: .78rem; padding: 0 6px; }
-.table-label.empty { color: var(--lamp); border-style: dashed; border-color: var(--gold-soft); }
-.split-tag.narrow { font-size: .76rem; padding: 1px 6px; }
+/* 灯り札: a seat's voice on unbleached paper, a warm light round it, tied
+   to its seat by a thin thread of light. The voice in large Mincho, about
+   twenty characters to a line; under it, in small Gothic, which seat. */
+.map-bubble { padding: 11px 16px 9px; border-radius: 4px; background: var(--paper); color: var(--paper-ink);
+  box-shadow: 0 0 0 1px var(--paper-line), 0 0 22px var(--lamp-soft), 0 10px 24px var(--shadow);
+  animation: kindle .45s ease-out both; transition: opacity .3s ease; }
+.map-bubble .voice { font-family: var(--mincho); font-size: 17px; line-height: 1.8; max-width: 20em; }
+.map-bubble .who { width: 0; min-width: 100%; margin-top: 3px; font-family: var(--gothic); font-size: 13px;
+  line-height: 1.5; color: var(--paper-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-bubble .mark { margin-right: .6em; padding: 0 5px; border: 1px solid var(--paper-line); border-radius: 3px; }
+.map-bubble.fading { opacity: 0; }
+.map-bubble .thread { position: absolute; height: 1.5px; transform-origin: 0 50%; transform: rotate(var(--a));
+  background: linear-gradient(90deg, transparent, var(--lamp) 40%, var(--lamp-bright)); pointer-events: none;
+  animation: thread .45s ease-out both; }
+@keyframes kindle {
+  from { opacity: 0; filter: blur(1.5px); box-shadow: 0 0 0 1px var(--paper-line), 0 0 46px var(--lamp-glow), 0 10px 24px var(--shadow); }
+  to { opacity: 1; filter: none; }
+}
+@keyframes thread { from { transform: rotate(var(--a)) scaleX(0); } }
+@media (min-width: 1600px) { .map-bubble .voice { font-size: 18px; } }
+.split-tag { background: var(--veil); color: var(--lamp); border: 1px dashed var(--lamp-soft);
+  font-family: var(--mincho); font-weight: 600; font-size: .9rem; }
+/* At the table, a seat's name is a small card set by its chair. */
+.table-label { background: var(--paper); color: var(--paper-ink); border: 0;
+  box-shadow: 0 0 0 1px var(--paper-line), 0 0 12px var(--lamp-faint), 0 4px 12px var(--shadow);
+  font-size: .8rem; padding: 1px 8px; border-radius: 4px; }
+.table-label.empty { background: var(--veil); color: var(--soft); box-shadow: none; border: 1px dashed var(--moon-soft); }
+.split-tag.narrow { font-size: .78rem; padding: 1px 6px; }
 .unplaced { display: none; }
 
-/* 地図にもどす, top left; the zoom buttons, bottom right. */
-.map-controls { position: absolute; inset: 0; pointer-events: none; }
-.map-controls button { pointer-events: auto; font-size: .85rem; color: var(--ink); background: rgba(11, 21, 36, .82);
-  border: 1px solid rgba(255, 255, 255, .2); border-radius: 4px; min-width: 36px; height: 36px; padding: 0 10px; }
-.map-controls button:hover { border-color: var(--gold); }
-.map-back { position: absolute; left: 8px; top: 8px; }
-.map-zoom { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
+/* Under the map, never over it: 地図にもどす, the table's heading, the zoom. */
+/* Tall enough from the start for a heading in two lines: the bar never
+   grows when the table opens, so the sources stay where the round put them. */
+.map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 6px 0 4px; min-height: 58px; }
+.map-bar button { min-width: 44px; min-height: 44px; padding: 0 14px; font-size: .92rem; color: var(--ink);
+  background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: 8px; }
+.map-bar button:hover { border-color: var(--moon); }
+.map-back { border-color: var(--lamp-soft); }
+.map-heading { flex: 1 1 16em; margin: 0; font-family: var(--mincho); font-weight: 600; font-size: 1.05rem;
+  line-height: 1.35; color: var(--lamp); }
+.map-heading:empty { visibility: hidden; }
+.map-zoom { display: flex; gap: 6px; margin-left: auto; }
 .map-zoom button { font-weight: bold; }
-/* The map's bottom corners: the met count and the sources. */
+/* The met count and the sources. */
 .map-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 16px;
-  background: var(--night-2); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 6px 6px; padding: 4px 10px; }
-.map-met { margin: 0; font-size: .85rem; font-weight: bold; color: var(--lamp); }
+  border-top: 1px solid var(--moon-faint); padding: 4px 2px 0; }
+.map-met { margin: 0; font-size: .88rem; font-weight: bold; color: var(--lamp); }
 .map-source { margin: 0; font-size: .7rem; line-height: 1.45; color: var(--faint); display: flex; flex-wrap: wrap;
   gap: 0 14px; flex: 1 1 18em; justify-content: flex-end; }
 .map-source span { min-width: 0; overflow-wrap: anywhere; }
 .school { pointer-events: none; }
-.map-card { background: var(--night-2); border: 1px solid var(--gold-soft); border-radius: 4px; padding: 10px 14px; margin-top: 8px; }
+.map-card { background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: 8px; padding: 12px 16px; margin-top: 8px; }
 .map-card .title { font-weight: bold; }
-.map-card .not-asked { font-size: .85rem; color: var(--soft); }
-.map-card .close { margin-top: 6px; font-size: .85rem; padding: 2px 10px; }
+.map-card .not-asked { font-size: .88rem; color: var(--soft); }
+.map-card .close { margin-top: 6px; font-size: .88rem; padding: 2px 12px; min-height: 36px; }
 
 @media (max-width: 640px) {
   .ask { grid-template-columns: 1fr; }
   #ask-button { justify-self: end; }
   .masthead { padding-top: 20px; }
+  #lab-choices { grid-template-columns: 1fr; }
+  .promises { padding: 8px 18px; }
 }
+/* Motion reduced: nothing moves; everything is at once as it ends. */
 @media (prefers-reduced-motion: reduce) {
-  .pt .halo, .drawing path, .chair, .relief-image, .basin-fill, .river, .rim, .points, .place-names,
-  .school, .shelf-boxes, .shelf-names, .crossing { transition: none !important; }
+  .pt .halo, .pt .shape, .drawing path, .chair, .relief-image, .basin-fill, .river, .rim, .points, .place-names,
+  .school, .shelf-boxes, .shelf-names, .crossing, button, .lab-choice::before, .map-bubble { transition: none !important; }
+  .map-bubble, .map-bubble .thread { animation: none !important; }
 }

@@ -61,7 +61,8 @@ async function setup() {
   for (const line of data.texts.start_notice) $("start-notice").append(el("li", { text: line }));
   $("lab-question").textContent = data.texts.lab_question;
   for (const [key, label] of Object.entries(data.labs)) {
-    $("lab-choices").append(el("button", { type: "button", text: label, onclick: () => start(key) }));
+    $("lab-choices").append(el("button", { type: "button", class: "lab-choice", "aria-pressed": "false", text: label,
+      onclick: (event) => start(key, event.currentTarget) }));
   }
   $("heavy-talk").textContent = data.texts.heavy_talk_notice;
   $("question").placeholder = "例：" + data.texts.input_example;
@@ -75,8 +76,25 @@ async function setup() {
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, { state, cardEntry, renderSeats, shownQuotes }));
 }
 
-async function start(lab) {
-  const data = await call("/api/start", { lab });
+// The Lab pressed lights up, the others step back, and the table opens a
+// moment after (at once when motion is reduced), so the choice is seen.
+async function start(lab, chosen) {
+  const buttons = [...$("lab-choices").querySelectorAll("button")];
+  for (const button of buttons) {
+    button.setAttribute("aria-pressed", String(button === chosen));
+    button.disabled = true;
+  }
+  const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let data;
+  try {
+    [data] = await Promise.all([call("/api/start", { lab }), new Promise((done) => setTimeout(done, still ? 0 : 320))]);
+  } catch (error) {
+    for (const button of buttons) {
+      button.setAttribute("aria-pressed", "false");
+      button.disabled = false;
+    }
+    throw error;
+  }
   $("start").hidden = true;
   $("table").hidden = false;
   onMap((map) => map.show());  // Draws the rim and the river once the map is on screen.

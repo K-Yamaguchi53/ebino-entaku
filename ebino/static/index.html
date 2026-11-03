@@ -14,9 +14,11 @@
 <main>
   <!-- Before starting: the seven notices and the one Lab question (SPEC 2-1). -->
   <section id="start">
-    <ol id="start-notice" class="notice-list"></ol>
-    <p id="lab-question" class="lab-question"></p>
-    <div id="lab-choices" class="choices"></div>
+    <div class="promises"><ol id="start-notice" class="notice-list"></ol></div>
+    <div class="lab-pick">
+      <p id="lab-question" class="lab-question"></p>
+      <div id="lab-choices" class="choices" role="group" aria-labelledby="lab-question"></div>
+    </div>
   </section>
 
   <section id="table" hidden>
@@ -36,14 +38,16 @@
       <div id="map-frame" class="map-frame">
         <svg id="map-svg" role="group" aria-label="えびのの地図と席の点" xmlns="http://www.w3.org/2000/svg"></svg>
         <div id="map-overlay" class="map-overlay"></div>
-        <!-- 地図にもどす and the zoom buttons; their words come from texts/map_buttons.tsv. -->
-        <div class="map-controls">
-          <button type="button" id="map-back" class="map-back" hidden></button>
-          <div class="map-zoom">
-            <button type="button" id="map-zoom-in"></button>
-            <button type="button" id="map-zoom-out"></button>
-            <button type="button" id="map-zoom-all"></button>
-          </div>
+      </div>
+      <!-- Under the map, never over it: 地図にもどす, the table's heading and
+           the zoom buttons; the buttons' words come from texts/map_buttons.tsv. -->
+      <div class="map-bar map-controls">
+        <button type="button" id="map-back" class="map-back" hidden></button>
+        <p id="map-heading" class="map-heading"></p>
+        <div class="map-zoom">
+          <button type="button" id="map-zoom-in"></button>
+          <button type="button" id="map-zoom-out"></button>
+          <button type="button" id="map-zoom-all"></button>
         </div>
       </div>
       <div class="map-foot">

@@ -18,9 +18,12 @@ const EbinoMap = (() => {
   const LIGHT_EVERY = 400;  // ms between two seats lighting up.
   const BUBBLE_FOR = 1500;  // ms a quote's bubble stays.
   const BUBBLE_CHARS = 36;  // A longer quote is cut here, with 「…」.
-  const BUBBLE_NEAR = 100;  // CSS px: a bubble further from its seat reads as another seat's.
+  // CSS px: a card further from its seat reads as another seat's (on a wide
+  // frame, this part of its width, if more: a thread of light ties the two).
+  const BUBBLE_NEAR = 100, BUBBLE_NEAR_PART = 0.12;
   const DRAW_FOR = 1800;  // ms to draw the rim; the river follows.
-  const MOUNTAINS = 16;
+  const RIPPLE_FOR = 1600;  // ms of the ring a seat sends out when its voice lights.
+  const FADE_FOR = 300;  // ms a card takes to go, at the end of its BUBBLE_FOR.
   // The round table (the picture only): round the basin's middle, flat at
   // the height of the ground there, in map units.
   const TABLE_RX = 150, TABLE_RY = 110, TABLE_LIFT = 7, SEAT_OUT = 48;
@@ -36,7 +39,9 @@ const EbinoMap = (() => {
   // A split's heading goes on the table only on a map this wide or wider (CSS
   // px); on a narrower one it is under the map only, over its cards.
   const TAG_ON_MAP = 600;
-  const CHAIR_R = 13, MIN_CHAIR_PX = 13;  // An empty chair: never under 26 px across to press.
+  const CHAIR_R = 13, MIN_CHAIR_PX = 13;  // An empty chair: never under 26 px across to see.
+  const HIT_PX = 22;  // An empty chair takes a press over a square 44 px across or more.
+  const CHAIR_GAP = HIT_PX + 6;  // CSS px between an empty chair and its label, clear of that square.
   const DRAG_FROM = 5;  // px moved before a press becomes a drag.
   // Words drawn on the picture, in CSS px (they keep their size as it zooms).
   const TEXT_PX = { place: 11, school: 12, shelf: 11 };
@@ -76,7 +81,7 @@ const EbinoMap = (() => {
     return node;
   }
 
-  // --- geometry (the same rule as seat_map.py's rim_point) ---
+  // --- geometry (the same middle as seat_map.py's) ---
 
   function centroid(ring) {
     let area = 0, cx = 0, cy = 0;
@@ -86,19 +91,6 @@ const EbinoMap = (() => {
       area += cross; cx += (x1 + x2) * cross; cy += (y1 + y2) * cross;
     });
     return [cx / (3 * area), cy / (3 * area)];
-  }
-
-  function rimPoint([cx, cy], [dx, dy], ring) {
-    let far = 0;
-    ring.forEach(([x1, y1], i) => {
-      const [x2, y2] = ring[(i + 1) % ring.length];
-      const ex = x2 - x1, ey = y2 - y1, d = dx * ey - dy * ex;
-      if (Math.abs(d) < 1e-12) return;
-      const t = ((x1 - cx) * ey - (y1 - cy) * ex) / d;
-      const u = ((x1 - cx) * dy - (y1 - cy) * dx) / d;
-      if (t > 0 && u >= 0 && u <= 1) far = Math.max(far, t);
-    });
-    return [cx + far * dx, cy + far * dy];
   }
 
   // A line with a point every `every` map units, so that on the picture it
@@ -196,6 +188,7 @@ const EbinoMap = (() => {
     // Colours come from style.css (a CSS rule beats rough's attributes). No
     // fill option: rough would hatch the inside.
     const ink = { stroke: "#000", seed: 7 };
+    drawGlows();
 
     if (view.relief) {
       const image = layer("relief-image");
@@ -213,9 +206,7 @@ const EbinoMap = (() => {
     const rim = layer("rim draw-first");
     rim.append(rc.polygon(rimLine, { ...ink, strokeWidth: 2.2 * S, roughness: 1.3, bowing: 0.8 }));
 
-    const seatXY = seats.filter((s) => s.x !== undefined).map((s) => [s.x, s.y]);
     const mapShelves = map.shelves || [];
-    if (!view.relief) drawMountains(rc, layer("mountains"), ink, seatXY, mapShelves);
 
     // Each kind's shelf: its name, faint, the same words as the seat list's
     // heading for that kind. On the picture, the shelves sit in its corners.
@@ -272,22 +263,15 @@ const EbinoMap = (() => {
     refresh();
   }
 
-  // Mountains on the flat map: a decoration, not data. Small peaks just
-  // beyond the rim.
-  function drawMountains(rc, hills, ink, seatXY, mapShelves) {
-    const [, , width, height] = map.viewbox;
-    const middle = centroid(map.boundary);
-    const onShelf = (x, y) => mapShelves.some(({ box: [x0, y0, x1, y1] }) =>
-      x > x0 - 24 && x < x1 + 24 && y > y0 - 16 && y < y1 + 16);
-    for (let k = 0; k < MOUNTAINS; k++) {
-      const angle = (k + 0.5) * 2 * Math.PI / MOUNTAINS;
-      const dir = [Math.cos(angle), Math.sin(angle)];
-      const [rx, ry] = rimPoint(middle, dir, map.boundary);
-      const x = rx + 40 * dir[0], y = ry + 40 * dir[1];
-      if (x < 20 || y < 20 || x > width - 20 || y > height - 20) continue;
-      if (seatXY.some(([sx, sy]) => Math.hypot(sx - x, sy - y) < 22) || onShelf(x, y)) continue;
-      hills.append(rc.linearPath([[x - 13, y + 7], [x - 4, y - 8], [x + 1, y - 1], [x + 6, y - 6], [x + 14, y + 7]],
-        { ...ink, strokeWidth: 1.4, roughness: 0.8, seed: 11 + k }));
+  // The soft lights the drawing is lit with: round glows that fade to
+  // nothing (their colours are style.css's, by name).
+  function drawGlows() {
+    const defs = svg.appendChild(svgEl("defs"));
+    for (const [id, stops] of [["lamp-glow", ["glow-in", "glow-out"]], ["paper-glow", ["paper-in", "paper-out"]],
+      ["table-light", ["top-in", "top-mid", "top-out"]]]) {
+      const glow = svgEl("radialGradient", { id });
+      stops.forEach((className, k) => glow.append(svgEl("stop", { class: className, offset: k / (stops.length - 1) })));
+      defs.append(glow);
     }
   }
 
@@ -317,7 +301,7 @@ const EbinoMap = (() => {
 
   function drawPoint(seat) {
     const point = svgEl("g", { class: `pt kind-${seat.kind}`, tabindex: 0, role: "button", "data-seat": seat.seat_id });
-    point.append(svgEl("circle", { class: "halo", r: 14 }), shape(seat.kind),
+    point.append(svgEl("circle", { class: "halo", r: 20 }), shape(seat.kind),
       svgEl("circle", { class: "met-mark", cx: 8, cy: -8, r: 3.5 }));
     const ask = svgEl("text", { class: "ask-mark", x: 9, y: -6 });
     ask.textContent = "？";
@@ -348,8 +332,8 @@ const EbinoMap = (() => {
     return Math.max(view.S, MIN_POINT_PX * (vb.w / across) / POINT_R);
   }
 
-  // The picture's shelves, one per corner (the zoom buttons' corner last),
-  // spaced so their points never touch at any width.
+  // The picture's shelves, one per corner (nothing is over the corners: the
+  // buttons are under the map), spaced so their points never touch at any width.
   function layoutShelves(f) {
     const margin = 14 * f;
     const corners = [[0, 0], [1, 0], [0, 1], [1, 1]];
@@ -385,6 +369,12 @@ const EbinoMap = (() => {
     for (const token of tokens) {
       const k = token.chair ? Math.max(f * token.scale, MIN_CHAIR_PX * perPx / CHAIR_R) : f * token.scale;
       token.node.setAttribute("transform", `translate(${token.at[0]} ${token.at[1]}) scale(${k})`);
+      if (!token.chair) continue;
+      // The square that takes the press: HIT_PX each way on screen, at any zoom.
+      const half = Math.max(CHAIR_R, HIT_PX * perPx / k);
+      const hit = token.node.querySelector(".hit");
+      Object.entries({ x: -half, y: -half, width: 2 * half, height: 2 * half, rx: half * 0.28 })
+        .forEach(([key, value]) => hit.setAttribute(key, value));
     }
     if (schoolGroup) {
       const k = view.relief ? Math.max(view.S, TEXT_PX.school * perPx / 20) : 1;
@@ -393,7 +383,7 @@ const EbinoMap = (() => {
     if (!view.relief) return;  // The flat map keeps its words' sizes from style.css.
     for (const text of svg.querySelectorAll("text[data-px]")) {
       text.style.fontSize = `${Number(text.dataset.px) * perPx}px`;
-      text.style.strokeWidth = `${3 * perPx}px`;
+      text.style.strokeWidth = `${2 * perPx}px`;  // A thin halo, not an outline.
     }
   }
 
@@ -661,7 +651,10 @@ const EbinoMap = (() => {
     node.style.left = "0px";
     node.style.top = "0px";
     node.style.width = "";
-    node.style.maxWidth = `${Math.floor(Math.min(frameBox.width * 0.7, 18 * 16, frameBox.width - 8))}px`;
+    // A voice's card: its lines about twenty characters (style.css), never
+    // more than half the frame across.
+    const most = node.classList.contains("map-bubble") ? frameBox.width * 0.5 : Math.min(frameBox.width * 0.7, 18 * 16);
+    node.style.maxWidth = `${Math.floor(Math.min(most, frameBox.width - 8))}px`;
     node.style.width = `${Math.ceil(node.getBoundingClientRect().width)}px`;
     const { width, height } = node.getBoundingClientRect();
     return { w: width, h: height };
@@ -696,27 +689,44 @@ const EbinoMap = (() => {
       .map(([left, top, w, h]) => [left - WORD_PAD, top - WORD_PAD, w + 2 * WORD_PAD, h + 2 * WORD_PAD]);
   }
 
-  // What a label, bubble or heading never covers: the buttons; the seats
-  // this round lights, on the map (all of them from the start, so a seat
-  // lit later is not under an earlier bubble), or, while the table is open,
-  // its seats and empty chairs; and the words drawn on the map: the place
-  // names, the shelves' names and the school's name.
+  // What a label, bubble or heading never covers (the buttons are under the
+  // map, not over it): the seats this round lights, on the map (all of them
+  // from the start, so a seat lit later is not under an earlier bubble), or,
+  // while the table is open, its seats and empty chairs with the square that
+  // takes a press; and the words drawn on the map: the place names, the
+  // shelves' names and the school's name.
   function fixedBoxes(frameBox) {
-    const nodes = [...frame.querySelectorAll(".map-controls button")].filter((b) => !b.hidden);
-    nodes.push(...tableLayer.querySelectorAll(".token .shape, .chair circle"));
-    if (!tableTop) nodes.push(...roundSeats.map((id) => points[id].node.querySelector(".shape")));
+    const nodes = [...tableLayer.querySelectorAll(".token .shape, .chair circle, .chair .hit")];
+    // A seat of the round at the size it has once lit (not met yet, it is drawn smaller).
+    const reach = 9.5 * pointScale() * frameBox.width / vb.w;
+    const seats = tableTop ? [] : roundSeats.map((id) => toFrame(...spotOf(id)))
+      .map(([px, py]) => [px - reach, py - reach, 2 * reach, 2 * reach]);
     const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text")]
       .map((node) => boxIn(node, frameBox));
     const cover = tableTop && tableTop.map(([x, y]) => toFrame(x, y));
-    return [...nodes.map((node) => boxIn(node, frameBox)),
+    return [...nodes.map((node) => boxIn(node, frameBox)), ...seats, ...(cover ? topStrips(cover) : []),
       ...seenWords({ w: frameBox.width, h: frameBox.height }, words, cover)];
+  }
+
+  // The round table's top (a ring of spots in a frame) as a few boxes, band
+  // by band, so a label by a chair stays off the top and its rim of light.
+  // It reads nothing but what it is given.
+  function topStrips(ring, bands = 8) {
+    const ys = ring.map((p) => p[1]), top = Math.min(...ys), step = (Math.max(...ys) - top) / bands;
+    const strips = [];
+    for (let k = 0; k < bands; k++) {
+      const y0 = top + k * step, y1 = y0 + step;
+      const xs = ring.filter(([, y]) => y >= y0 - step / 2 && y <= y1 + step / 2).map((p) => p[0]);
+      if (xs.length) strips.push([Math.min(...xs), y0, Math.max(...xs) - Math.min(...xs), step]);
+    }
+    return strips;
   }
 
   // Where a bubble (or a seat's label) goes, a box { w, h, px, py, gap } in a
   // frame { w, h }: clear of the fixed boxes, the headings and labels (kept)
   // and the bubbles still up, by its spot or, with no side free, at the
-  // nearest free spot (chooseSpot). When that spot is more than BUBBLE_NEAR
-  // from its own spot, the earlier bubbles in the way go instead, if that
+  // nearest free spot (chooseSpot). When that spot is further than near
+  // (BUBBLE_NEAR, or BUBBLE_NEAR_PART of the frame's width) from its own spot, the earlier bubbles in the way go instead, if that
   // frees a spot near it (they are short-lived); failing that, the free spot
   // further away; with none free, the one that covers least. Returns
   // [[left, top], area covered, whether the bubbles in the way go]. It reads
@@ -724,10 +734,11 @@ const EbinoMap = (() => {
   function planBubble(frame, box, fixed, kept, bubbles) {
     const away = ([left, top]) => Math.hypot(Math.max(left - box.px, 0, box.px - left - box.w),
       Math.max(top - box.py, 0, box.py - top - box.h));
+    const near = Math.max(BUBBLE_NEAR, frame.w * BUBBLE_NEAR_PART);
     const [best, least] = chooseSpot(frame, box, [...fixed, ...kept, ...bubbles]);
-    if (!bubbles.length || (!least && away(best) <= BUBBLE_NEAR)) return [best, least, false];
+    if (!bubbles.length || (!least && away(best) <= near)) return [best, least, false];
     const [spot, rest] = chooseSpot(frame, box, [...fixed, ...kept]);
-    if (!rest && (least || away(spot) <= BUBBLE_NEAR)) return [spot, 0, true];
+    if (!rest && (least || away(spot) <= near)) return [spot, 0, true];
     return [best, least, false];
   }
 
@@ -814,6 +825,9 @@ const EbinoMap = (() => {
   function hideTip() { for (const tip of overlay.querySelectorAll(".map-tip")) tip.remove(); }
   function restoreTip() { if (sticky) showTip(sticky); else hideTip(); }
 
+  // 灯り札: a seat's first quote on paper by its seat, in large Mincho, and
+  // under it which seat, in the words the seat's label already shows. A
+  // thread of light runs from the seat to the card's nearest edge.
   function bubble(seatId, quote) {
     const seat = seatOf(seatId);
     if (!seat || !quote) return;
@@ -821,10 +835,52 @@ const EbinoMap = (() => {
     if (!inView(x, y)) return;
     const chars = [...quote.text];
     const cut = chars.length > BUBBLE_CHARS ? chars.slice(0, BUBBLE_CHARS).join("") + "…" : quote.text;
-    const node = div("map-bubble", quote.said ? `「${cut}」` : cut);
+    const node = div("map-bubble");
+    node.append(div("voice", quote.said ? `「${cut}」` : cut));
+    const who = div("who", [seat.title, seat.detail].filter(Boolean).join("　"));
+    // A mark for words that are not the person's own speech (an article, a
+    // company's text): shown only when texts/ gives its words (the teacher decides).
+    const mark = app.state.texts.lamp_note_mark;
+    if (mark && !quote.said && quote.source && quote.source.note) {
+      const tag = document.createElement("span");
+      tag.className = "mark";
+      tag.textContent = mark.replace("{note}", quote.source.note.split("（")[0]);
+      who.prepend(tag);
+    }
+    node.append(who);
     overlay.append(node);
     place(node, x, y, 18);
+    thread(node, ...toFrame(x, y));
+    timers.push(setTimeout(() => node.classList.add("fading"), BUBBLE_FOR - FADE_FOR));
     timers.push(setTimeout(() => node.remove(), BUBBLE_FOR));
+  }
+
+  // The thread of light from a seat's spot (px, py in the frame) to the
+  // nearest edge of its card. Inside the card, so it goes with it.
+  function thread(node, px, py) {
+    const left = parseFloat(node.style.left), top = parseFloat(node.style.top);
+    const { width, height } = node.getBoundingClientRect();
+    const qx = Math.min(Math.max(px, left), left + width), qy = Math.min(Math.max(py, top), top + height);
+    const length = Math.hypot(qx - px, qy - py);
+    if (length < 4) return;
+    const line = document.createElement("span");
+    line.className = "thread";
+    Object.assign(line.style, { left: `${px - left}px`, top: `${py - top}px`, width: `${length}px` });
+    line.style.setProperty("--a", `${Math.atan2(qy - py, qx - px)}rad`);
+    node.append(line);
+  }
+
+  // A seat lights: bright, and (unless motion is reduced) one soft ring of
+  // light goes out from it, once.
+  function light(seatId) {
+    const node = points[seatId].node;
+    node.classList.add("lit");
+    if (reduced() || !node.animate) return;
+    const ring = svgEl("circle", { class: "ripple", r: 10 });
+    node.append(ring);
+    const wave = ring.animate([{ transform: "scale(1)", opacity: 0.9 }, { transform: "scale(4.2)", opacity: 0 }],
+      { duration: RIPPLE_FOR, easing: "cubic-bezier(.2,.6,.3,1)" });
+    wave.finished.then(() => ring.remove(), () => ring.remove());
   }
 
   // --- a round ---
@@ -872,7 +928,7 @@ const EbinoMap = (() => {
       return;
     }
     order.forEach((id, k) => timers.push(setTimeout(() => {
-      points[id].node.classList.add("lit");
+      light(id);
       bubble(id, first[id]);
     }, k * LIGHT_EVERY)));
     const end = (order.length - 1) * LIGHT_EVERY;
@@ -957,7 +1013,7 @@ const EbinoMap = (() => {
       for (const id of order) points[id].node.classList.add("lit");
     } else {
       for (const id of order) {
-        points[id].node.classList.add("lit");
+        light(id);
         bubble(id, first[id]);
         await wait(LIGHT_EVERY);
         if (!still()) return;
@@ -976,17 +1032,25 @@ const EbinoMap = (() => {
     const motion = !reduced();
     const { split, seats } = seating(result, order);
     svg.classList.add("dim");
+    // The map's points step back from the keyboard too: Tab goes to the chairs.
+    for (const { node } of Object.values(points)) node.setAttribute("tabindex", "-1");
     $("map-back").hidden = false;
     const rc = rough.svg(svg);
     const S = view.S;
-    tableLayer.append(
-      svgEl("polygon", { class: "table-glow", points: ring(center, SEAT_OUT + 26, 0).map((p) => p.join(",")).join(" ") }),
-      svgEl("polygon", { class: "table-shadow", points: ring(center, 0, 0).map((p) => p.join(",")).join(" ") }));
-    const top = rc.polygon(ring(center, 0, TABLE_LIFT), { stroke: "#000", fill: "#000", fillStyle: "solid",
-      strokeWidth: 2.4 * S, roughness: 1.3, seed: 11 });
-    top.classList.add("table-top");
-    tableLayer.append(top);
+    const polygon = (className, spots) => svgEl("polygon", { class: className, points: spots.map((p) => p.join(",")).join(" ") });
     tableTop = ring(center, 0, TABLE_LIFT);
+    // The lamp's light on the ground round the table, its shadow, the top's
+    // edge (so it reads as a top, not a ring), the top lit from its middle,
+    // its rim of light, and the lamp.
+    const top = svgEl("g", { class: "table-top-group" });
+    const [lx, ly] = view.proj(center.x, center.y, TABLE_LIFT, center.level);
+    const lamp = svgEl("g", { class: "table-lamp" });
+    lamp.append(svgEl("circle", { class: "light", cx: lx, cy: ly, r: 70 * S }),
+      svgEl("circle", { class: "core", cx: lx, cy: ly, r: 4.5 * S }));
+    top.append(polygon("table-edge", ring(center, 0, TABLE_LIFT - 6)), polygon("table-top", tableTop),
+      polygon("table-inner", ring(center, -16, TABLE_LIFT)), polygon("table-rim-glow", tableTop), lamp);
+    tableLayer.append(polygon("table-glow", ring(center, SEAT_OUT + 40, 0)),
+      polygon("table-shadow", ring(center, 4, 0)), top);
     if (motion) {
       top.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, easing: "ease-out" });
       await wait(350);
@@ -1007,7 +1071,9 @@ const EbinoMap = (() => {
       if (sitting.group === "front") return landed.push(chair(sitting.id, at));
       const kind = points[sitting.id].seat.kind;
       const node = svgEl("g", { class: `token pt lit kind-${kind}`, "aria-hidden": "true" });
-      node.append(svgEl("circle", { class: "halo", r: 14 }), shape(kind));
+      // Its chair, lit, under the seat's own mark.
+      node.append(svgEl("circle", { class: "halo", r: 20 }), svgEl("ellipse", { class: "cushion", rx: 15, ry: 10, cy: 3 }),
+        shape(kind));
       tableLayer.append(node);
       const token = { node, at, scale: TOKEN, id: sitting.id };
       tokens.push(token);
@@ -1035,16 +1101,12 @@ const EbinoMap = (() => {
       const label = div("table-label", title);
       if (item.chair) label.classList.add("empty");
       overlay.append(label);
-      Object.assign(label.dataset, { x: item.at[0], y: item.at[1], gap: 16, full: title,
+      Object.assign(label.dataset, { x: item.at[0], y: item.at[1], gap: item.chair ? CHAIR_GAP : 16, full: title,
         short: chars.length > LABEL_CHARS ? chars.slice(0, LABEL_CHARS).join("") + "…" : title });
     }
-    if (split) {
-      const tag = div("split-tag on-table", app.shownQuotes(split.heading));
-      overlay.append(tag);
-      // On the table, in its far half, clear of the seats round it.
-      const on = view.proj(center.x, center.y + TABLE_RY * 0.4, TABLE_LIFT, center.level);
-      Object.assign(tag.dataset, { x: on[0], y: on[1], gap: 0 });
-    }
+    // The split's heading: under the map, over neither the table's top nor
+    // its chairs; on a map narrower than TAG_ON_MAP, in the split block only.
+    if (split && overlay.clientWidth >= TAG_ON_MAP) $("map-heading").textContent = app.shownQuotes(split.heading);
     for (const chairNode of tableLayer.querySelectorAll(".chair")) chairNode.classList.add("ready");
     relayout();
   }
@@ -1055,7 +1117,7 @@ const EbinoMap = (() => {
     const seat = seatOf(seatId);
     const node = svgEl("g", { class: "chair", tabindex: 0, role: "button",
       "aria-label": [seat.title, app.state.texts.not_asked_yet].join("　") });
-    node.append(svgEl("circle", { r: CHAIR_R }));
+    node.append(svgEl("rect", { class: "hit" }), svgEl("circle", { r: CHAIR_R }));
     const mark = svgEl("text", { y: 5.5, "text-anchor": "middle" });
     mark.textContent = "？";
     node.append(mark);
@@ -1069,8 +1131,10 @@ const EbinoMap = (() => {
   function clearTable() {
     tokens = [];
     tableTop = null;
+    if ($("map-heading")) $("map-heading").textContent = "";
     if (tableLayer) tableLayer.replaceChildren();
     if (svg) svg.classList.remove("dim");
+    for (const { node } of Object.values(points)) node.setAttribute("tabindex", "0");
     if ($("map-back")) $("map-back").hidden = true;
   }
 

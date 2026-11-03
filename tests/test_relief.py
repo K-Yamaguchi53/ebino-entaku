@@ -412,8 +412,9 @@ def test_the_screen_moves_points_on_the_screen_only_and_keeps_its_fallbacks():
 
 # The map frame's width (CSS px) in the four windows it is seen in: iPad
 # upright and lying, a Chromebook's window under its bars, a PC. As measured
-# in the browser (style.css: the map is min(100%, 78vh x the drawing's ratio)).
-SCREENS = {"768x1024": 721, "1180x820": 834, "1366x650": 661, "1920x1080": 1008}
+# in the browser (style.css: the map is as wide as the window lets it be with
+# its buttons and sources under it, (100vh - 164px) x the drawing's ratio).
+SCREENS = {"768x1024": 721, "1180x820": 856, "1366x650": 634, "1920x1080": 1195}
 
 # A round over the real map and picture: seats in the basin and on two of
 # the four shelves (a seat with no place, and one from outside, fill the
@@ -450,13 +451,15 @@ const area = (a, b) => Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max
   Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]));
 const covers = (box, boxes) => boxes.reduce((sum, other) => sum + area(box, other), 0);
 const inFrame = (fr, w) => w[2] && w[0] < fr.w && w[1] < fr.h && w[0] + w[2] > 0 && w[1] + w[3] > 0;
-// A box of text as style.css sets it (1rem = 16px), with its padding and border.
+// A voice's card as style.css sets it: the voice in 17px Mincho, line height
+// 1.8, at most 20em and half the frame across; under it one line of 13px;
+// padding 11px 16px 9px.
 const REM = 16;
-function textBox(fr, text, size, pad) {
-  const most = Math.min(fr.w * 0.7, 18 * 16, fr.w - 8);
-  const across = chars(text) * size;
-  const w = Math.min(most, across + pad), lines = Math.ceil(across / (most - pad));
-  return { w, h: lines * size * 1.5 + 8 };
+function cardBox(fr, text) {
+  const most = Math.min(fr.w * 0.5, fr.w - 8, 20 * 17 + 32);
+  const across = chars(text) * 17;
+  const w = Math.min(most, across + 32), lines = Math.ceil(across / (w - 32));
+  return { w, h: 11 + lines * 17 * 1.8 + 3 + 13 * 1.5 + 9 };
 }
 
 function scene(width) {
@@ -476,7 +479,7 @@ function scene(width) {
       const w = chars(text) * size * spacing;
       out.push([middle ? x - w / 2 : x, y - size * 1.05, w, size * 1.3]);
     };
-    for (const place of map.places) word(...toFrame(...P(place.x, place.y, 2)), place.name, TEXT_PX.place, 1.1, true);
+    for (const place of map.places) word(...toFrame(...P(place.x, place.y, 2)), place.name, TEXT_PX.place, 1.18, true);
     for (const entry of shelves) word(...toFrame(entry.name.x, entry.name.y), entry.words, TEXT_PX.shelf, 1, false);
     if (map.school) {
       const [x, y] = P(map.school.x, map.school.y, 1), k = Math.max(view.S, TEXT_PX.school * perPx() / 20);
@@ -484,7 +487,7 @@ function scene(width) {
     }
     return out;
   };
-  const zoom = [fr.w - 8 - 140, fr.h - 8 - 36, 140, 36], back = [8, 8, 120, 36];
+  // The buttons are under the map, not over it: nothing of them is in the frame.
   const out = { bubbles: [], labels: [], unplaced: 0, wordsLeftOut: 0, shelfNames: 0, shelfNamesSeen: 0 };
 
   // The seats light up one by one on the whole map, each with its bubble;
@@ -496,58 +499,56 @@ function scene(width) {
   const up = [];
   const still = Math.ceil(BUBBLE_FOR / LIGHT_EVERY) - 1;
   const lit = round.seat_order.map((id) => {
-    const [px, py] = toFrame(...spotOf(id)), r = POINT_R * pointScale() / perPx();
+    const [px, py] = toFrame(...spotOf(id)), r = 9.5 * pointScale() / perPx();
     return [px - r, py - r, 2 * r, 2 * r];
   });
   round.seat_order.forEach((id, k) => {
     const [px, py] = toFrame(...spotOf(id));
     const quote = round.quotes.find((q) => q.seat_id === id);
     const text = `「${[...quote.text].slice(0, BUBBLE_CHARS).join("")}…」`;
-    const box = { ...textBox(fr, text, 0.85 * REM, 20), px, py, gap: 18 };
+    const box = { ...cardBox(fr, text), px, py, gap: 18 };
     const all = words();
     const shelfNames = all.slice(map.places.length, map.places.length + shelves.length).filter((w) => inFrame(fr, w));
     out.shelfNamesSeen = Math.max(out.shelfNamesSeen, shelfNames.length);
     const seen = seenWords(fr, all, null);
-    const fixed = [zoom, ...seen, ...lit];
+    const fixed = [...seen, ...lit];
     const alive = up.filter((b) => b.k >= k - still && !b.gone);
     const [spot, least, drop] = planBubble(fr, box, fixed, [], alive.map((b) => b.box));
     const placed = [spot[0], spot[1], box.w, box.h];
     if (drop) for (const b of alive) if (area(placed, b.box)) b.gone = true;
     up.push({ k, box: placed });
-    const without = chooseSpot(fr, box, [zoom, ...lit, ...alive.filter((b) => !b.gone).map((b) => b.box)])[0];
+    const without = chooseSpot(fr, box, [...lit, ...alive.filter((b) => !b.gone).map((b) => b.box)])[0];
     out.wordsLeftOut += covers([without[0], without[1], box.w, box.h], seen) ? 1 : 0;
     const away = Math.hypot(Math.max(placed[0] - px, 0, px - placed[0] - placed[2]),
       Math.max(placed[1] - py, 0, py - placed[1] - placed[3]));
-    out.bubbles.push({ least, near: away <= BUBBLE_NEAR, onFixed: covers(placed, fixed), onShelfNames: covers(placed, shelfNames),
+    out.bubbles.push({ least, near: away <= Math.max(BUBBLE_NEAR, fr.w * BUBBLE_NEAR_PART), onFixed: covers(placed, fixed), onShelfNames: covers(placed, shelfNames),
       onBubbles: covers(placed, alive.filter((b) => !b.gone).map((b) => b.box)),
       inside: placed[0] >= 0 && placed[1] >= 0 && placed[0] + placed[2] <= fr.w && placed[1] + placed[3] <= fr.h });
   });
 
-  // The round table: the camera at it, the seats and chairs round it, the
-  // heading on it, every label put by planLabels.
+  // The round table: the camera at it, the seats and chairs round it (an
+  // empty chair takes a press over a square HIT_PX each way), every label
+  // put by planLabels clear of the table's top. The split's heading is
+  // under the map, not in the frame.
   const [cx, cy] = centroid(map.boundary);
   const center = { x: cx, y: cy, level: view.zAt(cx, cy) };
   vb = tableView(center);
   const f = pointScale();
   layoutShelves(f);
   const { seats } = seating(round, round.seat_order);
-  const fixed = [zoom, back], labels = [];
+  const cover = ring(center, 0, TABLE_LIFT).map((p) => toFrame(...p));
+  const fixed = [...topStrips(cover)], labels = [];
   for (const sitting of seats) {
     const at = onTable(center, sitting.angle, SEAT_OUT), chair = sitting.group === "front";
     const k = chair ? Math.max(f * 1.2, MIN_CHAIR_PX * perPx() / CHAIR_R) : f * TOKEN;
-    const r = (chair ? CHAIR_R : POINT_R) * k / perPx();
+    const r = chair ? HIT_PX : POINT_R * k / perPx();
     const [px, py] = toFrame(...at);
     fixed.push([px - r, py - r, 2 * r, 2 * r]);
     const title = points[sitting.id].seat.title;
-    labels.push({ empty: chair, item: { w: chars(title) * 0.78 * REM + 14, h: 0.78 * REM * 1.5 + 2, px, py, gap: 16,
-      inView: true, heading: false, atTable: true } });
+    labels.push({ empty: chair, item: { w: chars(title) * 0.8 * REM + 18, h: 0.8 * REM * 1.5 + 4, px, py,
+      gap: chair ? CHAIR_GAP : 16, inView: true, heading: false, atTable: true } });
   }
-  const heading = round.splits[0].heading.replace(/"([^"]*)"/g, "「$1」");
-  const [hx, hy] = toFrame(...view.proj(center.x, center.y + TABLE_RY * 0.4, TABLE_LIFT, center.level));
-  const items = [{ ...textBox(fr, heading, 0.85 * REM, 18), px: hx, py: hy, gap: 0, inView: true, heading: true,
-    atTable: true }, ...labels.filter((l) => l.empty).map((l) => l.item),
-    ...labels.filter((l) => !l.empty).map((l) => l.item)];
-  const cover = ring(center, 0, TABLE_LIFT).map((p) => toFrame(...p));
+  const items = [...labels.filter((l) => l.empty).map((l) => l.item), ...labels.filter((l) => !l.empty).map((l) => l.item)];
   const all = words();
   const seen = seenWords(fr, all, cover);
   out.underTable = all.filter((w) => inFrame(fr, w)).length - seen.length;
@@ -560,6 +561,7 @@ function scene(width) {
       inside: box[0] >= 0 && box[1] >= 0 && box[0] + box[2] <= fr.w && box[1] + box[3] <= fr.h });
   });
   const without = planLabels(fr, items, fixed);
+  out.onTop = boxes.filter((box) => box && covers(box, topStrips(cover))).length;
   out.wordsLeftOut += without.filter((spot, k) => spot && covers([spot[0], spot[1], items[k].w, items[k].h], seen)).length;
   return out;
 }
@@ -573,7 +575,7 @@ def _scenes():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     consts = script[script.index("  const NS ="):script.index("  let map = null;")]
     names = ["centroid", "reliefView", "onTable", "ring", "tableView", "seating", "pointScale", "layoutShelves",
-             "shelfSpot", "chooseSpot", "planLabels", "within", "seenWords", "planBubble"]
+             "shelfSpot", "chooseSpot", "planLabels", "within", "seenWords", "planBubble", "topStrips"]
     source = "".join(_inner_function(script, name) for name in names)
     seats = [make_seat(seat_id=seat, kind=kind, title=f"架空の席{seat}", company="", display_name="",
                        district=district) for seat, kind, district in _ROUND_SEATS]
@@ -602,11 +604,11 @@ def test_bubbles_labels_and_the_heading_keep_off_the_maps_words_seats_and_button
         for bubble in scene["bubbles"]:
             assert bubble == {"least": 0, "near": True, "onFixed": 0, "onShelfNames": 0, "onBubbles": 0,
                               "inside": True}, name
-        # At the table every heading and label is put (the frames are all
-        # wider than TAG_ON_MAP), clear of those words (but the ones the
-        # table's top hides), the seats and chairs, the buttons and one another.
-        assert scene["unplaced"] == 0, name
-        assert len(scene["labels"]) == 1 + len(_ROUND["seat_order"]) + len(_ROUND["silent_seats"]), name
+        # At the table every label is put, clear of those words (but the
+        # ones the table's top hides), the table's top, the seats, the
+        # empty chairs' squares that take a press, and one another.
+        assert scene["unplaced"] == 0 and scene["onTop"] == 0, name
+        assert len(scene["labels"]) == len(_ROUND["seat_order"]) + len(_ROUND["silent_seats"]), name
         for label in scene["labels"]:
             assert label == {"onFixed": 0, "onOthers": 0, "inside": True}, name
         left_out += scene["wordsLeftOut"]
@@ -634,3 +636,83 @@ def test_a_round_brings_the_whole_map_and_its_sources_on_screen():
     assert '$("map").scrollIntoView({ block: "nearest" });' in start
     assert start.index("if (!order.length) return;") < start.index("scrollIntoView")
     assert start.index("scrollIntoView") < start.index("tableRound(")
+
+
+# --- 「夜の灯り」 (直し22): the colours, the type, the buttons, the chairs, the motion ---
+
+def _css():
+    return (app_module.STATIC_DIR / "style.css").read_text(encoding="utf-8")
+
+
+def test_every_colour_is_named_once_at_the_top_and_used_by_its_name():
+    css = _css()
+    root = re.search(r":root \{(.*?)\n\}", css, re.S)
+    assert root and css.index(":root {") < css.index("body {")
+    rest = css[:root.start()] + css[root.end():]
+    colour = re.compile(r"#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(")
+    assert not colour.search(rest), colour.search(rest).group(0)
+    for name in ("--night", "--lamp", "--paper", "--moon"):  # Night, the lamp's honey, paper, moonlight.
+        assert re.search(rf"{name}: #[0-9a-f]{{6}};", root.group(1)), name
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    assert not re.search(r'(fill|stroke)[:"]\s*"?#(?!000")', script)  # rough's "#000" is overridden by style.css.
+
+
+def test_the_voices_and_headings_are_mincho_the_small_words_gothic_from_the_machine():
+    css = _css()
+    assert ('--mincho: "Hiragino Mincho ProN", "Yu Mincho", "BIZ UDPMincho", "Noto Serif CJK JP", serif;' in css)
+    assert ('--gothic: "Hiragino Sans", "BIZ UDPGothic", "Yu Gothic UI", "Noto Sans CJK JP", sans-serif;' in css)
+    assert '--display: "Ebino Title", var(--mincho);' in css
+    assert "@import" not in css and "http" not in css  # Nothing from outside.
+    body = re.search(r"\nbody \{([^}]*)\}", css).group(1)
+    assert "font-size: 17px" in body and "var(--gothic)" in body
+    # A voice: 17-18px Mincho, line height 1.8, about twenty characters to a line.
+    for rule in (r"\.map-bubble \.voice \{([^}]*)\}", r"\.quote \.words \{([^}]*)\}"):
+        found = re.search(rule, css).group(1)
+        assert "var(--mincho)" in found and "line-height: 1.8" in found and re.search(r"font-size: 1[78]px", found)
+        assert re.search(r"max-width: 2[01]em", found)
+
+
+def test_the_maps_buttons_and_the_tables_heading_are_under_the_map_not_over_it():
+    html = (app_module.STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    frame = html[html.index('<div id="map-frame"'):html.index('<div id="map-overlay"')]
+    assert "<button" not in frame
+    bar = html[html.index('class="map-bar'):html.index('<div class="map-foot">')]
+    for button in ("map-back", "map-zoom-in", "map-zoom-out", "map-zoom-all"):
+        assert f'id="{button}"' in bar
+    assert 'id="map-heading"' in bar
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    table = _inner_function(script, "openTable")
+    assert '$("map-heading").textContent = app.shownQuotes(split.heading)' in table and "split-tag" not in table
+    assert "overlay.clientWidth >= TAG_ON_MAP" in table  # Narrower: in the split block only, as before.
+    # While the table is open, Tab goes to its chairs, not to the map's points under it.
+    assert 'node.setAttribute("tabindex", "-1")' in table
+    assert 'node.setAttribute("tabindex", "0")' in _inner_function(script, "clearTable")
+    # The labels at the table keep off its top.
+    assert "topStrips(cover)" in _inner_function(script, "fixedBoxes")
+
+
+def test_an_empty_chair_takes_a_press_over_44px_and_shows_the_keyboard_there():
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    assert re.search(r"const HIT_PX = (\d+);", script).group(1) == "22"
+    assert 'svgEl("rect", { class: "hit" })' in _inner_function(script, "chair")
+    rescale = _inner_function(script, "rescale")
+    assert "Math.max(CHAIR_R, HIT_PX * perPx / k)" in rescale and "width: 2 * half" in rescale
+    css = _css()
+    assert ".chair .hit { fill: transparent;" in css
+    assert re.search(r"\.chair:focus-visible \.hit \{[^}]*stroke: var\(--lamp\)", css)
+
+
+def test_the_flat_map_has_no_mountain_marks():
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    assert "drawMountains" not in script and "mountains" not in script and "MOUNTAINS" not in script
+    assert ".mountains" not in _css()
+
+
+def test_with_motion_reduced_no_ring_goes_out_and_the_cards_do_not_move():
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    light = _inner_function(script, "light")
+    assert light.index('classList.add("lit")') < light.index("if (reduced() || !node.animate) return;")
+    assert light.index("return;") < light.index(".animate(")
+    css = _css()
+    reduced = css[css.index("@media (prefers-reduced-motion: reduce)"):]
+    assert ".map-bubble, .map-bubble .thread { animation: none !important; }" in reduced
