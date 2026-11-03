@@ -451,7 +451,8 @@ async function reflectFirst(event) {
   }
   for (const node of $("reflect-first").querySelectorAll("input, textarea, button")) node.disabled = true;
   message.hidden = true;
-  $("ask-back").textContent = result.ask_back;
+  // The split headings in it shown in 「」 too; on screen only (SPEC 5-2).
+  $("ask-back").textContent = shownQuotes(result.ask_back);
   $("reflect-answer").hidden = false;
   $("answer").focus();
 }
@@ -554,7 +555,7 @@ function renderSheet(sheet) {
   if (sheet.cards.length) row("残した質問カード", ...sheet.cards);
   row("最初の問いは変わった？", sheet.changed);
   row("いまの問い（1回目）", sheet.now_question);
-  row("問い返し", sheet.ask_back, sheet.declined ? "答えない" : sheet.answer);
+  row("問い返し", shownQuotes(sheet.ask_back), sheet.declined ? "答えない" : sheet.answer);
   const move = sheet.chosen === "none" ? "選ばない"
     : sheet.chosen === "own" ? `自分で書いた一手：${sheet.own_move}`
     : sheet.move ? `${sheet.move.label}：${sheet.move.text}` : "";

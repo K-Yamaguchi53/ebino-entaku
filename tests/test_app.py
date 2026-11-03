@@ -203,6 +203,22 @@ def test_the_quote_marks_change_on_the_screen_only():
     assert 'fill((await call("/api/split", { round: roundNo, index: split.index })).heading)' in script
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_a_split_heading_inside_the_question_back_is_shown_as_kagi():
+    ask_back = '「休みは決めて取ります。」と"空いたら取る"の間で、”決める”のはだれ？'
+    assert _run_shown_quotes([ask_back]) == ["「休みは決めて取ります。」と「空いたら取る」の間で、「決める」のはだれ？"]
+
+
+def test_the_question_back_changes_on_the_screen_only():
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    # The reflection screen and the sheet's row show it through shownQuotes ...
+    assert '$("ask-back").textContent = shownQuotes(result.ask_back);' in script
+    assert 'row("問い返し", shownQuotes(sheet.ask_back),' in script
+    # ... and the screen never sends it back: the answer goes alone.
+    answer = script[script.index("async function reflectAnswer"):script.index("async function reflectFinish")]
+    assert "ask_back" not in answer and 'call("/api/reflect/answer", { answer, declined })' in answer
+
+
 def test_a_connection_that_sends_nothing_does_not_hold_up_the_screen(server):
     # Browsers open spare connections and may send nothing on them.
     srv, _ = server
