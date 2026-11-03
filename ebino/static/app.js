@@ -477,7 +477,7 @@ function renderSplit(roundNo, split, byId, [quotesA, quotesB]) {
     ...quotes.map((quote) => renderQuote(roundNo, quote)));
   return el("div", { class: "split" },
     el("p", { class: "notice", text: state.texts.split_notice }),
-    el("p", { class: "heading", text: shownQuotes(split.heading) }),
+    el("p", { class: "heading" }, phrased(shownQuotes(split.heading))),
     el("div", { class: "sides" }, side(split.side_a, quotesA), side(split.side_b, quotesB)),
     el("button", { type: "button", class: "quiet", text: "この割れ目を次の問いにする", onclick: async () => {
       fill((await call("/api/split", { round: roundNo, index: split.index })).heading);

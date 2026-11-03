@@ -799,3 +799,53 @@ def test_the_flat_maps_heading_wraps_between_pieces_and_labels_keep_off_the_scho
     assert relayout.index("clearSchoolName();") < relayout.index("fixedBoxes(frameBox)")
     # A seat's 「？」 keeps a little room round the words, not only off them.
     assert "r.width + 2 * WORD_PAD" in _inner_function(script, "placeAskMarks")
+
+
+# --- 直し24: the other screens in 「夜の灯り」 ---
+
+def _rule(css, selector):
+    found = re.search(r"(?:^|\n)" + re.escape(selector) + r" \{([^}]*)\}", css)
+    assert found, selector
+    return found.group(1)
+
+
+def test_the_student_writes_on_paper_in_gothic_and_only_the_ask_button_is_honey():
+    css = _css()
+    box = _rule(css, ".ask textarea")
+    assert "var(--gothic)" in box and re.search(r"font: 500 (1[7-9]|2\d)px/", box) and "var(--paper)" in box
+    assert "background: var(--lamp)" in _rule(css, "#ask-button")
+    # The other buttons by the box are moonlight, not honey.
+    assert "var(--lamp" not in _rule(css, ".hints button") and "var(--lamp" not in _rule(css, "#to-reflect")
+    assert "min-height: 44px" in _rule(css, "button")
+    html = (app_module.STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    form = html[html.index('<form id="ask-form"'):html.index("</form>", html.index('<form id="ask-form"'))]
+    assert form.count("<button") == 1 and "placeholder" not in form  # No new example or wording on the screen.
+
+
+def test_the_rounds_voices_are_lamp_cards_the_moderators_words_moonlight_and_the_newest_stands_out():
+    css = _css()
+    card = _rule(css, ".quote, .closing-word")
+    assert "var(--paper)" in card and "var(--lamp-faint)" in card
+    assert "var(--gothic)" in _rule(css, ".quote .source, .closing-word .source")
+    for selector in (".closing-question", ".ask-seat > .words"):
+        rule = _rule(css, selector)
+        assert "var(--gothic)" in rule and "var(--moon)" in rule and "var(--paper" not in rule, selector
+    assert "var(--moon)" in _rule(css, ".split .notice") and "var(--moon)" in _rule(css, ".count")
+    # The newest round first (prepended); the ones before it a step back.
+    assert '$("rounds").prepend(box);' in (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert "var(--soft)" in _rule(css, ".round + .round .round-question")
+    assert "var(--lamp)" in _rule(css, ".round-question::before")
+    # The split's heading wraps between its pieces, as the map's does.
+    app_js = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert 'el("p", { class: "heading" }, phrased(shownQuotes(split.heading)))' in app_js
+
+
+def test_the_purposes_are_tiles_of_the_lab_buttons_shape_and_a_met_seat_is_lit_like_paper():
+    css = _css()
+    lab, tile = _rule(css, ".lab-choice"), _rule(css, ".purposes li")
+    for part in ("border-radius: 10px", "background: var(--night-2)", "border: 1px solid var(--moon-soft)"):
+        assert part in lab and part in tile, part
+    assert "border-radius: 10px" in _rule(css, "#more-purposes")
+    met = _rule(css, ".seat.met")
+    assert "background: var(--paper)" in met and "var(--lamp-faint)" in met
+    assert "var(--lamp)" in _rule(css, ".seat.lit")

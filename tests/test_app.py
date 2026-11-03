@@ -290,7 +290,7 @@ def test_a_split_headings_quote_marks_are_shown_as_kagi():
 def test_the_quote_marks_change_on_the_screen_only():
     script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
     # The round's heading and the sheet's row are shown through it ...
-    assert 'text: shownQuotes(split.heading)' in script
+    assert 'el("p", { class: "heading" }, phrased(shownQuotes(split.heading)))' in script
     assert '"置いてきた：") + shownQuotes(split.heading)' in script
     # ... but the heading put back into the question box (sent to the models) is not.
     assert 'fill((await call("/api/split", { round: roundNo, index: split.index })).heading)' in script

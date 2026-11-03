@@ -99,7 +99,7 @@ body:has(#start[hidden]) .masthead h1 { font-size: 36px; letter-spacing: .12em; 
 h2 { font-family: var(--mincho); font-size: 1.25rem; font-weight: 600; letter-spacing: .08em; margin: 28px 0 10px; color: var(--ink); }
 h3 { font-family: var(--mincho); }
 button {
-  font: inherit; cursor: pointer; color: var(--ink); background: transparent;
+  font: inherit; cursor: pointer; color: var(--ink); background: transparent; min-height: 44px;
   border: 1px solid var(--moon-soft); border-radius: 6px; padding: 6px 14px;
   transition: border-color .2s, background-color .2s, color .2s;
 }
@@ -109,6 +109,10 @@ button.quiet:hover { color: var(--ink); border-color: var(--moon-soft); }
 button:disabled { opacity: .5; cursor: wait; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--lamp); outline-offset: 3px;
+}
+/* On paper the lamp's honey would hardly show: the ring is the paper's ink there. */
+.quote :focus-visible, .closing-word :focus-visible, .card-form :focus-visible, .harvest :focus-visible {
+  outline-color: var(--paper-ink);
 }
 input[type="text"], textarea, select {
   font: inherit; color: var(--ink); background: var(--night-deep); border: 1px solid var(--moon-soft); border-radius: 6px;
@@ -157,119 +161,151 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 /* --- asking --- */
 .heavy-talk { color: var(--soft); border-left: 2px solid var(--moon-soft); padding-left: 12px; font-size: 1rem; }
-.ask { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: end; margin-top: 22px; }
+/* The student's own words, written on one sheet of unbleached paper, its
+   lines faintly ruled; beside it 「聞く」, the one thing in honey here. */
+.ask { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: end; margin-top: 22px; }
 .ask textarea {
-  width: 100%; resize: vertical; min-height: 64px; padding: 10px 2px;
-  font: 500 clamp(21px, 2.6vw, 27px)/1.55 var(--mincho); background: transparent;
-  border: 0; border-bottom: 1.5px solid var(--moon-soft); border-radius: 0;
+  --rule: calc(19px * 1.7);
+  width: 100%; resize: vertical; min-height: calc(var(--rule) * 2 + 36px); padding: 18px 22px;
+  font: 500 19px/1.7 var(--gothic); color: var(--paper-ink); border: 0; border-radius: 4px;
+  /* The ruled lines under each line of writing, inside the writing only. */
+  background: linear-gradient(to bottom, transparent calc(var(--rule) - 1px), var(--paper-line) 0) 0 0 / 100% var(--rule) local
+      content-box content-box,
+    var(--paper);
+  box-shadow: 0 0 0 1px var(--paper-line), 0 0 30px var(--lamp-faint), 0 14px 34px var(--shadow);
 }
-.ask textarea:focus { outline: none; border-bottom-color: var(--lamp); }
+.ask textarea::placeholder { color: var(--paper-soft); }
 #ask-button {
-  min-height: 52px; font-weight: 700; letter-spacing: .3em; color: var(--night); background: var(--lamp); border: 0;
-  border-radius: 8px; padding: 12px 26px 12px 32px; box-shadow: 0 8px 26px var(--lamp-faint);
+  min-height: 56px; font-weight: 700; letter-spacing: .3em; color: var(--night); background: var(--lamp); border: 0;
+  border-radius: 8px; padding: 12px 26px 12px 32px; box-shadow: 0 0 26px var(--lamp-soft), 0 8px 22px var(--shadow);
 }
 #ask-button:hover { background: var(--lamp-bright); }
-.hints { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.hints { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
 .hints button {
-  min-height: 40px; border-color: var(--moon-faint); color: var(--soft); font-size: .92rem; border-radius: 999px; padding: 4px 16px;
+  border-color: var(--moon-faint); color: var(--soft); font-size: 16px; border-radius: 999px; padding: 4px 16px;
 }
 .hints button:hover { color: var(--ink); border-color: var(--moon-soft); }
-.message { background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: 6px; padding: 8px 14px; }
+.message { background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: 6px; padding: 8px 14px; color: var(--soft); }
 
 /* --- paper: the words a student reads --- */
-.quote, .closing-word, .purposes li, .sheet, .harvest { color: var(--paper-ink); }
-.quote, .purposes li {
-  background: var(--paper); border-radius: 4px; padding: 18px 22px 14px;
-  box-shadow: 0 0 0 1px var(--paper-line), 0 12px 30px var(--shadow);
-}
-.quote button, .closing-word button, .purposes li button, .sheet button, .harvest button {
+.quote, .closing-word, .sheet, .harvest { color: var(--paper-ink); }
+.quote button, .closing-word button, .sheet button, .harvest button {
   color: var(--paper-ink); border-color: var(--paper-line); background: var(--paper-light);
 }
 .quote button:hover, .closing-word button:hover, .harvest button:hover { border-color: var(--paper-soft); }
 
-.purposes ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); }
-.purposes li .words { font-family: var(--mincho); font-size: 17px; line-height: 1.8; max-width: 21em; margin: 0 0 6px; }
-.purposes li .source { color: var(--paper-soft); font-size: .85rem; }
-.purposes .summarized { font-size: .8rem; color: var(--paper-soft); border: 1px solid var(--paper-line); border-radius: 3px; padding: 0 6px; }
+/* The seniors' questions: tiles of the Lab buttons' shape (they are read,
+   not pressed: no dot), the words in Mincho. */
+.purposes ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
+.purposes li { min-height: 64px; padding: 14px 18px 12px; background: var(--night-2); border: 1px solid var(--moon-soft);
+  border-radius: 10px; color: var(--ink); }
+.purposes li .words { font-family: var(--mincho); font-size: 17px; line-height: 1.8; max-width: 21em; margin: 0 0 4px; }
+.purposes li .source { display: block; color: var(--soft); font-size: 14px; line-height: 1.5; }
+.purposes .summarized { display: inline-block; font-size: 13px; line-height: 1.6; color: var(--soft);
+  border: 1px solid var(--moon-faint); border-radius: 3px; padding: 0 6px; margin-bottom: 4px; }
+#more-purposes { margin-top: 12px; min-height: 52px; padding: 10px 18px; border-radius: 10px; border-color: var(--moon-soft);
+  background: var(--night-2); color: var(--ink); font-family: var(--gothic); }
+#more-purposes:hover { border-color: var(--moon); background: var(--night-3); }
 
-.round { border-top: 1px solid var(--moon-soft); margin-top: 32px; padding-top: 16px; }
-.round-question { font-family: var(--mincho); font-weight: 600; font-size: clamp(1.2rem, 2.2vw, 1.5rem); margin: 4px 0; }
-.steps { color: var(--faint); font-size: .85rem; margin: 0; }
-.count { font-size: 1.05rem; font-weight: bold; color: var(--lamp); margin: 6px 0 12px; }
-/* A voice's card: Mincho, large and open, about twenty characters to a line. */
-.cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); }
+/* A round: the newest on top, clear; the ones before it a step back. */
+.round { border-top: 1px solid var(--moon-faint); margin-top: 36px; padding-top: 20px; }
+.round-question { font-family: var(--mincho); font-weight: 600; font-size: clamp(1.3rem, 2.4vw, 1.65rem); line-height: 1.5;
+  margin: 4px 0 6px; color: var(--ink); }
+.round-question::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 14px; border-radius: 50%;
+  vertical-align: .18em; background: var(--lamp); box-shadow: 0 0 14px var(--lamp-glow); }
+/* 司会の言葉 (the steps, the count, the notices, its questions): never a card;
+   small Gothic in moonlight, apart from the voices. */
+.steps { color: var(--faint); font-size: 14px; margin: 0; }
+.count { font-size: 16px; color: var(--moon); margin: 4px 0 14px; letter-spacing: .04em; }
+.round + .round { margin-top: 44px; }
+.round + .round .round-question { font-size: 1.15rem; color: var(--soft); }
+.round + .round .round-question::before { background: var(--moon-soft); box-shadow: none; }
+.round + .round .quote, .round + .round .closing-word { background: var(--paper-2);
+  box-shadow: 0 0 0 1px var(--paper-line), 0 6px 16px var(--shadow); }
+
+/* A voice's card, as the map's 灯り札: paper with a warm light round it,
+   the voice in Mincho, large and open, about twenty characters to a line;
+   under it, in small Gothic, which seat. */
+.cards { display: grid; gap: 16px; align-items: start; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
+.quote, .closing-word { max-width: 30rem; background: var(--paper); border-radius: 4px; padding: 16px 20px 12px;
+  box-shadow: 0 0 0 1px var(--paper-line), 0 0 22px var(--lamp-faint), 0 12px 28px var(--shadow); }
 .quote { margin: 0; }
 .quote.marked { box-shadow: 0 0 0 3px var(--lamp), 0 0 26px var(--lamp-soft), 0 12px 30px var(--shadow); }
-.quote .words { margin: 0 0 8px; font-family: var(--mincho); font-size: 18px; line-height: 1.8; max-width: 21em; }
-.quote .source { color: var(--paper-soft); font-size: .88rem; }
-.quote .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.quote .actions button { font-size: .85rem; padding: 3px 12px; min-height: 34px; }
-.quote .paragraph { color: var(--paper-soft); font-size: .95rem; border-left: 3px solid var(--paper-line); padding-left: 10px; }
-.planted { color: var(--warn); font-size: .95rem; }
+.quote .words { margin: 0 0 6px; font-family: var(--mincho); font-size: 18px; line-height: 1.8; max-width: 21em; }
+.quote .source, .closing-word .source { display: block; color: var(--paper-soft); font-family: var(--gothic); font-size: 14px; line-height: 1.5; }
+.quote .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--paper-line); }
+.quote .actions button { font-size: 14px; padding: 3px 14px; }
+.quote .paragraph { color: var(--paper-soft); font-size: 16px; border-left: 3px solid var(--paper-line); padding-left: 10px; }
+.planted { color: var(--warn); font-size: 16px; }
 .planted s { color: var(--soft); }
 
 /* A split: its heading, then its two sides, each side's seats over its cards. */
-.split { margin: 24px 0 8px; }
-.split .notice { font-size: .88rem; color: var(--soft); margin: 0; }
-.split .heading { font-family: var(--mincho); font-weight: 600; color: var(--lamp); font-size: 1.25rem; margin: 2px 0 14px; }
+.split { margin: 28px 0 8px; }
+.split .notice { font-size: 15px; color: var(--moon); margin: 0; }
+.split .heading { font-family: var(--mincho); font-weight: 600; color: var(--lamp); font-size: 1.3rem; line-height: 1.5; margin: 4px 0 16px; }
 .split .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; align-items: start; }
-.split .side { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.split .side { display: grid; gap: 14px; align-content: start; min-width: 0; }
 .split .side-head {
-  margin: 0; font-size: .88rem; font-weight: bold; letter-spacing: .14em; color: var(--moon);
+  margin: 0; font-size: 15px; font-weight: bold; letter-spacing: .14em; color: var(--moon);
   border-bottom: 1px solid var(--moon-soft); padding-bottom: 6px;
 }
-.split > button { margin-top: 12px; }
+.split > button { margin-top: 14px; }
 @media (max-width: 640px) { .split .sides { grid-template-columns: 1fr; } }
 
-/* The round's last word (SPEC 14-53 A): set apart from the quotes. */
-.closing { border-top: 1px dashed var(--moon-soft); margin-top: 20px; padding-top: 12px; }
-.closing-question { font-family: var(--mincho); font-weight: 600; margin: 0 0 8px; }
-.closing-word { background: var(--paper-2); border-radius: 4px; padding: 14px 20px; margin: 8px 0; box-shadow: 0 8px 20px var(--shadow); }
-.closing-word .label { font-size: .85rem; color: var(--paper-soft); margin: 0; }
-.closing-word .words { margin: 2px 0; font-family: var(--mincho); font-size: 17px; line-height: 1.8; max-width: 21em; }
-.closing-word .source { color: var(--paper-soft); font-size: .88rem; }
-.ask-seat { border-top: 1px dashed var(--moon-soft); margin-top: 20px; padding-top: 12px; }
-.ask-seat > .label { font-size: .88rem; color: var(--soft); margin: 0; }
-.ask-seat > .words { font-family: var(--mincho); font-weight: 600; margin: 2px 0 8px; }
+/* The round's last word (SPEC 14-53 A): set apart from the quotes; the
+   question is the moderator's, the words are the seats'. */
+.closing { border-top: 1px dashed var(--moon-soft); margin-top: 24px; padding-top: 14px; }
+.closing-question { font-family: var(--gothic); font-size: 16px; color: var(--moon); margin: 0 0 10px; }
+.closing-word { margin: 10px 0; }
+.closing-word .label { font-family: var(--gothic); font-size: 14px; color: var(--paper-soft); margin: 0 0 2px; letter-spacing: .06em; }
+.closing-word .words { margin: 2px 0 6px; font-family: var(--mincho); font-size: 18px; line-height: 1.8; max-width: 21em; }
+.ask-seat { border-top: 1px dashed var(--moon-soft); margin-top: 24px; padding-top: 14px; }
+.ask-seat > .label { font-size: 14px; color: var(--soft); margin: 0; letter-spacing: .06em; }
+.ask-seat > .words { font-family: var(--gothic); font-size: 16px; color: var(--moon); margin: 2px 0 10px; }
 /* 「まだ答えていない」: shown only, never a button. */
 .ask-seat > .not-answered { color: var(--soft); margin: 4px 0; }
-.more-piece { border-left: 3px solid var(--paper-line); padding-left: 10px; margin: 8px 0 4px; }
-.more-piece .words { margin: 2px 0; font-family: var(--mincho); line-height: 1.8; }
-.more-piece .source { color: var(--paper-soft); font-size: .88rem; }
+.more-piece { border-left: 3px solid var(--paper-line); padding-left: 12px; margin: 10px 0 4px; }
+.more-piece .words { margin: 2px 0; font-family: var(--mincho); font-size: 17px; line-height: 1.8; }
+.more-piece .source { color: var(--paper-soft); font-size: 14px; }
 /* A ranking item's title, small over the item. */
-.ranking-title { font-size: .8rem; color: var(--paper-soft); margin: 0; }
-.closing-word button.more, .closing-word button.not-heard { display: block; margin-top: 8px; }
+.ranking-title { font-size: 13px; color: var(--paper-soft); margin: 0; }
+.closing-word button.more, .closing-word button.not-heard { display: block; margin-top: 10px; }
 /* コーチとオブザーバー: apart from the seats' words, two cards of the same size, on the night. */
-.ai-band { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-top: 1px solid var(--moon-soft);
-  margin-top: 20px; padding-top: 12px; }
+.ai-band { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-top: 1px solid var(--moon-faint);
+  margin-top: 24px; padding-top: 14px; }
 @media (max-width: 560px) { .ai-band { grid-template-columns: 1fr; } }
-.ai-card { border: 1px dashed var(--faint); border-radius: 6px; padding: 12px 16px; background: var(--night-2); }
-.ai-card .label { font-size: .88rem; color: var(--soft); margin: 0; }
-.ai-card .badge { font-size: .8rem; color: var(--soft); margin: 0 0 4px; }
-.ai-card .words { margin: 2px 0 8px; }
+.ai-card { border: 1px dashed var(--faint); border-radius: 8px; padding: 12px 16px; background: var(--night-2); }
+.ai-card .label { font-size: 14px; color: var(--soft); margin: 0; }
+.ai-card .badge { font-size: 13px; color: var(--soft); margin: 0 0 4px; }
+.ai-card .words { margin: 2px 0 10px; }
 .ai-card.answered { border-style: solid; border-color: var(--moon-soft); }
 .ai-answer { display: flex; gap: 6px; }
-.ai-answer input { flex: 1; min-width: 0; padding: 4px 8px; }
-.ai-asked { color: var(--soft); font-size: .95rem; margin: 0 0 2px; }
+.ai-answer input { flex: 1; min-width: 0; padding: 4px 10px; }
+.ai-asked { color: var(--soft); font-size: 16px; margin: 0 0 2px; }
 .ai-asked .label { margin-right: 8px; }
 
-/* --- the seat list, under the map (keyboard and screen readers) --- */
-.seats h2 { margin-top: 40px; }
-.seats .met { color: var(--soft); }
-.kind-group h3 { font-size: 1.02rem; margin: 16px 0 6px; color: var(--ink); }
+/* --- the seat list, under the map (keyboard and screen readers): small
+   cards on the night; a seat met is lit like paper by a lamp --- */
+.seats h2 { margin-top: 44px; }
+.seats .met { color: var(--moon); font-size: 16px; }
+.kind-group h3 { font-size: 1.02rem; margin: 18px 0 8px; color: var(--ink); }
 .kind-group h3::before { content: "●"; margin-right: 6px; }
-.seat-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.seat-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
 .seat {
-  background: var(--night-2); border: 1px solid var(--moon-faint); border-radius: 6px;
-  padding: 6px 12px; min-width: 9em; max-width: 16em;
+  background: var(--night-2); border: 1px solid var(--moon-faint); border-radius: 6px; font-size: 16px;
+  padding: 6px 12px; min-width: 9em; max-width: 16em; line-height: 1.55;
+  transition: background-color .45s ease, box-shadow .45s ease;
 }
 .seat .title { font-weight: bold; }
-.seat .detail { font-size: .82rem; color: var(--soft); }
+.seat .detail { font-size: 14px; color: var(--soft); }
 .seat .order { display: inline-block; min-width: 1.6em; text-align: center; border-radius: 50%; background: var(--lamp); color: var(--night); margin-right: 4px; }
-.seat.lit { box-shadow: 0 0 0 2px var(--lamp), 0 0 16px var(--lamp-faint); }
-.seat.met .title::after { content: " ✓"; color: var(--soft); }
-.seat .not-asked { font-size: .88rem; color: var(--soft); }
+.seat.met { background: var(--paper); color: var(--paper-ink); border-color: var(--paper-line);
+  box-shadow: 0 0 14px var(--lamp-faint), 0 4px 12px var(--shadow); }
+.seat.met .detail, .seat.met .title::after { color: var(--paper-soft); }
+.seat.lit { box-shadow: 0 0 0 2px var(--lamp), 0 0 18px var(--lamp-soft); }
+.seat.met .title::after { content: " ✓"; }
+.seat .not-asked { font-size: 14px; color: var(--soft); }
 .card-form { margin-top: 6px; }
 .card-form label { display: block; font-size: .92rem; }
 .card-form textarea { width: 100%; padding: 6px 8px; }
@@ -278,8 +314,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 /* --- the reflection sheet --- */
 .to-reflect { text-align: center; margin: 36px 0; }
-#to-reflect { padding: 12px 30px; min-height: 48px; border-color: var(--lamp-soft); letter-spacing: .12em; }
-#to-reflect:hover { border-color: var(--lamp); }
+#to-reflect { padding: 12px 30px; min-height: 52px; border-color: var(--moon-soft); background: var(--night-2); letter-spacing: .12em; }
+#to-reflect:hover { border-color: var(--moon); background: var(--night-3); }
 .first-question { font-family: var(--mincho); }
 .step { background: var(--night-2); border: 1px solid var(--moon-faint); border-radius: 8px; padding: 16px 20px; margin: 14px 0; }
 .step label { display: block; margin: 8px 0; }
@@ -473,7 +509,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .map-card { background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: 8px; padding: 12px 16px; margin-top: 8px; }
 .map-card .title { font-weight: bold; }
 .map-card .not-asked { font-size: .88rem; color: var(--soft); }
-.map-card .close { margin-top: 6px; font-size: .88rem; padding: 2px 12px; min-height: 36px; }
+.map-card .close { margin-top: 8px; font-size: 15px; padding: 2px 14px; }
 
 @media (max-width: 640px) {
   .ask { grid-template-columns: 1fr; }
@@ -485,6 +521,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* Motion reduced: nothing moves; everything is at once as it ends. */
 @media (prefers-reduced-motion: reduce) {
   .pt .halo, .pt .shape, .drawing path, .chair, .relief-image, .basin-fill, .river, .rim, .points, .place-names,
-  .school, .shelf-boxes, .shelf-names, .crossing, button, .lab-choice::before, .map-bubble { transition: none !important; }
+  .school, .shelf-boxes, .shelf-names, .crossing, button, .lab-choice::before, .map-bubble, .seat { transition: none !important; }
   .map-bubble, .map-bubble .thread { animation: none !important; }
 }
