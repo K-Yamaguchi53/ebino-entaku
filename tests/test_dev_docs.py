@@ -55,10 +55,20 @@ def test_editing_the_sync_folder_is_denied():
     assert f"Edit(//{SYNC}/**)" in _deny()
 
 
+@pytest.mark.parametrize("folder", [DATA, RECORDS])
+def test_editing_the_data_and_records_folders_is_denied(folder):
+    assert f"Edit(//{folder}/**)" in _deny()
+
+
 @pytest.mark.parametrize("shell", ["Bash", "PowerShell"])
 @pytest.mark.parametrize("folder", FOLDERS)
 def test_commands_naming_each_folder_are_denied(shell, folder):
     assert f"{shell}(*{folder}*)" in _deny()
+
+
+@pytest.mark.parametrize("shell", ["Bash", "PowerShell"])
+def test_commands_naming_env_are_denied(shell):
+    assert f"{shell}(*.env*)" in _deny()
 
 
 def _user_names() -> set[str]:

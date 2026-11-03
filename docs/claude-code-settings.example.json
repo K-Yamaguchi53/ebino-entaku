@@ -7,14 +7,18 @@
       "Edit(//<学校の同期フォルダ>/**)",
       "Read(//<EBINO_DATA_DIR>/**)",
       "Read(//<EBINO_RECORDS_DIR>/**)",
+      "Edit(//<EBINO_DATA_DIR>/**)",
+      "Edit(//<EBINO_RECORDS_DIR>/**)",
       "Read(./.env)",
       "Read(./.env.*)",
       "Bash(*<学校の同期フォルダ>*)",
       "Bash(*<EBINO_DATA_DIR>*)",
       "Bash(*<EBINO_RECORDS_DIR>*)",
+      "Bash(*.env*)",
       "PowerShell(*<学校の同期フォルダ>*)",
       "PowerShell(*<EBINO_DATA_DIR>*)",
-      "PowerShell(*<EBINO_RECORDS_DIR>*)"
+      "PowerShell(*<EBINO_RECORDS_DIR>*)",
+      "PowerShell(*.env*)"
     ]
   }
 }
