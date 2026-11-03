@@ -257,6 +257,7 @@ const EbinoMap = (() => {
     // Over the points so its label reads; it takes no presses (not a seat).
     if (map.school) drawSchool(layer("school"), map.school);
     tableLayer = layer("table");
+    drawAround();
 
     $("map-source").textContent = map.source;
     $("map-dem").textContent = view.relief ? map.relief.source : "";
@@ -265,6 +266,131 @@ const EbinoMap = (() => {
     watchSize();
     setView(vb);
     refresh();
+  }
+
+  // --- which way is north (直し25-3) ---
+
+  // Which way north, east, south and west go on the drawing, as unit steps
+  // on the screen, worked out from the map's own projection at its middle
+  // (the map's y grows southward), so it holds for either map: on the
+  // picture north is towards the front, on the flat map it is up.
+  function compassWays() {
+    const [x, y] = centroid(map.boundary);
+    const level = view.relief ? view.zAt(x, y) : null;
+    const [x0, y0] = view.proj(x, y, 0, level);
+    const unit = ([x1, y1]) => {
+      const dx = x1 - x0, dy = y1 - y0, n = Math.hypot(dx, dy) || 1;
+      return [dx / n, dy / n];
+    };
+    const north = unit(view.proj(x, y - 100, 0, level)), east = unit(view.proj(x + 100, y, 0, level));
+    return { north, east, south: [-north[0], -north[1]], west: [-east[0], -east[1]] };
+  }
+
+  // A small arrow with 「北」 in a corner, and by each edge what lies that way
+  // (texts/map_around.tsv), on the overlay: they take no presses. They are
+  // put by placeAround, off the shelves, the words and the points.
+  function drawAround() {
+    const words = app.state.texts && app.state.texts.map_around;
+    if (!words) return;
+    const ways = compassWays();
+    const [nx, ny] = ways.north;
+    const compass = div("map-compass");
+    compass.setAttribute("role", "img");
+    compass.setAttribute("aria-label", words.north.word);
+    const dial = svgEl("svg", { viewBox: "-20 -20 40 40", "aria-hidden": "true", focusable: "false" });
+    dial.append(svgEl("circle", { class: "dial", r: 15 }));
+    const needle = dial.appendChild(svgEl("g", { transform: `rotate(${(Math.atan2(ny, nx) * 180 / Math.PI + 90).toFixed(1)})` }));
+    needle.append(svgEl("polygon", { class: "north", points: "0,-13 4.2,0 -4.2,0" }),
+      svgEl("polygon", { class: "tail", points: "0,13 4.2,0 -4.2,0" }));
+    const letter = div("letter", words.north.word);
+    letter.setAttribute("aria-hidden", "true");
+    letter.style.left = `calc(50% + ${(nx * 20).toFixed(1)}px)`;
+    letter.style.top = `calc(50% + ${(ny * 20).toFixed(1)}px)`;
+    compass.append(dial, letter);
+    overlay.append(compass);
+    for (const way of ["north", "east", "south", "west"]) {
+      const [ux, uy] = ways[way];
+      const note = div("map-around", words[way].place);
+      note.dataset.way = way;
+      note.setAttribute("aria-label", `${words[way].word}　${words[way].place}`);
+      note.style.setProperty("--turn", `${(Math.atan2(uy, ux) + Math.PI / 4).toFixed(3)}rad`);
+      overlay.append(note);
+    }
+  }
+
+  // The arrow first, then the four names, each kept off the shelves, the
+  // words drawn on the map, the points and what was put before it.
+  function placeAround() {
+    const compass = overlay.querySelector(".map-compass");
+    if (!compass) return;
+    const frameBox = overlay.getBoundingClientRect();
+    const frameWH = { w: frameBox.width, h: frameBox.height };
+    const avoid = [...fixedBoxes(frameBox, false),
+      ...[...svg.querySelectorAll(".points .pt .shape")].map((node) => boxIn(node, frameBox))];
+    const ways = compassWays();
+    const put = (node, [left, top]) => {
+      node.style.left = `${left}px`;
+      node.style.top = `${top}px`;
+      avoid.push(boxIn(node, frameBox));
+    };
+    put(compass, compassSpot(frameWH, { w: compass.offsetWidth, h: compass.offsetHeight }, avoid));
+    for (const note of overlay.querySelectorAll(".map-around")) {
+      put(note, aroundSpot(frameWH, { w: note.offsetWidth, h: note.offsetHeight }, ways[note.dataset.way], avoid));
+    }
+  }
+
+  // How much of a box [left, top] { w, h } the boxes [left, top, w, h] cover.
+  function coverOf([left, top], { w, h }, others) {
+    let sum = 0;
+    for (const [x, y, ow, oh] of others) {
+      const dx = Math.min(left + w, x + ow) - Math.max(left, x), dy = Math.min(top + h, y + oh) - Math.max(top, y);
+      if (dx > 0 && dy > 0) sum += dx * dy;
+    }
+    return sum;
+  }
+
+  // Where a way's name goes in a frame { w, h }: by the edge its way [ux, uy]
+  // leaves the frame's middle through, where that way meets it, then slid
+  // along that edge to the first spot that covers nothing in avoid (with
+  // none free, the one that covers least). Inside the frame by margin.
+  function aroundSpot(frame, box, [ux, uy], avoid, margin = 8) {
+    const { w: W, h: H } = frame;
+    const across = Math.abs(uy) * W >= Math.abs(ux) * H;  // The top or the bottom edge.
+    const clampX = (left) => Math.min(Math.max(left, margin), W - box.w - margin);
+    const clampY = (top) => Math.min(Math.max(top, margin), H - box.h - margin);
+    const base = across
+      ? [clampX(W / 2 + ux * (H / 2) / Math.abs(uy) - box.w / 2), uy > 0 ? H - box.h - margin : margin]
+      : [ux > 0 ? W - box.w - margin : margin, clampY(H / 2 + uy * (W / 2) / Math.abs(ux) - box.h / 2)];
+    let best = base, least = Infinity;
+    for (let step = 0; step <= (across ? W : H) / 2; step += 12) {
+      for (const sign of step ? [1, -1] : [1]) {
+        const spot = across ? [clampX(base[0] + sign * step), base[1]] : [base[0], clampY(base[1] + sign * step)];
+        const cover = coverOf(spot, box, avoid);
+        if (cover === 0) return spot;
+        if (cover < least) [best, least] = [spot, cover];
+      }
+    }
+    return best;
+  }
+
+  // Where the arrow goes: the first corner (bottom right, bottom left, top
+  // right, top left), slid along either of its edges, that covers nothing in
+  // avoid; with none free, the spot that covers least.
+  function compassSpot(frame, box, avoid, margin = 8) {
+    const { w: W, h: H } = frame;
+    const right = W - box.w - margin, bottom = H - box.h - margin;
+    const corners = [[right, bottom, -1, -1], [margin, bottom, 1, -1], [right, margin, -1, 1], [margin, margin, 1, 1]];
+    let best = [right, bottom], least = Infinity;
+    for (const [x, y, sx, sy] of corners) {
+      for (let step = 0; step <= Math.min(W, H) / 2; step += 12) {
+        for (const spot of step ? [[x + sx * step, y], [x, y + sy * step]] : [[x, y]]) {
+          const cover = coverOf(spot, box, avoid);
+          if (cover === 0) return spot;
+          if (cover < least) [best, least] = [spot, cover];
+        }
+      }
+    }
+    return best;
   }
 
   // The soft lights the drawing is lit with: round glows that fade to
@@ -738,7 +864,7 @@ const EbinoMap = (() => {
   // takes a press; the shelves with their rows of points; and what is drawn
   // on the map in words: the place names, the shelves' names, the school's
   // name and its mark.
-  function fixedBoxes(frameBox) {
+  function fixedBoxes(frameBox, withAround = true) {
     const nodes = [...tableLayer.querySelectorAll(".token .shape, .chair circle, .chair .hit")];
     // A seat of the round at the size it has once lit (not met yet, it is drawn smaller).
     const reach = 9.5 * pointScale() * frameBox.width / vb.w;
@@ -751,8 +877,10 @@ const EbinoMap = (() => {
       const [left, top] = toFrame(x0, y0), [right, bottom] = toFrame(x1, y1);
       return [left, top, right - left, bottom - top];
     });
+    // The arrow and the four ways' names (直し25-3), once they are put.
+    const around = withAround ? [...overlay.querySelectorAll(".map-compass, .map-around")].map((node) => boxIn(node, frameBox)) : [];
     return [...nodes.map((node) => boxIn(node, frameBox)), ...seats, ...(cover ? topStrips(cover) : []),
-      ...shelfBoxes, ...seenWords({ w: frameBox.width, h: frameBox.height }, words, cover)];
+      ...shelfBoxes, ...seenWords({ w: frameBox.width, h: frameBox.height }, words, cover), ...around];
   }
 
   // The shelves, each a box of the drawing [x0, y0, x1, y1] with its name and
@@ -830,6 +958,7 @@ const EbinoMap = (() => {
     if (!view) return;
     clearSchoolName();
     for (const node of overlay.querySelectorAll(".map-bubble")) node.remove();
+    placeAround();
     const nodes = [...overlay.querySelectorAll(".split-tag"), ...overlay.querySelectorAll(".table-label.empty"),
       ...overlay.querySelectorAll(".table-label:not(.empty)"), ...overlay.querySelectorAll(".map-tip")];
     const frameBox = overlay.getBoundingClientRect();

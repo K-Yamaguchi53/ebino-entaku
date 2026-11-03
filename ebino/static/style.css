@@ -529,6 +529,25 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   box-shadow: 0 6px 18px var(--shadow); font-family: var(--gothic); font-size: 14px; }
 .map-tip .title { font-weight: bold; }
 .map-tip .detail { font-size: 13px; color: var(--soft); }
+/* Which way is north: a small arrow with 「北」 in a corner, and by each
+   edge, in moonlight about the size of a place name, what lies that way
+   with a little chevron pointing out. They take no presses. */
+.map-compass, .map-around { position: absolute; transition: opacity .9s ease; }
+.map-compass { width: 56px; height: 56px; }
+.map-compass svg { position: absolute; left: 13px; top: 13px; width: 30px; height: 30px; overflow: visible; }
+.map-compass .dial { fill: var(--veil-thin); stroke: var(--moon-soft); stroke-width: 1px; }
+.map-compass .north { fill: var(--moon); }
+.map-compass .tail { fill: none; stroke: var(--moon-soft); stroke-width: 1px; }
+.map-compass .letter { position: absolute; transform: translate(-50%, -50%); font-family: var(--gothic);
+  font-size: 13px; font-weight: bold; line-height: 1; color: var(--moon);
+  text-shadow: 0 0 3px var(--night-deep), 0 0 6px var(--night-deep); }
+.map-around { white-space: nowrap; padding: 1px 4px; font-family: var(--gothic); font-size: 12px;
+  line-height: 1.4; letter-spacing: .08em; color: var(--moon);
+  text-shadow: 0 0 3px var(--night-deep), 0 0 6px var(--night-deep); }
+.map-around::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 6px;
+  vertical-align: .12em; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor;
+  transform: rotate(var(--turn)); }
+.map-frame:has(svg.dim) .map-compass, .map-frame:has(svg.dim) .map-around { opacity: .3; }
 /* 灯り札: a seat's voice on unbleached paper, a warm light round it, tied
    to its seat by a thin thread of light. The voice in large Mincho, about
    twenty characters to a line; under it, in small Gothic, which seat. */

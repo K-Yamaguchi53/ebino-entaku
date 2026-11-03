@@ -102,6 +102,11 @@ SCHOOL_LABEL = "school_label"
 # ID・文字・読み上げ; an empty 読み上げ reads the 文字 itself.
 MAP_BUTTONS = "map_buttons"
 MAP_BUTTON_IDS = ("back", "zoom_in", "zoom_out", "zoom_all")
+# Round the map (map.js): the word on the mark that points north (the north
+# row's 方位), and by each of the map's four sides what lies that way.
+# Columns ID・方位・その方向にある所.
+MAP_AROUND = "map_around"
+MAP_AROUND_IDS = ("north", "west", "south", "east")
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
@@ -155,6 +160,7 @@ def screen_texts() -> dict:
     texts: dict = {name: load_text(name) for name in SCREEN_TEXTS}
     texts.update({name: load_lines(name) for name in SCREEN_LISTS})
     texts[MAP_BUTTONS] = map_buttons()
+    texts[MAP_AROUND] = map_around()
     return texts
 
 
@@ -165,3 +171,11 @@ def map_buttons() -> dict[str, dict[str, str]]:
         raise ValueError(f"{MAP_BUTTONS}.tsv must have the rows {', '.join(MAP_BUTTON_IDS)}")
     return {key: {"text": rows[key]["文字"], "label": rows[key]["読み上げ"] or rows[key]["文字"]}
             for key in MAP_BUTTON_IDS}
+
+
+def map_around() -> dict[str, dict[str, str]]:
+    """{ID: {"word": its 方位, "place": what lies that way}}, the four of them."""
+    rows = {row["ID"]: row for row in load_table(MAP_AROUND, ("ID", "方位", "その方向にある所"))}
+    if set(rows) != set(MAP_AROUND_IDS):
+        raise ValueError(f"{MAP_AROUND}.tsv must have the rows {', '.join(MAP_AROUND_IDS)}")
+    return {key: {"word": rows[key]["方位"], "place": rows[key]["その方向にある所"]} for key in MAP_AROUND_IDS}
