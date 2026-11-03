@@ -19,8 +19,9 @@ question goes through the same check as the reflection's question back
 gate's list anywhere, no banned word outside 「」『』. If it fails, no card.
 
 The answer is looked for only among that seat's pieces this student has not
-been shown, fragments left out (closing.is_fragment), by the librarian, and
-goes through the guard. Its line says
+been shown, fragments left out (closing.is_fragment): the librarian gathers
+the pieces near the question, the moderator picks the one that answers it by
+ID (or none), and the copy goes through the guard. Its line says
 whose words they are, by the piece's voice: the person's own words get
 「この人が、別の所で話したこと」, an article's or a senior employee's words
 another line, so an article never reads as the person speaking. When nothing
@@ -28,12 +29,13 @@ is found, 「まだ答えていない」; a press on it makes a question card to
 seat holding the question (SPEC 2-2).
 """
 
+import json
 import re
 from dataclasses import dataclass
 
 from . import closing, librarian, reflection
-from .gate import GateError, ModelUnavailable
-from .guard import Quote
+from .gate import GateError, ModelUnavailable, json_answer, json_request
+from .prompts import ASK_SEAT
 from .texts import ASK_OTHER_SIDE, ASK_WHY, load_text
 
 FORM_WHY = "why"
@@ -103,7 +105,16 @@ def plan(session, round_no: int) -> Plan | None:
     return None
 
 
+def pick_request(question: str, pieces: list) -> dict:
+    data = {"question": question, "pieces": [entry.for_model() for entry in pieces]}
+    return json_request("moderator", ASK_SEAT, json.dumps(data, ensure_ascii=False), closing.SCHEMA)
+
+
 def run(session, card: Plan) -> AskSeat:
+    """The librarian gathers the seat's pieces near the question (widely, so
+    some do not answer it); the moderator picks the one piece that answers
+    it, by ID, copying its words (structured output), or none; the guard
+    checks the copy. No pick, or a copy the guard stops: 「まだ答えていない」."""
     asked = AskSeat(card.form, card.seat_id, card.quote_id, card.text)
     seen = session.seen_ids()
     entries = [e for e in session.library.entries if e.seat_id == card.seat_id and e.utterance_id not in seen
@@ -114,16 +125,20 @@ def run(session, card: Plan) -> AskSeat:
         return asked
     try:
         found = librarian.find(session.gate, entries, card.text)
+        gathered = [by_id[i] for i in dict.fromkeys(found.utterance_ids) if i in by_id]
+        if not gathered:
+            asked.status = NOT_FOUND
+            return asked
+        answer = json_answer(session.gate.send("moderator", pick_request(card.text, gathered)))
+        quotes, _ = closing.clean(answer, gathered)
     except (GateError, ModelUnavailable) as error:
         asked.status, asked.reason = UNAVAILABLE, str(error)
         return asked
-    for utterance_id in found.utterance_ids:
-        if utterance_id not in by_id:
-            continue
-        verdict = session.guard.screen([Quote(utterance_id, by_id[utterance_id].text)])[0]
-        if verdict.passed:
-            asked.status, asked.answer_id, asked.answer_text = ANSWERED, utterance_id, verdict.shown
-            return asked
-        asked.guard_stopped += 1
     asked.status = NOT_FOUND
+    if quotes:
+        verdict = session.guard.screen(quotes[:1])[0]
+        if verdict.passed:
+            asked.status, asked.answer_id, asked.answer_text = ANSWERED, verdict.quote.utterance_id, verdict.shown
+        else:
+            asked.guard_stopped += 1
     return asked

@@ -7,7 +7,7 @@ import pytest
 from ebino import ask_seat, editor
 from ebino.session import Refused
 from ebino.texts import ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, load_text
-from test_closing import QUESTION, sitting
+from test_closing import QUESTION, says, sitting
 from test_session import ANSWERED, editor_says, librarian_finds, moderator_says, u
 
 PIECES = [
@@ -53,36 +53,67 @@ def test_a_marked_quote_comes_first_and_is_asked_back_to_its_own_seat():
     assert card["question"] == "『畑は天気しだいなので、休みは空いたら取ります。』　そう考えるのは、なぜですか？"
 
 
-def test_pressed_the_librarian_looks_only_in_that_seats_pieces_and_the_guard_passes_it():
+B7 = ("b7", "雨の日は、畑に出ないで休みます。")
+B6 = ("b6", "この方は、休みを天気で決めている。")
+
+
+def picked_ids(client):
+    return [p["utterance_id"] for p in json.loads(client.requests[-1]["messages"][0]["content"])["pieces"]]
+
+
+def test_pressed_the_librarian_gathers_that_seats_pieces_and_the_moderator_picks_one():
     # Another seat's piece (a6) and a piece already shown (b1) are not on the
     # librarian's shelf, so naming them gives nothing.
-    session, client = round_one([librarian_finds("a6", "b1", "b7")])
+    session, client = round_one([librarian_finds("a6", "b1", "b7", "b6"), says(B7)])
     view = session.ask_the_seat(1)
-    assert client.requests[-1]["model"] == "claude-sonnet-5-5"
-    assert OTHER_SIDE in json.dumps(client.requests[-1], ensure_ascii=False)
+    assert client.requests[-2]["model"] == "claude-sonnet-5-5"
+    assert OTHER_SIDE in json.dumps(client.requests[-2], ensure_ascii=False)
+    assert client.requests[-1]["model"] == "claude-opus-5-5"  # The moderator picks, by ID.
+    assert client.requests[-1]["output_config"]["format"]["type"] == "json_schema"
+    assert picked_ids(client) == ["b7", "b6"]
+    assert OTHER_SIDE in client.requests[-1]["messages"][0]["content"]
     assert view["status"] == "answered" and view["piece"]["utterance_id"] == "b7"
     assert view["label"] == load_text(ASK_ANSWER_SAID) == "この人が、別の所で話したこと"
     assert view["piece"]["said"] and view["question"] == OTHER_SIDE
 
 
+def test_when_no_gathered_piece_answers_the_question_it_says_not_answered_yet():
+    # The librarian gathers widely: here only a piece of background, which
+    # the moderator does not pick.
+    session, client = round_one([librarian_finds("b6"), says()])
+    view = session.ask_the_seat(1)
+    assert view["status"] == "not_found" and view["piece"] is None
+    assert view["not_answered"] == load_text(ASK_NOT_ANSWERED)
+    assert client.requests[-1]["model"] == "claude-opus-5-5"
+
+
+@pytest.mark.parametrize("pick", [("a6", "店を継いだのは、父の背中を見ていたからです。"), ("b7", "雨の日は畑に出ない。")])
+def test_a_pick_not_gathered_or_a_copy_the_guard_stops_is_not_shown(pick):
+    session, _ = round_one([librarian_finds("b7"), says(pick)])
+    view = session.ask_the_seat(1)
+    assert view["status"] == "not_found" and view["piece"] is None
+    assert session.rounds[0].ask_seat.guard_stopped == (1 if pick[0] == "b7" else 0)
+
+
 def test_a_fragment_is_not_on_the_librarians_shelf():
     pieces = PIECES + [u("b5", "S02", "と話していた。"), u("b4", "S02", "うれしかった", voice="spoken")]
-    session, _ = round_one([librarian_finds("b5", "b4", "b7")], pieces=pieces)
+    session, client = round_one([librarian_finds("b5", "b4", "b7"), says(B7)], pieces=pieces)
     view = session.ask_the_seat(1)
-    assert view["piece"]["utterance_id"] == "b7"  # b5 and b4, named first, are not on the shelf.
+    assert picked_ids(client) == ["b7"]  # b5 and b4, named first, are not on the shelf.
+    assert view["piece"]["utterance_id"] == "b7"
 
 
 def test_a_ranking_item_given_as_the_answer_has_its_title_over_it():
     pieces = PIECES + [u("r0", "S02", "好きな場所ベスト3", section="ランキング"),
                        u("r1", "S02", "１位　雨の日の畑の小屋の中です。", section="ランキング")]
-    session, _ = round_one([librarian_finds("r1")], pieces=pieces)
+    session, _ = round_one([librarian_finds("r1"), says(("r1", "１位　雨の日の畑の小屋の中です。"))], pieces=pieces)
     view = session.ask_the_seat(1)
     assert view["piece"]["utterance_id"] == "r1" and view["piece"]["ranking_title"] == "好きな場所ベスト3"
     assert "r0" not in session.seen_ids()
 
 
 def test_an_articles_piece_never_gets_this_person_spoke_over_it():
-    session, _ = round_one([librarian_finds("b6")])
+    session, _ = round_one([librarian_finds("b6"), says(B6)])
     view = session.ask_the_seat(1)
     assert view["piece"]["utterance_id"] == "b6" and not view["piece"]["said"]
     assert view["label"] == load_text(ASK_ANSWER_WRITTEN) != load_text(ASK_ANSWER_SAID)
@@ -91,7 +122,7 @@ def test_an_articles_piece_never_gets_this_person_spoke_over_it():
 
 
 def test_once_per_round():
-    session, _ = round_one([librarian_finds("b7")])
+    session, _ = round_one([librarian_finds("b7"), says(B7)])
     session.ask_the_seat(1)
     with pytest.raises(Refused, match="already_asked"):
         session.ask_the_seat(1)
@@ -143,7 +174,7 @@ def test_no_split_and_no_mark_gives_no_card():
 
 def test_more_can_be_pressed_under_the_answer():
     pieces = PIECES + [u("b5", "S02", "晴れたら、朝から畑です。", voice="spoken")]
-    session, _ = round_one([librarian_finds("b7")], pieces=pieces)
+    session, _ = round_one([librarian_finds("b7"), says(B7)], pieces=pieces)
     session.ask_the_seat(1)
     heard = session.hear_more("b7")
     assert heard["pieces"][0]["utterance_id"] == "b6"  # Next in the same section, as recorded.
