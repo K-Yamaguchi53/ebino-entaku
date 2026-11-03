@@ -10,8 +10,11 @@ in texts/ (the teacher's wording) and the record's own words; no model
 writes it, and no new topic is made:
   - why: the quote the student marked in this round, asked back to its own
     seat (「なぜ」);
-  - other_side: a split's first quote, passed to a seat on the other side
-    (「『〇〇』と言った人がいる。あなたは？」).
+  - other_side: a quote on one side of a split, passed to a seat on the
+    other side (「『〇〇』と言った人がいる。あなたは？」); a quote of the
+    person's own words comes before an article's.
+Each form has a second sentence for an article's or a company's words
+(「と記事に書かれ…」), so they never read as something the person said.
 A marked quote comes first: it is the student's own pick. The quote is the
 first sentence of the words shown, whole. Before the card is shown, the
 question goes through the same check as the reflection's question back
@@ -35,12 +38,21 @@ from dataclasses import dataclass
 
 from . import closing, librarian, reflection
 from .gate import GateError, ModelUnavailable, json_answer, json_request
+from .ingest.utterance import VOICE_ANSWER, VOICE_OWN, VOICE_SENIOR, VOICE_SPOKEN
 from .prompts import ASK_SEAT
-from .texts import ASK_OTHER_SIDE, ASK_WHY, load_text
+from .texts import ASK_OTHER_SIDE, ASK_OTHER_SIDE_WRITTEN, ASK_WHY, ASK_WHY_WRITTEN, load_text
 
 FORM_WHY = "why"
 FORM_OTHER_SIDE = "other_side"
-TEMPLATES = {FORM_WHY: ASK_WHY, FORM_OTHER_SIDE: ASK_OTHER_SIDE}
+# The person's own words: a poster's or slide's own, said in an interview, a
+# senior employee's, an answer to a question card. An article's or a
+# company's words are written.
+PERSON_VOICES = frozenset({VOICE_OWN, VOICE_SPOKEN, VOICE_SENIOR, VOICE_ANSWER})
+# (form, written) -> the teacher's sentence in texts/.
+TEMPLATES = {
+    (FORM_WHY, False): ASK_WHY, (FORM_WHY, True): ASK_WHY_WRITTEN,
+    (FORM_OTHER_SIDE, False): ASK_OTHER_SIDE, (FORM_OTHER_SIDE, True): ASK_OTHER_SIDE_WRITTEN,
+}
 MAX_CHARS = reflection.MAX_ASK_BACK_CHARS
 
 ANSWERED = "answered"
@@ -77,29 +89,45 @@ def first_sentence(text: str) -> str:
     return match.group(0).strip() if match else text.strip()
 
 
-def question_for(form: str, quote_text: str) -> str:
-    return load_text(TEMPLATES[form]).format(quote=first_sentence(quote_text))
+def is_written(voice: str) -> bool:
+    """An article's or a company's words, not the person's own."""
+    return voice not in PERSON_VOICES
+
+
+def question_for(form: str, quote_text: str, voice: str = "spoken") -> str:
+    """The question in the teacher's wording; an article's words get the
+    written form, so they never read as something the person said."""
+    return load_text(TEMPLATES[form, is_written(voice)]).format(quote=first_sentence(quote_text))
+
+
+def _other_side(result) -> list:
+    """Every (seat, quote) a split can pass on: a quote on one side, asked to
+    a seat on the other side. The person's own words first, then an
+    article's; otherwise in the order of the splits, side A first."""
+    shown = {quote.utterance_id: quote for quote in result.quotes}
+    tries = []
+    for split in result.splits:
+        for this, other in ((split.side_a, split.side_b), (split.side_b, split.side_a)):
+            for quote in (shown[i] for i in this if i in shown):
+                seat = next((shown[i].seat_id for i in other
+                             if i in shown and shown[i].seat_id != quote.seat_id), None)
+                if seat:
+                    tries.append((FORM_OTHER_SIDE, seat, quote))
+    return sorted(tries, key=lambda t: is_written(t[2].voice))
 
 
 def plan(session, round_no: int) -> Plan | None:
     """The card for a round, or None: no marked quote and no split, or the
     question fails the check."""
     result = session.rounds[round_no - 1]
-    shown = {quote.utterance_id: quote for quote in result.quotes}
     tries = []
     marked = next((q for q in result.quotes if session.marks.get(q.seat_id) == q.utterance_id), None)
     if marked is not None:
         tries.append((FORM_WHY, marked.seat_id, marked))
-    for split in result.splits:
-        quote = shown.get(split.side_a[0])
-        other = next((shown[i].seat_id for i in split.side_b
-                      if i in shown and quote and shown[i].seat_id != quote.seat_id), None)
-        if quote and other:
-            tries.append((FORM_OTHER_SIDE, other, quote))
-            break
+    tries += _other_side(result)
     record = reflection.Record(session)
     for form, seat_id, quote in tries:
-        text = question_for(form, quote.text)
+        text = question_for(form, quote.text, quote.voice)
         if not reflection.checked(text, record, session.gate, MAX_CHARS):
             return Plan(form, seat_id, quote.utterance_id, text)
     return None

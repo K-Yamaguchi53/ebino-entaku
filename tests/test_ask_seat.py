@@ -6,9 +6,10 @@ import pytest
 
 from ebino import ask_seat, editor
 from ebino.session import Refused
-from ebino.texts import ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, load_text
+from ebino.texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_OTHER_SIDE,
+                         ASK_OTHER_SIDE_WRITTEN, ASK_WHY, ASK_WHY_WRITTEN, load_text)
 from test_closing import QUESTION, says, sitting
-from test_session import ANSWERED, editor_says, librarian_finds, moderator_says, u
+from test_session import ANSWERED, SPLIT, editor_says, librarian_finds, moderator_says, u
 
 PIECES = [
     u("b7", "S02", "雨の日は、畑に出ないで休みます。", voice="spoken"),
@@ -54,11 +55,49 @@ def test_a_marked_quote_comes_first_and_is_asked_back_to_its_own_seat():
 
 
 B7 = ("b7", "雨の日は、畑に出ないで休みます。")
-B6 = ("b6", "この方は、休みを天気で決めている。")
 
 
 def picked_ids(client):
     return [p["utterance_id"] for p in json.loads(client.requests[-1]["messages"][0]["content"])["pieces"]]
+
+
+HEADING = SPLIT[0]
+A2 = ("a2", "月曜は必ず店を閉める。")  # An article's words (S01).
+B6 = ("b6", "この方は、休みを天気で決めている。")  # An article's words (S02).
+B1 = ("b1", "畑は天気しだいなので、休みは空いたら取ります。")  # Said (S02).
+
+
+def split_round(quotes, side_a, side_b):
+    session, _ = sitting([librarian_finds(*[i for i, _ in quotes]),
+                          moderator_says(list(quotes), [(HEADING, side_a, side_b)])], kinds={}, pieces=PIECES)
+    session.ask(QUESTION)
+    return session
+
+
+def test_an_articles_quote_never_gets_someone_said_it():
+    session = split_round([A2, B6], ["a2"], ["b6"])
+    card = session.ask_card(1)["card"]
+    assert card["form"] == "other_side" and card["seat_id"] == "S02"
+    assert card["question"] == "『月曜は必ず店を閉める。』と記事に書かれた人がいる。あなたは？"
+    assert "と言った人がいる" not in card["question"]
+    assert load_text(ASK_OTHER_SIDE_WRITTEN) != load_text(ASK_OTHER_SIDE)
+
+
+def test_the_persons_own_words_on_either_side_come_first():
+    # Side A holds only an article's words; side B holds the person's own.
+    session = split_round([A2, B1], ["a2"], ["b1"])
+    card = session.ask_card(1)["card"]
+    assert card["seat_id"] == "S01"
+    assert card["question"] == "『畑は天気しだいなので、休みは空いたら取ります。』と言った人がいる。あなたは？"
+
+
+def test_a_marked_articles_quote_asks_why_in_the_written_form():
+    session, _ = round_one()
+    session.mark(1, "a2")
+    card = session.ask_card(1)["card"]
+    assert card["form"] == "why" and card["seat_id"] == "S01"
+    assert card["question"] == "『月曜は必ず店を閉める。』と記事に書かれています。そう考えるのは、なぜですか？"
+    assert load_text(ASK_WHY_WRITTEN) != load_text(ASK_WHY)
 
 
 def test_pressed_the_librarian_gathers_that_seats_pieces_and_the_moderator_picks_one():
