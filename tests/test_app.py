@@ -4,6 +4,7 @@ a fake model client, and a real server on 127.0.0.1 with a free port."""
 import http.client
 import json
 import random
+import re
 import socket
 import threading
 
@@ -58,6 +59,15 @@ def test_the_page_and_its_two_files_are_served_and_nothing_else(server):
         assert status == 200
     for path in ("/../ebino/app.py", "/static/app.js", "/.env", "/api/nothing"):
         assert request(srv, "GET", path)[0] == 404
+
+
+def test_a_hidden_box_stays_hidden_whatever_its_class_says():
+    # .sheet sets display: grid, which beat the browser's own [hidden] rule, so
+    # the empty sheet showed as a bare frame at the bottom of the reflection.
+    css = (app_module.STATIC_DIR / "style.css").read_text(encoding="utf-8")
+    assert re.search(r"\[hidden\]\s*\{\s*display:\s*none\s*!important;?\s*\}", css)
+    html = (app_module.STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    assert re.search(r'<dl id="sheet"[^>]*\bhidden\b', html)
 
 
 def test_setup_gives_texts_kinds_and_seat_labels(server):

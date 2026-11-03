@@ -10,6 +10,8 @@
   --lit: #f3c64b;
 }
 * { box-sizing: border-box; }
+/* A class that sets display (.sheet is a grid) must not show a hidden box. */
+[hidden] { display: none !important; }
 body {
   margin: 0;
   background: var(--paper);
