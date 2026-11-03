@@ -46,6 +46,9 @@ const EbinoMap = (() => {
   // Words drawn on the picture, in CSS px (they keep their size as it zooms).
   const TEXT_PX = { place: 11, school: 12, shelf: 11 };
   const WORD_PAD = 2;  // CSS px kept clear round a word drawn on the map.
+  // Where a seat's 「？」 may go, by its point (x, y, which way the text runs
+  // from there), in the order tried: upper right first.
+  const ASK_CORNERS = [[9, -6, "start"], [-9, -6, "end"], [9, 16, "start"], [-9, 16, "end"]];
 
   let map = null;  // The drawing from /api/setup.
   let app = null;  // What app.js lends: state, cardEntry, renderSeats, shownQuotes.
@@ -693,8 +696,8 @@ const EbinoMap = (() => {
   // map, not over it): the seats this round lights, on the map (all of them
   // from the start, so a seat lit later is not under an earlier bubble), or,
   // while the table is open, its seats and empty chairs with the square that
-  // takes a press; and the words drawn on the map: the place names, the
-  // shelves' names and the school's name.
+  // takes a press; the shelves with their rows of points; and the words drawn
+  // on the map: the place names, the shelves' names and the school's name.
   function fixedBoxes(frameBox) {
     const nodes = [...tableLayer.querySelectorAll(".token .shape, .chair circle, .chair .hit")];
     // A seat of the round at the size it has once lit (not met yet, it is drawn smaller).
@@ -704,8 +707,23 @@ const EbinoMap = (() => {
     const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text")]
       .map((node) => boxIn(node, frameBox));
     const cover = tableTop && tableTop.map(([x, y]) => toFrame(x, y));
+    const shelfBoxes = shelfAreas().map(([x0, y0, x1, y1]) => {
+      const [left, top] = toFrame(x0, y0), [right, bottom] = toFrame(x1, y1);
+      return [left, top, right - left, bottom - top];
+    });
     return [...nodes.map((node) => boxIn(node, frameBox)), ...seats, ...(cover ? topStrips(cover) : []),
-      ...seenWords({ w: frameBox.width, h: frameBox.height }, words, cover)];
+      ...shelfBoxes, ...seenWords({ w: frameBox.width, h: frameBox.height }, words, cover)];
+  }
+
+  // The shelves, each a box of the drawing [x0, y0, x1, y1] with its name and
+  // its row of points: on the picture where layoutShelves put it (a corner),
+  // on the flat map where the map has it.
+  function shelfAreas() {
+    if (view.relief) {
+      return shelves.filter((entry) => entry.origin).map(({ shelf: { box: [x0, y0, x1, y1] }, origin: [left, top], scale }) =>
+        [left, top, left + (x1 - x0) * scale, top + (y1 - y0) * scale]);
+    }
+    return (map.shelves || []).filter((shelf) => app.state.kinds[shelf.kind]).map((shelf) => shelf.box);
   }
 
   // The round table's top (a ring of spots in a frame) as a few boxes, band
@@ -793,6 +811,40 @@ const EbinoMap = (() => {
       node.style.left = `${spots[k][0]}px`;
       node.style.top = `${spots[k][1]}px`;
     });
+    placeAskMarks();
+  }
+
+  // A 「？」 by its seat, at the first of its four corners that covers no word
+  // drawn on the map (a place name, a shelf's name, the school's); with none
+  // free, the one that covers least. Measured on screen, as the zoom is now.
+  function placeAskMarks() {
+    const marks = [...svg.querySelectorAll(".pt.silent .ask-mark")];
+    if (!marks.length) return;
+    const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text")]
+      .map((node) => node.getBoundingClientRect()).filter((r) => r.width)
+      .map((r) => [r.left, r.top, r.width, r.height]);
+    for (const mark of marks) {
+      const boxes = ASK_CORNERS.map(([x, y, anchor]) => {
+        Object.entries({ x, y, "text-anchor": anchor }).forEach(([key, value]) => mark.setAttribute(key, value));
+        const r = mark.getBoundingClientRect();
+        return [r.left, r.top, r.width, r.height];
+      });
+      const [x, y, anchor] = ASK_CORNERS[leastCovered(boxes, words)];
+      Object.entries({ x, y, "text-anchor": anchor }).forEach(([key, value]) => mark.setAttribute(key, value));
+    }
+  }
+
+  // Of a few boxes, the first that covers none of the others given, or the
+  // one that covers least ([left, top, width, height]). It reads nothing but
+  // what it is given.
+  function leastCovered(boxes, others) {
+    let best = 0, least = Infinity;
+    boxes.forEach(([left, top, w, h], k) => {
+      const area = others.reduce((sum, [ol, ot, ow, oh]) => sum + Math.max(0, Math.min(left + w, ol + ow) - Math.max(left, ol)) *
+        Math.max(0, Math.min(top + h, ot + oh) - Math.max(top, ot)), 0);
+      if (area < least) { best = k; least = area; }
+    });
+    return best;
   }
 
   function overlaps(a, b) {
@@ -837,17 +889,7 @@ const EbinoMap = (() => {
     const cut = chars.length > BUBBLE_CHARS ? chars.slice(0, BUBBLE_CHARS).join("") + "…" : quote.text;
     const node = div("map-bubble");
     node.append(div("voice", quote.said ? `「${cut}」` : cut));
-    const who = div("who", [seat.title, seat.detail].filter(Boolean).join("　"));
-    // A mark for words that are not the person's own speech (an article, a
-    // company's text): shown only when texts/ gives its words (the teacher decides).
-    const mark = app.state.texts.lamp_note_mark;
-    if (mark && !quote.said && quote.source && quote.source.note) {
-      const tag = document.createElement("span");
-      tag.className = "mark";
-      tag.textContent = mark.replace("{note}", quote.source.note.split("（")[0]);
-      who.prepend(tag);
-    }
-    node.append(who);
+    node.append(div("who", [seat.title, seat.detail].filter(Boolean).join("　")));
     overlay.append(node);
     place(node, x, y, 18);
     thread(node, ...toFrame(x, y));
@@ -1106,7 +1148,8 @@ const EbinoMap = (() => {
     }
     // The split's heading: under the map, over neither the table's top nor
     // its chairs; on a map narrower than TAG_ON_MAP, in the split block only.
-    if (split && overlay.clientWidth >= TAG_ON_MAP) $("map-heading").textContent = app.shownQuotes(split.heading);
+    // It wraps after its 「：」 or between its 「…」, never inside one (app.phrased).
+    if (split && overlay.clientWidth >= TAG_ON_MAP) $("map-heading").replaceChildren(app.phrased(app.shownQuotes(split.heading)));
     for (const chairNode of tableLayer.querySelectorAll(".chair")) chairNode.classList.add("ready");
     relayout();
   }
@@ -1131,7 +1174,7 @@ const EbinoMap = (() => {
   function clearTable() {
     tokens = [];
     tableTop = null;
-    if ($("map-heading")) $("map-heading").textContent = "";
+    if ($("map-heading")) $("map-heading").replaceChildren();
     if (tableLayer) tableLayer.replaceChildren();
     if (svg) svg.classList.remove("dim");
     for (const { node } of Object.values(points)) node.setAttribute("tabindex", "0");
@@ -1162,6 +1205,7 @@ const EbinoMap = (() => {
       node.setAttribute("aria-label", words.filter(Boolean).join("　"));
     }
     $("map-met-count").textContent = String(app.state.met.size);
+    placeAskMarks();
   }
 
   // Pressing a 「？」 opens the same 「聞きたいことを書く」 as the seat list.

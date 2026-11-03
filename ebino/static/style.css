@@ -114,6 +114,10 @@ input[type="text"], textarea, select {
   font: inherit; color: var(--ink); background: var(--night-deep); border: 1px solid var(--moon-soft); border-radius: 6px;
 }
 input::placeholder, textarea::placeholder { color: var(--faint); }
+/* Words that wrap only between their pieces (app.js phrases()): a piece
+   wraps inside itself only when it is wider than its line. */
+.phrased { min-width: 0; }
+.phrase { display: inline-block; max-width: 100%; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 /* --- the entrance: the seven notices on one card, then the Lab --- */
@@ -422,7 +426,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .map-bubble .voice { font-family: var(--mincho); font-size: 17px; line-height: 1.8; max-width: 20em; }
 .map-bubble .who { width: 0; min-width: 100%; margin-top: 3px; font-family: var(--gothic); font-size: 13px;
   line-height: 1.5; color: var(--paper-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.map-bubble .mark { margin-right: .6em; padding: 0 5px; border: 1px solid var(--paper-line); border-radius: 3px; }
 .map-bubble.fading { opacity: 0; }
 .map-bubble .thread { position: absolute; height: 1.5px; transform-origin: 0 50%; transform: rotate(var(--a));
   background: linear-gradient(90deg, transparent, var(--lamp) 40%, var(--lamp-bright)); pointer-events: none;

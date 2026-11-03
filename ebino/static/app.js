@@ -61,8 +61,8 @@ async function setup() {
   for (const line of data.texts.start_notice) $("start-notice").append(el("li", { text: line }));
   $("lab-question").textContent = data.texts.lab_question;
   for (const [key, label] of Object.entries(data.labs)) {
-    $("lab-choices").append(el("button", { type: "button", class: "lab-choice", "aria-pressed": "false", text: label,
-      onclick: (event) => start(key, event.currentTarget) }));
+    $("lab-choices").append(el("button", { type: "button", class: "lab-choice", "aria-pressed": "false",
+      onclick: (event) => start(key, event.currentTarget) }, phrased(label)));
   }
   $("heavy-talk").textContent = data.texts.heavy_talk_notice;
   $("question").placeholder = "例：" + data.texts.input_example;
@@ -73,7 +73,7 @@ async function setup() {
   renderSeats();
   // The map over the seat list (map.js). No map, or one that fails to draw:
   // the seat list alone, as before.
-  if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, { state, cardEntry, renderSeats, shownQuotes }));
+  if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, { state, cardEntry, renderSeats, shownQuotes, phrased }));
 }
 
 // The Lab pressed lights up, the others step back, and the table opens a
@@ -445,6 +445,29 @@ function renderPlanted(text) {
 // and what the models are sent keep the heading as it was written.
 function shownQuotes(text) {
   return text.replace(/["“”]([^"“”\n]*)["“”]/g, "「$1」");
+}
+
+// Words that wrap only between their pieces: after a 「：」, between two
+// 「…」 (休みを「決めて取る」か｜「空いたら取る」か), and before a 「（」; never
+// inside a 「…」 or a （…）. A piece wider than its line wraps inside itself
+// only then. The same words, on screen only.
+function phrases(text) {
+  const pieces = [];
+  let piece = "", depth = 0, quoted = false;
+  const cut = () => { if (piece) pieces.push(piece); piece = ""; quoted = false; };
+  for (const char of text) {
+    if (!depth && ((char === "「" && quoted) || char === "（")) cut();
+    piece += char;
+    if (char === "「" || char === "（") depth += 1;
+    else if ((char === "」" || char === "）") && depth) { depth -= 1; if (!depth && char === "」") quoted = true; }
+    else if (!depth && char === "：") cut();
+  }
+  cut();
+  return pieces;
+}
+
+function phrased(text) {
+  return el("span", { class: "phrased" }, ...phrases(text).map((piece) => el("span", { class: "phrase", text: piece })));
 }
 
 function renderSplit(roundNo, split, byId, [quotesA, quotesB]) {

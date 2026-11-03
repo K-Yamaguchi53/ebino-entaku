@@ -440,6 +440,7 @@ let view, vb, frame = { clientWidth: 0 }, shelves = [], points = {};
 %(source)s
 const setup = %(setup)s, round = %(round)s, screens = %(screens)s;
 const map = setup.map;
+const app = { state: { kinds: setup.kinds } };
 view = reliefView(map.relief);
 const P = view.proj;
 const stub = () => { const node = {}; node.setAttribute = (key, value) => { node[key] = value; }; return node; };
@@ -488,7 +489,7 @@ function scene(width) {
     return out;
   };
   // The buttons are under the map, not over it: nothing of them is in the frame.
-  const out = { bubbles: [], labels: [], unplaced: 0, wordsLeftOut: 0, shelfNames: 0, shelfNamesSeen: 0 };
+  const out = { bubbles: [], labels: [], unplaced: 0, wordsLeftOut: 0, shelfNames: 0, shelfNamesSeen: 0, farByFixed: 0 };
 
   // The seats light up one by one on the whole map, each with its bubble;
   // the bubbles of the seats just before are still up. Every seat of the
@@ -502,6 +503,12 @@ function scene(width) {
     const [px, py] = toFrame(...spotOf(id)), r = 9.5 * pointScale() / perPx();
     return [px - r, py - r, 2 * r, 2 * r];
   });
+  // The shelves with their rows of points, as fixedBoxes takes them.
+  const shelfBoxes = () => shelfAreas().map(([x0, y0, x1, y1]) => {
+    const [left, top] = toFrame(x0, y0), [right, bottom] = toFrame(x1, y1);
+    return [left, top, right - left, bottom - top];
+  });
+  out.shelfBoxes = shelfBoxes().length;
   round.seat_order.forEach((id, k) => {
     const [px, py] = toFrame(...spotOf(id));
     const quote = round.quotes.find((q) => q.seat_id === id);
@@ -511,7 +518,7 @@ function scene(width) {
     const shelfNames = all.slice(map.places.length, map.places.length + shelves.length).filter((w) => inFrame(fr, w));
     out.shelfNamesSeen = Math.max(out.shelfNamesSeen, shelfNames.length);
     const seen = seenWords(fr, all, null);
-    const fixed = [...seen, ...lit];
+    const fixed = [...seen, ...lit, ...shelfBoxes()];
     const alive = up.filter((b) => b.k >= k - still && !b.gone);
     const [spot, least, drop] = planBubble(fr, box, fixed, [], alive.map((b) => b.box));
     const placed = [spot[0], spot[1], box.w, box.h];
@@ -519,9 +526,16 @@ function scene(width) {
     up.push({ k, box: placed });
     const without = chooseSpot(fr, box, [...lit, ...alive.filter((b) => !b.gone).map((b) => b.box)])[0];
     out.wordsLeftOut += covers([without[0], without[1], box.w, box.h], seen) ? 1 : 0;
-    const away = Math.hypot(Math.max(placed[0] - px, 0, px - placed[0] - placed[2]),
-      Math.max(placed[1] - py, 0, py - placed[1] - placed[3]));
-    out.bubbles.push({ least, near: away <= Math.max(BUBBLE_NEAR, fr.w * BUBBLE_NEAR_PART), onFixed: covers(placed, fixed), onShelfNames: covers(placed, shelfNames),
+    const awayOf = ([left, top]) => Math.hypot(Math.max(left - px, 0, px - left - box.w),
+      Math.max(top - py, 0, py - top - box.h));
+    const away = awayOf(placed);
+    // Near its seat: within BUBBLE_NEAR (or its part of the width), or, where
+    // the fixed boxes leave no spot that near (a seat on a shelf, low on a
+    // short frame), as near as they let it be.
+    const canBe = awayOf(chooseSpot(fr, box, fixed)[0]);
+    if (canBe > Math.max(BUBBLE_NEAR, fr.w * BUBBLE_NEAR_PART)) out.farByFixed += 1;
+    out.bubbles.push({ least, near: away <= Math.max(BUBBLE_NEAR, fr.w * BUBBLE_NEAR_PART, canBe), onFixed: covers(placed, fixed),
+      onShelfNames: covers(placed, shelfNames), onShelves: covers(placed, shelfBoxes()),
       onBubbles: covers(placed, alive.filter((b) => !b.gone).map((b) => b.box)),
       inside: placed[0] >= 0 && placed[1] >= 0 && placed[0] + placed[2] <= fr.w && placed[1] + placed[3] <= fr.h });
   });
@@ -537,7 +551,7 @@ function scene(width) {
   layoutShelves(f);
   const { seats } = seating(round, round.seat_order);
   const cover = ring(center, 0, TABLE_LIFT).map((p) => toFrame(...p));
-  const fixed = [...topStrips(cover)], labels = [];
+  const fixed = [...topStrips(cover), ...shelfBoxes()], labels = [];
   for (const sitting of seats) {
     const at = onTable(center, sitting.angle, SEAT_OUT), chair = sitting.group === "front";
     const k = chair ? Math.max(f * 1.2, MIN_CHAIR_PX * perPx() / CHAIR_R) : f * TOKEN;
@@ -575,7 +589,7 @@ def _scenes():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     consts = script[script.index("  const NS ="):script.index("  let map = null;")]
     names = ["centroid", "reliefView", "onTable", "ring", "tableView", "seating", "pointScale", "layoutShelves",
-             "shelfSpot", "chooseSpot", "planLabels", "within", "seenWords", "planBubble", "topStrips"]
+             "shelfSpot", "chooseSpot", "planLabels", "within", "seenWords", "planBubble", "topStrips", "shelfAreas"]
     source = "".join(_inner_function(script, name) for name in names)
     seats = [make_seat(seat_id=seat, kind=kind, title=f"架空の席{seat}", company="", display_name="",
                        district=district) for seat, kind, district in _ROUND_SEATS]
@@ -593,17 +607,18 @@ def _scenes():
 def test_bubbles_labels_and_the_heading_keep_off_the_maps_words_seats_and_buttons_on_the_four_screens():
     scenes = _scenes()
     assert set(scenes) == set(SCREENS)
-    left_out = 0
+    left_out = far_by_fixed = 0
     for name, scene in scenes.items():
         # The four shelves' names are on screen while the seats light up.
-        assert scene["shelfNames"] == 4 and scene["shelfNamesSeen"] == 4, name
+        assert scene["shelfNames"] == 4 and scene["shelfNamesSeen"] == 4 and scene["shelfBoxes"] == 4, name
         # Each bubble clear of the place names, the shelves' names, the
-        # school's name, the seats of the round, the buttons and the bubbles
-        # still up, inside the frame, and near its own seat.
+        # school's name, the seats of the round, the shelves with their rows
+        # of points, and the bubbles still up, inside the frame, and near its
+        # own seat.
         assert len(scene["bubbles"]) == len(_ROUND["seat_order"]), name
         for bubble in scene["bubbles"]:
-            assert bubble == {"least": 0, "near": True, "onFixed": 0, "onShelfNames": 0, "onBubbles": 0,
-                              "inside": True}, name
+            assert bubble == {"least": 0, "near": True, "onFixed": 0, "onShelfNames": 0, "onShelves": 0,
+                              "onBubbles": 0, "inside": True}, name
         # At the table every label is put, clear of those words (but the
         # ones the table's top hides), the table's top, the seats, the
         # empty chairs' squares that take a press, and one another.
@@ -612,8 +627,11 @@ def test_bubbles_labels_and_the_heading_keep_off_the_maps_words_seats_and_button
         for label in scene["labels"]:
             assert label == {"onFixed": 0, "onOthers": 0, "inside": True}, name
         left_out += scene["wordsLeftOut"]
+        far_by_fixed += scene["farByFixed"]
     # Not by luck: put without the map's words, some would cover them.
     assert left_out > 0
+    # Rarely further than BUBBLE_NEAR for want of room: one card in the four screens.
+    assert far_by_fixed <= 1
 
 
 def test_the_maps_words_are_among_what_a_label_or_bubble_keeps_off():
@@ -682,7 +700,8 @@ def test_the_maps_buttons_and_the_tables_heading_are_under_the_map_not_over_it()
     assert 'id="map-heading"' in bar
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     table = _inner_function(script, "openTable")
-    assert '$("map-heading").textContent = app.shownQuotes(split.heading)' in table and "split-tag" not in table
+    assert '$("map-heading").replaceChildren(app.phrased(app.shownQuotes(split.heading)))' in table
+    assert "split-tag" not in table
     assert "overlay.clientWidth >= TAG_ON_MAP" in table  # Narrower: in the split block only, as before.
     # While the table is open, Tab goes to its chairs, not to the map's points under it.
     assert 'node.setAttribute("tabindex", "-1")' in table
@@ -716,3 +735,37 @@ def test_with_motion_reduced_no_ring_goes_out_and_the_cards_do_not_move():
     css = _css()
     reduced = css[css.index("@media (prefers-reduced-motion: reduce)"):]
     assert ".map-bubble, .map-bubble .thread { animation: none !important; }" in reduced
+
+
+# --- 直し23: words wrap between their pieces; cards and 「？」 off the shelves and the names ---
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_a_heading_and_a_labs_name_wrap_only_between_their_pieces():
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    start = script.index("function phrases(")
+    source = script[start:script.index("\n}\n", start) + 3]
+    texts = ["ここで割れた：休みを「決めて取る」か「空いたら取る」か", "Creation（生活文化科）",
+             "ここで割れた：「空いたら取る」と「決めて取る」", "割れ目のない言葉"]
+    program = source + "process.stdout.write(JSON.stringify(%s.map(phrases)));" % json.dumps(texts, ensure_ascii=False)
+    done = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=30)
+    assert done.returncode == 0, done.stderr.decode("utf-8", "replace")
+    assert json.loads(done.stdout.decode("utf-8")) == [
+        ["ここで割れた：", "休みを「決めて取る」か", "「空いたら取る」か"], ["Creation", "（生活文化科）"],
+        ["ここで割れた：", "「空いたら取る」と", "「決めて取る」"], ["割れ目のない言葉"]]
+    assert 'phrased(label)' in script and "shownQuotes, phrased }" in script
+    css = _css()
+    assert ".phrase { display: inline-block; max-width: 100%; }" in css
+
+
+def test_cards_keep_off_the_shelves_and_a_seats_mark_off_the_maps_words():
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    fixed = _inner_function(script, "fixedBoxes")
+    assert "shelfAreas()" in fixed and "...shelfBoxes," in fixed
+    marks = _inner_function(script, "placeAskMarks")
+    assert ".place-names text, .shelf-names text, .school text" in marks and "leastCovered(" in marks
+    assert "placeAskMarks();" in _inner_function(script, "relayout") and "placeAskMarks();" in _inner_function(script, "refresh")
+    plan = _inner_function(script, "leastCovered")
+    for outside in ("overlay", "dataset", "document", "vb", "style", "classList", "svg"):
+        assert outside not in plan
+    # No mark on a card for words that are not the person's own (the teacher's answer).
+    assert "lamp_note_mark" not in script and not (REPO / "texts" / "lamp_note_mark.txt").exists()
