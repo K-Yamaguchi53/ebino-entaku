@@ -55,6 +55,15 @@ CLOSING_KIND_LABELS = "closing_kind_labels"
 # it makes a question card), and after that card is made.
 MORE_END = "more_end"
 MORE_CARD_DONE = "more_card_done"
+# 「司会が○○に聞いてみる」 (SPEC 14-53 B): the card's line ({seat} is the
+# seat's title), the two forms of the question ({quote} is the record's own
+# words), the line over an answer by its voice, and 「まだ答えていない」.
+ASK_SEAT_HEADER = "ask_seat_header"
+ASK_WHY = "ask_why"
+ASK_OTHER_SIDE = "ask_other_side"
+ASK_ANSWER_SAID = "ask_answer_said"
+ASK_ANSWER_WRITTEN = "ask_answer_written"
+ASK_NOT_ANSWERED = "ask_not_answered"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (

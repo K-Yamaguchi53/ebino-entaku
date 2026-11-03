@@ -91,6 +91,7 @@ def session_record(session) -> dict:
             "silent_seats": result.silent_seats,
             "card_id": result.card.card_id if result.card else "",
             "closing": _closing_record(result.closing),
+            "ask_seat": _ask_seat_record(result.ask_seat),
         })
     return {
         "session_id": session.session_id,
@@ -112,6 +113,23 @@ def session_record(session) -> dict:
             for state in session.mores.values()
         ],
         "reflection": _reflection_record(session.reflection),
+    }
+
+
+def _ask_seat_record(asked) -> dict | None:
+    """SPEC 14-53 B: the form, the seat asked, the quote the question held and
+    the answer's piece ID, by IDs only. None when the card was not pressed."""
+    if asked is None:
+        return None
+    return {
+        "form": asked.form,
+        "seat_id": asked.seat_id,
+        "quote_id": asked.quote_id,
+        "status": asked.status,
+        "reason": asked.reason,
+        "answer_id": asked.answer_id,
+        "guard_stopped": asked.guard_stopped,
+        "card_id": asked.card_id,
     }
 
 

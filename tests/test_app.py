@@ -147,7 +147,12 @@ def test_the_rounds_last_word_over_http(server):
     assert request(srv, "POST", "/api/more_card", {"utterance_id": "a1"}) == (
         400, {"error": "not_ready_for_card"})
     script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
-    assert 'call("/api/closing"' in script and 'if (round.status === "answered") closeRound(' in script
+    assert 'call("/api/closing"' in script and "closeRound(round.round, closingBox)" in script
+    # 「司会が○○に聞いてみる」: the card is fetched, asked only on a press, before the last word.
+    assert request(srv, "POST", "/api/ask_card", {"round": 1})[1]["card"]["form"] == "other_side"
+    assert request(srv, "POST", "/api/ask_seat_card", {"round": 1}) == (400, {"error": "not_ready_for_card"})
+    assert script.index("loadAskCard(round.round, askBox)") < script.index("closeRound(round.round, closingBox)")
+    assert 'call("/api/ask_seat"' in script and 'call("/api/ask_seat_card"' in script
     assert 'call("/api/more"' in script and 'call("/api/more_card"' in script
     assert "state.texts.more_end" in script and "state.texts.more_card_done" in script
 

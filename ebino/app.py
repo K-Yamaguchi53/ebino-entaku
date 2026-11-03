@@ -100,6 +100,12 @@ class App:
             return session.ask(body.get("question", ""))
         if path == "/api/closing":
             return session.close_round(body.get("round"))
+        if path == "/api/ask_card":
+            return session.ask_card(body.get("round"))
+        if path == "/api/ask_seat":
+            return session.ask_the_seat(body.get("round"))
+        if path == "/api/ask_seat_card":
+            return session.ask_card_to_seat(body.get("round"))
         if path == "/api/more":
             return session.hear_more(body.get("utterance_id", ""))
         if path == "/api/more_card":

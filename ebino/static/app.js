@@ -5,6 +5,7 @@
 const state = {
   texts: {}, kinds: {}, seats: [], seatById: {},
   lastOrder: [], met: new Set(), silent: new Set(), carded: new Set(), marks: {},
+  askBoxes: {},  // Round number -> the box of 「司会が○○に聞いてみる」.
 };
 
 const $ = (id) => document.getElementById(id);
@@ -136,7 +137,76 @@ function renderRound(round) {
   if (round.card) box.append(el("p", { class: "card-done", text: "この問いを質問カードにしました" }));
   $("rounds").prepend(box);
   renderSeats();
-  if (round.status === "answered") closeRound(round.round, box);
+  if (round.status === "answered") {
+    // 「司会が○○に聞いてみる」 comes before the last word (SPEC 14-53 B).
+    const askBox = el("div", { class: "ask-seat-box" });
+    const closingBox = el("div");
+    box.append(askBox, closingBox);
+    state.askBoxes[round.round] = askBox;
+    loadAskCard(round.round, askBox);
+    closeRound(round.round, closingBox);
+  }
+}
+
+// 「司会が○○に聞いてみる」 (SPEC 14-53 B): a card with one question to one
+// seat. Nothing is asked until the student presses it; once per round.
+async function loadAskCard(roundNo, box) {
+  let data;
+  try {
+    data = await call("/api/ask_card", { round: roundNo });
+  } catch (error) {
+    return;
+  }
+  if (data.asked) { renderAsked(roundNo, box, data.asked); return; }
+  box.replaceChildren();
+  if (!data.card) return;
+  const button = el("button", { type: "button", class: "quiet", text: "聞いてみる" });
+  button.onclick = async () => {
+    button.disabled = true;
+    try {
+      renderAsked(roundNo, box, await call("/api/ask_seat", { round: roundNo }));
+    } catch (error) {
+      button.disabled = false;
+    }
+  };
+  box.append(el("div", { class: "ask-seat" },
+    el("p", { class: "label", text: data.card.header }),
+    el("p", { class: "words", text: data.card.question }),
+    button));
+}
+
+function renderAsked(roundNo, box, asked) {
+  box.dataset.asked = "1";
+  const node = el("div", { class: "ask-seat" },
+    el("p", { class: "label", text: asked.header }),
+    el("p", { class: "words", text: asked.question }));
+  if (asked.piece) {
+    const answer = el("div", { class: "closing-word" },
+      el("p", { class: "label", text: asked.label }),
+      el("p", { class: "words", text: asked.piece.said ? `「${asked.piece.text}」` : asked.piece.text }),
+      el("span", { class: "source", text: sourceLine(asked.piece.source) }));
+    answer.append(moreButton(asked.piece.utterance_id, answer));
+    node.append(answer);
+  } else if (asked.not_answered) {
+    if (asked.card_made) {
+      node.append(el("p", { class: "card-done", text: state.texts.more_card_done }));
+    } else {
+      const toCard = el("button", { type: "button", class: "quiet not-heard", text: asked.not_answered });
+      toCard.onclick = async () => {
+        toCard.disabled = true;
+        try {
+          await call("/api/ask_seat_card", { round: roundNo });
+          toCard.replaceWith(el("p", { class: "card-done", text: state.texts.more_card_done }));
+        } catch (error) {
+          toCard.disabled = false;
+        }
+      };
+      node.append(toCard);
+    }
+  } else if (asked.message) {
+    node.append(el("p", { class: "message", text: asked.message }));
+  }
+  box.replaceChildren(node);
 }
 
 // 「最後に、何か伝えたいことはありますか」 (SPEC 14-53 A): asked after the
@@ -220,6 +290,9 @@ function renderQuote(roundNo, quote) {
       const seatId = other.dataset.seat;
       other.classList.toggle("marked", state.marks[seatId] === other.dataset.utterance);
     }
+    // A mark can change the card of 「司会が○○に聞いてみる」 until it is pressed.
+    const askBox = state.askBoxes[roundNo];
+    if (askBox && !askBox.dataset.asked) loadAskCard(roundNo, askBox);
   } });
   node.dataset.seat = quote.seat_id;
   node.append(

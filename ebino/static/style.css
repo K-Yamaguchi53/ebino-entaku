@@ -68,6 +68,9 @@ button:disabled { opacity: .5; cursor: wait; }
 .closing-word .label { font-size: .85rem; color: var(--soft); margin: 0; }
 .closing-word .words { margin: 2px 0; }
 .closing-word .source { color: var(--soft); font-size: .9rem; }
+.ask-seat { border-top: 2px dashed var(--line); margin-top: 12px; padding-top: 8px; }
+.ask-seat > .label { font-size: .85rem; color: var(--soft); margin: 0; }
+.ask-seat > .words { font-weight: bold; margin: 2px 0 6px; }
 .more-piece { border-left: 3px solid var(--line); padding-left: 10px; margin: 8px 0 4px; }
 .more-piece .words { margin: 2px 0; }
 .more-piece .source { color: var(--soft); font-size: .9rem; }

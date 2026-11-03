@@ -77,6 +77,9 @@ class Round:
     # 「最後に、何か伝えたいことはありますか」 (SPEC 14-53 A): closing.Closing,
     # once the screen asked for it after an answered round.
     closing: object = None
+    # 「司会が○○に聞いてみる」 (SPEC 14-53 B): ask_seat.AskSeat, once the
+    # student pressed the card.
+    ask_seat: object = None
 
     @property
     def seat_order(self) -> list[str]:

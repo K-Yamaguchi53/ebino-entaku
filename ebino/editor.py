@@ -8,7 +8,11 @@ A card is made in these ways (SPEC 14-12, 14-53):
   - not_heard_yet: under 「もっと聞く」 the seat's section ran out and the
     student pressed 「ここから先は、まだ聞いていない」; the round's question
     goes to that seat.
-The card's text is always the student's own words. The editor (Sonnet 5.5)
+  - ask_seat: 「司会が○○に聞いてみる」 found nothing and the student pressed
+    「まだ答えていない」; the card's question goes to that seat. It holds the
+    record's words in a fixed sentence, not the student's own words.
+No model writes a card's text: it is the student's own words, or for
+ask_seat the checked question built from the record. The editor (Sonnet 5.5)
 adds, on the back of the card only, seats that could be asked and, for a
 question that asks only for a fact, a rephrasing that asks why. The back is
 for the teacher and next year's interviewers; it is never on the student's
@@ -31,6 +35,9 @@ ORIGIN_STUDENT = "student"
 # The student pressed 「ここから先は、まだ聞いていない」 under 「もっと聞く」: the
 # round's question goes to that seat (SPEC 2-2).
 ORIGIN_NOT_HEARD = "not_heard_yet"
+# 「司会が○○に聞いてみる」 found nothing and the student pressed 「まだ答えていない」:
+# the moderator's question goes to that seat (SPEC 14-53 B, 2-2).
+ORIGIN_ASK_SEAT = "ask_seat"
 MAX_ASK = 3
 MAX_REPHRASE_CHARS = 80
 
@@ -96,8 +103,8 @@ def card_for_no_answer(gate: Gate, question: str, seats: list[Seat]) -> Question
 
 
 def card_for_seat(gate: Gate, origin: str, seat_id: str, text: str, seats: list[Seat]) -> QuestionCard:
-    """A card to one seat the student pressed for, holding the student's own
-    question (「まだ聞いていない」 under 「もっと聞く」, SPEC 2-2)."""
+    """A card to one seat the student pressed for (「まだ聞いていない」 under
+    「もっと聞く」, or 「まだ答えていない」 on 「司会が○○に聞いてみる」; SPEC 2-2)."""
     return QuestionCard(new_card_id(), origin, text, seat_id, write_back(gate, text, seats))
 
 

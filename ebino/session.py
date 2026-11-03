@@ -18,10 +18,11 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import closing, editor, harvest, more, reflection, roundtable, talk_kinds
+from . import ask_seat, closing, editor, harvest, more, reflection, roundtable, talk_kinds
 from .editor import QuestionCard
 from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
-from .texts import CLOSING_KIND_LABELS, CLOSING_QUESTION, NAME_IN_QUESTION, load_table, load_text
+from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_SEAT_HEADER, CLOSING_KIND_LABELS,
+                    CLOSING_QUESTION, MODEL_UNAVAILABLE, NAME_IN_QUESTION, load_table, load_text)
 from .gate import Gate
 from .guard import Guard
 from .index import Entry, build_index, load_topics, load_utterances
@@ -218,13 +219,80 @@ class Session:
             return {"round": round_no, "question": "", "words": []}
         return {"round": round_no, "question": load_text(CLOSING_QUESTION), "words": words}
 
+    # --- 「司会が○○に聞いてみる」 (SPEC 14-53 B) ---
+
+    def _answered_round(self, round_no: int) -> roundtable.Round:
+        result = self._round(round_no)
+        if result.status != roundtable.ANSWERED:
+            raise Refused("no_seat_spoke")
+        return result
+
+    def ask_card(self, round_no: int) -> dict:
+        """The card as it stands; no model is called. Asked again after a
+        mark, it may change until the student presses it."""
+        result = self._answered_round(round_no)
+        if result.ask_seat is not None:
+            return {"round": round_no, "card": None, "asked": self.asked_view(round_no)}
+        card = ask_seat.plan(self, round_no)
+        if card is None:
+            return {"round": round_no, "card": None, "asked": None}
+        title = seat_label(self._seats[card.seat_id], self.library.show_private).title
+        return {"round": round_no, "asked": None,
+                "card": {"form": card.form, "seat_id": card.seat_id,
+                         "header": load_text(ASK_SEAT_HEADER).format(seat=title), "question": card.text}}
+
+    def ask_the_seat(self, round_no: int) -> dict:
+        """The student pressed the card: the seat is asked, once per round."""
+        result = self._answered_round(round_no)
+        if result.ask_seat is not None:
+            raise Refused("already_asked")
+        card = ask_seat.plan(self, round_no)
+        if card is None:
+            raise Refused("no_ask_card")
+        result.ask_seat = ask_seat.run(self, card)
+        self.save()
+        return self.asked_view(round_no)
+
+    def asked_view(self, round_no: int) -> dict:
+        asked = self._round(round_no).ask_seat
+        title = seat_label(self._seats[asked.seat_id], self.library.show_private).title
+        view = {"round": round_no, "status": asked.status, "seat_id": asked.seat_id,
+                "header": load_text(ASK_SEAT_HEADER).format(seat=title), "question": asked.text,
+                "label": "", "piece": None, "not_answered": "", "message": "", "card_made": bool(asked.card_id)}
+        if asked.status == ask_seat.ANSWERED:
+            utterance = self._utterances[asked.answer_id]
+            said = not utterance.note
+            # The person's own words, or an article's: never shown as the person speaking.
+            view["label"] = load_text(ASK_ANSWER_SAID if said else ASK_ANSWER_WRITTEN)
+            view["piece"] = {"utterance_id": asked.answer_id, "seat_id": asked.seat_id, "text": asked.answer_text,
+                             "said": said, "source": self.source(asked.seat_id, utterance)}
+        elif asked.status == ask_seat.NOT_FOUND:
+            view["not_answered"] = load_text(ASK_NOT_ANSWERED)
+        else:
+            view["message"] = load_text(MODEL_UNAVAILABLE)
+        return view
+
+    def ask_card_to_seat(self, round_no: int) -> dict:
+        """「まだ答えていない」 pressed: the question becomes a card to that seat."""
+        asked = self._round(round_no).ask_seat
+        if asked is None or asked.status != ask_seat.NOT_FOUND or asked.card_id:
+            raise Refused("not_ready_for_card")
+        card = editor.card_for_seat(self.gate, editor.ORIGIN_ASK_SEAT, asked.seat_id, asked.text,
+                                    self.library.seats)
+        self.cards.append(card)
+        asked.card_id = card.card_id
+        self.save()
+        return card.front()
+
     def more_origins(self) -> dict[str, int]:
         """Pieces 「もっと聞く」 may be pressed under, with their round: the
-        rounds' last words."""
+        rounds' last words and the answers 「司会が○○に聞いてみる」 found."""
         origins: dict[str, int] = {}
         for number, result in enumerate(self.rounds, start=1):
             for word in result.closing.words if result.closing else []:
                 origins.setdefault(word.utterance_id, number)
+            if result.ask_seat is not None and result.ask_seat.answer_id:
+                origins.setdefault(result.ask_seat.answer_id, number)
         return origins
 
     def hear_more(self, utterance_id: str) -> dict:
@@ -403,7 +471,8 @@ class Session:
         a last word."""
         closings = {w.utterance_id for r in self.rounds if r.closing for w in r.closing.words}
         heard = {piece_id for state in self.mores.values() for piece_id in state.shown}
-        return self.shown_ids() | closings | heard
+        answers = {r.ask_seat.answer_id for r in self.rounds if r.ask_seat and r.ask_seat.answer_id}
+        return self.shown_ids() | closings | heard | answers
 
     def seconds_used(self) -> int:
         return int(time.monotonic() - self.started)
