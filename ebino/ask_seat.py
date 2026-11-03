@@ -19,7 +19,8 @@ question goes through the same check as the reflection's question back
 gate's list anywhere, no banned word outside 「」『』. If it fails, no card.
 
 The answer is looked for only among that seat's pieces this student has not
-been shown, by the librarian, and goes through the guard. Its line says
+been shown, fragments left out (closing.is_fragment), by the librarian, and
+goes through the guard. Its line says
 whose words they are, by the piece's voice: the person's own words get
 「この人が、別の所で話したこと」, an article's or a senior employee's words
 another line, so an article never reads as the person speaking. When nothing
@@ -30,7 +31,7 @@ seat holding the question (SPEC 2-2).
 import re
 from dataclasses import dataclass
 
-from . import librarian, reflection
+from . import closing, librarian, reflection
 from .gate import GateError, ModelUnavailable
 from .guard import Quote
 from .texts import ASK_OTHER_SIDE, ASK_WHY, load_text
@@ -105,7 +106,8 @@ def plan(session, round_no: int) -> Plan | None:
 def run(session, card: Plan) -> AskSeat:
     asked = AskSeat(card.form, card.seat_id, card.quote_id, card.text)
     seen = session.seen_ids()
-    entries = [e for e in session.library.entries if e.seat_id == card.seat_id and e.utterance_id not in seen]
+    entries = [e for e in session.library.entries if e.seat_id == card.seat_id and e.utterance_id not in seen
+               and not closing.is_fragment(e.text)]
     by_id = {entry.utterance_id: entry for entry in entries}
     if not entries:
         asked.status = NOT_FOUND

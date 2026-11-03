@@ -86,6 +86,27 @@ def test_pieces_of_kind_none_unanswered_and_ranking_titles_never_answer():
     assert session.library.kind_order[0] == "to_students" and session.library.kind_order[-1] == "none"
 
 
+@pytest.mark.parametrize("text, fragment", [
+    ("と話していた。", True), ("うれしかった", True), ("って笑っていました。", True),
+    ("休みの日は、川で釣りをします。", False), ("いつも楽しく働いています", False),
+])
+def test_a_fragment_is_known_by_code(text, fragment):
+    assert closing.is_fragment(text) is fragment
+
+
+def test_a_fragment_never_gives_the_last_word():
+    pieces = [u("a9", "S01", "と話していた。", voice="article"), u("a8", "S01", "うれしかった", voice="spoken"),
+              u("a7", "S01", "休みの日は、川で釣りをします。")]
+    kinds = {"a9": "to_students", "a8": "joy", "a7": "refresh"}
+    session, client = sitting(ANSWERED + [says(("a7", "休みの日は、川で釣りをします。"))], kinds=kinds, pieces=pieces)
+    assert {k: [e.utterance_id for e in v] for k, v in session.library.closing_pieces["S01"].items()} == {
+        "refresh": ["a7"]}
+    session.ask(QUESTION)
+    view = session.close_round(1)
+    assert sent_ids(client) == ["a7"]
+    assert [w["utterance_id"] for w in view["words"]] == ["a7"]
+
+
 # --- the round's last word ---
 
 def test_each_lit_seat_answers_with_one_piece_of_the_kind_code_picked():

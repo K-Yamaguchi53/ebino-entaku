@@ -65,6 +65,13 @@ def test_pressed_the_librarian_looks_only_in_that_seats_pieces_and_the_guard_pas
     assert view["piece"]["said"] and view["question"] == OTHER_SIDE
 
 
+def test_a_fragment_is_not_on_the_librarians_shelf():
+    pieces = PIECES + [u("b5", "S02", "と話していた。"), u("b4", "S02", "うれしかった", voice="spoken")]
+    session, _ = round_one([librarian_finds("b5", "b4", "b7")], pieces=pieces)
+    view = session.ask_the_seat(1)
+    assert view["piece"]["utterance_id"] == "b7"  # b5 and b4, named first, are not on the shelf.
+
+
 def test_an_articles_piece_never_gets_this_person_spoke_over_it():
     session, _ = round_one([librarian_finds("b6")])
     view = session.ask_the_seat(1)

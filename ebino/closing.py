@@ -9,8 +9,9 @@ is made (SPEC 3, 1-1).
 Which pieces may answer is decided by the kind of talk each piece was tagged
 with at ingest (talk_kinds.py; the teacher's table texts/talk_kinds.tsv):
 every kind but 「なし」 (none). A ranking's title alone (a line ending in
-ベスト or ランキング and a number) never answers. Section names are not looked
-at.
+ベスト or ランキング and a number) never answers, nor does a fragment (shorter
+than 8 characters, or starting with 「と」 or 「って」). Section names are not
+looked at.
 
 For each seat, code picks one kind: among the kinds the seat still has a
 piece for that this student has not been shown, the kind shown to this
@@ -36,6 +37,8 @@ from .talk_kinds import NONE
 MAX_SEATS = 3
 # 「やってよかったことベスト3」「好きな場所ランキング５」: a ranking's title alone.
 _RANKING_TITLE = re.compile(r"(?:ベスト|ランキング)\s*[0-9０-９一二三四五六七八九十]+\s*[!！]?\s*$")
+MIN_PIECE_CHARS = 8
+FRAGMENT_LEADS = ("と", "って")
 
 SHOWN = "shown"  # At least one seat's words passed the guard.
 NONE_HOLD = "none_hold"  # No lit seat holds a piece that may answer: no call.
@@ -64,12 +67,21 @@ def is_ranking_title(text: str) -> bool:
     return "\n" not in text.strip() and _RANKING_TITLE.search(text.strip()) is not None
 
 
+def is_fragment(text: str) -> bool:
+    """A piece that means nothing without the pieces around it (the teacher's
+    call on the real data: 「と語った。」「楽しかった」): shorter than
+    MIN_PIECE_CHARS, or starting with a quoting 「と」 or 「って」. Never an
+    answer on its own: not the last word, not the seat's answer."""
+    text = text.strip()
+    return len(text) < MIN_PIECE_CHARS or text.startswith(FRAGMENT_LEADS)
+
+
 def pieces_by_seat(entries: list[Entry], kind_of: dict[str, str]) -> dict[str, dict[str, list[Entry]]]:
     """Each seat's pieces that may answer, by kind, in reading order."""
     found: dict[str, dict[str, list[Entry]]] = {}
     for entry in entries:
         kind = kind_of.get(entry.utterance_id, NONE)
-        if kind == NONE or is_ranking_title(entry.text):
+        if kind == NONE or is_ranking_title(entry.text) or is_fragment(entry.text):
             continue
         found.setdefault(entry.seat_id, {}).setdefault(kind, []).append(entry)
     return found
