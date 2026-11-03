@@ -1,10 +1,12 @@
 """「司会が○○に聞いてみる」 (SPEC 14-53 B). Every seat and piece is invented."""
 
 import json
+from dataclasses import replace
 
 import pytest
 
 from ebino import ask_seat, editor, harvest
+from ebino.ingest.utterance import TEACHER_ARTICLE_NOTE
 from ebino.reflection import Reflection
 from ebino.session import Refused
 from ebino.texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_OTHER_SIDE,
@@ -68,11 +70,38 @@ B6 = ("b6", "この方は、休みを天気で決めている。")  # An article
 B1 = ("b1", "畑は天気しだいなので、休みは空いたら取ります。")  # Said (S02).
 
 
-def split_round(quotes, side_a, side_b):
+def split_round(quotes, side_a, side_b, pieces=PIECES):
     session, _ = sitting([librarian_finds(*[i for i, _ in quotes]),
-                          moderator_says(list(quotes), [(HEADING, side_a, side_b)])], kinds={}, pieces=PIECES)
+                          moderator_says(list(quotes), [(HEADING, side_a, side_b)])], kinds={}, pieces=pieces)
     session.ask(QUESTION)
     return session
+
+
+# The teacher's own article (SPEC 14-50): voice own, but shown with a note.
+T1 = ("t1", "休みの日は、朝から店の前を掃いている。")
+WITH_TEACHER = PIECES + [replace(u("t1", "S01", T1[1], voice="own"), source_note=TEACHER_ARTICLE_NOTE)]
+
+
+def test_the_teachers_article_is_asked_in_the_written_form_by_its_note_not_its_voice():
+    session = split_round([T1, B6], ["t1"], ["b6"], pieces=WITH_TEACHER)
+    card = session.ask_card(1)["card"]
+    assert card["seat_id"] == "S02"
+    assert card["question"] == "『休みの日は、朝から店の前を掃いている。』と記事に書かれた人がいる。あなたは？"
+
+
+def test_a_marked_teachers_article_asks_why_in_the_written_form():
+    session = split_round([T1, B6], ["t1"], ["b6"], pieces=WITH_TEACHER)
+    session.mark(1, "t1")
+    card = session.ask_card(1)["card"]
+    assert card["form"] == "why" and card["seat_id"] == "S01"
+    assert card["question"] == "『休みの日は、朝から店の前を掃いている。』と記事に書かれています。そう考えるのは、なぜですか？"
+
+
+def test_words_with_no_note_come_before_the_teachers_article():
+    session = split_round([T1, B1], ["t1"], ["b1"], pieces=WITH_TEACHER)
+    card = session.ask_card(1)["card"]
+    assert card["seat_id"] == "S01"
+    assert card["question"] == "『畑は天気しだいなので、休みは空いたら取ります。』と言った人がいる。あなたは？"
 
 
 def test_an_articles_quote_never_gets_someone_said_it():
