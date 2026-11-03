@@ -8,6 +8,7 @@ from conftest import DISPLAY_NAME, make_seat
 from fake_client import FakeClient, text_response
 
 from ebino import purpose_summary
+from ebino.banned_words import BANNED_WORDS
 from ebino.gate import Gate, NameList
 from ebino.ingest.utterance import Utterance
 from ebino.purpose import samples
@@ -128,6 +129,39 @@ def test_the_command_sends_only_long_samples_missing_a_summary_and_counts_what_f
     assert dict(report.stopped) == {"banned_word": 1} and report.missing == ["P03"]
     printed = "\n".join(report.lines())
     assert "P03" in printed and "祭り" not in printed and "川" not in printed  # Counts, codes and IDs only.
+
+
+WISH = "若い人にも、商店街で店を開く楽しさを知ってほしいと考えた。"
+WISH_SAMPLE = ("商店街の空き店舗が増えている理由を、店の人と町の人の両方から確かめたい。" * 3, WISH)
+
+
+def wish_sample():
+    pieces = [u("w1", "P01", WISH_SAMPLE[0]), u("w2", "P01", WISH_SAMPLE[1])]
+    return samples(pieces, SEATS)[0]
+
+
+def test_the_request_asks_for_a_wish_in_quotes_from_one_line_with_the_banned_words():
+    sample = wish_sample()
+    assert purpose_summary.is_long(sample)
+    request = purpose_summary.request_for(sample)
+    system = request["system"][0]["text"]
+    assert "見本の言葉のまま「」で引く" in system and "見本の1行の中の言葉だけ" in system
+    assert "「」『』は使わない" not in system  # The old rule against any quote is gone.
+    assert all(word in system for word in BANNED_WORDS)
+    assert "{" not in system  # Every slot is filled.
+    # The pieces go one to a line, so the model sees the lines a quote stays in.
+    assert json.loads(request["messages"][0]["content"])["text"] == "\n".join(WISH_SAMPLE)
+
+
+def test_a_wish_quoted_from_the_sample_passes_and_one_in_own_words_is_still_stopped():
+    sample = wish_sample()
+    quoted = "空き店舗が増えた理由を確かめ、「若い人にも、商店街で店を開く楽しさを知ってほしい」と考えた。"
+    assert not purpose_summary.stopped(quoted, sample, names())
+    own_words = "空き店舗が増えた理由を確かめ、若い人にも店を開く楽しさを知ってほしいと考えた。"
+    assert purpose_summary.stopped(own_words, sample, names()) == "banned_word"
+    # A 「」 must still hold the sample's words from one line: not changed, not across pieces.
+    for wrong in ("「若い人にも、店を開く楽しさを知ってほしい」", "「両方から確かめたい。若い人にも」"):
+        assert purpose_summary.stopped(f"空き店舗が増えた中で、{wrong}と考えた。", sample, names()) == "quote_not_in_record"
 
 
 def test_the_command_makes_a_summary_and_a_failed_request_is_counted():

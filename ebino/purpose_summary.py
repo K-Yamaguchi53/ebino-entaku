@@ -9,7 +9,10 @@ MAX_SAMPLE_CHARS are sent, one by one, through the gate to the editor model
 summary is saved only when it passes the same check as the reflection's
 question back (reflection.checked: no name from the gate's list, no banned
 word outside 「」『』, every 「」『』 holding the sample's own words, and the
-length, here MAX_SAMPLE_CHARS). Saved to EBINO_DATA_DIR/ingested/
+length, here MAX_SAMPLE_CHARS). A seat's own wish or call (〜てほしい) hits
+a banned word when put in the summary's own words, so the request asks for it
+in 「」, as the sample's words from one line (the teacher's call on 11/3); the
+check is unchanged. Saved to EBINO_DATA_DIR/ingested/
 purpose_summaries.json with the model name and date, output being seat ID ->
 summary, so the teacher can read and correct each one by hand; "sources"
 keeps the piece IDs each summary was made from. Only what is missing is made:
@@ -30,6 +33,7 @@ from collections import Counter
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
+from .banned_words import BANNED_WORDS
 from .config import PlaceError, data_dir, load_env_file
 from .gate import MODELS, Gate, GateError, ModelUnavailable, NameList, json_answer, json_request, load_names
 from .guard import check
@@ -146,9 +150,18 @@ class SummaryReport:
         ]
 
 
+def instruction() -> str:
+    """The request's instruction, with the banned words in it: a seat's own
+    wish (〜てほしい) is to be quoted in 「」 from one line of the sample, not
+    put in the summary's own words, where the check stops it."""
+    return PURPOSE_SUMMARY.format(limit=MAX_SAMPLE_CHARS, banned="・".join(BANNED_WORDS))
+
+
 def request_for(sample: PurposeSample) -> dict:
-    content = json.dumps({"text": sample_text(sample)}, ensure_ascii=False)
-    return json_request(ROLE, PURPOSE_SUMMARY.format(limit=MAX_SAMPLE_CHARS), content, SCHEMA)
+    """The pieces are sent one to a line, so the model sees the lines a quote
+    must stay inside (_Original)."""
+    content = json.dumps({"text": "\n".join(sample.texts)}, ensure_ascii=False)
+    return json_request(ROLE, instruction(), content, SCHEMA)
 
 
 def summarize(gate: Gate, found: list[PurposeSample], saved: Saved, report: SummaryReport) -> Saved:
