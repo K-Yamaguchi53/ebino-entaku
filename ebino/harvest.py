@@ -133,7 +133,11 @@ def found_moves(session, sheet_heading) -> list[Found]:
               for seat in session.library.seats}
     kinds = {seat.seat_id: seat.kind for seat in session.library.seats}
     current = session.reflection
-    asked = [r for r in session.rounds if r.question]
+    # A round that answered an AI's question (coach.py) is not a move of the
+    # student's own (SPEC 5-1, the default): its question, its silence and
+    # the seats it met are not read here.
+    typed = [r for r in session.rounds if r.ai_question is None]
+    asked = [r for r in typed if r.question]
     found: dict[str, Found] = {}
 
     go_words = load_lines(GO_WORDS)
@@ -160,12 +164,13 @@ def found_moves(session, sheet_heading) -> list[Found]:
     if card is not None:
         found["card_at_silent_seat"] = Found("card_at_silent_seat", card.text, seat=titles[card.seat_id])
     for number, result in enumerate(session.rounds, start=1):
-        # Pressed, then asked again: a later round exists.
+        # Pressed, then asked again: a later round the student typed exists.
         pressed = [i for i in range(len(result.splits)) if (number, i) in session.pressed_splits]
-        if pressed and number < len(session.rounds) and "pressed_split" not in found:
+        later = any(r.ai_question is None for r in session.rounds[number:])
+        if pressed and later and "pressed_split" not in found:
             found["pressed_split"] = Found("pressed_split", sheet_heading(result.splits[pressed[0]].heading))
     by_kind: dict[str, str] = {}
-    for seat_id in session.met_seats():
+    for seat_id in dict.fromkeys(s for r in typed for s in r.seat_order):
         by_kind.setdefault(kinds[seat_id], titles[seat_id])
     if len(by_kind) >= MIN_KINDS_MET:
         found["kinds_met"] = Found("kinds_met", "・".join(list(by_kind.values())[:3]))

@@ -60,6 +60,14 @@ def data_dir(environ=os.environ) -> Path:
     return _resolve(raw)
 
 
+COACH_ENV = "EBINO_COACH"
+
+
+def coach_on(environ=os.environ) -> bool:
+    """コーチとオブザーバー's band is shown unless EBINO_COACH=0 (SPEC 5-1)."""
+    return environ.get(COACH_ENV, "").strip() != "0"
+
+
 def load_env_file(path: Path = ENV_FILE, environ=os.environ) -> None:
     """Read KEY=value lines from .env. A variable already set wins.
 

@@ -51,6 +51,8 @@ MODELS = {
     "editor": "claude-sonnet-5-5",
     # The harvest card's ③: sorts the record into one 札 and two numbers.
     "subjects": "claude-haiku-5-5",
+    # コーチとオブザーバー: two questions to the student at a round's end.
+    "coach": "claude-opus-5-5",
 }
 EFFORT = {
     "tagger": "low",
@@ -59,6 +61,7 @@ EFFORT = {
     "reflection": "high",
     "editor": "low",
     "subjects": "low",
+    "coach": "medium",
 }
 
 

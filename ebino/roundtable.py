@@ -80,6 +80,11 @@ class Round:
     # 「司会が○○に聞いてみる」 (SPEC 14-53 B): ask_seat.AskSeat, once the
     # student pressed the card.
     ask_seat: object = None
+    # コーチとオブザーバー (coach.py): coach.Asked when this round's question
+    # is the student's answer to that AI question; coach.Band, the round's
+    # own two questions, once the screen asked for them.
+    ai_question: object = None
+    band: object = None
 
     @property
     def seat_order(self) -> list[str]:
@@ -105,20 +110,28 @@ def _splits(plans, shown: dict[str, ShownQuote], gate: Gate) -> tuple[list[Split
 
 
 def run(
-    gate: Gate, entries: list[Entry], seats: list[Seat], guard: Guard, question: str, plant: bool = False
+    gate: Gate, entries: list[Entry], seats: list[Seat], guard: Guard, question: str, plant: bool = False,
+    ai_question=None,
 ) -> Round:
+    """ai_question (coach.Asked): the question is the student's answer to it.
+    Both go to the librarian and the moderator; a silent round then makes no
+    question card (SPEC 5-1: an AI's question is not the student's)."""
     if gate.names.hits(question):
         return Round("", ASK_AGAIN, reason=REASON_NAME_IN_QUESTION, message=load_text(NAME_IN_QUESTION))
+    asked = ai_question.text if ai_question is not None else ""
     by_id = {entry.utterance_id: entry for entry in entries}
     try:
-        found = librarian.find(gate, entries, question)
-        result = Round(question, SILENT, candidates=found.utterance_ids, librarian_ended=found.ended)
+        found = librarian.find(gate, entries, question, asked)
+        result = Round(question, SILENT, candidates=found.utterance_ids, librarian_ended=found.ended,
+                       ai_question=ai_question)
         if not found.utterance_ids:
-            result.card = editor.card_for_no_answer(gate, question, seats)
+            if not asked:
+                result.card = editor.card_for_no_answer(gate, question, seats)
             return result
-        plan = moderator.plan(gate, question, [by_id[i] for i in found.utterance_ids], seats)
+        plan = moderator.plan(gate, question, [by_id[i] for i in found.utterance_ids], seats, asked)
     except (GateError, ModelUnavailable) as error:
-        return Round(question, UNAVAILABLE, reason=str(error), message=load_text(MODEL_UNAVAILABLE))
+        return Round(question, UNAVAILABLE, reason=str(error), message=load_text(MODEL_UNAVAILABLE),
+                     ai_question=ai_question)
 
     quotes: list[Quote] = list(plan.quotes)
     if plant:
@@ -147,6 +160,6 @@ def run(
     result.guard_stopped_seats = len(stopped_seats - answered)
     result.silent_seats = [s for s in plan.silent_seat_ids if s not in answered]
     result.status = ANSWERED if result.quotes else SILENT
-    if result.status == SILENT:
+    if result.status == SILENT and not asked:
         result.card = editor.card_for_no_answer(gate, question, seats)
     return result

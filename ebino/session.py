@@ -18,8 +18,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import (ask_seat, closing, editor, harvest, more, purpose_summary, reflection, roundtable, subjects,
-               talk_kinds)
+from . import (ask_seat, closing, coach, config, editor, harvest, more, purpose_summary, reflection, roundtable,
+               subjects, talk_kinds)
 from .editor import QuestionCard
 from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
 from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_SEAT_HEADER, CLOSING_KIND_LABELS,
@@ -87,27 +87,46 @@ class Library:
     ranking_titles: dict[str, str] = field(default_factory=dict)
     # The harvest card's ③ (subjects.py). None: ③ is not shown.
     subject_catalog: subjects.Catalog | None = None
+    # Every seat of the table, those kept off the map too: the name list is
+    # built from these. `seats` above holds the seats on the map only.
+    all_seats: list[Seat] = field(default_factory=list)
+    # コーチとオブザーバー (coach.py): the coach's source pieces (the seats in
+    # coach.tsv; empty: no coach card), and whether the band is on at all.
+    coach_sources: list[str] = field(default_factory=list)
+    coach_on: bool = True
 
     @classmethod
     def build(cls, seats, utterances, topics, show_private=False, saved_kinds=None,
-              saved_summaries=None, names=None, subject_catalog=None) -> "Library":
-        entries = build_index(utterances, seats, topics)
+              saved_summaries=None, names=None, subject_catalog=None, coach_seats=None,
+              coach_on=None) -> "Library":
+        """coach_seats: coach.tsv as {seat ID: shown on the map}. A seat kept
+        off the map is left out of the seat list and of everything the
+        librarian and the moderator can pick; its pieces are the coach's only."""
+        coach_seats = coach_seats or {}
+        hidden = {seat_id for seat_id, shown in coach_seats.items() if not shown}
+        every_entry = build_index(utterances, seats, topics)
+        entries = [entry for entry in every_entry if entry.seat_id not in hidden]
+        shown_seats = [seat for seat in seats if seat.seat_id not in hidden]
+        shown_utterances = [u for u in utterances if u.seat_id not in hidden]
         kinds = talk_kinds.load_kinds()
         kind_of = {u.id: talk_kinds.kind_of(saved_kinds or {}, u.id, kinds) for u in utterances}
         # A long sample shows only as its saved summary, checked again here.
-        purposes = purpose_summary.shown_samples(samples(utterances, seats),
+        purposes = purpose_summary.shown_samples(samples(shown_utterances, shown_seats),
                                                  saved_summaries or purpose_summary.Saved(),
                                                  names or NameList.build(seats, {}))
-        return cls(seats, utterances, entries, purposes, show_private,
+        return cls(shown_seats, utterances, entries, purposes, show_private,
                    closing.pieces_by_seat(entries, kind_of), [kind.kind_id for kind in kinds],
-                   closing.ranking_titles(utterances), subject_catalog)
+                   closing.ranking_titles(shown_utterances), subject_catalog, list(seats),
+                   [entry.text for entry in every_entry if entry.seat_id in coach_seats],
+                   config.coach_on() if coach_on is None else coach_on)
 
     @classmethod
     def load(cls, data_dir: Path, show_private: bool = False) -> "Library":
         seats = load_seats(data_dir / "seats.tsv")
         return cls.build(seats, load_utterances(data_dir), load_topics(data_dir), show_private,
                          talk_kinds.load_saved(data_dir), purpose_summary.load_saved(data_dir),
-                         load_names(data_dir, seats), subjects.load_catalog(data_dir))
+                         load_names(data_dir, seats), subjects.load_catalog(data_dir),
+                         coach.load_coach(data_dir, {seat.seat_id for seat in seats}))
 
     def seat_view(self, seat: Seat) -> dict:
         label = seat_label(seat, self.show_private)
@@ -237,6 +256,46 @@ class Session:
         if not words:
             return {"round": round_no, "question": "", "words": []}
         return {"round": round_no, "question": load_text(CLOSING_QUESTION), "words": words}
+
+    # --- コーチとオブザーバー (SPEC 5-1, coach.py) ---
+
+    def coach_band(self, round_no: int) -> dict:
+        """The two AI questions at the end of a round the student asked in:
+        asked once; asked again, the same band. No cards: nothing is shown."""
+        result = self._round(round_no)
+        if result.status not in (roundtable.ANSWERED, roundtable.SILENT):
+            raise Refused("no_round_for_band")
+        if not self.library.coach_on:
+            return {"round": round_no, "cards": [], "answered": ""}
+        if result.band is None:
+            result.band = coach.run(self.gate, self, round_no, self.library.coach_sources)
+            self.save()
+        return self.band_view(round_no)
+
+    def band_view(self, round_no: int) -> dict:
+        band = self._round(round_no).band
+        return {"round": round_no, "cards": [coach.card_view(card) for card in band.cards],
+                "answered": band.answered}
+
+    def coach_answer(self, round_no: int, role: str, answer: str) -> dict:
+        """The student's one line to one card of a band: it goes with that
+        question to the next round, where the seats answer as always."""
+        band = self._round(round_no).band
+        if band is None or band.answered:
+            raise Refused("no_band_to_answer")
+        asked = next((card for card in band.cards if card.role == role), None)
+        if asked is None:
+            raise Refused("unknown_card")
+        answer = _line(answer, MAX_LINE_CHARS, "empty_answer")
+        if self.gate.names.hits(answer):
+            return {"status": roundtable.ASK_AGAIN, "message": load_text(NAME_IN_QUESTION)}
+        result = roundtable.run(self.gate, self.library.entries, self.library.seats, self.guard,
+                                answer, plant=self.plant, ai_question=asked)
+        self.rounds.append(result)
+        if result.status != roundtable.UNAVAILABLE:  # Unavailable: the card may be answered again.
+            band.answered, band.answer = role, answer
+        self.save()
+        return self.round_view(len(self.rounds))
 
     # --- 「司会が○○に聞いてみる」 (SPEC 14-53 B) ---
 
@@ -591,6 +650,9 @@ class Session:
             "silent_seats": list(result.silent_seats),
             "card": result.card.front() if result.card else None,
             "met_seats": self.met_seats(),
+            # The AI question this round's question answers (coach.py), or None.
+            "ai_question": ({"role": result.ai_question.role, "label": coach.label(result.ai_question.role),
+                             "text": result.ai_question.text} if result.ai_question else None),
         }
 
     def purpose_view(self, sample: PurposeSample) -> dict:

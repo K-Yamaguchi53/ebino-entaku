@@ -87,6 +87,13 @@ HARVEST_SUBJECT_WHEN = "harvest_subject_when"
 HARVEST_SUBJECT_LINE = "harvest_subject_line"
 HARVEST_SUBJECT_LINE_PLAIN = "harvest_subject_line_plain"
 HARVEST_SUBJECT_MORE = "harvest_subject_more"
+# コーチとオブザーバー (SPEC 5-1, coach.py): each card's line (the role's name
+# and what it asks from), the mark that it is an AI's question, and the
+# observer's view, which is told to the model and never shown.
+COACH_LABEL = "coach_label"
+OBSERVER_LABEL = "observer_label"
+AI_QUESTION_BADGE = "ai_question_badge"
+OBSERVER_VIEW = "observer_view"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (

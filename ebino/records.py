@@ -8,7 +8,7 @@ has already checked is outside this repository and outside synced folders.
                        name, class or seat number, and no clock time: the
                        date and the seconds used only.
   prompts/<id>/        what was really sent to the moderator (and to the
-                       reflection and the harvest card's ③), the
+                       reflection, the harvest card's ③ and コーチとオブザーバー), the
                        instruction part (system and output form) and the
                        data part (question and pieces) in separate files,
                        so each can be searched on its own (SPEC 6).
@@ -34,7 +34,7 @@ from .config import PlaceError, load_env_file, records_dir
 
 SESSIONS_DIR = "sessions"
 PROMPTS_DIR = "prompts"
-LOGGED_ROLES = ("moderator", "reflection", "subjects")
+LOGGED_ROLES = ("moderator", "reflection", "subjects", "coach")
 SUBJECT_COUNTS_FILE = "subject_counts.json"
 
 
@@ -112,6 +112,10 @@ def session_record(session) -> dict:
             "card_id": result.card.card_id if result.card else "",
             "closing": _closing_record(result.closing),
             "ask_seat": _ask_seat_record(result.ask_seat),
+            # This round's question answers this AI question (coach.py).
+            "ai_question": ({"role": result.ai_question.role, "text": result.ai_question.text}
+                            if result.ai_question else None),
+            "band": _band_record(result.band),
         })
     return {
         "session_id": session.session_id,
@@ -149,6 +153,24 @@ def _ask_seat_record(asked) -> dict | None:
         "reason": asked.reason,
         "answer_id": asked.answer_id,
         "guard_stopped": asked.guard_stopped,
+    }
+
+
+def _band_record(band) -> dict | None:
+    """コーチとオブザーバー (SPEC 5-1): the questions shown, the cards the model
+    was asked for, the stops by reason (never the stopped words), which card
+    the student answered ("" for none) and the answer. None when the screen
+    never asked (the band is off, or the round could not have one)."""
+    if band is None:
+        return None
+    return {
+        "status": band.status,
+        "reason": band.reason,
+        "asked_roles": list(band.asked_roles),
+        "shown": [{"role": card.role, "text": card.text} for card in band.cards],
+        "stopped": dict(band.stopped),
+        "answered": band.answered,
+        "answer": band.answer,
     }
 
 
@@ -216,6 +238,7 @@ def load_sessions(folder: Path) -> list[dict]:
 
 def summary(sessions: list[dict]) -> list[str]:
     rounds = [r for s in sessions for r in s.get("rounds", [])]
+    bands = [r["band"] for r in rounds if r.get("band")]
     status = Counter(r["status"] for r in rounds)
     asked = status["answered"] + status["silent"]
     rate = f"{status['silent'] / asked:.0%}" if asked else "-"
@@ -226,6 +249,9 @@ def summary(sessions: list[dict]) -> list[str]:
         f"guard passed / stopped: {sum(r['guard_passed'] for r in rounds)} / "
         f"{sum(r['guard_stopped'] for r in rounds)}",
         f"cards: {sum(len(s.get('cards', [])) for s in sessions)}",
+        # コーチとオブザーバー: the questions shown and stopped by code, like the guard's.
+        f"ai questions shown / stopped: {sum(len(b['shown']) for b in bands)} / "
+        f"{sum(sum(b['stopped'].values()) for b in bands)}  answered: {sum(1 for b in bands if b['answered'])}",
     ]
 
 

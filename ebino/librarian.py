@@ -156,11 +156,14 @@ def _picked(ids, shelf: Shelf) -> list[str]:
     return kept[:MAX_PICKED]
 
 
-def find(gate: Gate, entries: list[Entry], question: str) -> Found:
+def find(gate: Gate, entries: list[Entry], question: str, ai_question: str = "") -> Found:
     """Raises GateError or ModelUnavailable (reason codes only); the caller
-    shows the fixed sentence (SPEC 14-51)."""
+    shows the fixed sentence (SPEC 14-51). With ai_question, the question is
+    the student's answer to that AI question (coach.py)."""
     shelf = Shelf(entries)
-    request = json_request("librarian", LIBRARIAN, f"生徒の問い：{question}", ANSWER_SCHEMA)
+    content = (f"AIの問い：{ai_question}\n生徒の答え：{question}" if ai_question
+               else f"生徒の問い：{question}")
+    request = json_request("librarian", LIBRARIAN, content, ANSWER_SCHEMA)
     request["tools"] = TOOLS
     messages = request["messages"]
     found = Found([], ENDED_REQUEST_LIMIT)

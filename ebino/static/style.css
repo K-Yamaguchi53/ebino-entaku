@@ -79,6 +79,19 @@ button:disabled { opacity: .5; cursor: wait; }
 /* A ranking item's title, small over the item. */
 .ranking-title { font-size: .8rem; color: var(--soft); margin: 0; }
 .closing-word button.more, .closing-word button.not-heard { display: block; margin-top: 6px; }
+/* コーチとオブザーバー: apart from the seats' words, two cards of the same size. */
+.ai-band { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border-top: 2px solid var(--line);
+  margin-top: 14px; padding-top: 10px; }
+@media (max-width: 560px) { .ai-band { grid-template-columns: 1fr; } }
+.ai-card { border: 1px dashed var(--soft); border-radius: 12px; padding: 8px 14px; background: #fafafa; }
+.ai-card .label { font-size: .85rem; color: var(--soft); margin: 0; }
+.ai-card .badge { font-size: .8rem; color: var(--soft); margin: 0 0 4px; }
+.ai-card .words { margin: 2px 0 6px; }
+.ai-card.answered { border-style: solid; }
+.ai-answer { display: flex; gap: 6px; }
+.ai-answer input { flex: 1; min-width: 0; }
+.ai-asked { color: var(--soft); font-size: .9rem; margin: 0 0 2px; }
+.ai-asked .label { margin-right: 8px; }
 
 .kind-group h3 { font-size: 1rem; margin: 12px 0 4px; }
 .kind-group h3::before { content: "●"; margin-right: 4px; }

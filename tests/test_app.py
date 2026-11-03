@@ -171,6 +171,31 @@ def test_the_rounds_last_word_over_http(server):
     assert "state.texts.more_end" in script and "state.texts.more_card_done" in script
 
 
+def test_the_coach_and_observer_band_over_http(server, monkeypatch):
+    from fake_client import text_response
+    from test_session import librarian_finds
+    srv, client = server
+    monkeypatch.setattr(srv.the_app.library, "coach_on", True)
+    observer = "休みを決めて取る働き方は、誰の役に立っているのだろう？"
+    client._answers += [text_response({"observer": observer}), librarian_finds()]
+    request(srv, "POST", "/api/start", {"lab": "quest"})
+    request(srv, "POST", "/api/ask", {"question": "休みの日って、みんな何してる？"})
+    status, band = request(srv, "POST", "/api/coach", {"round": 1})
+    # No coach.tsv in this library: the observer's card only.
+    assert status == 200 and [card["role"] for card in band["cards"]] == ["observer"]
+    status, view = request(srv, "POST", "/api/coach_answer", {"round": 1, "role": "observer", "answer": "店の人"})
+    assert status == 200 and view["round"] == 2 and view["ai_question"]["text"] == observer
+    assert view["status"] == "silent" and view["card"] is None
+    assert request(srv, "POST", "/api/coach_answer", {"round": 1, "role": "observer", "answer": "もう一度"}) == (
+        400, {"error": "no_band_to_answer"})
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    # Last in the round, after the last word; the answer box opens empty.
+    assert script.index("closeRound(round.round, closingBox)") < script.index("loadBand(round.round, bandBox)")
+    entry = script[script.index("function answerEntry"):]
+    entry = entry[:entry.index("\n}\n")]
+    assert 'el("input", { type: "text"' in entry and ".value =" not in entry
+
+
 def test_not_answered_yet_is_shown_only_with_the_seats_empty_card_box_under_it():
     script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
     asked = script[script.index("function renderAsked"):script.index("async function closeRound")]

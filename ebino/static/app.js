@@ -128,6 +128,12 @@ function renderRound(round) {
   for (const id of round.silent_seats) state.silent.add(id);
 
   const box = el("article", { class: "round" });
+  // A round that answers an AI's question shows that question over the answer.
+  if (round.ai_question) {
+    box.append(el("p", { class: "ai-asked" },
+      el("span", { class: "label", text: round.ai_question.label }),
+      el("span", { text: round.ai_question.text })));
+  }
   box.append(el("p", { class: "round-question", text: round.question }));
   box.append(el("p", { class: "steps",
     text: `司書が見つけた片：${round.steps.found}　番人が通した引用：${round.steps.passed}　止めた引用：${round.steps.stopped}` }));
@@ -154,6 +160,70 @@ function renderRound(round) {
     loadAskCard(round.round, askBox);
     closeRound(round.round, closingBox);
   }
+  if (round.status === "answered" || round.status === "silent") {
+    // コーチとオブザーバー: last in the round, apart from the seats' words.
+    const bandBox = el("div");
+    box.append(bandBox);
+    loadBand(round.round, bandBox);
+  }
+}
+
+// コーチとオブザーバー (SPEC 5-1): two AI questions in a fixed order, the same
+// size. Pressing one opens an empty one-line box; the answer starts the next
+// round. Not answering is fine: nothing waits on it.
+async function loadBand(roundNo, box) {
+  let band;
+  try {
+    band = await call("/api/coach", { round: roundNo });
+  } catch (error) {
+    return;  // An extra at the round's end.
+  }
+  if (!band.cards.length) return;
+  const part = el("section", { class: "ai-band" });
+  for (const card of band.cards) {
+    const node = el("div", { class: "ai-card" },
+      el("p", { class: "label", text: card.label }),
+      el("p", { class: "badge", text: card.badge }),
+      el("p", { class: "words", text: card.question }));
+    if (!band.answered) node.append(answerEntry(roundNo, card.role, part));
+    else if (band.answered === card.role) node.classList.add("answered");
+    part.append(node);
+  }
+  box.append(part);
+}
+
+function answerEntry(roundNo, role, part) {
+  const open = el("button", { type: "button", class: "quiet", text: "答える" });
+  open.addEventListener("click", () => {
+    const input = el("input", { type: "text", maxlength: "120", autocomplete: "off" });
+    const form = el("form", { class: "ai-answer" }, input, el("button", { type: "submit", text: "送る" }));
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const answer = input.value.trim();
+      if (!answer) return;
+      for (const node of form.querySelectorAll("input, button")) node.disabled = true;
+      showMessage(state.texts.waiting_ask);
+      try {
+        const round = await call("/api/coach_answer", { round: roundNo, role, answer });
+        if (round.status === "ask_again" || round.status === "unavailable") {
+          showMessage(round.message);
+          for (const node of form.querySelectorAll("input, button")) node.disabled = false;
+          return;
+        }
+        hideMessage();
+        // One answer per band: the other card's button goes away.
+        for (const button of part.querySelectorAll(".ai-card > button")) button.remove();
+        form.closest(".ai-card").classList.add("answered");
+        renderRound(round);
+      } catch (error) {
+        showMessage(sendFailed(error));
+        for (const node of form.querySelectorAll("input, button")) node.disabled = false;
+      }
+    });
+    open.replaceWith(form);
+    input.focus();
+  });
+  return open;
 }
 
 // 「司会が○○に聞いてみる」 (SPEC 14-53 B): a card with one question to one

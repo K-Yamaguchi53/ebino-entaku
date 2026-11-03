@@ -150,9 +150,16 @@ class Record:
         names = session.gate.names
         seats = {seat.seat_id: seat for seat in session.library.seats}
         entries = {quote.utterance_id: quote for r in session.rounds for quote in r.quotes}
-        number = 0
+        number = answers = 0
         for index, result in enumerate(session.rounds, start=1):
-            if result.question:
+            if result.question and result.ai_question is not None:
+                # The student's answer to an AI's question (coach.py): their
+                # own words; the AI's question goes along but is not.
+                answers += 1
+                self._add(Material(f"A{answers}", "answer", result.question,
+                                   {"id": f"A{answers}", "kind": "answer", "text": result.question,
+                                    "asked": result.ai_question.text}))
+            elif result.question:
                 number += 1
                 self._add(Material(f"Q{number}", "question", result.question,
                                    {"id": f"Q{number}", "kind": "question", "text": result.question}))

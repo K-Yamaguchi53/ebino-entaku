@@ -70,12 +70,15 @@ class Plan:
     silent_seat_ids: tuple[str, ...] = ()
 
 
-def request_for(question: str, candidates: list[Entry], seats: list[Seat]) -> dict:
+def request_for(question: str, candidates: list[Entry], seats: list[Seat], ai_question: str = "") -> dict:
     """The instruction part is the system text; the data part (the question,
     the pieces and the seat list) is the message, so the two can be kept
-    apart (SPEC 6). Seats go in through Seat.for_model only."""
-    data = {
-        "question": question,
+    apart (SPEC 6). Seats go in through Seat.for_model only. With
+    ai_question, the question is the student's answer to it (coach.py)."""
+    data = {"question": question}
+    if ai_question:
+        data["ai_question"] = ai_question
+    data |= {
         "pieces": [entry.for_model() for entry in candidates],
         "seats": [seat.for_model() for seat in seats],
     }
@@ -116,7 +119,7 @@ def clean(answer, candidates: list[Entry], seats: list[Seat] = ()) -> Plan:
     return Plan(tuple(quotes), tuple(splits[:MAX_SPLITS]), tuple(silent[:MAX_SILENT]))
 
 
-def plan(gate: Gate, question: str, candidates: list[Entry], seats: list[Seat]) -> Plan:
+def plan(gate: Gate, question: str, candidates: list[Entry], seats: list[Seat], ai_question: str = "") -> Plan:
     """Raises GateError or ModelUnavailable (reason codes only)."""
-    answer = json_answer(gate.send("moderator", request_for(question, candidates, seats)))
+    answer = json_answer(gate.send("moderator", request_for(question, candidates, seats, ai_question)))
     return clean(answer, candidates, seats)

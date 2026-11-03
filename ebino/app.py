@@ -100,6 +100,10 @@ class App:
             return session.ask(body.get("question", ""))
         if path == "/api/closing":
             return session.close_round(body.get("round"))
+        if path == "/api/coach":
+            return session.coach_band(body.get("round"))
+        if path == "/api/coach_answer":
+            return session.coach_answer(body.get("round"), body.get("role", ""), body.get("answer", ""))
         if path == "/api/ask_card":
             return session.ask_card(body.get("round"))
         if path == "/api/ask_seat":
@@ -241,9 +245,12 @@ def main(argv=None) -> int:
     except ValueError as error:  # A table's file name and line number only.
         print(error, file=sys.stderr)
         return 2
-    gate = Gate(anthropic.Anthropic(), load_names(folder, library.seats))
+    # Every seat's names, those kept off the map (coach.tsv) too.
+    gate = Gate(anthropic.Anthropic(), load_names(folder, library.all_seats))
     server = make_server(App(library, gate, records, plant=args.plant), args.port)
     print(f"seats {len(library.seats)}  pieces {len(library.entries)}  purpose samples {len(library.purposes)}")
+    print(f"coach band {'on' if library.coach_on else 'off'}  coach pieces {len(library.coach_sources)}  "
+          f"seats off the map {len(library.all_seats) - len(library.seats)}")
     print(library.subject_catalog.report())  # The harvest card's ③: counts only.
     print(f"open http://{HOST}:{server.server_address[1]}/  (Ctrl+C to stop)")
     try:
