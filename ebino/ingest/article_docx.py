@@ -72,14 +72,18 @@ _WIDTH_SLACK = 1
 # can be notes taken while listening, not a printed paragraph cut in two.
 _MIN_JOIN_LENGTH = 15
 # A line starting with a list or heading mark never joins, on either side.
-# A number is a mark only with 「.」「、」「）」 or 「位」 after it (「3月に」 is
-# not); 「1.5倍」 is not either. Q only when no letter follows (「QRコード」).
+# A number is a mark with 「.」「、」「）」 or 「位」 after it, and a number of one
+# or two digits is one with anything after it but a digit or a unit
+# (「１　山の上」「２川の駅」「20〜24歳」 are; 「3月に」「7割が」 are not). A decimal
+# (「1.5倍」) never is. Q only when no letter follows (「QRコード」).
+_NUMBER_UNITS = "年月日%％万千百円人回歳時分割"
 _LIST_MARK = re.compile(
     r"(?:[①-⑳【・●○■□◆◇※★☆▼▶]"
     r"|[QＱ](?![A-Za-zＡ-Ｚａ-ｚ])"
     r"|[AＡ][:：]"
     r"|[(（][0-9０-９]+[)）]"
-    r"|[0-9０-９]+(?:[.．](?![0-9０-９])|[、）)]|位))"
+    r"|[0-9０-９]+(?:[.．](?![0-9０-９])|[、）)]|位)"
+    rf"|[0-9０-９]{{1,2}}(?![0-9０-９{_NUMBER_UNITS}]|[.．][0-9０-９]))"
 )
 
 

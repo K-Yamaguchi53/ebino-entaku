@@ -249,6 +249,30 @@ def test_a_number_with_a_unit_or_a_word_after_it_is_not_a_mark(line):
     assert texts == [WRAP_1 + line + WRAP_END]
 
 
+@pytest.mark.parametrize("line", ["１　山の上の展望台", "２川の駅の足湯がある", "20〜24歳　県外で修業"])
+def test_a_numbered_item_is_not_joined_onto_the_line_before(line):
+    texts, stats = body_texts([WRAP_1, WRAP_2, line])
+    assert texts == [WRAP_1 + WRAP_2, line]
+    assert stats.wrapped_lines_joined == 1
+
+
+@pytest.mark.parametrize("line", [
+    "１　山の上の展望台から町を見下ろせるの", "２川の駅の足湯があって季節ごとに働く職",
+    "20〜24歳　県外で修業して季節ごとに働",
+])
+def test_a_numbered_item_does_not_join_the_next(line):
+    assert abs(len(line) - len(WRAP_1)) <= 1
+    texts, _ = body_texts([WRAP_1, WRAP_2, line, WRAP_END])
+    assert texts == [WRAP_1 + WRAP_2, line, WRAP_END]
+
+
+@pytest.mark.parametrize("line", ["7割が地元の人で、", "3月に始めた", "1.5倍に増えた", "１５０人が来た。"])
+def test_a_number_with_a_unit_still_joins_onto_the_line_before(line):
+    texts, stats = body_texts([WRAP_1, WRAP_2, line])
+    assert texts == [WRAP_1 + WRAP_2 + line]
+    assert stats.wrapped_lines_joined == 2
+
+
 def test_a_left_line_shorter_than_fifteen_does_not_join():
     short_a, short_b = "朝は店の前を掃除してから開", "昼は交代で休んで、夜に閉め"  # 13 each: the width.
     fourteen = "朝は店の前を掃除してから開け"
