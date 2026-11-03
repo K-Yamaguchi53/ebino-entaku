@@ -41,7 +41,7 @@ def test_a_press_shows_the_next_piece_of_the_same_seat_and_section_as_recorded()
     heard = session.hear_more("a9")
     assert heard["pieces"][0]["utterance_id"] == "a9b"  # x1 is in another section.
     assert heard["pieces"][0]["text"] == "だから、外に出る前に、町を歩いてほしい。"
-    assert not heard["pieces"][0]["said"] and heard["pieces"][0]["source"]["note"] == "取材記事（本人確認済み）"
+    assert not heard["pieces"][0]["said"] and heard["source"]["note"] == "取材記事（本人確認済み）"
     assert heard["can_press"] and not heard["ended"]
     assert len(client.requests) == before  # No model is used.
 
@@ -73,7 +73,7 @@ def test_when_only_shown_pieces_are_left_the_section_has_ended():
     session = before_and_after_the_quotes(
         ANSWERED + [says(("a0", "休みの日は、店の仲間と話します。"))],
         u("a0", "S01", "休みの日は、店の仲間と話します。", voice="spoken"))
-    assert session.hear_more("a0") == {"utterance_id": "a0", "pieces": [], "ended": True, "can_press": False}
+    assert session.hear_more("a0") == {"utterance_id": "a0", "pieces": [], "source": None, "ended": True, "can_press": False}
 
 
 def heard_after(origin, *following):
@@ -94,9 +94,40 @@ def test_one_press_reads_on_to_the_end_of_the_sentence():
                                  u("m2", "S01", "と言われるとうれしい。"),
                                  u("m3", "S01", "次の日も、また店に立ちます。"))
     assert [(p["utterance_id"], p["said"]) for p in heard["pieces"]] == [("m1", True), ("m2", False)]
-    assert heard["pieces"][1]["source"]["note"] == "取材記事（本人確認済み）"
+    assert heard["source"]["note"] == "取材記事（本人確認済み）"
     assert session.mores["m0"].shown == ["m1", "m2"] and session.mores["m0"].presses == 1
     assert heard["can_press"]
+
+
+ONE_PASSAGE = (u("m0", "S01", "休みの日は、だいたい店にいる。"),
+               u("m1", "S01", "だが"),
+               u("m2", "S01", "休みの日に来る客ほど、よく話してくれる", voice="spoken"),
+               u("m3", "S01", "と振り返り、うれしそうに笑った。"),
+               u("m4", "S01", "次の日も、また店に立つ。"))
+
+
+def test_one_press_is_one_passage_with_one_source_line():
+    session, heard = heard_after(*ONE_PASSAGE)
+    assert [(p["utterance_id"], p["said"]) for p in heard["pieces"]] == [
+        ("m1", False), ("m2", True), ("m3", False)]
+    assert all("source" not in p for p in heard["pieces"])  # One line for the passage.
+    assert heard["source"]["note"] == "取材記事（本人確認済み）"
+    assert session.mores["m0"].shown == ["m1", "m2", "m3"]  # Every ID, as before.
+
+
+def test_a_passage_of_the_persons_own_words_only_has_no_note():
+    _, heard = heard_after(u("m0", "S01", "休みの日は、だいたい店にいる。"),
+                           u("m1", "S01", "客と話すのが好きです", voice="spoken"),
+                           u("m2", "S01", "って話す", voice="spoken"))
+    assert heard["source"]["note"] == ""
+
+
+def test_two_notes_in_one_passage_are_each_given_once():
+    _, heard = heard_after(u("m0", "S01", "休みの日は、だいたい店にいる。"),
+                           u("m1", "S01", "店の前を掃いて、"),
+                           u("m2", "S01", "花に水をやり、", voice="company"),
+                           u("m3", "S01", "それから店を開ける。"))
+    assert heard["source"]["note"] == "取材記事（本人確認済み）・会社の紹介文（本人確認済み）"
 
 
 def test_after_the_persons_words_it_goes_on_only_into_to_or_tte():
@@ -165,7 +196,7 @@ def test_two_presses_from_one_piece_and_no_more():
 def test_the_end_of_the_section_says_not_heard_yet_and_a_press_makes_a_card():
     session, client = closed(more_answers=[editor_says(["S02"])])
     heard = session.hear_more("b9")
-    assert heard == {"utterance_id": "b9", "pieces": [], "ended": True, "can_press": False}
+    assert heard == {"utterance_id": "b9", "pieces": [], "source": None, "ended": True, "can_press": False}
     assert load_text(MORE_END) == "ここから先は、まだ聞いていない"
     assert load_text(MORE_CARD_DONE)
     card = session.more_card("b9")

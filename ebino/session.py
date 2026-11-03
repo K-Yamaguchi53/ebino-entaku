@@ -34,6 +34,8 @@ from .seat_label import KIND_LABELS, seat_label
 
 MAX_QUESTION_CHARS = 200
 MAX_CARD_CHARS = 200
+# Between two different notes on one 「もっと聞く」 passage's source line.
+PASSAGE_NOTE_JOIN = "・"
 # The one question asked first (SPEC 2-1, 14-20). The keys are what is kept.
 LAB_CHOICES = {
     "quest": "Quest",
@@ -302,8 +304,10 @@ class Session:
 
     def hear_more(self, utterance_id: str) -> dict:
         """「もっと聞く」: the next pieces of the same seat and section, to the
-        end of the sentence, as recorded; each with the source of its voice.
-        A ranking's title goes over the first of its items only."""
+        end of the sentence, as recorded, shown as one passage with one
+        source line (the notes of the pieces that have one; none when all
+        are the person's own words). A ranking's title goes over the first
+        of its items only."""
         origins = self.more_origins()
         if not isinstance(utterance_id, str) or utterance_id not in origins:
             raise Refused("not_a_last_word")
@@ -321,10 +325,12 @@ class Session:
             title = self.library.ranking_titles.get(piece.id, "")
             shown.append({"utterance_id": piece.id, "seat_id": piece.seat_id, "text": piece.text,
                           "ranking_title": title if title != title_over else "",
-                          "said": not piece.note, "source": self.source(piece.seat_id, piece)})
+                          "ranking_item": bool(title),  # Starts its own line in the passage.
+                          "said": not piece.note})
             title_over = title
-        return {"utterance_id": utterance_id, "pieces": shown, "ended": state.ended,
-                "can_press": state.can_press}
+        return {"utterance_id": utterance_id, "pieces": shown,
+                "source": self.passage_source(state.seat_id, pieces) if pieces else None,
+                "ended": state.ended, "can_press": state.can_press}
 
     def more_card(self, utterance_id: str) -> dict:
         """「ここから先は、まだ聞いていない」 pressed: the round's question becomes
@@ -499,6 +505,13 @@ class Session:
         seat = self._seats[seat_id]
         label = seat_label(seat, self.library.show_private)
         return {"title": label.title, "detail": label.detail, "note": utterance.note}
+
+    def passage_source(self, seat_id: str, pieces: list[Utterance]) -> dict:
+        """One source line for pieces shown together: the seat, and the notes
+        of the pieces that have one, each once, in reading order."""
+        label = seat_label(self._seats[seat_id], self.library.show_private)
+        notes = dict.fromkeys(piece.note for piece in pieces if piece.note)
+        return {"title": label.title, "detail": label.detail, "note": PASSAGE_NOTE_JOIN.join(notes)}
 
     def round_view(self, round_no: int) -> dict:
         result = self._round(round_no)

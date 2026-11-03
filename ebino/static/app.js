@@ -231,6 +231,22 @@ async function closeRound(roundNo, box) {
   box.append(part);
 }
 
+// One press of 「もっと聞く」 as one passage: the pieces in reading order, the
+// person's own words in 「」 inside the sentence, a ranking item's title
+// small before the item, each ranking item on its own line, and one source
+// line at the end (heard.source).
+function morePassage(heard) {
+  const blocks = [];
+  for (const piece of heard.pieces) {
+    if (piece.ranking_title) blocks.push({ title: piece.ranking_title });
+    const words = piece.said ? `「${piece.text}」` : piece.text;
+    const last = blocks[blocks.length - 1];
+    if (last && "words" in last && !piece.ranking_item) last.words += words;
+    else blocks.push({ words });
+  }
+  return { blocks, source: sourceLine(heard.source) };
+}
+
 // 「もっと聞く」: the next piece of the same seat and section, as recorded,
 // at most twice from one piece. When the section runs out, 「ここから先は、
 // まだ聞いていない」; pressing it makes a question card to that seat (SPEC 2-2).
@@ -245,13 +261,14 @@ function moreButton(utteranceId, node) {
       button.disabled = false;
       return;
     }
-    // One press reads to the end of the sentence: one or more pieces, each
-    // with the source of its own voice.
-    for (const piece of heard.pieces) {
+    // One press reads to the end of the sentence: its pieces in one box.
+    if (heard.pieces.length) {
+      const passage = morePassage(heard);
       node.insertBefore(el("div", { class: "more-piece" },
-        rankingTitle(piece),
-        el("p", { class: "words", text: piece.said ? `「${piece.text}」` : piece.text }),
-        el("span", { class: "source", text: sourceLine(piece.source) })), button);
+        ...passage.blocks.map((block) => "title" in block
+          ? el("p", { class: "ranking-title", text: block.title })
+          : el("p", { class: "words", text: block.words })),
+        el("span", { class: "source", text: passage.source })), button);
     }
     if (heard.ended) {
       const end = el("button", { type: "button", class: "quiet not-heard", text: state.texts.more_end });

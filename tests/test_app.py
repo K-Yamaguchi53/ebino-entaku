@@ -174,9 +174,49 @@ def test_not_answered_yet_is_shown_only_with_the_seats_empty_card_box_under_it()
 def test_a_ranking_title_is_shown_over_the_last_word_the_more_piece_and_the_answer():
     script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
     assert "rankingTitle(word)" in script and "rankingTitle(asked.piece)" in script
-    assert "rankingTitle(piece)" in script
+    assert 'el("p", { class: "ranking-title", text: block.title })' in script  # 「もっと聞く」.
     css = (app_module.STATIC_DIR / "style.css").read_text(encoding="utf-8")
     assert ".ranking-title" in css
+
+
+def _run_more_passage(heard):
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    source = ""
+    for name in ("function sourceLine", "function morePassage"):
+        start = script.index(name)
+        source += script[start:script.index("\n}\n", start) + 3]
+    program = source + "process.stdout.write(JSON.stringify(morePassage(%s)));" % json.dumps(heard)
+    done = subprocess.run(["node", "-e", program], capture_output=True, timeout=30)
+    return json.loads(done.stdout.decode("utf-8"))
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_one_more_press_is_one_box_with_one_source_line():
+    heard = {"pieces": [
+        {"utterance_id": "m1", "text": "だが", "said": False, "ranking_title": ""},
+        {"utterance_id": "m2", "text": "休みの日に来る客ほど、よく話してくれる", "said": True, "ranking_title": ""},
+        {"utterance_id": "m3", "text": "と振り返り、うれしそうに笑った。", "said": False, "ranking_title": ""}],
+        "source": {"title": "電子部品工場の社員", "detail": "", "note": "取材記事（本人確認済み）"}}
+    assert _run_more_passage(heard) == {
+        "blocks": [{"words": "だが「休みの日に来る客ほど、よく話してくれる」と振り返り、うれしそうに笑った。"}],
+        "source": "電子部品工場の社員　取材記事（本人確認済み）"}
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    press = script[script.index("function moreButton"):script.index("function renderQuote")]
+    # One box per press, its one source line at the end; no box per piece.
+    assert press.count('el("div", { class: "more-piece" }') == 1
+    assert "for (const piece of heard.pieces)" not in press
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_a_ranking_title_in_a_passage_goes_before_its_item():
+    heard = {"pieces": [
+        {"utterance_id": "r1", "text": "１位　小屋の中", "said": False, "ranking_title": "好きな場所ベスト3",
+         "ranking_item": True},
+        {"utterance_id": "r2", "text": "２位　川の土手", "said": False, "ranking_title": "", "ranking_item": True}],
+        "source": {"title": "農家", "detail": "", "note": "取材記事（本人確認済み）"}}
+    # The title once, before the first item; each item on its own line.
+    assert _run_more_passage(heard)["blocks"] == [
+        {"title": "好きな場所ベスト3"}, {"words": "１位　小屋の中"}, {"words": "２位　川の土手"}]
 
 
 def test_the_screen_does_not_require_a_seat_before_the_sheet_is_made():
