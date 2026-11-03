@@ -5,11 +5,14 @@ import json
 import random
 from pathlib import Path
 
+import anthropic
+import httpx2
 import pytest
 from fake_client import FakeClient, text_response
 
 from conftest import COMPANY, DISPLAY_NAME
 from ebino import coach, harvest, reflection
+from ebino.banned_words import BANNED_WORDS
 from ebino.gate import Gate, NameList
 from ebino.ingest.seats import load_seats
 from ebino.records import Records, summary
@@ -120,6 +123,26 @@ def test_no_model_means_no_band():
     assert session.rounds[0].band.status == coach.STATUS_UNAVAILABLE
 
 
+def timed_out() -> Exception:
+    """What the SDK raises when the wait runs out (no request text in it)."""
+    return anthropic.APITimeoutError(request=httpx2.Request("POST", "https://api.invalid/v1/messages"))
+
+
+def test_a_band_past_the_wait_limit_is_not_shown_and_the_next_question_is_answered(tmp_path):
+    session, client = sitting(ANSWERED + [timed_out()] + ANSWERED, tmp_path=tmp_path)
+    session.ask(QUESTION)
+    assert session.coach_band(1)["cards"] == []
+    band = session.rounds[0].band
+    assert band.status == coach.STATUS_UNAVAILABLE and band.reason == "api_error:APITimeoutError"
+    view = session.ask("休みを決めるのは、自分？")
+    assert view["status"] == "answered" and view["round"] == 2
+    # Only the band's call has the wait limit, with no retry.
+    assert client.options == [{}, {}, {"timeout": 30.0, "max_retries": 0}, {}, {}]
+    kept = json.loads((tmp_path / "sessions" / f"{session.session_id}.json").read_text(encoding="utf-8")
+                      )["rounds"][0]["band"]
+    assert kept["status"] == coach.STATUS_UNAVAILABLE and kept["shown"] == [] and kept["stopped"] == {}
+
+
 def test_a_silent_round_has_a_band_too():
     session, _ = sitting([librarian_finds(), editor_says(), coach_says(coach=GOOD_OBSERVER, observer=GOOD_OBSERVER)])
     session.ask("やってみて合わなかった人は？")
@@ -225,6 +248,14 @@ def test_the_instruction_part_names_no_question_of_the_record():
     system = client.requests[-1]["system"][0]["text"]
     assert QUESTION not in system and "畑は天気しだい" not in system
     assert load_text("observer_view").splitlines()[0] in system
+
+
+def test_the_instruction_part_lists_every_banned_word():
+    session, client = round_one({"coach": GOOD_COACH, "observer": GOOD_OBSERVER})
+    session.coach_band(1)
+    system = client.requests[-1]["system"][0]["text"]
+    assert "・".join(BANNED_WORDS) in system
+    assert all(word in system for word in BANNED_WORDS) and "{banned}" not in system
 
 
 def round_two_band(second_cards, first_cards=None):

@@ -26,7 +26,8 @@ way as the reflection's question back (reflection.checked), and more:
     one sentence ending in ？; at most MAX_CHARS characters.
 A card that fails is not shown and nothing is put in its place; when both
 fail the band is not shown. Stops are counted by reason; failed words are
-never kept. When the model cannot be used the band is not shown.
+never kept. When the model cannot be used, or does not answer within
+TIMEOUT_SECONDS (no retry; SPEC 14-62), the band is not shown.
 
 The student may answer one card of a band in one line (the box opens
 empty). The answer goes with that question to the next round as its input
@@ -43,6 +44,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .banned_words import BANNED_WORDS
 from .gate import Gate, GateError, ModelUnavailable, json_answer, json_request
 from .guard import check
 from .ingest.scrub import normalize_for_match
@@ -56,6 +58,11 @@ OBSERVER = "observer"
 CARDS = (COACH, OBSERVER)  # The fixed order on screen, never a ranking.
 LABELS = {COACH: COACH_LABEL, OBSERVER: OBSERVER_LABEL}
 MAX_CHARS = 60
+# The wait for the model, with no retry (SPEC 14-62). The app runs one
+# sitting's requests one at a time, so a long band would hold back the next
+# question's round; past this the band is not shown, as when the model cannot
+# be used.
+TIMEOUT_SECONDS = 30.0
 
 COACH_FILE = "coach.tsv"
 COACH_COLUMNS = ("席ID", "地図に出す")
@@ -184,7 +191,7 @@ def schema(roles: tuple[str, ...]) -> dict:
 def request_for(record: Record, sources: list[str], roles: tuple[str, ...]) -> dict:
     """The instruction part (with the observer's view) is the system text;
     the record and the coach's pieces are the data part (SPEC 6)."""
-    system = COACH_PROMPT.format(observer_view=load_text(OBSERVER_VIEW))
+    system = COACH_PROMPT.format(observer_view=load_text(OBSERVER_VIEW), banned="・".join(BANNED_WORDS))
     data = {"cards": list(roles), "rounds": record.rounds, "asked_before": record.asked_before}
     if COACH in roles:
         data["coach_sources"] = sources
@@ -195,7 +202,7 @@ def run(gate: Gate, session, round_no: int, sources: list[str]) -> Band:
     roles = tuple(role for role in CARDS if role != COACH or sources)
     record = Record(session, round_no)
     try:
-        answer = json_answer(gate.send(ROLE, request_for(record, sources, roles)))
+        answer = json_answer(gate.send(ROLE, request_for(record, sources, roles), timeout=TIMEOUT_SECONDS))
         if not isinstance(answer, dict):
             raise ModelUnavailable("bad_output")
     except (GateError, ModelUnavailable) as error:

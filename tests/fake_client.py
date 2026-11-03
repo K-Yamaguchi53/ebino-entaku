@@ -21,10 +21,19 @@ class FakeClient:
 
     def __init__(self, answers):
         self.requests: list[dict] = []
+        self.options: list[dict] = []  # with_options for each request; {} when none.
+        self._pending_options: dict = {}
         self._answers = answers
         self.messages = SimpleNamespace(create=self._create)
 
+    def with_options(self, **options):
+        """Like the SDK's: the next request is sent with these options."""
+        self._pending_options = options
+        return self
+
     def _create(self, **request):
+        self.options.append(self._pending_options)
+        self._pending_options = {}
         self.requests.append(json.loads(json.dumps(request, ensure_ascii=False, default=vars)))
         if callable(self._answers):
             return self._answers(request)

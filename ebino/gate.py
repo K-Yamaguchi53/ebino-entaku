@@ -154,15 +154,18 @@ class Gate:
     sent: int = 0
     stopped: int = 0
 
-    def send(self, role: str, request: dict):
+    def send(self, role: str, request: dict, timeout: float | None = None):
+        """timeout: seconds to wait for this request, with no retry; None
+        keeps the SDK's defaults. Past it the model counts as not usable."""
         if self.names.hits(request_text(request)):
             self.stopped += 1
             raise GateError("name_in_request")
         if self.on_send:
             self.on_send(role, request)
         self.sent += 1
+        client = self.client if timeout is None else self.client.with_options(timeout=timeout, max_retries=0)
         try:
-            response = self.client.messages.create(**request)
+            response = client.messages.create(**request)
         except Exception as error:  # SDK messages can echo the request.
             raise ModelUnavailable(f"api_error:{type(error).__name__}") from None
         if response.stop_reason == "refusal":
