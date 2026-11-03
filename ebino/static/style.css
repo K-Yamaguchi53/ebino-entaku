@@ -68,6 +68,10 @@ button:disabled { opacity: .5; cursor: wait; }
 .closing-word .label { font-size: .85rem; color: var(--soft); margin: 0; }
 .closing-word .words { margin: 2px 0; }
 .closing-word .source { color: var(--soft); font-size: .9rem; }
+.more-piece { border-left: 3px solid var(--line); padding-left: 10px; margin: 8px 0 4px; }
+.more-piece .words { margin: 2px 0; }
+.more-piece .source { color: var(--soft); font-size: .9rem; }
+.closing-word button.more, .closing-word button.not-heard { display: block; margin-top: 6px; }
 
 .kind-group h3 { font-size: 1rem; margin: 12px 0 4px; }
 .kind-group h3::before { content: "●"; margin-right: 4px; }

@@ -143,8 +143,13 @@ def test_the_rounds_last_word_over_http(server):
     assert request(srv, "POST", "/api/closing", {"round": 1}) == (
         200, {"round": 1, "question": "", "words": []})
     assert request(srv, "POST", "/api/closing", {"round": 9}) == (400, {"error": "unknown_round"})
+    assert request(srv, "POST", "/api/more", {"utterance_id": "a1"}) == (400, {"error": "not_a_last_word"})
+    assert request(srv, "POST", "/api/more_card", {"utterance_id": "a1"}) == (
+        400, {"error": "not_ready_for_card"})
     script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
     assert 'call("/api/closing"' in script and 'if (round.status === "answered") closeRound(' in script
+    assert 'call("/api/more"' in script and 'call("/api/more_card"' in script
+    assert "state.texts.more_end" in script and "state.texts.more_card_done" in script
 
 
 def test_the_screen_does_not_require_a_seat_before_the_sheet_is_made():

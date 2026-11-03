@@ -18,7 +18,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import closing, editor, harvest, reflection, roundtable, talk_kinds
+from . import closing, editor, harvest, more, reflection, roundtable, talk_kinds
 from .editor import QuestionCard
 from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
 from .texts import CLOSING_KIND_LABELS, CLOSING_QUESTION, NAME_IN_QUESTION, load_table, load_text
@@ -119,6 +119,7 @@ class Session:
     date: str = field(default_factory=today)
     records: Records | None = None  # None: nothing is kept (tests only).
     reflection: Reflection | None = None
+    mores: dict[str, more.More] = field(default_factory=dict)  # 「もっと聞く」, by the piece pressed under.
 
     def __post_init__(self):
         self.guard = Guard(self.library.utterances)
@@ -216,6 +217,49 @@ class Session:
         if not words:
             return {"round": round_no, "question": "", "words": []}
         return {"round": round_no, "question": load_text(CLOSING_QUESTION), "words": words}
+
+    def more_origins(self) -> dict[str, int]:
+        """Pieces 「もっと聞く」 may be pressed under, with their round: the
+        rounds' last words."""
+        origins: dict[str, int] = {}
+        for number, result in enumerate(self.rounds, start=1):
+            for word in result.closing.words if result.closing else []:
+                origins.setdefault(word.utterance_id, number)
+        return origins
+
+    def hear_more(self, utterance_id: str) -> dict:
+        """「もっと聞く」: the next piece of the same seat and section, as recorded."""
+        origins = self.more_origins()
+        if not isinstance(utterance_id, str) or utterance_id not in origins:
+            raise Refused("not_a_last_word")
+        state = self.mores.get(utterance_id)
+        if state is None:
+            seat_id = self._utterances[utterance_id].seat_id
+            state = self.mores[utterance_id] = more.More(utterance_id, origins[utterance_id], seat_id)
+        if not state.can_press:
+            raise Refused("no_more_presses")
+        piece = more.press(state, self.library.utterances)
+        self.save()
+        shown = None
+        if piece is not None:
+            shown = {"utterance_id": piece.id, "seat_id": piece.seat_id, "text": piece.text,
+                     "said": not piece.note, "source": self.source(piece.seat_id, piece)}
+        return {"utterance_id": utterance_id, "piece": shown, "ended": state.ended,
+                "can_press": state.can_press}
+
+    def more_card(self, utterance_id: str) -> dict:
+        """「ここから先は、まだ聞いていない」 pressed: the round's question becomes
+        a question card to that seat (SPEC 2-2). Once per piece."""
+        state = self.mores.get(utterance_id) if isinstance(utterance_id, str) else None
+        if state is None or not state.ended or state.card_id:
+            raise Refused("not_ready_for_card")
+        question = self._round(state.round_no).question
+        card = editor.card_for_seat(self.gate, editor.ORIGIN_NOT_HEARD, state.seat_id, question,
+                                    self.library.seats)
+        self.cards.append(card)
+        state.card_id = card.card_id
+        self.save()
+        return card.front()
 
     def next_purposes(self) -> list[dict]:
         return [self.purpose_view(sample) for sample in self.shelf.next()]
@@ -354,10 +398,12 @@ class Session:
         return {q.utterance_id for r in self.rounds for q in r.quotes}
 
     def seen_ids(self) -> set[str]:
-        """Every piece this student was shown: the rounds' quotes and the
-        rounds' last words. Never shown twice in a last word."""
+        """Every piece this student was shown: the rounds' quotes, the
+        rounds' last words and what 「もっと聞く」 showed. Never shown twice in
+        a last word."""
         closings = {w.utterance_id for r in self.rounds if r.closing for w in r.closing.words}
-        return self.shown_ids() | closings
+        heard = {piece_id for state in self.mores.values() for piece_id in state.shown}
+        return self.shown_ids() | closings | heard
 
     def seconds_used(self) -> int:
         return int(time.monotonic() - self.started)

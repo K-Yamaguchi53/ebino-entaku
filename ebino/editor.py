@@ -1,10 +1,13 @@
 """Question cards and the editor (SPEC 5-1, 6, 14-12, 14-13).
 
-A card is made in two ways only (SPEC 14-12):
+A card is made in these ways (SPEC 14-12, 14-53):
   - no_answer: no seat answered the question (「この問いに答えた席：0」); the
     question itself becomes the card.
   - student: the student pressed a silent seat and wrote what they want to
     ask that person; what they wrote becomes the card as it is.
+  - not_heard_yet: under 「もっと聞く」 the seat's section ran out and the
+    student pressed 「ここから先は、まだ聞いていない」; the round's question
+    goes to that seat.
 The card's text is always the student's own words. The editor (Sonnet 5.5)
 adds, on the back of the card only, seats that could be asked and, for a
 question that asks only for a fact, a rephrasing that asks why. The back is
@@ -25,6 +28,9 @@ from .prompts import EDITOR
 
 ORIGIN_NO_ANSWER = "no_answer"
 ORIGIN_STUDENT = "student"
+# The student pressed 「ここから先は、まだ聞いていない」 under 「もっと聞く」: the
+# round's question goes to that seat (SPEC 2-2).
+ORIGIN_NOT_HEARD = "not_heard_yet"
 MAX_ASK = 3
 MAX_REPHRASE_CHARS = 80
 
@@ -87,6 +93,12 @@ def write_back(gate: Gate, text: str, seats: list[Seat]) -> Back:
 
 def card_for_no_answer(gate: Gate, question: str, seats: list[Seat]) -> QuestionCard:
     return QuestionCard(new_card_id(), ORIGIN_NO_ANSWER, question, back=write_back(gate, question, seats))
+
+
+def card_for_seat(gate: Gate, origin: str, seat_id: str, text: str, seats: list[Seat]) -> QuestionCard:
+    """A card to one seat the student pressed for, holding the student's own
+    question (「まだ聞いていない」 under 「もっと聞く」, SPEC 2-2)."""
+    return QuestionCard(new_card_id(), origin, text, seat_id, write_back(gate, text, seats))
 
 
 def card_from_student(gate: Gate, seat_id: str, text: str, seats: list[Seat]) -> QuestionCard | None:

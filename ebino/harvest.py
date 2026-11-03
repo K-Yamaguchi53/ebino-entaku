@@ -23,6 +23,7 @@ import re
 from dataclasses import dataclass
 
 from . import roundtable
+from .editor import ORIGIN_STUDENT
 from .seat_label import seat_label
 from .texts import GO_WORDS, HARVEST_MEET_PREFIX, WORK_QUESTIONS, load_lines, load_text
 
@@ -151,7 +152,9 @@ def found_moves(session, sheet_heading) -> list[Found]:
             found.setdefault("silent_question", Found("silent_question", result.question))
             if index + 1 < len(asked):
                 found.setdefault("asked_after_silence", Found("asked_after_silence", asked[index + 1].question))
-    card = next((c for c in session.cards if c.seat_id), None)
+    # Only a card the student wrote at a silent seat; one made from 「まだ
+    # 聞いていない」 under 「もっと聞く」 is not a move (the teacher's call to make).
+    card = next((c for c in session.cards if c.origin == ORIGIN_STUDENT), None)
     if card is not None:
         found["card_at_silent_seat"] = Found("card_at_silent_seat", card.text, seat=titles[card.seat_id])
     for number, result in enumerate(session.rounds, start=1):

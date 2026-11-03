@@ -153,12 +153,54 @@ async function closeRound(roundNo, box) {
   if (!closing.words.length) return;
   const part = el("section", { class: "closing" }, el("p", { class: "closing-question", text: closing.question }));
   for (const word of closing.words) {
-    part.append(el("div", { class: "closing-word" },
+    const node = el("div", { class: "closing-word" },
       el("p", { class: "label", text: word.label }),
       el("p", { class: "words", text: word.said ? `「${word.text}」` : word.text }),
-      el("span", { class: "source", text: sourceLine(word.source) })));
+      el("span", { class: "source", text: sourceLine(word.source) }));
+    node.append(moreButton(word.utterance_id, node));
+    part.append(node);
   }
   box.append(part);
+}
+
+// 「もっと聞く」: the next piece of the same seat and section, as recorded,
+// at most twice from one piece. When the section runs out, 「ここから先は、
+// まだ聞いていない」; pressing it makes a question card to that seat (SPEC 2-2).
+function moreButton(utteranceId, node) {
+  const button = el("button", { type: "button", class: "quiet more", text: "もっと聞く" });
+  button.onclick = async () => {
+    button.disabled = true;
+    let heard;
+    try {
+      heard = await call("/api/more", { utterance_id: utteranceId });
+    } catch (error) {
+      button.disabled = false;
+      return;
+    }
+    if (heard.piece) {
+      node.insertBefore(el("div", { class: "more-piece" },
+        el("p", { class: "words", text: heard.piece.said ? `「${heard.piece.text}」` : heard.piece.text }),
+        el("span", { class: "source", text: sourceLine(heard.piece.source) })), button);
+    }
+    if (heard.ended) {
+      const end = el("button", { type: "button", class: "quiet not-heard", text: state.texts.more_end });
+      end.onclick = async () => {
+        end.disabled = true;
+        try {
+          await call("/api/more_card", { utterance_id: utteranceId });
+          end.replaceWith(el("p", { class: "card-done", text: state.texts.more_card_done }));
+        } catch (error) {
+          end.disabled = false;
+        }
+      };
+      button.replaceWith(end);
+    } else if (!heard.can_press) {
+      button.remove();
+    } else {
+      button.disabled = false;
+    }
+  };
+  return button;
 }
 
 function renderQuote(roundNo, quote) {

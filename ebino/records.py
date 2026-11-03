@@ -105,6 +105,12 @@ def session_record(session) -> dict:
                                      "rephrase": card.back.rephrase, "reason": card.back.reason}}
             for card in session.cards
         ],
+        # 「もっと聞く」: presses and the pieces' IDs shown, never the words.
+        "more": [
+            {"origin_id": state.origin_id, "round": state.round_no, "presses": state.presses,
+             "shown_ids": list(state.shown), "ended": state.ended, "card_id": state.card_id}
+            for state in session.mores.values()
+        ],
         "reflection": _reflection_record(session.reflection),
     }
 

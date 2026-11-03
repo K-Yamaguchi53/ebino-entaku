@@ -51,13 +51,17 @@ CLOSING_QUESTION = "closing_question"
 # kind in the round's last word (columns ID・見出し). Tables the teacher edits.
 TALK_KINDS = "talk_kinds"
 CLOSING_KIND_LABELS = "closing_kind_labels"
+# 「もっと聞く」: shown when the seat's section has no next piece (a press on
+# it makes a question card), and after that card is made.
+MORE_END = "more_end"
+MORE_CARD_DONE = "more_card_done"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
     HEAVY_TALK_NOTICE, SPLIT_NOTICE, START_NOTICE, LAB_QUESTION, ANSWERED_COUNT,
     NOT_ASKED_YET, INPUT_EXAMPLE, PURPOSE_HEADING, WAITING_ASK, WAITING_REFLECTION,
     SEND_FAILED, MET_LIVES_EMPTY, HARVEST_HEADING, HARVEST_USE_QUESTION, MEET_QUESTION,
-    HARVEST_MEET_PREFIX,
+    HARVEST_MEET_PREFIX, MORE_END, MORE_CARD_DONE,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 
