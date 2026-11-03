@@ -19,7 +19,7 @@ harvest card's moves (the teacher decides whether they should be).
 
 from dataclasses import dataclass, field
 
-from .closing import FRAGMENT_LEADS
+from .closing import starts_quoting
 from .ingest.utterance import Utterance
 
 MAX_PRESSES = 2
@@ -57,10 +57,11 @@ def next_after(utterances: list[Utterance], piece_id: str, skip=frozenset()) -> 
 def goes_on(piece: Utterance, following: Utterance) -> bool:
     """Whether the sentence goes on into the following piece. A piece shown in
     「」 (the person's own words) or ending in 」』 goes on only into a quoting
-    「と」「って」; any other piece goes on unless it ends a sentence."""
+    「と」「って」 (not 「とにかく」 and the like: closing.starts_quoting); any
+    other piece goes on unless it ends a sentence."""
     text = piece.text.rstrip()
     if not piece.note or text.endswith(_QUOTE_END):
-        return following.text.lstrip().startswith(FRAGMENT_LEADS)
+        return starts_quoting(following.text)
     return not text.endswith(_SENTENCE_END)
 
 

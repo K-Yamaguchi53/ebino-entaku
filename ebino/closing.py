@@ -39,6 +39,9 @@ MAX_SEATS = 3
 _RANKING_TITLE = re.compile(r"(?:ベスト|ランキング)\s*[0-9０-９一二三四五六七八九十]+\s*[!！]?\s*$")
 MIN_PIECE_CHARS = 8
 FRAGMENT_LEADS = ("と", "って")
+# Words that start with と but are not the quoting と (the teacher's call on
+# the real data): a piece starting with one stands on its own. The one list.
+NOT_QUOTING_LEADS = ("とにかく", "とても", "ところ", "とくに")
 
 SHOWN = "shown"  # At least one seat's words passed the guard.
 NONE_HOLD = "none_hold"  # No lit seat holds a piece that may answer: no call.
@@ -67,13 +70,21 @@ def is_ranking_title(text: str) -> bool:
     return "\n" not in text.strip() and _RANKING_TITLE.search(text.strip()) is not None
 
 
+def starts_quoting(text: str) -> bool:
+    """Whether a piece starts with a quoting 「と」 or 「って」, the rest of a
+    sentence whose 「」 came before: 「と語った。」, but not 「とにかく…」
+    (NOT_QUOTING_LEADS)."""
+    text = text.lstrip()
+    return text.startswith(FRAGMENT_LEADS) and not text.startswith(NOT_QUOTING_LEADS)
+
+
 def is_fragment(text: str) -> bool:
     """A piece that means nothing without the pieces around it (the teacher's
     call on the real data: 「と語った。」「楽しかった」): shorter than
     MIN_PIECE_CHARS, or starting with a quoting 「と」 or 「って」. Never an
     answer on its own: not the last word, not the seat's answer."""
     text = text.strip()
-    return len(text) < MIN_PIECE_CHARS or text.startswith(FRAGMENT_LEADS)
+    return len(text) < MIN_PIECE_CHARS or starts_quoting(text)
 
 
 def ranking_titles(utterances) -> dict[str, str]:

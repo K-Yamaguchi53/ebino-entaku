@@ -117,6 +117,13 @@ def test_a_piece_ending_in_a_closing_mark_goes_on_only_into_to_or_tte():
     assert [p["utterance_id"] for p in heard["pieces"]] == ["m1"]
 
 
+def test_a_to_that_is_not_quoting_does_not_carry_the_persons_words_on():
+    _, heard = heard_after(u("m0", "S01", "先輩からは、よくこう言われました。"),
+                           u("m1", "S01", "がんばれ", voice="spoken"),
+                           u("m2", "S01", "とにかく自分の足で出歩いてほしい。"))
+    assert [p["utterance_id"] for p in heard["pieces"]] == ["m1"]
+
+
 def test_one_press_shows_four_pieces_at_most():
     following = [u(f"m{i}", "S01", text) for i, text in
                  enumerate(["朝は早く起きて、", "道具をそろえて、", "店の前を掃いて、", "お湯をわかして、", "店を開けます。"],

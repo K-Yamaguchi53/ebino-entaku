@@ -89,9 +89,21 @@ def test_pieces_of_kind_none_unanswered_and_ranking_titles_never_answer():
 @pytest.mark.parametrize("text, fragment", [
     ("と話していた。", True), ("うれしかった", True), ("って笑っていました。", True),
     ("休みの日は、川で釣りをします。", False), ("いつも楽しく働いています", False),
+    # Not the quoting と (the teacher's call): these stand on their own.
+    ("とにかく自分の足で出歩いてほしい。", False), ("とても静かな朝が好きです。", False),
+    ("ところで、休みは何をしていますか。", False), ("とくに雨の日は畑に出ません。", False),
+    ("と言われるのがうれしい。", True),
 ])
 def test_a_fragment_is_known_by_code(text, fragment):
     assert closing.is_fragment(text) is fragment
+
+
+def test_a_piece_starting_with_tonikaku_can_give_the_last_word():
+    pieces = [u("a9", "S01", "とにかく自分の足で出歩いてほしい。", voice="article"),
+              u("a8", "S01", "と言われるのがうれしい。", voice="article")]
+    session, _ = sitting(ANSWERED, kinds={"a9": "to_students", "a8": "joy"}, pieces=pieces)
+    assert {k: [e.utterance_id for e in v] for k, v in session.library.closing_pieces["S01"].items()} == {
+        "to_students": ["a9"]}
 
 
 def test_a_fragment_never_gives_the_last_word():
