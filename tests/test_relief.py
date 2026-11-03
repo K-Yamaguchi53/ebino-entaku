@@ -731,8 +731,9 @@ def test_the_schools_mark_is_its_building_from_above_a_half_ring_and_the_lit_gla
     assert 'd: "M -4.8 0 A 4.8 4.8 0 0 1 4.8 0 Z"' in school and '{ class: "glass", r: 1.6 }' in school
     assert "flag" not in school and "pole" not in school and "polygon" not in school
     assert 'label.textContent = school.label;' in school and 'group.setAttribute("aria-label", school.label);' in school
-    # Its size follows the zoom as before.
-    assert "Math.max(view.S, TEXT_PX.school * perPx / 20)" in _inner_function(script, "rescale")
+    # Its size follows the zoom as before, up to its most (直し25-1).
+    assert "placeSchool(perPx)" in _inner_function(script, "rescale")
+    assert "Math.max(view.S, TEXT_PX.school * perPx / 20)" in _inner_function(script, "placeSchool")
     css = _css()
     assert re.search(r"\.school \.wing, \.school \.dome \{[^}]*fill: var\(--night\); stroke: var\(--moon\)", css)
     assert ".school .glass { fill: var(--lamp); }" in css and ".flag" not in css

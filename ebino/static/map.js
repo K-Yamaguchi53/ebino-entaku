@@ -45,6 +45,13 @@ const EbinoMap = (() => {
   const DRAG_FROM = 5;  // px moved before a press becomes a drag.
   // Words drawn on the picture, in CSS px (they keep their size as it zooms).
   const TEXT_PX = { place: 11, school: 12, shelf: 11 };
+  // The school (直し25-1). Its 3D picture: at the whole map a share of the
+  // drawing's width (about 86px on a PC's full screen, the size 19d drew it for),
+  // nearer in as the ground grows, but never under SCHOOL_MIN_PX nor over
+  // SCHOOL_MAX_PX on screen. Its name never over SCHOOL_TEXT_MAX_PX, and the
+  // line mark (with no picture) never over SCHOOL_MARK_MAX_PX across.
+  const SCHOOL_SHARE = 0.072, SCHOOL_MIN_PX = 56, SCHOOL_MAX_PX = 130;
+  const SCHOOL_TEXT_MAX_PX = 24, SCHOOL_MARK_MAX_PX = 64;
   const WORD_PAD = 2;  // CSS px kept clear round a word drawn on the map.
   // Where a seat's 「？」 may go, by its point (x, y, which way the text runs
   // from there), in the order tried: upper right first.
@@ -237,6 +244,8 @@ const EbinoMap = (() => {
     }
 
     splitLayer = layer("split-lines");
+    // The school's picture, when it comes, under the points: no seat is hidden under it.
+    const pictureLayer = layer("school-picture");
     const seatLayer = layer("points");
     for (const seat of seats) {
       if (seat.x === undefined) continue;
@@ -255,7 +264,7 @@ const EbinoMap = (() => {
     }
     for (const text of shelfNames.children) text.dataset.px = TEXT_PX.shelf;
     // Over the points so its label reads; it takes no presses (not a seat).
-    if (map.school) drawSchool(layer("school"), map.school);
+    if (map.school) drawSchool(layer("school"), map.school, pictureLayer);
     tableLayer = layer("table");
     drawAround();
 
@@ -410,9 +419,9 @@ const EbinoMap = (() => {
   // middle, and the glass at the roof's top lit like a lamp (it does not
   // move). The southern wing, the corridors, the gate and the grounds are
   // left out: a mark this small would blur them.
-  function drawSchool(group, school) {
+  function drawSchool(group, school, pictureLayer) {
     const [x, y] = view.proj(school.x, school.y, 1);
-    schoolGroup = { node: group, x, y };
+    schoolGroup = { node: group, x, y, picture: null };
     group.setAttribute("role", "img");
     group.setAttribute("aria-label", school.label);
     group.append(
@@ -424,6 +433,47 @@ const EbinoMap = (() => {
     const label = svgEl("text", { x: 0, y: 25, "text-anchor": "middle" });
     label.textContent = school.label;
     group.append(label);
+    const picture = map.school_picture && map.school_picture[view.relief ? "relief" : "flat"];
+    if (picture) loadSchoolPicture(picture, pictureLayer);
+  }
+
+  // The school as a 3D picture (from outside the repo, school_picture.py),
+  // in place of its line mark once it has loaded; until then, or if it never
+  // does, the line mark stays. Like the mark it takes no presses.
+  function loadSchoolPicture(picture, pictureLayer) {
+    const owner = schoolGroup;
+    const image = new Image();
+    image.onload = () => {
+      if (schoolGroup !== owner) return;  // The map was drawn again meanwhile.
+      const node = svgEl("image", { href: picture.image, width: picture.width, height: picture.height });
+      pictureLayer.append(node);
+      owner.picture = { ...picture, node };
+      owner.node.classList.add("pictured");
+      rescale();
+      relayout();
+    };
+    image.src = picture.image;
+  }
+
+  // The school's mark or picture at the zoom as it is (perPx: the drawing's
+  // units to a CSS pixel), and its name just under it, at most so large.
+  function placeSchool(perPx) {
+    const { node, x, y, picture } = schoolGroup;
+    const grown = view.relief ? Math.max(view.S, TEXT_PX.school * perPx / 20) : 1;
+    const k = Math.min(grown, SCHOOL_MARK_MAX_PX * perPx / 27);
+    node.setAttribute("transform", `translate(${x} ${y}) scale(${k})`);
+    let bottom = 4.8 * k / perPx;  // How far under the point the mark ends, on screen.
+    if (picture) {
+      const width = Math.min(Math.max(SCHOOL_SHARE * view.W, SCHOOL_MIN_PX * perPx), SCHOOL_MAX_PX * perPx);
+      const s = width / picture.width;
+      picture.node.setAttribute("transform",
+        `translate(${x - picture.point[0] * s} ${y - picture.point[1] * s}) scale(${s})`);
+      bottom = (picture.height - picture.point[1]) * s / perPx + 2;
+    }
+    const label = node.querySelector("text");
+    const fontPx = Math.min(20 * grown / perPx, SCHOOL_TEXT_MAX_PX);
+    label.style.fontSize = `${fontPx * perPx / k}px`;
+    label.setAttribute("y", (bottom + fontPx * 1.01) * perPx / k);
   }
 
   // Circle, square, triangle, diamond: the kind shows in the shape as well
@@ -542,10 +592,7 @@ const EbinoMap = (() => {
       Object.entries({ x: -half, y: -half, width: 2 * half, height: 2 * half, rx: half * 0.28 })
         .forEach(([key, value]) => hit.setAttribute(key, value));
     }
-    if (schoolGroup) {
-      const k = view.relief ? Math.max(view.S, TEXT_PX.school * perPx / 20) : 1;
-      schoolGroup.node.setAttribute("transform", `translate(${schoolGroup.x} ${schoolGroup.y}) scale(${k})`);
-    }
+    if (schoolGroup) placeSchool(perPx);
     if (!view.relief) return;  // The flat map keeps its words' sizes from style.css.
     for (const text of svg.querySelectorAll("text[data-px]")) {
       text.style.fontSize = `${Number(text.dataset.px) * perPx}px`;
@@ -870,8 +917,8 @@ const EbinoMap = (() => {
     const reach = 9.5 * pointScale() * frameBox.width / vb.w;
     const seats = tableTop ? [] : roundSeats.map((id) => toFrame(...spotOf(id)))
       .map(([px, py]) => [px - reach, py - reach, 2 * reach, 2 * reach]);
-    const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text, .school > :not(text)")]
-      .map((node) => boxIn(node, frameBox));
+    const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text, .school > :not(text), " +
+      ".school-picture image")].map((node) => boxIn(node, frameBox));
     const cover = tableTop && tableTop.map(([x, y]) => toFrame(x, y));
     const shelfBoxes = shelfAreas().map(([x0, y0, x1, y1]) => {
       const [left, top] = toFrame(x0, y0), [right, bottom] = toFrame(x1, y1);
@@ -990,7 +1037,7 @@ const EbinoMap = (() => {
   function placeAskMarks() {
     const marks = [...svg.querySelectorAll(".pt.silent .ask-mark")];
     if (!marks.length) return;
-    const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text")]
+    const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text, .school-picture image")]
       .map((node) => node.getBoundingClientRect()).filter((r) => r.width)
       .map((r) => [r.left - WORD_PAD, r.top - WORD_PAD, r.width + 2 * WORD_PAD, r.height + 2 * WORD_PAD]);
     for (const mark of marks) {
@@ -1004,14 +1051,21 @@ const EbinoMap = (() => {
     }
   }
 
-  // The school's name stays under its mark; a place name in its way moves up
-  // or down (whichever is nearer its own side), just clear of it, as the zoom is now.
+  // The school's name stays under its mark; a place name in its way (or in
+  // the way of the school's picture) moves up or down (whichever is nearer
+  // its own side), just clear of both, as the zoom is now.
   function clearSchoolName() {
     const label = svg.querySelector(".school text");
     const names = [...svg.querySelectorAll(".place-names text")];
     for (const name of names) name.removeAttribute("dy");
-    const school = label && label.getBoundingClientRect();
+    let school = label && label.getBoundingClientRect();
     if (!school || !school.width) return;
+    const picture = svg.querySelector(".school-picture image");
+    if (picture) {
+      const p = picture.getBoundingClientRect();
+      school = { left: Math.min(school.left, p.left), right: Math.max(school.right, p.right),
+        top: Math.min(school.top, p.top), bottom: Math.max(school.bottom, p.bottom) };
+    }
     const perPx = vb.h / (overlay.clientHeight || 1);
     for (const name of names) {
       const r = name.getBoundingClientRect();

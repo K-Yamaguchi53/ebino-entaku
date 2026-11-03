@@ -33,6 +33,7 @@ from . import relief
 from .config import PlaceError, data_dir, load_env_file, records_dir
 from .gate import Gate, load_names
 from .records import Records
+from .school_picture import SchoolPicture, folder_from_env
 from .reflection import CHANGED_CHOICES
 from .seat_label import KIND_LABELS, show_private_labels
 from .session import LAB_CHOICES, Library, Refused, Session
@@ -67,8 +68,11 @@ class App:
     """Holds the library, the gate and the one sitting in progress."""
 
     def __init__(self, library: Library, gate: Gate, records: Records | None = None,
-                 plant: bool = False, rng=None):
+                 plant: bool = False, rng=None, school: SchoolPicture | None = None):
         self.library = library
+        # The school's 3D picture, from outside the repo (school_picture.py);
+        # None or without pictures: its line mark.
+        self.school = school
         self.gate = gate
         self.records = records
         self.plant = plant
@@ -85,13 +89,16 @@ class App:
             self.records.save_prompt(self.session.session_id, role, request)
 
     def setup(self) -> dict:
+        view = self.library.map_view()  # None: no map, the seat list alone.
+        if view is not None:
+            view["school_picture"] = self.school.view if self.school else None
         return {
             "texts": screen_texts(),
             "kinds": KIND_LABELS,
             "labs": LAB_CHOICES,
             "changed_choices": CHANGED_CHOICES,
             "seats": self.library.seat_list(),
-            "map": self.library.map_view(),  # None: no map, the seat list alone.
+            "map": view,
         }
 
     def start(self, body: dict) -> dict:
@@ -197,6 +204,10 @@ def make_handler(app: App, port: int, timeout: float = CONNECTION_TIMEOUT):
                     return self._send(HTTPStatus.OK, file.read_bytes(), content_type)
                 except OSError:
                     pass  # No picture: the screen keeps the flat map.
+            # The school's two pictures, from their folder only; anything else is 404.
+            picture = app.school.file(path) if app.school else None
+            if picture is not None:
+                return self._send(HTTPStatus.OK, picture, "image/png")
             self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
         def do_POST(self):
@@ -267,13 +278,15 @@ def main(argv=None) -> int:
         return 2
     # Every seat's names, those kept off the map (coach.tsv) too.
     gate = Gate(anthropic.Anthropic(), load_names(folder, library.all_seats))
-    server = make_server(App(library, gate, records, plant=args.plant), args.port)
+    school = SchoolPicture(folder_from_env())
+    server = make_server(App(library, gate, records, plant=args.plant, school=school), args.port)
     print(f"seats {len(library.seats)}  pieces {len(library.entries)}  purpose samples {len(library.purposes)}")
     print(f"coach band {'on' if library.coach_on else 'off'}  coach pieces {len(library.coach_sources)}  "
           f"seats off the map {len(library.all_seats) - len(library.seats)}")
     print(library.map_report())  # 「地図なし」 when the map file is missing or broken.
     if library.placement is not None:
         print(library.relief_report())  # No picture: the flat map.
+        print(school.report())  # No picture of the school: its line mark.
     print(library.subject_catalog.report())  # The harvest card's ③: counts only.
     print(f"open http://{HOST}:{server.server_address[1]}/  (Ctrl+C to stop)")
     try:

@@ -451,11 +451,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .river path { stroke: var(--river); fill: none; }
 .drawing path { transition-property: stroke-dashoffset; transition-timing-function: ease-in-out; }
 /* While the round table is open, the map steps back under it. */
-.relief-image, .basin-fill, .river, .rim, .points, .place-names, .school, .shelf-boxes, .shelf-names, .crossing {
+.relief-image, .basin-fill, .river, .rim, .points, .place-names, .school, .school-picture, .shelf-boxes,
+.shelf-names, .crossing {
   transition: opacity .9s ease;
 }
 .dim .relief-image { opacity: .42; }
-.dim .basin-fill, .dim .river, .dim .rim, .dim .points, .dim .place-names, .dim .school,
+.dim .basin-fill, .dim .river, .dim .rim, .dim .points, .dim .place-names, .dim .school, .dim .school-picture,
 .dim .shelf-boxes, .dim .shelf-names, .dim .crossing { opacity: .26; }
 /* Place names: small, a little spaced out, in moonlight; a thin halo only. */
 .place-names { pointer-events: none; }
@@ -469,6 +470,10 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .school .glass { fill: var(--lamp); }
 .school .glass-glow { fill: url(#lamp-glow); opacity: .32; }
+/* With the school's 3D picture (under the points), the line mark steps aside;
+   its name stays. Neither takes a press. */
+.school.pictured > :not(text) { display: none; }
+.school-picture { pointer-events: none; }
 .school text { fill: var(--ink); font-family: var(--gothic); font-size: 20px; font-weight: bold;
   paint-order: stroke; stroke: var(--veil-thin); stroke-width: 3px; }
 .crossing path { stroke: var(--moon-soft); fill: none; }
@@ -614,7 +619,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* Motion reduced: nothing moves; everything is at once as it ends. */
 @media (prefers-reduced-motion: reduce) {
   .pt .halo, .pt .shape, .drawing path, .chair, .relief-image, .basin-fill, .river, .rim, .points, .place-names,
-  .school, .shelf-boxes, .shelf-names, .crossing, button, .lab-choice::before, .map-bubble, .seat,
+  .school, .school-picture, .shelf-boxes, .shelf-names, .crossing, button, .lab-choice::before, .map-bubble, .seat,
   .choice, .choice::before { transition: none !important; }
   .map-bubble, .map-bubble .thread { animation: none !important; }
 }
