@@ -7,19 +7,24 @@ allowed pairs with the first, so the two never line up with one Lab's own
 set (SPEC 5-3). Only that list of pairs is kept here, not the Labs or their
 sets (SPEC 14-1). With no allowed second, one is shown. ⑥ is never shown.
 
-② 会うときに使ってみたい力: offered right after the student picks one seat to
-meet. Only the uses the record fits are offered; the student picks one or
-none. Nothing marks the forces that came up in ①.
+A step every student must take is not a move. Picking a seat to hear more
+from is optional and is not counted; the student's own words about going to
+meet someone are (the teacher's call: they are stronger).
 
-The table is the teacher's (SPEC 14-1: kept as data); its wording may be
-changed here.
+② 会うときに使ってみたい力: offered right after the student picks a seat to hear
+more from, and only then. Only the uses the record fits are offered; the
+student picks one or none. Nothing marks the forces that came up in ①.
+
+The table is the teacher's (SPEC 14-1: kept as data); its wording and order
+may be changed here. The words that show going to meet someone are in texts/.
 """
 
+import re
 from dataclasses import dataclass
 
 from . import roundtable
 from .seat_label import seat_label
-from .texts import WORK_QUESTIONS, load_lines
+from .texts import GO_WORDS, HARVEST_MEET_PREFIX, WORK_QUESTIONS, load_lines, load_text
 
 FORCES = {
     1: "① 自走する力",
@@ -33,7 +38,6 @@ FORCE_IN_MOVES = FORCES | {4: "④ 向かう力の、手前の動き"}
 ALLOWED_PAIRS = frozenset(frozenset(pair) for pair in ((1, 3), (1, 4), (2, 4), (3, 5), (4, 5)))
 MAX_WORDS = 30  # The record's words in the first move; longer ones end in 「…」.
 MOVES_PREFIX = "今日の動き："
-MEET_PREFIX = "会いに行きたい1人："
 USE_PREFIX = "会うときに："
 CHOSE_NO_USE = "none"  # 「選ばない」
 MIN_KINDS_MET = 3
@@ -52,6 +56,7 @@ class MoveRow:
 
 # In priority order: the first row the record shows is the first move.
 MOVE_TABLE = (
+    MoveRow("wrote_to_go", 4, "「{w}」と自分で書いた", "会いに行く一言を自分で書いた"),
     MoveRow("rewrote", 1, "問いを「{w}」に書き直した", "問いを書き直した"),
     MoveRow("asked_after_silence", 1, "どの席も答えなかったあとも、「{w}」と問いを続けた",
             "どの席も答えなかったあとも、問いを続けた"),
@@ -61,9 +66,18 @@ MOVE_TABLE = (
     MoveRow("kinds_met", 2, "{w}と、種類の違う席の言葉を聞いた", "種類の違う席の言葉を、3種類以上聞いた"),
     MoveRow("many_rounds", 1, "「{w}」から、問いを{n}回続けた", "問いを{n}回続けた"),
     MoveRow("own_first_question", 1, "最初の問い「{w}」を自分の言葉で入れた", "最初の問いを自分の言葉で入れた"),
-    MoveRow("chose_to_meet", 4, "{w}に会いに行きたいと選んだ", "{w}に会いに行きたいと選んだ"),
 )
 ROWS = {row.code: row for row in MOVE_TABLE}
+
+# The sheet's fields the student wrote, read in this order for words about
+# going to meet someone. Never the round-table questions or the cards, and
+# never a move the moderator offered (own_move is set only when the student
+# wrote one).
+GO_FIELDS = ("now_question", "answer", "own_move", "rewrite", "meet_reason")
+# After the word, in the same sentence: the student is not going. When in
+# doubt the sentence is not counted.
+NOT_GOING = ("ない", "なかっ", "なく", "ません")
+_SENTENCES = re.compile(r"[^。．！？!?\n]+[。．！？!?]*")
 
 # ②: how to act when meeting, in the words of the use; the force name is small.
 USES = {
@@ -85,6 +99,20 @@ class Found:
     words: str = ""
     seat: str = ""  # A seat's title, for the card move.
     count: int = 0  # Rounds, for the many-rounds move.
+    field: str = ""  # The sheet's field the words came from, for the going move.
+
+
+def going_sentence(text: str, words: list[str]) -> str:
+    """The first sentence holding a word about going to meet someone, with
+    no 「ない」 (or the like) after the word in that sentence; "" if none."""
+    for sentence in _SENTENCES.findall(text):
+        hits = [sentence.find(word) for word in words if word in sentence]
+        if not hits:
+            continue
+        rest = sentence[min(hits):]
+        if not any(no in rest for no in NOT_GOING):
+            return sentence.strip().rstrip("。．")  # Quoted on the card without its 。.
+    return ""
 
 
 def _cut(words: str) -> str:
@@ -104,6 +132,12 @@ def found_moves(session, sheet_heading) -> list[Found]:
     asked = [r for r in session.rounds if r.question]
     found: dict[str, Found] = {}
 
+    go_words = load_lines(GO_WORDS)
+    for field in GO_FIELDS:
+        sentence = going_sentence(getattr(current, field), go_words)
+        if sentence:
+            found["wrote_to_go"] = Found("wrote_to_go", sentence, field=field)
+            break
     if current.rewrite:
         found["rewrote"] = Found("rewrote", current.rewrite)
     for index, result in enumerate(asked):
@@ -130,8 +164,6 @@ def found_moves(session, sheet_heading) -> list[Found]:
             found["many_rounds"] = Found("many_rounds", first, count=len(asked))
         if not any(_same(first, line) for line in load_lines(WORK_QUESTIONS)):
             found["own_first_question"] = Found("own_first_question", first)
-    if current.meet_seat:
-        found["chose_to_meet"] = Found("chose_to_meet", titles[current.meet_seat])
     return [found[row.code] for row in MOVE_TABLE if row.code in found]
 
 
@@ -152,6 +184,9 @@ def _move_text(move: Found, with_words: bool) -> str:
 
 
 def moves_line(picked: list[Found]) -> str:
+    """The card's first line; "" with no move (the line is then left out)."""
+    if not picked:
+        return ""
     parts = [f"{_move_text(move, index == 0)}（{FORCE_IN_MOVES[ROWS[move.code].force]}）"
              for index, move in enumerate(picked)]
     return MOVES_PREFIX + "／".join(parts)
@@ -173,7 +208,7 @@ def use_view(force: int) -> dict:
 
 
 def meet_line(title: str, use: int | None) -> str:
-    line = MEET_PREFIX + title
+    line = load_text(HARVEST_MEET_PREFIX) + title
     if use is None:
         return line
     return f"{line}　／　{USE_PREFIX}{FORCES[use][0]} {USES[use]}"

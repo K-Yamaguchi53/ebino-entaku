@@ -79,7 +79,7 @@
       <label>いまの問いを書き直す（書き直さなくてよい）
         <textarea id="rewrite" rows="2" maxlength="200"></textarea>
       </label>
-      <label>会いに行きたい1人
+      <label><span id="meet-question"></span>
         <select id="meet-seat"></select>
       </label>
       <label>理由（1行）
@@ -88,8 +88,8 @@
       <button type="submit">この1枚にする</button>
     </form>
 
-    <!-- Today's harvest card (SPEC 5-3): ② right after the seat to meet is
-         picked, then ① and ② on the last screen. -->
+    <!-- Today's harvest card (SPEC 5-3): ② right after a seat to hear more
+         from is picked (not asked when none is), then the card. -->
     <section id="harvest-use" class="step" hidden>
       <p id="harvest-use-question"></p>
       <div id="uses" class="uses"></div>

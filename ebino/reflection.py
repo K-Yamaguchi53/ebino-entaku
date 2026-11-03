@@ -127,9 +127,14 @@ class Reflection:
     meet_reason: str = ""
     finished: bool = False
     # The harvest card (SPEC 5-3): codes of the moves shown in ①, and the use
-    # picked in ② (a force number as text, or harvest.CHOSE_NO_USE).
+    # picked in ② (a force number as text, or harvest.CHOSE_NO_USE; "" when
+    # no seat was picked, so ② was not asked). The moves are read when the
+    # sheet is finished. harvest_go_field names the sheet's field the going
+    # move's words came from (the words stay in that field only).
     harvest_moves: list[str] = field(default_factory=list)
     harvest_use: str = ""
+    harvest_go_field: str = ""
+    harvest_moves_line: str = ""  # The card's ① line, as shown; not recorded.
 
 
 class Record:

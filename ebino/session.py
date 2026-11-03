@@ -225,7 +225,8 @@ class Session:
             raise Refused("not_ready_to_finish")
         if chosen not in [m.direction for m in current.moves] + [CHOSE_NONE, CHOSE_OWN]:
             raise Refused("unknown_move")
-        if meet_seat not in self._seats:
+        # The seat to hear more from is optional ("" when none is picked).
+        if meet_seat and meet_seat not in self._seats:
             raise Refused("unknown_seat")
         current.chosen = chosen
         if chosen == CHOSE_OWN:
@@ -234,25 +235,33 @@ class Session:
         current.meet_seat = meet_seat
         current.meet_reason = _line(meet_reason, MAX_LINE_CHARS, "", required=False)
         current.finished = True
+        picked = harvest.pick(harvest.found_moves(self, _sheet_heading))
+        current.harvest_moves = [move.code for move in picked]
+        current.harvest_go_field = next((m.field for m in picked if m.field), "")
+        current.harvest_moves_line = harvest.moves_line(picked)
         self.save()
-        # ② comes right after the seat to meet is picked (SPEC 5-3).
-        return self.sheet_view() | {"uses": [harvest.use_view(force) for force in harvest.uses_offered(self)]}
+        sheet = self.sheet_view()
+        if meet_seat:
+            # ② comes right after the seat is picked (SPEC 5-3); the card after it.
+            return sheet | {"uses": [harvest.use_view(force) for force in harvest.uses_offered(self)],
+                            "harvest": None}
+        # No seat: no ② and no second line; no move either: no card.
+        card = {"moves": current.harvest_moves_line, "meet": ""} if picked else None
+        return sheet | {"uses": [], "harvest": card}
 
     def harvest(self, use: str) -> dict:
         """② picked (or 「選ばない」); the card's ① and ② lines (SPEC 5-3)."""
         current = self._reflection()
-        if not current.finished or current.harvest_use:
+        if not current.finished or not current.meet_seat or current.harvest_use:
             raise Refused("not_ready_for_harvest")
         offered = [str(force) for force in harvest.uses_offered(self)]
         if use not in offered + [harvest.CHOSE_NO_USE]:
             raise Refused("unknown_use")
-        picked = harvest.pick(harvest.found_moves(self, _sheet_heading))
-        current.harvest_moves = [move.code for move in picked]
         current.harvest_use = use
         self.save()
         title = seat_label(self._seats[current.meet_seat], self.library.show_private).title
         return {
-            "moves": harvest.moves_line(picked),
+            "moves": current.harvest_moves_line,
             "meet": harvest.meet_line(title, None if use == harvest.CHOSE_NO_USE else int(use)),
         }
 
@@ -290,6 +299,7 @@ class Session:
             "own_move": current.own_move,
             "rewrite": current.rewrite,
             "meet": meet | {"reason": current.meet_reason} if meet else None,
+            "meet_reason": current.meet_reason,  # Kept even with no seat picked.
         }
 
     # --- what the sitting has gathered ---

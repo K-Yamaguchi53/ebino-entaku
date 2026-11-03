@@ -110,11 +110,33 @@ def test_the_reflection_sheet_over_http(server):
     # The harvest card's ② comes with the sheet; ① and ② come after the pick.
     assert [use["force"] for use in sheet["uses"]] == ["1", "3", "4", "5"]
     status, card = request(srv, "POST", "/api/harvest", {"use": "1"})
-    assert status == 200 and card["meet"] == "会いに行きたい1人：保育士　／　会うときに：① 聞きたいことを、自分で決めて行く"
+    assert status == 200 and card["meet"] == "もっと話を聞いてみたい人：保育士　／　会うときに：① 聞きたいことを、自分で決めて行く"
     assert card["moves"].startswith("今日の動き：最初の問い「休みの日って、みんな何してる？」を自分の言葉で入れた（① 自走する力）")
     assert request(srv, "POST", "/api/harvest", {"use": "1"}) == (400, {"error": "not_ready_for_harvest"})
     texts = request(srv, "GET", "/api/setup")[1]["texts"]
     assert texts["harvest_heading"] and texts["harvest_use_question"]
+    assert texts["meet_question"] and texts["harvest_meet_prefix"]
+
+
+def test_the_sheet_is_made_over_http_with_no_seat_picked(server):
+    srv, client = server
+    from test_reflection import reflection_says
+    client._answers.append(reflection_says())
+    request(srv, "POST", "/api/start", {"lab": "creation"})
+    request(srv, "POST", "/api/ask", {"question": "休みの日って、みんな何してる？"})
+    request(srv, "POST", "/api/reflect/begin", {"changed": "same", "now_question": "休みの決め方"})
+    request(srv, "POST", "/api/reflect/answer", {"answer": "保育士さんに会ってみようと思った"})
+    status, sheet = request(srv, "POST", "/api/reflect/finish", {"chosen": "none", "meet_seat": ""})
+    assert status == 200 and sheet["meet"] is None and sheet["uses"] == []
+    assert sheet["harvest"]["moves"].startswith("今日の動き：「保育士さんに会ってみようと思った」と自分で書いた")
+    assert sheet["harvest"]["meet"] == ""
+    assert request(srv, "POST", "/api/harvest", {"use": "none"}) == (400, {"error": "not_ready_for_harvest"})
+
+
+def test_the_screen_does_not_require_a_seat_before_the_sheet_is_made():
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    finish = script[script.index("async function reflectFinish"):script.index("// --- today's harvest card")]
+    assert "!meetSeat" not in finish and "if (!chosen) return;" in finish
 
 
 def test_a_connection_that_sends_nothing_does_not_hold_up_the_screen(server):

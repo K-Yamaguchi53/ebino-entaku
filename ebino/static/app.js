@@ -258,6 +258,7 @@ function openReflection() {
   document.querySelector(".reflect-heavy-talk").textContent = state.texts.heavy_talk_notice;
   $("first-question").textContent = state.firstQuestion;
   radios($("changed-choices"), "changed", Object.entries(state.changedChoices));
+  $("meet-question").textContent = state.texts.meet_question;
   const select = $("meet-seat");
   select.replaceChildren(el("option", { value: "", text: "席を選ぶ" }));
   const label = (seat) => [seat.title, seat.detail].filter(Boolean).join("　");
@@ -320,19 +321,35 @@ async function reflectAnswer(declined) {
 async function reflectFinish(event) {
   event.preventDefault();
   const chosen = picked("move");
-  const meetSeat = $("meet-seat").value;
-  if (!chosen || !meetSeat) return;
+  // The seat to hear more from is optional.
+  if (!chosen) return;
   if (chosen === "own" && !$("own-move").value.trim()) return;
   const sheet = await call("/api/reflect/finish", {
     chosen, own_move: $("own-move").value, rewrite: $("rewrite").value,
-    meet_seat: meetSeat, meet_reason: $("meet-reason").value,
+    meet_seat: $("meet-seat").value, meet_reason: $("meet-reason").value,
   });
   for (const id of ["reflect-first", "reflect-answer", "reflect-finish"]) $(id).hidden = true;
   state.sheet = sheet;
-  renderUses(sheet.uses);
+  if (sheet.uses.length) {
+    renderUses(sheet.uses);
+    return;
+  }
+  // No seat picked: no ②; the card (if any move) and the sheet at once.
+  if (sheet.harvest) showHarvest(sheet.harvest);
+  renderSheet(sheet);
 }
 
 // --- today's harvest card (SPEC 5-3) ---
+
+// Either line may be empty: no move, or no seat picked. Then it is left out.
+function showHarvest(card) {
+  $("harvest-heading").textContent = state.texts.harvest_heading;
+  for (const [id, text] of [["harvest-moves", card.moves], ["harvest-meet", card.meet]]) {
+    $(id).textContent = text;
+    $(id).hidden = !text;
+  }
+  $("harvest").hidden = false;
+}
 
 // ②: the uses the record fits, and 「選ばない」, all the same size.
 function renderUses(uses) {
@@ -354,10 +371,7 @@ async function pickUse(use) {
   try {
     const card = await call("/api/harvest", { use });
     $("harvest-use").hidden = true;
-    $("harvest-heading").textContent = state.texts.harvest_heading;
-    $("harvest-moves").textContent = card.moves;
-    $("harvest-meet").textContent = card.meet;
-    $("harvest").hidden = false;
+    showHarvest(card);
     renderSheet(state.sheet);
   } catch (error) {
     message.textContent = sendFailed(error);
@@ -391,7 +405,10 @@ function renderSheet(sheet) {
     : sheet.move ? `${sheet.move.label}：${sheet.move.text}` : "";
   row("次の一手", move);
   if (sheet.rewrite) row("いまの問い（書き直し）", sheet.rewrite);
-  if (sheet.meet) row("会いに行きたい1人", sourceLine(sheet.meet), sheet.meet.reason);
+  // The row's label is the card's line head without its colon.
+  const meetLabel = state.texts.harvest_meet_prefix.replace(/[：:]$/, "");
+  if (sheet.meet) row(meetLabel, sourceLine(sheet.meet), sheet.meet.reason);
+  else if (sheet.meet_reason) row(meetLabel, sheet.meet_reason);
   box.hidden = false;
 }
 

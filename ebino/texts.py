@@ -37,12 +37,20 @@ MET_LIVES_EMPTY = "met_lives_empty"
 # Today's harvest card (SPEC 5-3): its heading, and the line above ②.
 HARVEST_HEADING = "harvest_heading"
 HARVEST_USE_QUESTION = "harvest_use_question"
+# The sheet's optional question for a seat to hear more from, and the card's
+# second line, which starts with the same words.
+MEET_QUESTION = "meet_question"
+HARVEST_MEET_PREFIX = "harvest_meet_prefix"
+# Words that show going to meet someone, one per line, looked for in what the
+# student wrote on the sheet (the harvest card's ④). Not shown on screen.
+GO_WORDS = "go_words"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
     HEAVY_TALK_NOTICE, SPLIT_NOTICE, START_NOTICE, LAB_QUESTION, ANSWERED_COUNT,
     NOT_ASKED_YET, INPUT_EXAMPLE, PURPOSE_HEADING, WAITING_ASK, WAITING_REFLECTION,
-    SEND_FAILED, MET_LIVES_EMPTY, HARVEST_HEADING, HARVEST_USE_QUESTION,
+    SEND_FAILED, MET_LIVES_EMPTY, HARVEST_HEADING, HARVEST_USE_QUESTION, MEET_QUESTION,
+    HARVEST_MEET_PREFIX,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 

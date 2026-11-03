@@ -135,6 +135,7 @@ def _reflection_record(reflection) -> dict | None:
         "finished": reflection.finished,
         "harvest_moves": list(reflection.harvest_moves),
         "harvest_use": reflection.harvest_use,
+        "harvest_go_field": reflection.harvest_go_field,
     }
 
 
