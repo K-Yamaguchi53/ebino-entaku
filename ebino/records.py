@@ -133,6 +133,8 @@ def _reflection_record(reflection) -> dict | None:
         "meet_seat": reflection.meet_seat,
         "meet_reason": reflection.meet_reason,
         "finished": reflection.finished,
+        "harvest_moves": list(reflection.harvest_moves),
+        "harvest_use": reflection.harvest_use,
     }
 
 

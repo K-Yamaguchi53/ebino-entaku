@@ -34,12 +34,15 @@ WAITING_REFLECTION = "waiting_reflection"
 SEND_FAILED = "send_failed"
 # The sheet's 出会った生き方 when the student marked no words (SPEC 5-2).
 MET_LIVES_EMPTY = "met_lives_empty"
+# Today's harvest card (SPEC 5-3): its heading, and the line above ②.
+HARVEST_HEADING = "harvest_heading"
+HARVEST_USE_QUESTION = "harvest_use_question"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
     HEAVY_TALK_NOTICE, SPLIT_NOTICE, START_NOTICE, LAB_QUESTION, ANSWERED_COUNT,
     NOT_ASKED_YET, INPUT_EXAMPLE, PURPOSE_HEADING, WAITING_ASK, WAITING_REFLECTION,
-    SEND_FAILED, MET_LIVES_EMPTY,
+    SEND_FAILED, MET_LIVES_EMPTY, HARVEST_HEADING, HARVEST_USE_QUESTION,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 

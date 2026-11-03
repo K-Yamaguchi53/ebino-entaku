@@ -17,7 +17,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import editor, reflection, roundtable
+from . import editor, harvest, reflection, roundtable
 from .editor import QuestionCard
 from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
 from .texts import NAME_IN_QUESTION, load_text
@@ -235,7 +235,26 @@ class Session:
         current.meet_reason = _line(meet_reason, MAX_LINE_CHARS, "", required=False)
         current.finished = True
         self.save()
-        return self.sheet_view()
+        # ② comes right after the seat to meet is picked (SPEC 5-3).
+        return self.sheet_view() | {"uses": [harvest.use_view(force) for force in harvest.uses_offered(self)]}
+
+    def harvest(self, use: str) -> dict:
+        """② picked (or 「選ばない」); the card's ① and ② lines (SPEC 5-3)."""
+        current = self._reflection()
+        if not current.finished or current.harvest_use:
+            raise Refused("not_ready_for_harvest")
+        offered = [str(force) for force in harvest.uses_offered(self)]
+        if use not in offered + [harvest.CHOSE_NO_USE]:
+            raise Refused("unknown_use")
+        picked = harvest.pick(harvest.found_moves(self, _sheet_heading))
+        current.harvest_moves = [move.code for move in picked]
+        current.harvest_use = use
+        self.save()
+        title = seat_label(self._seats[current.meet_seat], self.library.show_private).title
+        return {
+            "moves": harvest.moves_line(picked),
+            "meet": harvest.meet_line(title, None if use == harvest.CHOSE_NO_USE else int(use)),
+        }
 
     def _reflection(self) -> Reflection:
         if self.reflection is None:

@@ -126,6 +126,10 @@ class Reflection:
     meet_seat: str = ""
     meet_reason: str = ""
     finished: bool = False
+    # The harvest card (SPEC 5-3): codes of the moves shown in ①, and the use
+    # picked in ② (a force number as text, or harvest.CHOSE_NO_USE).
+    harvest_moves: list[str] = field(default_factory=list)
+    harvest_use: str = ""
 
 
 class Record:

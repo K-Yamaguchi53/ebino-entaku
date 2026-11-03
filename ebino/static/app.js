@@ -328,7 +328,42 @@ async function reflectFinish(event) {
     meet_seat: meetSeat, meet_reason: $("meet-reason").value,
   });
   for (const id of ["reflect-first", "reflect-answer", "reflect-finish"]) $(id).hidden = true;
-  renderSheet(sheet);
+  state.sheet = sheet;
+  renderUses(sheet.uses);
+}
+
+// --- today's harvest card (SPEC 5-3) ---
+
+// ②: the uses the record fits, and 「選ばない」, all the same size.
+function renderUses(uses) {
+  $("harvest-use-question").textContent = state.texts.harvest_use_question;
+  const box = $("uses");
+  box.replaceChildren();
+  for (const use of uses) {
+    box.append(el("button", { type: "button", onclick: () => pickUse(use.force) },
+      el("span", { text: use.text }), el("span", { class: "force", text: use.name })));
+  }
+  box.append(el("button", { type: "button", text: "選ばない", onclick: () => pickUse("none") }));
+  $("harvest-use").hidden = false;
+}
+
+async function pickUse(use) {
+  const buttons = [...$("uses").querySelectorAll("button")];
+  for (const button of buttons) button.disabled = true;
+  const message = $("harvest-message");
+  try {
+    const card = await call("/api/harvest", { use });
+    $("harvest-use").hidden = true;
+    $("harvest-heading").textContent = state.texts.harvest_heading;
+    $("harvest-moves").textContent = card.moves;
+    $("harvest-meet").textContent = card.meet;
+    $("harvest").hidden = false;
+    renderSheet(state.sheet);
+  } catch (error) {
+    message.textContent = sendFailed(error);
+    message.hidden = false;
+    for (const button of buttons) button.disabled = false;
+  }
 }
 
 function renderSheet(sheet) {

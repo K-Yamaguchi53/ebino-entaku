@@ -92,6 +92,12 @@ button:disabled { opacity: .5; cursor: wait; }
 .sheet .left { color: var(--soft); }
 .sheet .source { color: var(--soft); font-size: .85rem; }
 @media (max-width: 600px) { .sheet { grid-template-columns: 1fr; } }
+.uses { display: grid; gap: 8px; }
+.uses button { text-align: left; }
+.uses .force { display: block; font-size: .8rem; color: var(--soft); }
+.harvest { background: #fff; border: 2px solid var(--lit); border-radius: 12px; padding: 12px 16px; margin: 12px 0; }
+.harvest h3 { margin: 0 0 6px; font-size: 1rem; }
+.harvest p { margin: 4px 0; }
 
 .kind-adult h3::before { color: var(--adult); }
 .kind-poster h3::before { color: var(--poster); }

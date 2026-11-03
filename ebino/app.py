@@ -116,6 +116,8 @@ class App:
             return session.reflect_finish(body.get("chosen", ""), body.get("own_move", ""),
                                           body.get("rewrite", ""), body.get("meet_seat", ""),
                                           body.get("meet_reason", ""))
+        if path == "/api/harvest":
+            return session.harvest(body.get("use", ""))
         raise Refused("unknown_path")
 
 

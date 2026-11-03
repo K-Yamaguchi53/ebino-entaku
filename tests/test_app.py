@@ -107,6 +107,14 @@ def test_the_reflection_sheet_over_http(server):
     status, sheet = request(srv, "POST", "/api/reflect/finish",
                             {"chosen": "silent_seat", "meet_seat": "S03", "meet_reason": ""})
     assert status == 200 and sheet["move"]["label"] == "黙った席" and sheet["meet"]["title"] == "保育士"
+    # The harvest card's ② comes with the sheet; ① and ② come after the pick.
+    assert [use["force"] for use in sheet["uses"]] == ["1", "3", "4", "5"]
+    status, card = request(srv, "POST", "/api/harvest", {"use": "1"})
+    assert status == 200 and card["meet"] == "会いに行きたい1人：保育士　／　会うときに：① 聞きたいことを、自分で決めて行く"
+    assert card["moves"].startswith("今日の動き：最初の問い「休みの日って、みんな何してる？」を自分の言葉で入れた（① 自走する力）")
+    assert request(srv, "POST", "/api/harvest", {"use": "1"}) == (400, {"error": "not_ready_for_harvest"})
+    texts = request(srv, "GET", "/api/setup")[1]["texts"]
+    assert texts["harvest_heading"] and texts["harvest_use_question"]
 
 
 def test_a_connection_that_sends_nothing_does_not_hold_up_the_screen(server):
