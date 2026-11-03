@@ -6,6 +6,7 @@ new row can never carry a name through by accident.
 
 import re
 import unicodedata
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -62,6 +63,11 @@ ROW_VOICES = {
 _DASHES = re.compile(r"[‐‑‒–—―−ーｰ]")
 _FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
 _CONTENT_COLUMN = 2
+# A paragraph ending in one of these closes a sentence, so it is never a wrap.
+_SENTENCE_ENDS = "。．.！？!?」』）)…"
+# Shorter paragraphs are headings or list items; they never set the line width.
+_MIN_LINE_WIDTH = 10
+_WIDTH_SLACK = 1
 
 
 @dataclass
@@ -75,6 +81,7 @@ class ArticleStats:
     unsplit_name: bool = False
     single_char_name: bool = False
     dropped_rows: int = 0
+    wrapped_lines_joined: int = 0
     notes: list[str] = field(default_factory=list)
 
 
@@ -122,6 +129,57 @@ def read_rows(table: Table) -> ArticleRows:
     return ArticleRows(rows, dropped)
 
 
+def _ends_a_sentence(paragraph: str) -> bool:
+    return paragraph.endswith(tuple(_SENTENCE_ENDS))
+
+
+def line_width(paragraphs: list[str]) -> int | None:
+    """The width of a printed line, when one file's paragraphs show it.
+
+    An article taken from a PDF can hold each printed line as a paragraph,
+    so a word is cut where the line ended (「…職員一人ひと」「りの…」). Such
+    lines all have about the same length and do not end a sentence. The
+    width is the commonest length among those paragraphs; it needs two of
+    them, so a lone heading never sets it. None when nothing shows a width.
+    """
+    lengths = Counter(
+        len(p) for p in paragraphs if not _ends_a_sentence(p) and len(p) >= _MIN_LINE_WIDTH
+    )
+    if not lengths:
+        return None
+    width, count = max(lengths.items(), key=lambda item: (item[1], item[0]))
+    return width if count >= 2 else None
+
+
+def join_wrapped(rows: dict[str, list[str]]) -> tuple[dict[str, list[str]], int]:
+    """Join each printed line back onto the paragraph it was cut from.
+
+    A paragraph of the file's line width (±1) that does not end a sentence
+    is a wrapped line, and the next paragraph of the same row continues it.
+    Headings (shorter) and paragraphs that end a sentence stay as they are.
+    Only the rows that are shown take part: the name row keeps one paragraph
+    per person. Returns the rows and how many lines were joined.
+    """
+    width = line_width([p for key in USED_ROWS for p in rows.get(key, [])])
+    if width is None:
+        return rows, 0
+    joined_rows = dict(rows)
+    joined = 0
+    for key in USED_ROWS:
+        kept: list[str] = []
+        carry = False
+        for paragraph in rows.get(key, []):
+            if carry:
+                kept[-1] += paragraph
+                joined += 1
+            else:
+                kept.append(paragraph)
+            carry = not _ends_a_sentence(paragraph) and abs(len(paragraph) - width) <= _WIDTH_SLACK
+        if key in rows:
+            joined_rows[key] = kept
+    return joined_rows, joined
+
+
 def ingest_article_rows(
     parsed: ArticleRows, seat: Seat, masks: SeatMasks = SeatMasks()
 ) -> tuple[list[Utterance], ArticleStats]:
@@ -147,9 +205,10 @@ def ingest_article_rows(
     # The teacher wrote the article themself: every row is their own words, not
     # split at 「」, and shown as the teacher's article (SPEC 14-50).
     own = seat.kind == KIND_TEACHER_ARTICLE
+    rows, wrapped = join_wrapped(parsed.rows)
     utterances: list[Utterance] = []
     for key, section in USED_ROWS.items():
-        for raw in parsed.rows.get(key, []):
+        for raw in rows.get(key, []):
             paragraph = dedupe_sentences(scrub(raw)).strip()
             if not paragraph:
                 continue
@@ -178,6 +237,7 @@ def ingest_article_rows(
         unsplit_name=person.unsplit,
         single_char_name=person.single_char,
         dropped_rows=parsed.dropped_rows,
+        wrapped_lines_joined=wrapped,
     )
     return utterances, stats
 

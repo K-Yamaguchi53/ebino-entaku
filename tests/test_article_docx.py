@@ -167,6 +167,49 @@ def test_repeated_paragraph_becomes_one(seat):
     assert len(utterances) == 1
 
 
+# A PDF's printed lines, each kept as a paragraph (13 characters to a line).
+WRAP_1 = "うちの店では、職員一人ひと"
+WRAP_2 = "りの暮らしに合わせて休みを"
+WRAP_END = "決めています。"
+FULL_LINE = "休みは店で決めて取ります。"  # The width, but it ends a sentence.
+
+
+def body_texts(body):
+    utterances, stats = ingest_article_rows(ArticleRows({"1": [PERSON], "8": body}), make_seat())
+    return [u.text for u in utterances], stats
+
+
+def test_lines_of_the_line_width_become_one_paragraph():
+    assert len(WRAP_1) == len(WRAP_2) == len(FULL_LINE) == 13
+    texts, stats = body_texts([WRAP_1, WRAP_2, WRAP_END])
+    assert texts == [WRAP_1 + WRAP_2 + WRAP_END]
+    assert stats.wrapped_lines_joined == 2
+
+
+def test_a_short_heading_does_not_join_the_body_after_it():
+    texts, _ = body_texts(["休みの決め方", WRAP_1, WRAP_2, WRAP_END])
+    assert texts == ["休みの決め方", WRAP_1 + WRAP_2 + WRAP_END]
+
+
+def test_a_line_that_ends_a_sentence_does_not_join_the_next():
+    texts, stats = body_texts([WRAP_1, WRAP_2, WRAP_END, FULL_LINE, "朝は早く店を開けます。"])
+    assert texts == [WRAP_1 + WRAP_2 + WRAP_END, FULL_LINE, "朝は早く店を開けます。"]
+    assert stats.wrapped_lines_joined == 2
+
+
+def test_one_line_of_a_length_alone_sets_no_width():
+    # A single unended paragraph could be a heading: nothing is joined.
+    texts, stats = body_texts(["店の休みの決め方について", "休みは決めて取ります。"])
+    assert texts == ["店の休みの決め方について", "休みは決めて取ります。"]
+    assert stats.wrapped_lines_joined == 0
+
+
+def test_rows_are_not_joined_into_each_other():
+    rows = {"1": [PERSON], "3": [WRAP_1], "8": [WRAP_2, WRAP_END]}
+    utterances, _ = ingest_article_rows(ArticleRows(rows), make_seat())
+    assert [u.text for u in utterances] == [WRAP_1, WRAP_2 + WRAP_END]
+
+
 @pytest.mark.parametrize(
     "names",
     [

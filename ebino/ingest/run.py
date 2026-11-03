@@ -46,6 +46,7 @@ class Report:
     unsplit_names: int = 0
     single_char_names: int = 0
     dropped_rows: int = 0
+    wrapped_lines_joined: int = 0
     poster_sections_by_role: Counter = field(default_factory=Counter)
     posters_purpose_from_hypothesis: int = 0
     posters_purpose_from_theme_reason: int = 0
@@ -67,6 +68,7 @@ class Report:
             f"names without separator (check by hand): {self.unsplit_names}",
             f"one-character name parts (check by hand): {self.single_char_names}",
             f"table rows dropped: {self.dropped_rows}",
+            f"article lines joined back into paragraphs: {self.wrapped_lines_joined}",
             f"poster sections by role: {dict(self.poster_sections_by_role)}",
             f"posters whose purpose comes from 仮説/経緯: {self.posters_purpose_from_hypothesis}",
             "posters whose purpose comes from テーマ設定の理由: "
@@ -91,6 +93,7 @@ def _ingest_seat(
         report.unsplit_names += stats.unsplit_name
         report.single_char_names += stats.single_char_name
         report.dropped_rows += stats.dropped_rows
+        report.wrapped_lines_joined += stats.wrapped_lines_joined
         return utterances
     if suffix == ".pdf" and seat.kind == "poster":
         if pdf_page_count(path) > 1:
