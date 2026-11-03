@@ -418,7 +418,8 @@ function renderSheet(sheet) {
   row("出会った生き方", ...(lives.length ? lives : [el("div", { class: "left", text: state.texts.met_lives_empty })]));
   row("割れたところ", ...sheet.splits.map((split) =>
     el("div", { class: split.pressed ? "" : "left", text: (split.pressed ? "" : "置いてきた：") + split.heading })));
-  row("残した質問カード", ...sheet.cards);
+  // No card left: the row is not shown at all.
+  if (sheet.cards.length) row("残した質問カード", ...sheet.cards);
   row("最初の問いは変わった？", sheet.changed);
   row("いまの問い（1回目）", sheet.now_question);
   row("問い返し", sheet.ask_back, sheet.declined ? "答えない" : sheet.answer);

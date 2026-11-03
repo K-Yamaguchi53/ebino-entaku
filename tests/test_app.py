@@ -151,6 +151,13 @@ def test_the_screen_does_not_require_a_seat_before_the_sheet_is_made():
     assert "!meetSeat" not in finish and "if (!chosen) return;" in finish
 
 
+def test_the_sheet_has_no_card_row_when_no_card_was_left():
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    sheet = script[script.index("function renderSheet"):]
+    assert 'if (sheet.cards.length) row("残した質問カード"' in sheet
+    assert sheet.count('row("残した質問カード"') == 1
+
+
 def test_a_connection_that_sends_nothing_does_not_hold_up_the_screen(server):
     # Browsers open spare connections and may send nothing on them.
     srv, _ = server
