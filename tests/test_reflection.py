@@ -221,6 +221,16 @@ def test_the_widened_banned_words_let_these_moves_through(text):
     assert not banned_in(text)
 
 
+@pytest.mark.parametrize("text", ["選べばいい", "読めばいい", "行けばいい", "遊べばいい", "頼めばいい"])
+def test_ba_ii_stops_the_forms_ra_ba_ii_missed(text):
+    assert banned_in(text)
+
+
+@pytest.mark.parametrize("text", ["休みを決めて取る人が、何を決め手にしたのかを確かめる", "「休みの日」の何を知りたいのかを絞る"])
+def test_ba_ii_lets_these_moves_through(text):
+    assert not banned_in(text)
+
+
 def test_no_screen_text_holds_a_banned_word():
     for path in TEXTS_DIR.glob("*.txt"):
         if path.stem != "planted_fake_quote":  # The fake is meant to be stopped.
