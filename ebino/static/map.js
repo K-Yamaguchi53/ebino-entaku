@@ -18,6 +18,7 @@ const EbinoMap = (() => {
   const LIGHT_EVERY = 400;  // ms between two seats lighting up.
   const BUBBLE_FOR = 1500;  // ms a quote's bubble stays.
   const BUBBLE_CHARS = 36;  // A longer quote is cut here, with 「…」.
+  const BUBBLE_NEAR = 100;  // CSS px: a bubble further from its seat reads as another seat's.
   const DRAW_FOR = 1800;  // ms to draw the rim; the river follows.
   const MOUNTAINS = 16;
   // The round table (the picture only): round the basin's middle, flat at
@@ -39,6 +40,7 @@ const EbinoMap = (() => {
   const DRAG_FROM = 5;  // px moved before a press becomes a drag.
   // Words drawn on the picture, in CSS px (they keep their size as it zooms).
   const TEXT_PX = { place: 11, school: 12, shelf: 11 };
+  const WORD_PAD = 2;  // CSS px kept clear round a word drawn on the map.
 
   let map = null;  // The drawing from /api/setup.
   let app = null;  // What app.js lends: state, cardEntry, renderSeats, shownQuotes.
@@ -53,6 +55,8 @@ const EbinoMap = (() => {
   let sticky = null;  // The seat whose label stays (the last to light up).
   let drawn = false, wantShow = false, pending = null;
   let camera = null, roundNo = 0, returnFocus = null;
+  let tableTop = null;  // The round table's top, a ring of spots of the drawing, while it is open.
+  let roundSeats = [];  // The seats this round lights, in order.
   let soon = null;
 
   const reduced = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -668,16 +672,67 @@ const EbinoMap = (() => {
     return [r.left - frameBox.left, r.top - frameBox.top, r.width, r.height];
   }
 
-  // What a label never covers: the buttons, and the seats and empty chairs
-  // at the round table.
+  // Whether a spot is inside a closed ring of spots.
+  function within(ring, [x, y]) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+
+  // The words drawn on the map ([left, top, width, height] in a frame
+  // { w, h }) that a box keeps off, each with a little room round it: those
+  // in the frame and not wholly under the round table's top, which hides
+  // them (cover: the top's ring in the frame, or null). It reads nothing but
+  // what it is given.
+  function seenWords(frame, words, cover) {
+    const under = ([left, top, w, h]) => cover &&
+      [[left, top], [left + w, top], [left, top + h], [left + w, top + h]].every((p) => within(cover, p));
+    return words
+      .filter((word) => word[2] && word[0] < frame.w && word[1] < frame.h && word[0] + word[2] > 0 &&
+        word[1] + word[3] > 0 && !under(word))
+      .map(([left, top, w, h]) => [left - WORD_PAD, top - WORD_PAD, w + 2 * WORD_PAD, h + 2 * WORD_PAD]);
+  }
+
+  // What a label, bubble or heading never covers: the buttons; the seats
+  // this round lights, on the map (all of them from the start, so a seat
+  // lit later is not under an earlier bubble), or, while the table is open,
+  // its seats and empty chairs; and the words drawn on the map: the place
+  // names, the shelves' names and the school's name.
   function fixedBoxes(frameBox) {
     const nodes = [...frame.querySelectorAll(".map-controls button")].filter((b) => !b.hidden);
     nodes.push(...tableLayer.querySelectorAll(".token .shape, .chair circle"));
-    return nodes.map((node) => boxIn(node, frameBox));
+    if (!tableTop) nodes.push(...roundSeats.map((id) => points[id].node.querySelector(".shape")));
+    const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text")]
+      .map((node) => boxIn(node, frameBox));
+    const cover = tableTop && tableTop.map(([x, y]) => toFrame(x, y));
+    return [...nodes.map((node) => boxIn(node, frameBox)),
+      ...seenWords({ w: frameBox.width, h: frameBox.height }, words, cover)];
+  }
+
+  // Where a bubble (or a seat's label) goes, a box { w, h, px, py, gap } in a
+  // frame { w, h }: clear of the fixed boxes, the headings and labels (kept)
+  // and the bubbles still up, by its spot or, with no side free, at the
+  // nearest free spot (chooseSpot). When that spot is more than BUBBLE_NEAR
+  // from its own spot, the earlier bubbles in the way go instead, if that
+  // frees a spot near it (they are short-lived); failing that, the free spot
+  // further away; with none free, the one that covers least. Returns
+  // [[left, top], area covered, whether the bubbles in the way go]. It reads
+  // nothing but what it is given.
+  function planBubble(frame, box, fixed, kept, bubbles) {
+    const away = ([left, top]) => Math.hypot(Math.max(left - box.px, 0, box.px - left - box.w),
+      Math.max(top - box.py, 0, box.py - top - box.h));
+    const [best, least] = chooseSpot(frame, box, [...fixed, ...kept, ...bubbles]);
+    if (!bubbles.length || (!least && away(best) <= BUBBLE_NEAR)) return [best, least, false];
+    const [spot, rest] = chooseSpot(frame, box, [...fixed, ...kept]);
+    if (!rest && (least || away(spot) <= BUBBLE_NEAR)) return [spot, 0, true];
+    return [best, least, false];
   }
 
   // Puts one label, bubble or heading by a spot of the drawing, clear of the
-  // fixed boxes and of every other box on the map (chooseSpot). Returns
+  // fixed boxes and of every other box on the map (planBubble). Returns
   // false when there is no free spot even with the bubbles gone (it then
   // takes the side that covers least). The spot is kept on the node, so it
   // can be put again when the frame or the camera changes.
@@ -686,18 +741,11 @@ const EbinoMap = (() => {
     const frameBox = overlay.getBoundingClientRect();
     const [px, py] = toFrame(x, y);
     const box = { ...measure(node, frameBox), px, py, gap };
-    const size = { w: frameBox.width, h: frameBox.height };
-    const fixed = fixedBoxes(frameBox);
-    const others = (keep) => [...fixed, ...[...overlay.children]
-      .filter((other) => other !== node && keep(other)).map((other) => boxIn(other, frameBox))];
-    let [best, least] = chooseSpot(size, box, others(() => true));
-    let dropBubbles = false;
-    // Bubbles are short-lived: rather than cover a label or a heading, the
-    // earlier bubbles in the way go.
-    if (least) {
-      const [spot, rest] = chooseSpot(size, box, others((other) => !other.classList.contains("map-bubble")));
-      if (!rest) [best, least, dropBubbles] = [spot, 0, true];
-    }
+    const others = [...overlay.children].filter((other) => other !== node && !other.classList.contains("unplaced"));
+    const isBubble = (other) => other.classList.contains("map-bubble");
+    const boxes = (nodes) => nodes.map((other) => boxIn(other, frameBox));
+    const [best, least, dropBubbles] = planBubble({ w: frameBox.width, h: frameBox.height }, box,
+      fixedBoxes(frameBox), boxes(others.filter((other) => !isBubble(other))), boxes(others.filter(isBubble)));
     node.style.left = `${best[0]}px`;
     node.style.top = `${best[1]}px`;
     if (dropBubbles) {
@@ -790,6 +838,7 @@ const EbinoMap = (() => {
     for (const flight of flights) flight.cancel();
     flights = [];
     sticky = null;
+    roundSeats = [];
     hideTip();
     for (const node of overlay.querySelectorAll(".map-bubble, .split-tag, .table-label")) node.remove();
     splitLayer.replaceChildren();
@@ -809,6 +858,10 @@ const EbinoMap = (() => {
     for (const quote of result.quotes) if (!(quote.seat_id in first)) first[quote.seat_id] = quote;
     const order = result.seat_order.filter((id) => points[id]);
     if (!order.length) return;
+    roundSeats = order;
+    // The whole map and its sources on screen while the round plays (on a
+    // low screen it starts under the question). At once, as the round starts.
+    $("map").scrollIntoView({ block: "nearest" });
     if (view.relief) return tableRound(result, order, first, roundNo);
     const last = order[order.length - 1];
     if (reduced()) {  // Everything at once: no order, no bubbles.
@@ -933,6 +986,7 @@ const EbinoMap = (() => {
       strokeWidth: 2.4 * S, roughness: 1.3, seed: 11 });
     top.classList.add("table-top");
     tableLayer.append(top);
+    tableTop = ring(center, 0, TABLE_LIFT);
     if (motion) {
       top.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, easing: "ease-out" });
       await wait(350);
@@ -1014,6 +1068,7 @@ const EbinoMap = (() => {
 
   function clearTable() {
     tokens = [];
+    tableTop = null;
     if (tableLayer) tableLayer.replaceChildren();
     if (svg) svg.classList.remove("dim");
     if ($("map-back")) $("map-back").hidden = true;
