@@ -13,8 +13,10 @@ asks the model for two questions to the student in one structured output:
     research at a university, as texts/observer_view.txt says. It has no
     source text and is no person.
 The model reads the student's record up to this round (the questions typed
-and answered, split headings, quotes shown and seats not asked yet) and the
-coach's pieces; never the Lab, the subjects or a name.
+and answered, split headings, quotes shown and seats not asked yet), the AI
+questions shown before this round (asked_before, so their form is not
+repeated; SPEC 14-61) and the coach's pieces; never the Lab, the subjects or
+a name.
 
 Nothing the model writes reaches the screen before code checks it, the same
 way as the reflection's question back (reflection.checked), and more:
@@ -139,6 +141,13 @@ class Record:
             item["silent_seats"] = [seats[s].title for s in result.silent_seats if s in seats]
             self.own_words += [seats[q.seat_id].title for q in result.quotes] + item["silent_seats"]
             self.rounds.append(item)
+        # The AI questions shown before this round, in the order they were
+        # shown (SPEC 14-61), so the model does not repeat their form. They
+        # are the AI's words: never in own_words, so 「」 around them stops.
+        self.asked_before: list[dict] = [
+            {"role": card.role, "text": card.text}
+            for result in session.rounds[:round_no - 1] if result.band is not None
+            for card in result.band.cards]
 
     def holds(self, part: str) -> bool:
         if any(part in words for words in self.own_words):
@@ -176,7 +185,7 @@ def request_for(record: Record, sources: list[str], roles: tuple[str, ...]) -> d
     """The instruction part (with the observer's view) is the system text;
     the record and the coach's pieces are the data part (SPEC 6)."""
     system = COACH_PROMPT.format(observer_view=load_text(OBSERVER_VIEW))
-    data = {"cards": list(roles), "rounds": record.rounds}
+    data = {"cards": list(roles), "rounds": record.rounds, "asked_before": record.asked_before}
     if COACH in roles:
         data["coach_sources"] = sources
     return json_request(ROLE, system, json.dumps(data, ensure_ascii=False), schema(roles), max_tokens=4000)

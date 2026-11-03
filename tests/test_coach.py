@@ -227,6 +227,40 @@ def test_the_instruction_part_names_no_question_of_the_record():
     assert load_text("observer_view").splitlines()[0] in system
 
 
+def round_two_band(second_cards, first_cards=None):
+    """Round 1 with its band, then a typed round 2 and its band."""
+    first_cards = first_cards or {"coach": "休みは決めて取るほうがいいよね？", "observer": GOOD_OBSERVER}
+    session, client = round_one(first_cards, more=ANSWERED + [coach_says(**second_cards)])
+    session.coach_band(1)
+    session.ask("休みを決めるのは、自分？")
+    view = session.coach_band(2)
+    return session, client, view
+
+
+def test_the_second_band_is_sent_the_questions_shown_before_but_not_the_stopped_one():
+    session, client, _ = round_two_band({"coach": GOOD_COACH, "observer": GOOD_OBSERVER})
+    first = json.loads(client.requests[2]["messages"][0]["content"])
+    second = json.loads(client.requests[-1]["messages"][0]["content"])
+    assert first["asked_before"] == []
+    assert second["asked_before"] == [{"role": "observer", "text": GOOD_OBSERVER}]
+    assert "ほうがいい" not in client.requests[-1]["messages"][0]["content"]  # The stopped card.
+    assert [r["round"] for r in second["rounds"]] == [1, 2]
+
+
+def test_the_questions_shown_before_go_in_the_order_they_were_shown():
+    session, client, _ = round_two_band({"coach": GOOD_COACH, "observer": GOOD_OBSERVER},
+                                        first_cards={"coach": GOOD_COACH, "observer": GOOD_OBSERVER})
+    assert json.loads(client.requests[-1]["messages"][0]["content"])["asked_before"] == [
+        {"role": "coach", "text": GOOD_COACH}, {"role": "observer", "text": GOOD_OBSERVER}]
+
+
+def test_a_question_quoting_an_earlier_ai_question_is_not_shown():
+    quoting = "「誰の役に立っているのだろう」と聞かれて、あなたが思い出すのは何？"
+    session, _, view = round_two_band({"coach": GOOD_COACH, "observer": quoting})
+    assert [card["question"] for card in view["cards"]] == [GOOD_COACH]
+    assert session.rounds[1].band.stopped == {"quote_not_in_record": 1}
+
+
 # --- answering ---
 
 def answered_round_two(tmp_path=None, answers=ANSWERED):
