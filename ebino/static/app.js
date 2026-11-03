@@ -36,6 +36,11 @@ function sourceLine(source) {
   return [source.title, source.detail, source.note].filter(Boolean).join("　");
 }
 
+// A ranking item's title, small over the item, as recorded (null when none).
+function rankingTitle(piece) {
+  return piece.ranking_title ? el("p", { class: "ranking-title", text: piece.ranking_title }) : null;
+}
+
 // --- start ---
 
 async function setup() {
@@ -183,6 +188,7 @@ function renderAsked(roundNo, box, asked) {
   if (asked.piece) {
     const answer = el("div", { class: "closing-word" },
       el("p", { class: "label", text: asked.label }),
+      rankingTitle(asked.piece),
       el("p", { class: "words", text: asked.piece.said ? `「${asked.piece.text}」` : asked.piece.text }),
       el("span", { class: "source", text: sourceLine(asked.piece.source) }));
     answer.append(moreButton(asked.piece.utterance_id, answer));
@@ -225,6 +231,7 @@ async function closeRound(roundNo, box) {
   for (const word of closing.words) {
     const node = el("div", { class: "closing-word" },
       el("p", { class: "label", text: word.label }),
+      rankingTitle(word),
       el("p", { class: "words", text: word.said ? `「${word.text}」` : word.text }),
       el("span", { class: "source", text: sourceLine(word.source) }));
     node.append(moreButton(word.utterance_id, node));
@@ -249,6 +256,7 @@ function moreButton(utteranceId, node) {
     }
     if (heard.piece) {
       node.insertBefore(el("div", { class: "more-piece" },
+        rankingTitle(heard.piece),
         el("p", { class: "words", text: heard.piece.said ? `「${heard.piece.text}」` : heard.piece.text }),
         el("span", { class: "source", text: sourceLine(heard.piece.source) })), button);
     }

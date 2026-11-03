@@ -157,6 +157,14 @@ def test_the_rounds_last_word_over_http(server):
     assert "state.texts.more_end" in script and "state.texts.more_card_done" in script
 
 
+def test_a_ranking_title_is_shown_over_the_last_word_the_more_piece_and_the_answer():
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert "rankingTitle(word)" in script and "rankingTitle(asked.piece)" in script
+    assert "rankingTitle(heard.piece)" in script or "rankingTitle(piece)" in script
+    css = (app_module.STATIC_DIR / "style.css").read_text(encoding="utf-8")
+    assert ".ranking-title" in css
+
+
 def test_the_screen_does_not_require_a_seat_before_the_sheet_is_made():
     script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
     finish = script[script.index("async function reflectFinish"):script.index("// --- today's harvest card")]

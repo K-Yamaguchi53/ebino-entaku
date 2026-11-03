@@ -10,7 +10,7 @@ from ebino.reflection import Reflection
 from ebino.session import Refused
 from ebino.texts import MORE_CARD_DONE, MORE_END, load_text
 from test_closing import QUESTION, says, sitting
-from test_session import ANSWERED, editor_says, u
+from test_session import ANSWERED, UTTERANCES, editor_says, u
 
 PIECES = [
     u("a9", "S01", "地元にも、面白い仕事はたくさんあります。", voice="spoken", section="高校生に一言"),
@@ -85,6 +85,50 @@ def test_pieces_heard_are_not_shown_again_as_a_last_word():
     session, client = closed()
     session.hear_more("a9")
     assert "a9b" in session.seen_ids()
+
+
+RANKING = [
+    u("r0", "S02", "好きな場所ベスト3", section="ランキング"),
+    u("r1", "S02", "１位　川の駅", section="ランキング"),
+    u("r2", "S02", "２位　山の上の展望台から見る夕日。", section="ランキング"),
+    u("n1", "S02", "畑の朝は、静かで気持ちがいい。", voice="spoken", section="本文"),
+    u("n2", "S02", "雨の日は、道具の手入れをします。", voice="spoken", section="本文"),
+]
+
+
+def test_a_ranking_item_gets_the_title_before_it_and_other_pieces_get_none():
+    from ebino.closing import ranking_titles
+
+    titles = ranking_titles(UTTERANCES + RANKING)
+    assert titles["r1"] == titles["r2"] == "好きな場所ベスト3"
+    assert "r0" not in titles and "n1" not in titles and "n2" not in titles
+
+
+def test_a_ranking_item_heard_has_its_title_over_it_and_the_title_is_not_counted():
+    session, client = sitting(ANSWERED + [says(("r2", "２位　山の上の展望台から見る夕日。"),
+                                               ("a9", "地元にも、面白い仕事はたくさんあります。"))],
+                              kinds={"r2": "joy", "a9": "to_students", "n1": "joy"}, pieces=PIECES + RANKING)
+    session.ask(QUESTION)
+    view = session.close_round(1)
+    word = next(w for w in view["words"] if w["utterance_id"] == "r2")
+    assert word["ranking_title"] == "好きな場所ベスト3"
+    assert next(w for w in view["words"] if w["utterance_id"] == "a9")["ranking_title"] == ""
+    assert "r0" not in session.seen_ids()
+
+
+def test_more_shows_the_title_over_a_ranking_item_and_nothing_over_other_pieces():
+    pieces = PIECES + RANKING + [u("r3", "S02", "３位　駅前の古い本屋さんです。", section="ランキング")]
+    session, _ = sitting(ANSWERED + [says(("r2", "２位　山の上の展望台から見る夕日。"))],
+                         kinds={"r2": "joy"}, pieces=pieces)
+    session.ask(QUESTION)
+    session.close_round(1)
+    heard = session.hear_more("r2")
+    assert heard["piece"]["utterance_id"] == "r3" and heard["piece"]["ranking_title"] == "好きな場所ベスト3"
+    assert "r0" not in session.seen_ids() and session.mores["r2"].shown == ["r3"]
+    session, _ = sitting(ANSWERED + [says(("n1", "畑の朝は、静かで気持ちがいい。"))], kinds={"n1": "joy"}, pieces=pieces)
+    session.ask(QUESTION)
+    session.close_round(1)
+    assert session.hear_more("n1")["piece"]["ranking_title"] == ""
 
 
 def test_presses_and_the_card_are_recorded_without_words_and_are_not_moves(tmp_path):

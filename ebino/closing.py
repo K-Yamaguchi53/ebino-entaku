@@ -76,6 +76,21 @@ def is_fragment(text: str) -> bool:
     return len(text) < MIN_PIECE_CHARS or text.startswith(FRAGMENT_LEADS)
 
 
+def ranking_titles(utterances) -> dict[str, str]:
+    """For each piece after a ranking's title, the nearest such title before
+    it in the same seat and section, as recorded; shown small over the piece
+    so the student knows what the ranking is. A title itself gets none."""
+    last: dict[tuple[str, str], str] = {}
+    titles: dict[str, str] = {}
+    for utterance in utterances:
+        key = (utterance.seat_id, utterance.section)
+        if is_ranking_title(utterance.text):
+            last[key] = utterance.text.strip()
+        elif key in last:
+            titles[utterance.id] = last[key]
+    return titles
+
+
 def pieces_by_seat(entries: list[Entry], kind_of: dict[str, str]) -> dict[str, dict[str, list[Entry]]]:
     """Each seat's pieces that may answer, by kind, in reading order."""
     found: dict[str, dict[str, list[Entry]]] = {}

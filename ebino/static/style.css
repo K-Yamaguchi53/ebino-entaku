@@ -74,6 +74,8 @@ button:disabled { opacity: .5; cursor: wait; }
 .more-piece { border-left: 3px solid var(--line); padding-left: 10px; margin: 8px 0 4px; }
 .more-piece .words { margin: 2px 0; }
 .more-piece .source { color: var(--soft); font-size: .9rem; }
+/* A ranking item's title, small over the item. */
+.ranking-title { font-size: .8rem; color: var(--soft); margin: 0; }
 .closing-word button.more, .closing-word button.not-heard { display: block; margin-top: 6px; }
 
 .kind-group h3 { font-size: 1rem; margin: 12px 0 4px; }

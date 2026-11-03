@@ -79,6 +79,9 @@ class Library:
     # talk (SPEC 14-53 A), and the kinds in the teacher's table order.
     closing_pieces: dict[str, dict[str, list[Entry]]] = field(default_factory=dict)
     kind_order: list[str] = field(default_factory=list)
+    # A ranking item's title (the nearest title piece before it in the same
+    # seat and section), shown small over the item; never counted as shown.
+    ranking_titles: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def build(cls, seats, utterances, topics, show_private=False, saved_kinds=None) -> "Library":
@@ -86,7 +89,8 @@ class Library:
         kinds = talk_kinds.load_kinds()
         kind_of = {u.id: talk_kinds.kind_of(saved_kinds or {}, u.id, kinds) for u in utterances}
         return cls(seats, utterances, entries, samples(utterances, seats), show_private,
-                   closing.pieces_by_seat(entries, kind_of), [kind.kind_id for kind in kinds])
+                   closing.pieces_by_seat(entries, kind_of), [kind.kind_id for kind in kinds],
+                   closing.ranking_titles(utterances))
 
     @classmethod
     def load(cls, data_dir: Path, show_private: bool = False) -> "Library":
@@ -214,6 +218,7 @@ class Session:
             utterance = self._utterances[word.utterance_id]
             words.append({"seat_id": word.seat_id, "utterance_id": word.utterance_id, "text": word.text,
                           "kind": word.kind, "label": labels.get(word.kind, ""),
+                          "ranking_title": self.library.ranking_titles.get(word.utterance_id, ""),
                           "said": not utterance.note, "source": self.source(word.seat_id, utterance)})
         if not words:
             return {"round": round_no, "question": "", "words": []}
@@ -265,6 +270,7 @@ class Session:
             # The person's own words, or an article's: never shown as the person speaking.
             view["label"] = load_text(ASK_ANSWER_SAID if said else ASK_ANSWER_WRITTEN)
             view["piece"] = {"utterance_id": asked.answer_id, "seat_id": asked.seat_id, "text": asked.answer_text,
+                             "ranking_title": self.library.ranking_titles.get(asked.answer_id, ""),
                              "said": said, "source": self.source(asked.seat_id, utterance)}
         elif asked.status == ask_seat.NOT_FOUND:
             view["not_answered"] = load_text(ASK_NOT_ANSWERED)
@@ -311,6 +317,7 @@ class Session:
         shown = None
         if piece is not None:
             shown = {"utterance_id": piece.id, "seat_id": piece.seat_id, "text": piece.text,
+                     "ranking_title": self.library.ranking_titles.get(piece.id, ""),
                      "said": not piece.note, "source": self.source(piece.seat_id, piece)}
         return {"utterance_id": utterance_id, "piece": shown, "ended": state.ended,
                 "can_press": state.can_press}

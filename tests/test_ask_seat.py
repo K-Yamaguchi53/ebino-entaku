@@ -72,6 +72,15 @@ def test_a_fragment_is_not_on_the_librarians_shelf():
     assert view["piece"]["utterance_id"] == "b7"  # b5 and b4, named first, are not on the shelf.
 
 
+def test_a_ranking_item_given_as_the_answer_has_its_title_over_it():
+    pieces = PIECES + [u("r0", "S02", "好きな場所ベスト3", section="ランキング"),
+                       u("r1", "S02", "１位　雨の日の畑の小屋の中です。", section="ランキング")]
+    session, _ = round_one([librarian_finds("r1")], pieces=pieces)
+    view = session.ask_the_seat(1)
+    assert view["piece"]["utterance_id"] == "r1" and view["piece"]["ranking_title"] == "好きな場所ベスト3"
+    assert "r0" not in session.seen_ids()
+
+
 def test_an_articles_piece_never_gets_this_person_spoke_over_it():
     session, _ = round_one([librarian_finds("b6")])
     view = session.ask_the_seat(1)
