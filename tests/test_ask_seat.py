@@ -10,7 +10,8 @@ from ebino.ingest.utterance import TEACHER_ARTICLE_NOTE
 from ebino.reflection import Reflection
 from ebino.session import Refused
 from ebino.texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_OTHER_SIDE,
-                         ASK_OTHER_SIDE_WRITTEN, ASK_WHY, ASK_WHY_WRITTEN, load_text)
+                         ASK_OTHER_SIDE_COMPANY, ASK_OTHER_SIDE_WRITTEN, ASK_WHY, ASK_WHY_COMPANY,
+                         ASK_WHY_WRITTEN, load_text)
 from test_closing import QUESTION, says, sitting
 from test_session import ANSWERED, SPLIT, editor_says, librarian_finds, moderator_says, u
 
@@ -95,6 +96,30 @@ def test_a_marked_teachers_article_asks_why_in_the_written_form():
     card = session.ask_card(1)["card"]
     assert card["form"] == "why" and card["seat_id"] == "S01"
     assert card["question"] == "『休みの日は、朝から店の前を掃いている。』と記事に書かれています。そう考えるのは、なぜですか？"
+
+
+C9 = ("c9", "当社は、雨の日を社員の休みにしています。")  # A company's introduction (S02).
+WITH_COMPANY = PIECES + [u("c9", "S02", C9[1], voice="company")]
+
+
+def test_a_companys_introduction_is_never_called_an_article():
+    session = split_round([C9, A2], ["c9"], ["a2"], pieces=WITH_COMPANY)
+    card = session.ask_card(1)["card"]
+    assert card["seat_id"] == "S01"
+    assert card["question"] == "『当社は、雨の日を社員の休みにしています。』と会社の紹介に書かれています。あなたは？"
+    assert "記事" not in card["question"]
+    session.mark(1, "c9")
+    card = session.ask_card(1)["card"]
+    assert card["form"] == "why" and "記事" not in card["question"]
+    assert card["question"] == "『当社は、雨の日を社員の休みにしています。』と会社の紹介に書かれています。そう考えるのは、なぜですか？"
+    assert load_text(ASK_OTHER_SIDE_COMPANY) != load_text(ASK_OTHER_SIDE_WRITTEN)
+    assert load_text(ASK_WHY_COMPANY) != load_text(ASK_WHY_WRITTEN)
+
+
+def test_an_interview_articles_quote_keeps_the_article_form_beside_a_company():
+    session = split_round([A2, C9], ["a2"], ["c9"], pieces=WITH_COMPANY)
+    card = session.ask_card(1)["card"]
+    assert card["question"] == "『月曜は必ず店を閉める。』と記事に書かれた人がいる。あなたは？"
 
 
 def test_words_with_no_note_come_before_the_teachers_article():

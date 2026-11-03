@@ -14,7 +14,8 @@ writes it, and no new topic is made:
     other side (「『〇〇』と言った人がいる。あなたは？」); a quote of the
     person's own words comes before one with a source note.
 Each form has a second sentence for a piece shown with a source note
-(「と記事に書かれ…」), so it never reads as something the person said. The
+(「と記事に書かれ…」), and a third for a company's introduction (「と会社の紹介に
+書かれ…」), so it never reads as something the person said. The
 source note decides, as on the screen (said = not note), not the voice: the
 teacher's own article is own words but shown as an article.
 A marked quote comes first: it is the student's own pick. The quote is the
@@ -42,18 +43,25 @@ from dataclasses import dataclass
 
 from . import closing, librarian, reflection
 from .gate import GateError, ModelUnavailable, json_answer, json_request
-from .ingest.utterance import Utterance
+from .ingest.utterance import VOICE_COMPANY, Utterance
 from .prompts import ASK_SEAT
-from .texts import ASK_OTHER_SIDE, ASK_OTHER_SIDE_WRITTEN, ASK_WHY, ASK_WHY_WRITTEN, load_text
+from .texts import (ASK_OTHER_SIDE, ASK_OTHER_SIDE_COMPANY, ASK_OTHER_SIDE_WRITTEN, ASK_WHY, ASK_WHY_COMPANY,
+                    ASK_WHY_WRITTEN, load_text)
 
 FORM_WHY = "why"
 FORM_OTHER_SIDE = "other_side"
-# (form, written) -> the teacher's sentence in texts/. Written means the
-# piece is shown with a source note, as on the screen (said = not note): the
-# teacher's own article is written although its voice is own.
+# Whose words the quote is, for the question's wording: the person's own (no
+# source note, shown in 「」, as on the screen: said = not note), a company's
+# introduction, or any other piece with a note (an article, a senior
+# employee's message, the teacher's own article, though its voice is own).
+SAID = "said"
+WRITTEN = "written"
+COMPANY = "company"
+# (form, wording) -> the teacher's sentence in texts/.
 TEMPLATES = {
-    (FORM_WHY, False): ASK_WHY, (FORM_WHY, True): ASK_WHY_WRITTEN,
-    (FORM_OTHER_SIDE, False): ASK_OTHER_SIDE, (FORM_OTHER_SIDE, True): ASK_OTHER_SIDE_WRITTEN,
+    (FORM_WHY, SAID): ASK_WHY, (FORM_WHY, WRITTEN): ASK_WHY_WRITTEN, (FORM_WHY, COMPANY): ASK_WHY_COMPANY,
+    (FORM_OTHER_SIDE, SAID): ASK_OTHER_SIDE, (FORM_OTHER_SIDE, WRITTEN): ASK_OTHER_SIDE_WRITTEN,
+    (FORM_OTHER_SIDE, COMPANY): ASK_OTHER_SIDE_COMPANY,
 }
 MAX_CHARS = reflection.MAX_ASK_BACK_CHARS
 
@@ -97,11 +105,17 @@ def is_written(utterance: Utterance) -> bool:
     return bool(utterance.note)
 
 
+def wording(utterance: Utterance | None) -> str:
+    if utterance is None or not is_written(utterance):
+        return SAID
+    return COMPANY if utterance.voice == VOICE_COMPANY else WRITTEN
+
+
 def question_for(form: str, quote_text: str, utterance: Utterance | None = None) -> str:
     """The question in the teacher's wording; a piece with a source note gets
-    the written form, so it never reads as something the person said."""
-    written = utterance is not None and is_written(utterance)
-    return load_text(TEMPLATES[form, written]).format(quote=first_sentence(quote_text))
+    a written form (a company's introduction its own), so it never reads as
+    something the person said, nor a company's words as an article's."""
+    return load_text(TEMPLATES[form, wording(utterance)]).format(quote=first_sentence(quote_text))
 
 
 def _other_side(result, utterances: dict[str, Utterance]) -> list:
