@@ -9,7 +9,8 @@ from conftest import make_seat, write_seats
 from ebino.ask_seat import first_sentence
 from ebino.guard import check
 from ebino.ingest.masks import SeatMasks
-from ebino.ingest.poster_pdf import ROLE_BACKGROUND, ROLE_RESULT, heading_of, purpose_examples
+from ebino.ingest.poster_pdf import (PURPOSE_FROM_THEME_REASON, ROLE_BACKGROUND, ROLE_RESULT, Fragment,
+                                     heading_of, ingest_poster_fragments, purpose_examples, purpose_rank)
 from ebino.ingest.poster_text import ingest_text_poster, text_sections
 from ebino.ingest.run import run
 from ebino.ingest.utterance import IngestError, VOICE_OWN
@@ -119,6 +120,35 @@ def test_a_mark_with_no_name_stops():
 def test_no_purpose_or_theme_reason_heading_stops(tmp_path, seat):
     with pytest.raises(IngestError, match="purpose_heading_missing"):
         ingest_text_poster(write(tmp_path, f"## 【窓そうじ】\n{WINDOW}\n## 成果\n喜ばれた。\n"), seat)
+
+
+THEME_BODY = "テーマが2つあり、1つ目はお客さんとの話し方を学ぶことだ。"
+
+
+def test_a_heading_named_exactly_theme_is_the_purpose_source(tmp_path, seat):
+    utterances = ingest_text_poster(write(tmp_path, f"## テーマ\n{THEME_BODY}\n## 成果\n喜ばれた。\n"), seat)
+    assert purpose_examples(utterances) == [utterances[0]]
+    assert utterances[0].text == THEME_BODY
+    assert purpose_rank(utterances[0].section, utterances[0].heading) == PURPOSE_FROM_THEME_REASON
+
+
+@pytest.mark.parametrize("heading", ["テーマ曲", "お店をテーマに"])
+def test_a_heading_only_holding_theme_still_stops(tmp_path, seat, heading):
+    with pytest.raises(IngestError, match="purpose_heading_missing"):
+        ingest_text_poster(write(tmp_path, f"## {heading}\n{THEME_BODY}\n"), seat)
+
+
+def pdf_poster(heading):
+    return [Fragment("川辺 三郎", 50, 10),
+            *[Fragment(text, 50, 60 + i * 20) for i, text in enumerate(
+                ["背景", "店が少ない。", heading, THEME_BODY, "結果", "喜ばれた。"])]]
+
+
+def test_a_pdf_heading_named_theme_is_the_purpose_source_too(seat):
+    examples = purpose_examples(ingest_poster_fragments(pdf_poster("【テーマ】"), seat))
+    assert [(u.heading, u.text) for u in examples] == [("テーマ", THEME_BODY)]
+    with pytest.raises(IngestError, match="purpose_heading_missing"):
+        ingest_poster_fragments(pdf_poster("【テーマ曲】"), seat)
 
 
 def test_a_company_word_to_hide_is_gone_from_the_body(tmp_path, seat):

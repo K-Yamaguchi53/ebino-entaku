@@ -456,7 +456,10 @@ def split_sections(fragments: list[Fragment]) -> list[Section]:
 
 PURPOSE_FROM_PURPOSE = 0  # 目的・目標
 PURPOSE_FROM_HYPOTHESIS = 1  # 研究仮説・探究仮説・経緯・目的
-PURPOSE_FROM_THEME_REASON = 2  # テーマ設定の理由・なぜの問い (role stays 背景と課題)
+PURPOSE_FROM_THEME_REASON = 2  # テーマ設定の理由・なぜの問い・テーマ (role stays as found)
+# A band printed with 「テーマ」 alone, over what the poster set out to do (the
+# teacher's call on 11/3). Only the exact name: not 「テーマ曲」.
+THEME_HEADING = "テーマ"
 
 
 def purpose_rank(section: str, heading: str) -> int | None:
@@ -464,7 +467,7 @@ def purpose_rank(section: str, heading: str) -> int | None:
     if section == ROLE_PURPOSE:
         direct = ("目的" in heading or "目標" in heading) and "経緯" not in heading
         return PURPOSE_FROM_PURPOSE if direct else PURPOSE_FROM_HYPOTHESIS
-    if _THEME_REASON.search(heading) or is_why_question(heading):
+    if heading == THEME_HEADING or _THEME_REASON.search(heading) or is_why_question(heading):
         return PURPOSE_FROM_THEME_REASON
     return None
 
