@@ -141,7 +141,8 @@ function renderRound(round) {
 
 // 「最後に、何か伝えたいことはありますか」 (SPEC 14-53 A): asked after the
 // round is on screen. Shown apart from the quotes, never as an answer to the
-// question; when no seat's words passed, nothing is shown at all.
+// question; when no seat's words passed, nothing is shown at all. Each piece
+// has the line of its kind of talk over it, and its source by its voice.
 async function closeRound(roundNo, box) {
   let closing;
   try {
@@ -153,7 +154,7 @@ async function closeRound(roundNo, box) {
   const part = el("section", { class: "closing" }, el("p", { class: "closing-question", text: closing.question }));
   for (const word of closing.words) {
     part.append(el("div", { class: "closing-word" },
-      el("p", { class: "label", text: closing.label }),
+      el("p", { class: "label", text: word.label }),
       el("p", { class: "words", text: word.said ? `「${word.text}」` : word.text }),
       el("span", { class: "source", text: sourceLine(word.source) })));
   }

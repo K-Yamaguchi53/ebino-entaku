@@ -141,7 +141,7 @@ def test_the_rounds_last_word_over_http(server):
     request(srv, "POST", "/api/ask", {"question": "休みの日って、みんな何してる？"})
     # The invented seats here hold no words to high-school students: nothing shown.
     assert request(srv, "POST", "/api/closing", {"round": 1}) == (
-        200, {"round": 1, "question": "", "label": "", "words": []})
+        200, {"round": 1, "question": "", "words": []})
     assert request(srv, "POST", "/api/closing", {"round": 9}) == (400, {"error": "unknown_round"})
     script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
     assert 'call("/api/closing"' in script and 'if (round.status === "answered") closeRound(' in script

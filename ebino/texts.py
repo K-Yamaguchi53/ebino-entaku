@@ -44,10 +44,13 @@ HARVEST_MEET_PREFIX = "harvest_meet_prefix"
 # Words that show going to meet someone, one per line, looked for in what the
 # student wrote on the sheet (the harvest card's ④). Not shown on screen.
 GO_WORDS = "go_words"
-# The round's last word (SPEC 14-53 A): the moderator's fixed sentence, and
-# the line over each seat's words to high-school students.
+# The round's last word (SPEC 14-53 A): the moderator's fixed sentence.
 CLOSING_QUESTION = "closing_question"
-CLOSING_LABEL = "closing_label"
+# The kinds of talk a piece is tagged with (columns ID・名前・説明; the 説明 is
+# what the tagger model is told), and the line shown over a piece of each
+# kind in the round's last word (columns ID・見出し). Tables the teacher edits.
+TALK_KINDS = "talk_kinds"
+CLOSING_KIND_LABELS = "closing_kind_labels"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
@@ -65,6 +68,22 @@ def load_text(name: str) -> str:
 
 def load_lines(name: str) -> list[str]:
     return [line.strip() for line in load_text(name).splitlines() if line.strip()]
+
+
+def load_table(name: str, columns: tuple[str, ...]) -> list[dict[str, str]]:
+    """A tab-separated table in texts/: its rows, in order. Errors give line
+    numbers only."""
+    lines = [line for line in (TEXTS_DIR / f"{name}.tsv").read_text(encoding="utf-8-sig").splitlines()
+             if line.strip()]
+    if not lines or tuple(cell.strip() for cell in lines[0].split("\t")) != columns:
+        raise ValueError(f"{name}.tsv columns do not match")
+    rows = []
+    for number, line in enumerate(lines[1:], start=2):
+        cells = [cell.strip() for cell in line.split("\t")]
+        if len(cells) != len(columns) or not all(cells):
+            raise ValueError(f"{name}.tsv line {number}: wrong column count or empty cell")
+        rows.append(dict(zip(columns, cells)))
+    return rows
 
 
 def screen_texts() -> dict:

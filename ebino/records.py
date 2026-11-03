@@ -110,16 +110,19 @@ def session_record(session) -> dict:
 
 
 def _closing_record(closing) -> dict | None:
-    """SPEC 14-53 A: the seats that spoke and their pieces' IDs. None when
-    the screen never asked (a round in which no seat spoke)."""
+    """SPEC 14-53 A: the seats asked and the kind picked for each, the seats
+    that spoke, their pieces' IDs and kinds. Never the words. None when the
+    screen never asked (a round in which no seat spoke)."""
     if closing is None:
         return None
     return {
         "status": closing.status,
         "reason": closing.reason,
         "seats_asked": list(closing.seats_asked),
+        "kinds_asked": list(closing.kinds_asked),
         "seats_shown": [word.seat_id for word in closing.words],
         "utterance_ids": [word.utterance_id for word in closing.words],
+        "kinds_shown": [word.kind for word in closing.words],
         "guard_stopped": closing.guard_stopped,
         "dropped": closing.dropped,
     }

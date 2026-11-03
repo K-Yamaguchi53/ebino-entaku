@@ -1,50 +1,44 @@
-"""The round's last word: 「最後に、何か伝えたいことはありますか」 (SPEC 14-53 A).
+"""The round's last word: 「最後に、何か伝えたいことはありますか」 (SPEC 14-53 A,
+widened by the teacher on 11/3).
 
 After a round in which seats spoke, the moderator's fixed sentence (texts/,
 never written by a model) asks the seats that lit up whether they have
-anything to tell. Seats that hold words written (or said) to high-school
-students answer with one of those pieces; the others stay quiet. Not one new
-word is made (SPEC 3, 1-1).
+anything to tell. Each answers with one piece of its own; not one new word
+is made (SPEC 3, 1-1).
 
-Which pieces are words to high-school students is decided here by code, from
-the section each piece came from, never by a model:
-  - 志事図鑑 articles: 高校生に一言, ランキング, 先輩社員からのメッセージ
-  - the teacher's article: 高校生に一言
-  - posters: the 結論と展望 section, and any section whose heading holds 展望
-  - slides: the pages a person listed in EBINO_DATA_DIR/hasshin_pages.tsv
-    (columns 席ID・ページ). With no table, no slide page speaks.
-The kind of seat is not looked at: the senior talks are posters shaped like
-slides, and their pages are slide pages (sections p1, p2, ...).
+Which pieces may answer is decided by the kind of talk each piece was tagged
+with at ingest (talk_kinds.py; the teacher's table texts/talk_kinds.tsv):
+every kind but 「なし」 (none). A ranking's title alone (a line ending in
+ベスト or ランキング and a number) never answers. Section names are not looked
+at.
 
-The moderator picks one such piece per seat, the one nearest the student's
-question, by its ID (structured output), and copies the words; the guard
-checks the copy against the piece, sentence breaks included. A seat whose
-pick fails, or that the guard stops, shows nothing.
+For each seat, code picks one kind: among the kinds the seat still has a
+piece for that this student has not been shown, the kind shown to this
+student the fewest times, ties in the table's order; a kind picked for a seat
+counts at once, so seats in one round lean apart. The moderator then picks
+one piece of that kind, the one nearest the student's question, by its ID
+(structured output), and copies the words; the guard checks the copy against
+the piece, sentence breaks included. A seat whose pick fails, or that the
+guard stops, shows nothing. A piece is never shown twice to one student.
 """
 
-import csv
 import json
+import re
+from collections import Counter
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from .gate import Gate, GateError, ModelUnavailable, json_answer, json_request
 from .guard import Guard, Quote
 from .index import Entry
-from .ingest.utterance import Utterance
 from .prompts import CLOSING
+from .talk_kinds import NONE
 
-HASSHIN_PAGES_FILE = "hasshin_pages.tsv"
-COLUMNS = ("席ID", "ページ")
 MAX_SEATS = 3
-
-ARTICLE_SECTIONS = ("高校生に一言", "ランキング", "先輩社員からのメッセージ")
-TEACHER_ARTICLE_SECTIONS = ("高校生に一言",)
-KIND_TEACHER = "outsider_teacher"
-POSTER_SECTION = "結論と展望"
-POSTER_HEADING_WORD = "展望"
+# 「やってよかったことベスト3」「好きな場所ランキング５」: a ranking's title alone.
+_RANKING_TITLE = re.compile(r"(?:ベスト|ランキング)\s*[0-9０-９一二三四五六七八九十]+\s*[!！]?\s*$")
 
 SHOWN = "shown"  # At least one seat's words passed the guard.
-NONE_HOLD = "none_hold"  # No lit seat holds words to high-school students: no call.
+NONE_HOLD = "none_hold"  # No lit seat holds a piece that may answer: no call.
 NONE_PASSED = "none_passed"  # Picks came back, none reached the screen.
 UNAVAILABLE = "unavailable"  # The model or the gate failed: reason code kept.
 
@@ -66,53 +60,30 @@ SCHEMA = {
 }
 
 
-def load_hasshin_pages(path: Path, seat_ids: set[str]) -> dict[str, frozenset[int]]:
-    """Slide pages a person marked as words to high-school students.
-
-    No file: no slide page speaks (the quiet side). Errors give line numbers,
-    never values."""
-    if not path.exists():
-        return {}
-    pages: dict[str, set[int]] = {}
-    with open(path, encoding="utf-8-sig", newline="") as file:
-        reader = csv.DictReader(file, delimiter="\t")
-        if tuple(reader.fieldnames or ()) != COLUMNS:
-            raise ValueError(f"{HASSHIN_PAGES_FILE} columns do not match")
-        for row in reader:
-            line = reader.line_num
-            if None in row or None in row.values():
-                raise ValueError(f"{HASSHIN_PAGES_FILE} line {line}: wrong column count")
-            seat_id, page = row["席ID"].strip(), row["ページ"].strip()
-            if seat_id not in seat_ids:
-                raise ValueError(f"{HASSHIN_PAGES_FILE} line {line}: unknown seat")
-            if not page.isascii() or not page.isdigit() or int(page) < 1:
-                raise ValueError(f"{HASSHIN_PAGES_FILE} line {line}: bad page number")
-            pages.setdefault(seat_id, set()).add(int(page))
-    return {seat_id: frozenset(numbers) for seat_id, numbers in pages.items()}
+def is_ranking_title(text: str) -> bool:
+    return "\n" not in text.strip() and _RANKING_TITLE.search(text.strip()) is not None
 
 
-def to_students(utterance: Utterance, pages: dict[str, frozenset[int]]) -> bool:
-    """Whether a piece holds words to high-school students, by its section."""
-    section = utterance.section
-    if section in ARTICLE_SECTIONS:
-        allowed = TEACHER_ARTICLE_SECTIONS if utterance.kind == KIND_TEACHER else ARTICLE_SECTIONS
-        return section in allowed
-    if section == POSTER_SECTION or POSTER_HEADING_WORD in utterance.heading:
-        return True
-    if section.startswith("p") and section[1:].isascii() and section[1:].isdigit():
-        return int(section[1:]) in pages.get(utterance.seat_id, frozenset())
-    return False
-
-
-def pieces_by_seat(utterances: list[Utterance], entries: list[Entry],
-                   pages: dict[str, frozenset[int]]) -> dict[str, list[Entry]]:
-    """Each seat's pieces to high-school students, as index entries."""
-    chosen = {u.id for u in utterances if to_students(u, pages)}
-    found: dict[str, list[Entry]] = {}
+def pieces_by_seat(entries: list[Entry], kind_of: dict[str, str]) -> dict[str, dict[str, list[Entry]]]:
+    """Each seat's pieces that may answer, by kind, in reading order."""
+    found: dict[str, dict[str, list[Entry]]] = {}
     for entry in entries:
-        if entry.utterance_id in chosen:
-            found.setdefault(entry.seat_id, []).append(entry)
+        kind = kind_of.get(entry.utterance_id, NONE)
+        if kind == NONE or is_ranking_title(entry.text):
+            continue
+        found.setdefault(entry.seat_id, {}).setdefault(kind, []).append(entry)
     return found
+
+
+def choose_kind(by_kind: dict[str, list[Entry]], shown_ids: set[str], counts: Counter,
+                order: list[str]) -> str | None:
+    """The kind shown the fewest times among those with a piece not shown yet."""
+    open_kinds = [kind for kind, pieces in by_kind.items()
+                  if any(entry.utterance_id not in shown_ids for entry in pieces)]
+    if not open_kinds:
+        return None
+    rank = {kind: index for index, kind in enumerate(order)}
+    return min(open_kinds, key=lambda kind: (counts[kind], rank.get(kind, len(rank))))
 
 
 @dataclass(frozen=True)
@@ -122,16 +93,18 @@ class Word:
     seat_id: str
     utterance_id: str
     text: str
+    kind: str
 
 
 @dataclass
 class Closing:
     status: str
-    seats_asked: list[str] = field(default_factory=list)  # Lit seats holding such words.
+    seats_asked: list[str] = field(default_factory=list)  # Lit seats holding a piece that may answer.
+    kinds_asked: list[str] = field(default_factory=list)  # The kind picked for each asked seat.
     words: list[Word] = field(default_factory=list)
     reason: str = ""  # Reason code when unavailable.
     guard_stopped: int = 0
-    dropped: int = 0  # Picks naming no piece of an asked seat, or a second for one seat.
+    dropped: int = 0  # Picks naming no piece sent, or a second for one seat.
 
 
 def request_for(question: str, pieces: list[Entry]) -> dict:
@@ -160,23 +133,40 @@ def clean(answer, pieces: list[Entry]) -> tuple[list[Quote], int]:
 
 
 def run(gate: Gate, guard: Guard, question: str, seat_order: list[str],
-        held: dict[str, list[Entry]]) -> Closing:
-    asked = [seat_id for seat_id in seat_order if held.get(seat_id)][:MAX_SEATS]
+        held: dict[str, dict[str, list[Entry]]], shown_ids: set[str], counts: Counter,
+        order: list[str]) -> Closing:
+    """shown_ids: every piece this student has been shown; counts: how many
+    times each kind was shown to this student in earlier rounds."""
+    counts = Counter(counts)
+    asked: list[str] = []
+    kinds: list[str] = []
+    pieces: list[Entry] = []
+    for seat_id in seat_order:
+        if len(asked) == MAX_SEATS:
+            break
+        kind = choose_kind(held.get(seat_id, {}), shown_ids, counts, order)
+        if kind is None:
+            continue
+        asked.append(seat_id)
+        kinds.append(kind)
+        counts[kind] += 1
+        pieces += [entry for entry in held[seat_id][kind] if entry.utterance_id not in shown_ids]
     if not asked:
         return Closing(NONE_HOLD)
-    pieces = [entry for seat_id in asked for entry in held[seat_id]]
     try:
         answer = json_answer(gate.send("moderator", request_for(question, pieces)))
         quotes, dropped = clean(answer, pieces)
     except (GateError, ModelUnavailable) as error:
-        return Closing(UNAVAILABLE, asked, reason=str(error))
+        return Closing(UNAVAILABLE, asked, kinds, reason=str(error))
     seat_of = {entry.utterance_id: entry.seat_id for entry in pieces}
-    result = Closing(NONE_PASSED, asked, dropped=dropped)
+    kind_of_seat = dict(zip(asked, kinds))
+    result = Closing(NONE_PASSED, asked, kinds, dropped=dropped)
     passed = {}
     for verdict in guard.screen(quotes):
         if verdict.passed:
             uid = verdict.quote.utterance_id
-            passed[seat_of[uid]] = Word(seat_of[uid], uid, verdict.shown)
+            seat_id = seat_of[uid]
+            passed[seat_id] = Word(seat_id, uid, verdict.shown, kind_of_seat[seat_id])
         else:
             result.guard_stopped += 1
     # In the order the seats spoke in the round.

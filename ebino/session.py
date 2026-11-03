@@ -14,13 +14,14 @@ One sitting at a time: there is no login and no second student at once
 import re
 import secrets
 import time
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import closing, editor, harvest, reflection, roundtable
+from . import closing, editor, harvest, reflection, roundtable, talk_kinds
 from .editor import QuestionCard
 from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
-from .texts import CLOSING_LABEL, CLOSING_QUESTION, NAME_IN_QUESTION, load_text
+from .texts import CLOSING_KIND_LABELS, CLOSING_QUESTION, NAME_IN_QUESTION, load_table, load_text
 from .gate import Gate
 from .guard import Guard
 from .index import Entry, build_index, load_topics, load_utterances
@@ -73,21 +74,24 @@ class Library:
     entries: list[Entry]
     purposes: list[PurposeSample]
     show_private: bool = False
-    # Each seat's pieces to high-school students (SPEC 14-53 A).
-    to_students: dict[str, list[Entry]] = field(default_factory=dict)
+    # Each seat's pieces that may give the round's last word, by kind of
+    # talk (SPEC 14-53 A), and the kinds in the teacher's table order.
+    closing_pieces: dict[str, dict[str, list[Entry]]] = field(default_factory=dict)
+    kind_order: list[str] = field(default_factory=list)
 
     @classmethod
-    def build(cls, seats, utterances, topics, show_private=False, hasshin_pages=None) -> "Library":
+    def build(cls, seats, utterances, topics, show_private=False, saved_kinds=None) -> "Library":
         entries = build_index(utterances, seats, topics)
+        kinds = talk_kinds.load_kinds()
+        kind_of = {u.id: talk_kinds.kind_of(saved_kinds or {}, u.id, kinds) for u in utterances}
         return cls(seats, utterances, entries, samples(utterances, seats), show_private,
-                   closing.pieces_by_seat(utterances, entries, hasshin_pages or {}))
+                   closing.pieces_by_seat(entries, kind_of), [kind.kind_id for kind in kinds])
 
     @classmethod
     def load(cls, data_dir: Path, show_private: bool = False) -> "Library":
         seats = load_seats(data_dir / "seats.tsv")
-        pages = closing.load_hasshin_pages(data_dir / closing.HASSHIN_PAGES_FILE,
-                                           {seat.seat_id for seat in seats})
-        return cls.build(seats, load_utterances(data_dir), load_topics(data_dir), show_private, pages)
+        return cls.build(seats, load_utterances(data_dir), load_topics(data_dir), show_private,
+                         talk_kinds.load_saved(data_dir))
 
     def seat_view(self, seat: Seat) -> dict:
         label = seat_label(seat, self.show_private)
@@ -190,23 +194,28 @@ class Session:
         if result.status != roundtable.ANSWERED:
             raise Refused("no_seat_spoke")
         if result.closing is None:
+            counts = Counter(word.kind for r in self.rounds if r.closing for word in r.closing.words)
             result.closing = closing.run(self.gate, self.guard, result.question, result.seat_order,
-                                         self.library.to_students)
+                                         self.library.closing_pieces, self.seen_ids(), counts,
+                                         self.library.kind_order)
             self.save()
         return self.closing_view(round_no)
 
     def closing_view(self, round_no: int) -> dict:
         """The fixed sentence and the words only when some seat's words passed;
-        otherwise nothing is shown (a seat without such words says nothing)."""
+        otherwise nothing is shown (a seat without such words says nothing).
+        Each piece has the line of its kind over it, never 「この人が」: most
+        pieces are an interviewer's article or a senior employee's words."""
+        labels = {row["ID"]: row["見出し"] for row in load_table(CLOSING_KIND_LABELS, ("ID", "見出し"))}
         words = []
         for word in self._round(round_no).closing.words:
             utterance = self._utterances[word.utterance_id]
             words.append({"seat_id": word.seat_id, "utterance_id": word.utterance_id, "text": word.text,
+                          "kind": word.kind, "label": labels.get(word.kind, ""),
                           "said": not utterance.note, "source": self.source(word.seat_id, utterance)})
         if not words:
-            return {"round": round_no, "question": "", "label": "", "words": []}
-        return {"round": round_no, "question": load_text(CLOSING_QUESTION), "label": load_text(CLOSING_LABEL),
-                "words": words}
+            return {"round": round_no, "question": "", "words": []}
+        return {"round": round_no, "question": load_text(CLOSING_QUESTION), "words": words}
 
     def next_purposes(self) -> list[dict]:
         return [self.purpose_view(sample) for sample in self.shelf.next()]
@@ -343,6 +352,12 @@ class Session:
 
     def shown_ids(self) -> set[str]:
         return {q.utterance_id for r in self.rounds for q in r.quotes}
+
+    def seen_ids(self) -> set[str]:
+        """Every piece this student was shown: the rounds' quotes and the
+        rounds' last words. Never shown twice in a last word."""
+        closings = {w.utterance_id for r in self.rounds if r.closing for w in r.closing.words}
+        return self.shown_ids() | closings
 
     def seconds_used(self) -> int:
         return int(time.monotonic() - self.started)
