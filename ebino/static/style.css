@@ -8,6 +8,10 @@
   --cross: #3d6bc8;
   --outsider_teacher: #8a5bb0;
   --lit: #f3c64b;
+  /* The map (map.js). The seat kinds above colour its points too. */
+  --basin: #eef0dc;
+  --river: #4f8fc0;
+  --hill: #8c8270;
 }
 * { box-sizing: border-box; }
 /* A class that sets display (.sheet is a grid) must not show a hidden box. */
@@ -139,3 +143,60 @@ button:disabled { opacity: .5; cursor: wait; }
 .seat.kind-poster { border-left: 6px solid var(--poster); }
 .seat.kind-cross { border-left: 6px solid var(--cross); }
 .seat.kind-outsider_teacher { border-left: 6px solid var(--outsider_teacher); }
+
+/* --- the map (SPEC 5-1, 14-65): over the seat list, which stays --- */
+.map { margin: 12px 0; }
+.map-frame { position: relative; width: 100%; overflow: hidden; background: #fff;
+  border: 1px solid var(--line); border-bottom: 0; border-radius: 12px 12px 0 0; }
+.map-frame svg { display: block; width: 100%; height: 100%; }
+.map-overlay { position: absolute; inset: 0; pointer-events: none; }
+.basin-fill polygon { fill: var(--basin); stroke: none; }
+.rim path { stroke: var(--ink); fill: none; }
+.river path { stroke: var(--river); fill: none; }
+.mountains path { stroke: var(--hill); fill: none; }
+.drawing path { transition-property: stroke-dashoffset; transition-timing-function: ease-in-out; }
+.place-names text { fill: var(--soft); font-size: 22px; letter-spacing: .1em; }
+.school rect, .school polygon:not(.flag) { fill: #fff; stroke: var(--ink); stroke-width: 1.6; }
+.school .pole { stroke: var(--ink); stroke-width: 1.6; }
+.school .flag { fill: var(--adult); stroke: var(--ink); stroke-width: 1; }
+.school text { fill: var(--ink); font-size: 20px; font-weight: bold; paint-order: stroke; stroke: #fff; stroke-width: 4px; }
+.crossing path { stroke: var(--cross); fill: none; }
+.crossing circle { fill: var(--cross); }
+.split-lines line { stroke: var(--ink); stroke-width: 2.4; stroke-dasharray: 7 6; }
+
+.pt { cursor: pointer; outline: none; }
+.pt .shape { stroke: #fff; stroke-width: 1.6; }
+.pt.kind-adult .shape { fill: var(--adult); }
+.pt.kind-poster .shape { fill: var(--poster); }
+.pt.kind-cross .shape { fill: var(--cross); }
+.pt.kind-outsider_teacher .shape { fill: var(--outsider_teacher); }
+.pt .halo { fill: var(--lit); opacity: 0; transition: opacity .25s; }
+.pt.lit .halo { opacity: .9; }
+.pt:hover .shape, .pt:focus-visible .shape { stroke: var(--ink); stroke-width: 3; }
+.pt .met-mark { fill: var(--ink); stroke: #fff; stroke-width: 1.2; display: none; }
+.pt.met .met-mark { display: inline; }
+.pt .ask-mark { display: none; fill: var(--ink); font-size: 16px; font-weight: bold;
+  paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.pt.silent .ask-mark { display: inline; }
+
+.map-tip, .map-bubble, .split-tag { position: absolute; max-width: min(70%, 18em); background: #fff;
+  color: var(--ink); border: 1px solid var(--ink); border-radius: 8px; padding: 2px 8px;
+  font-size: .85rem; line-height: 1.5; box-shadow: 0 1px 3px rgba(0, 0, 0, .15); }
+.map-tip .title { font-weight: bold; }
+.map-tip .detail { font-size: .8rem; color: var(--soft); }
+.map-bubble { border-color: var(--lit); border-width: 2px; }
+.split-tag { background: #fff6dc; border-style: dashed; font-size: .8rem; }
+/* The map's bottom corners: the met count and the source. */
+.map-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; background: #fff;
+  border: 1px solid var(--line); border-top: 1px dashed var(--line); border-radius: 0 0 12px 12px; padding: 2px 10px; }
+.map-met, .map-source { margin: 0; font-size: .8rem; color: var(--soft); }
+.map-met { font-weight: bold; }
+.school { pointer-events: none; }
+.map-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin-top: 6px; }
+.map-card .title { font-weight: bold; }
+.map-card .not-asked { font-size: .85rem; color: var(--soft); }
+.map-card .close { margin-top: 6px; font-size: .85rem; padding: 2px 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pt .halo, .drawing path { transition: none !important; }
+}

@@ -1,5 +1,5 @@
 """One student's sitting at the round table, and what the screen is sent
-(SPEC 5-1, 14-12, 14-51: a seat list until the map is drawn).
+(SPEC 5-1, 14-12, 14-51, 14-65: the map over the seat list, which stays).
 
 The screen gets plain data built here, never a model's words except the
 quotes the guard passed (which are the pieces' own text) and split headings.
@@ -19,11 +19,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import (ask_seat, closing, coach, config, editor, harvest, more, purpose_summary, reflection, roundtable,
-               subjects, talk_kinds)
+               seat_map, subjects, talk_kinds)
 from .editor import QuestionCard
 from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
 from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_SEAT_HEADER, CLOSING_KIND_LABELS,
-                    CLOSING_QUESTION, MODEL_UNAVAILABLE, NAME_IN_QUESTION, load_table, load_text)
+                    CLOSING_QUESTION, MODEL_UNAVAILABLE, NAME_IN_QUESTION, SCHOOL_LABEL, load_optional_text, load_table,
+                    load_text)
 from .gate import Gate, NameList, load_names
 from .guard import Guard
 from .index import Entry, build_index, load_topics, load_utterances
@@ -94,11 +95,15 @@ class Library:
     # coach.tsv; empty: no coach card), and whether the band is on at all.
     coach_sources: list[str] = field(default_factory=list)
     coach_on: bool = True
+    # The map (seat_map.py): None when the map file is missing or unreadable,
+    # and the screen keeps the seat list alone. The points are for `seats`.
+    map_data: seat_map.MapData | None = None
+    placement: seat_map.Placement | None = None
 
     @classmethod
     def build(cls, seats, utterances, topics, show_private=False, saved_kinds=None,
               saved_summaries=None, names=None, subject_catalog=None, coach_seats=None,
-              coach_on=None) -> "Library":
+              coach_on=None, map_data=None) -> "Library":
         """coach_seats: coach.tsv as {seat ID: shown on the map}. A seat kept
         off the map is left out of the seat list and of everything the
         librarian and the moderator can pick; its pieces are the coach's only."""
@@ -118,24 +123,41 @@ class Library:
                    closing.pieces_by_seat(entries, kind_of), [kind.kind_id for kind in kinds],
                    closing.ranking_titles(shown_utterances), subject_catalog, list(seats),
                    [entry.text for entry in every_entry if entry.seat_id in coach_seats],
-                   config.coach_on() if coach_on is None else coach_on)
+                   config.coach_on() if coach_on is None else coach_on,
+                   map_data, seat_map.place_seats(map_data, shown_seats) if map_data else None)
 
     @classmethod
-    def load(cls, data_dir: Path, show_private: bool = False) -> "Library":
+    def load(cls, data_dir: Path, show_private: bool = False, map_file: Path | None = None) -> "Library":
         seats = load_seats(data_dir / "seats.tsv")
         return cls.build(seats, load_utterances(data_dir), load_topics(data_dir), show_private,
                          talk_kinds.load_saved(data_dir), purpose_summary.load_saved(data_dir),
                          load_names(data_dir, seats), subjects.load_catalog(data_dir),
-                         coach.load_coach(data_dir, {seat.seat_id for seat in seats}))
+                         coach.load_coach(data_dir, {seat.seat_id for seat in seats}),
+                         map_data=seat_map.load_map(map_file))
 
     def seat_view(self, seat: Seat) -> dict:
         label = seat_label(seat, self.show_private)
         return {"seat_id": seat.seat_id, "kind": seat.kind, "title": label.title, "detail": label.detail}
 
+    def map_view(self) -> dict | None:
+        """The map part of /api/setup, or None: no map, the seat list alone."""
+        if self.map_data is None or self.placement is None:
+            return None
+        return seat_map.map_view(self.map_data, self.placement, load_optional_text(SCHOOL_LABEL))
+
+    def map_report(self) -> str:
+        """The start-up line about the map: counts only."""
+        return self.placement.report() if self.placement is not None else "地図なし"
+
     def seat_list(self) -> list[dict]:
         order = list(KIND_LABELS)
         seats = sorted(self.seats, key=lambda s: order.index(s.kind) if s.kind in order else len(order))
-        return [self.seat_view(seat) for seat in seats]
+        views = [self.seat_view(seat) for seat in seats]
+        if self.placement is not None:  # Where each point is on the map.
+            for view in views:
+                point = self.placement.points[view["seat_id"]]
+                view.update(x=point.x, y=point.y, outer=point.outer)
+        return views
 
 
 @dataclass

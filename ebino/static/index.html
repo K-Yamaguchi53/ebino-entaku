@@ -30,6 +30,20 @@
     <div id="work-questions" class="hints"></div>
     <p id="ask-message" class="message" hidden></p>
 
+    <!-- The map (SPEC 5-1, 14-65): added over the seat list below, which stays
+         for the keyboard and screen readers. Hidden when there is no map. -->
+    <section id="map" class="map" hidden>
+      <div id="map-frame" class="map-frame">
+        <svg id="map-svg" role="group" aria-label="えびのの地図と席の点" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div id="map-overlay" class="map-overlay"></div>
+      </div>
+      <div class="map-foot">
+        <p class="map-met">会った席 <span id="map-met-count">0</span></p>
+        <p id="map-source" class="map-source"></p>
+      </div>
+      <div id="map-card" class="map-card" hidden></div>
+    </section>
+
     <section id="purposes" class="purposes">
       <h2 id="purpose-heading"></h2>
       <ul id="purpose-list"></ul>
@@ -121,6 +135,8 @@
   </form>
 </template>
 
+<script src="/rough.js"></script>
+<script src="/map.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

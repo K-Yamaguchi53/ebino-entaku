@@ -94,6 +94,9 @@ COACH_LABEL = "coach_label"
 OBSERVER_LABEL = "observer_label"
 AI_QUESTION_BADGE = "ai_question_badge"
 OBSERVER_VIEW = "observer_view"
+# The school's landmark on the map (SPEC 14-65): its label, one line. Missing
+# or empty: no landmark.
+SCHOOL_LABEL = "school_label"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
@@ -107,6 +110,14 @@ SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 
 def load_text(name: str) -> str:
     return (TEXTS_DIR / f"{name}.txt").read_text(encoding="utf-8").strip()
+
+
+def load_optional_text(name: str) -> str:
+    """A text that may be missing: "" then."""
+    try:
+        return load_text(name)
+    except (OSError, UnicodeDecodeError):
+        return ""
 
 
 def load_lines(name: str) -> list[str]:

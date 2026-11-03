@@ -2,8 +2,9 @@
 
     python -m ebino.app [--port 8765] [--plant]
 
-Standard library only, plain HTML and JS, listening on 127.0.0.1 alone. Until
-the map is drawn the screen is a seat list. The app reads EBINO_DATA_DIR and
+Standard library only, plain HTML and JS, listening on 127.0.0.1 alone. The
+map (seat_map.py) sits over the seat list, which stays; without the map file
+the screen is the seat list alone. The app reads EBINO_DATA_DIR and
 the key from .env, and does not start unless EBINO_RECORDS_DIR is set to a
 safe place (SPEC 2-1): there is no default place to fall back to. Each
 sitting and each prompt sent to the moderator is kept there (records.py).
@@ -43,6 +44,10 @@ STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
+    "/map.js": ("map.js", "text/javascript; charset=utf-8"),
+    # Hand-drawn lines on the map (MIT), bundled: nothing is loaded from outside.
+    "/rough.js": ("rough.js", "text/javascript; charset=utf-8"),
+    "/rough.LICENSE.txt": ("rough.LICENSE.txt", "text/plain; charset=utf-8"),
 }
 MAX_BODY = 16 * 1024
 # Seconds a connection may sit without sending or taking bytes. Waiting for
@@ -78,6 +83,7 @@ class App:
             "labs": LAB_CHOICES,
             "changed_choices": CHANGED_CHOICES,
             "seats": self.library.seat_list(),
+            "map": self.library.map_view(),  # None: no map, the seat list alone.
         }
 
     def start(self, body: dict) -> dict:
@@ -251,6 +257,7 @@ def main(argv=None) -> int:
     print(f"seats {len(library.seats)}  pieces {len(library.entries)}  purpose samples {len(library.purposes)}")
     print(f"coach band {'on' if library.coach_on else 'off'}  coach pieces {len(library.coach_sources)}  "
           f"seats off the map {len(library.all_seats) - len(library.seats)}")
+    print(library.map_report())  # 「地図なし」 when the map file is missing or broken.
     print(library.subject_catalog.report())  # The harvest card's ③: counts only.
     print(f"open http://{HOST}:{server.server_address[1]}/  (Ctrl+C to stop)")
     try:

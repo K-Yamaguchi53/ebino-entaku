@@ -36,6 +36,17 @@ function sourceLine(source) {
   return [source.title, source.detail, source.note].filter(Boolean).join("　");
 }
 
+// The map (map.js) is an extra over the seat list: when it is missing or
+// fails, the seat list and the round go on as before.
+function onMap(action) {
+  if (typeof EbinoMap === "undefined") return;
+  try {
+    action(EbinoMap);
+  } catch (error) {
+    $("map").hidden = true;
+  }
+}
+
 // A ranking item's title, small over the item, as recorded (null when none).
 function rankingTitle(piece) {
   return piece.ranking_title ? el("p", { class: "ranking-title", text: piece.ranking_title }) : null;
@@ -59,12 +70,16 @@ async function setup() {
     $("work-questions").append(el("button", { type: "button", text, onclick: () => fill(text) }));
   }
   renderSeats();
+  // The map over the seat list (map.js). No map, or one that fails to draw:
+  // the seat list alone, as before.
+  if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, { state, cardEntry, renderSeats, shownQuotes }));
 }
 
 async function start(lab) {
   const data = await call("/api/start", { lab });
   $("start").hidden = true;
   $("table").hidden = false;
+  onMap((map) => map.show());  // Draws the rim and the river once the map is on screen.
   renderPurposes(data.purposes);
   $("question").focus();
 }
@@ -151,6 +166,7 @@ function renderRound(round) {
   if (round.card) box.append(el("p", { class: "card-done", text: "この問いを質問カードにしました" }));
   $("rounds").prepend(box);
   renderSeats();
+  onMap((map) => map.round(round));  // The quoted seats light up on the map, in order.
   if (round.status === "answered") {
     // 「司会が○○に聞いてみる」 comes before the last word (SPEC 14-53 B).
     const askBox = el("div", { class: "ask-seat-box" });
@@ -430,6 +446,7 @@ function renderSeats() {
     list.append(el("section", { class: `kind-group kind-${kind}` }, el("h3", { text: label }), row));
   }
   $("met-count").textContent = String(state.met.size);
+  onMap((map) => map.refresh());  // The same count and marks on the map.
 }
 
 function renderSeat(seat) {
