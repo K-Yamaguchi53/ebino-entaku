@@ -11,6 +11,7 @@ One sitting at a time: there is no login and no second student at once
 (SPEC 3). Starting again makes a new sitting with a new random ID.
 """
 
+import re
 import secrets
 import time
 from dataclasses import dataclass, field
@@ -42,6 +43,15 @@ LAB_CHOICES = {
 
 class Refused(Exception):
     """A screen request that cannot be done. Reason code only."""
+
+
+# The moderator's headings begin 「ここで割れた：」 (prompts.MODERATOR). The
+# round table keeps it; the sheet already says 割れたところ and 置いてきた：.
+_SPLIT_LEAD = re.compile(r"^\s*ここで割れた\s*[：:]\s*")
+
+
+def _sheet_heading(heading: str) -> str:
+    return _SPLIT_LEAD.sub("", heading) or heading
 
 
 def _line(text, limit: int, empty_code: str, required: bool = True) -> str:
@@ -248,7 +258,7 @@ class Session:
         return {
             "first_question": next((r.question for r in self.rounds if r.question), ""),
             "met_lives": met_lives,
-            "splits": [{"heading": s.heading, "pressed": (n, i) in self.pressed_splits}
+            "splits": [{"heading": _sheet_heading(s.heading), "pressed": (n, i) in self.pressed_splits}
                        for n, r in enumerate(self.rounds, start=1) for i, s in enumerate(r.splits)],
             "cards": [card.text for card in self.cards],
             "changed": CHANGED_CHOICES[current.changed],

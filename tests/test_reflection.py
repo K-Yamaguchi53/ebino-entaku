@@ -183,7 +183,10 @@ def test_the_whole_sheet_and_its_record(tmp_path):
     assert sheet["first_question"] == "休みの日って、みんな何してる？"
     assert sheet["met_lives"] == [{"text": "休みは決めて取ります。", "said": True,
                                    "source": {"title": "理容師", "detail": "", "note": ""}}]
-    assert sheet["splits"] == [{"heading": SPLIT[0], "pressed": True}]
+    # The sheet drops 「ここで割れた：」; the round table keeps it.
+    assert SPLIT[0].startswith("ここで割れた：")
+    assert sheet["splits"] == [{"heading": SPLIT[0].removeprefix("ここで割れた："), "pressed": True}]
+    assert session.round_view(1)["splits"][0]["heading"] == SPLIT[0]
     assert (sheet["changed"], sheet["ask_back"], sheet["declined"]) == ("少し", FALLBACK, True)
     assert (sheet["chosen"], sheet["move"], sheet["own_move"]) == ("own", None, "畑に行って休みの決め方を見る")
     assert sheet["meet"]["title"] == "農家" and sheet["meet"]["reason"] == "畑の休みが気になった"
