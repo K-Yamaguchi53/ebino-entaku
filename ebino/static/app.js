@@ -190,6 +190,11 @@ function renderRound(round) {
   round.splits.forEach((split, index) => box.append(renderSplit(round.round, split, byId, sides[index])));
   if (round.card) box.append(el("p", { class: "card-done", text: "この問いを質問カードにしました" }));
   $("rounds").prepend(box);
+  // The keyboard goes on from the new round's question, not through the
+  // map's points before it (直し25-5); the page does not jump for it.
+  const asked = box.querySelector(".round-question");
+  asked.tabIndex = -1;
+  asked.focus({ preventScroll: true });
   renderSeats();
   onMap((map) => map.round(round));  // The quoted seats light up on the map, in order.
   if (round.status === "answered") {

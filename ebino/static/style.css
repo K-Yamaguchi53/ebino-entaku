@@ -320,6 +320,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .card-form button { margin-top: 10px; color: var(--paper-ink); background: var(--paper-light); border-color: var(--paper-soft); }
 .card-form button:hover { background: var(--paper-2); }
 .card-done { font-size: 14px; color: var(--soft); }
+/* The new round's question takes the keyboard's focus after 「聞く」. */
+.round-question:focus-visible { outline: 2px solid var(--lamp); outline-offset: 4px; border-radius: 4px; }
 /* In the seat list, the open card spans the list under its seat's line;
    its seat is marked while it is open. */
 .seat-row > .card-form { flex: 1 0 100%; max-width: none; margin-top: 2px; }
