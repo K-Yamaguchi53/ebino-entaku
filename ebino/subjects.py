@@ -26,8 +26,10 @@ not shown at all.
    札's narrowed candidates, is not used; numbers missing are filled by
    code's way below. なし, or a 札 with no candidate left, shows no ③.
 4. When the model cannot be used or does not answer: of all the narrowed
-   candidates, the two whose clue words (手がかりの言葉) the record holds
-   most (ties in table order); none held, no ③.
+   candidates, the one whose clue words (手がかりの言葉) the record holds
+   most (ties in table order) gives the 札, and the second is the next by
+   clue words within that 札 only, so the 札 recorded and the subjects shown
+   agree; none held, no ③.
 5. Of the two, the one shown fewer times so far is shown (a tie: the one
    first). 「ほかの教科も見る」 shows the other, then the rest of that 札's
    narrowed candidates, fewest shown first, then starts again. Every one shown
@@ -313,11 +315,14 @@ def choose(gate: Gate, catalog: Catalog | None, lab: str, words: dict[str, str],
                 picked.append(candidate)
         picked = picked[:PICKS]
         return Pick(SHOWN, fuda=fuda, source=SOURCE_MODEL, order=_ordered(picked, pool, counts))
-    picked = [c for c in by_clues(candidates, words) if clue_hits(c.row, words)][:PICKS]
-    if not picked:
+    ranked = by_clues(candidates, words)
+    if not clue_hits(ranked[0].row, words):
         return Pick(STATUS_NO_CLUE, source=SOURCE_CODE, model_error=error)
-    fuda = picked[0].row.fuda
+    # The first one's 札 is the 札; the second comes from the same 札 only,
+    # so the 札 recorded and the subjects on screen always agree.
+    fuda = ranked[0].row.fuda
     pool = [c for c in candidates if c.row.fuda == fuda]
+    picked = by_clues(pool, words)[:PICKS]
     return Pick(SHOWN, fuda=fuda, source=SOURCE_CODE, model_error=error, order=_ordered(picked, pool, counts))
 
 

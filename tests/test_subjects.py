@@ -156,6 +156,19 @@ def test_with_no_model_the_clue_words_choose_and_none_held_means_no_third_line()
     assert nothing.status == subjects.STATUS_NO_CLUE and subjects.view(catalog(), nothing) is None
 
 
+def test_with_no_model_the_second_comes_from_the_first_ones_fuda_only():
+    # 国語ア (札1) and 地理ス (札3) each hold two clue words; 社会ウ (札1) one.
+    words = {"question": "比べると違う町の地域", "answer": "", "move": ""}
+    pick = choose(gate(RuntimeError("down")), catalog(), "quest", words, Counter())
+    assert pick.fuda == "札1" and pick.source == subjects.SOURCE_CODE
+    assert [c.row.subject for c in pick.order[:2]] == ["国語ア", "社会ウ"]
+    assert {c.row.fuda for c in pick.order} == {"札1"}
+    # The same 札 fills the second even with no clue word: 歴史セ, shown fewer times, first.
+    town = {"question": "町のこと", "answer": "", "move": ""}
+    pick = choose(gate(RuntimeError("down")), catalog(), "quest", town, Counter({ROWS[12].key: 1}))
+    assert [c.row.subject for c in pick.order] == ["歴史セ", "地理ス", "公共ソ"]
+
+
 def test_of_the_two_the_one_shown_fewer_times_comes_first_and_the_rest_follow_fewest_first():
     counts = Counter({ROWS[12].key: 3, ROWS[13].key: 1, ROWS[14].key: 0})
     pick = choose(gate(says("札3", number("quest", "地理ス"), number("quest", "歴史セ"))),
