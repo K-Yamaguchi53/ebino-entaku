@@ -200,6 +200,27 @@ def test_banned_words_are_found_through_width_and_spaces():
     assert banned_in("それが向いて いる") and banned_in("ｵｽｽﾒ") and not banned_in("休みを決めて取る")
 
 
+@pytest.mark.parametrize("text", [
+    "保育士の席で聞いてみて", "休みの決め方を確かめましょう", "この仕事は向いていない", "向いてないかも",
+    "外の仕事は向かない", "進路を考える", "決めておくといい", "読んだらいい", "取ればいい",
+    "決めた方が良い", "決めたほうが良い", "確かめてほしい", "偉かった", "えらかったね", "素敵な問い",
+    "立派な問い", "いい問いだね", "良い問いになった", "よく考えた", "もう一度しよう", "畑に行こう",
+    "農家に聞こう", "決め手を確かめよう", "記事を読もう", "農家に会おう", "記事を読んでみて",
+])
+def test_the_widened_banned_words_stop_these(text):
+    assert banned_in(text)
+
+
+@pytest.mark.parametrize("text", [
+    "休みを決めて取る人が、何を決め手にしたのかを確かめる",
+    "まだ誰も聞いていない「保育士」の席で、休みの取り方を確かめる",
+    "「休みの日」の何を知りたいのかを絞る",
+    "なぜ割れたのかを確かめる",
+])
+def test_the_widened_banned_words_let_these_moves_through(text):
+    assert not banned_in(text)
+
+
 def test_no_screen_text_holds_a_banned_word():
     for path in TEXTS_DIR.glob("*.txt"):
         if path.stem != "planted_fake_quote":  # The fake is meant to be stopped.
