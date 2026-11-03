@@ -356,9 +356,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   paint-order: stroke; stroke: var(--veil-thin); stroke-width: 2px; stroke-linejoin: round; }
 .shelf-names text { fill: var(--soft); font-family: var(--gothic); font-size: 17px; letter-spacing: .06em; }
 .shelf-boxes rect { fill: var(--veil); stroke: var(--moon-faint); }
-.school rect, .school polygon:not(.flag) { fill: var(--night); stroke: var(--ink); stroke-width: 1.4; }
-.school .pole { stroke: var(--ink); stroke-width: 1.4; }
-.school .flag { fill: var(--moon); stroke: var(--ink); stroke-width: 1; }
+/* The school: its wings and round roof in thin moonlight on the night, the
+   glass at the top in the lamp's honey with the faintest light round it. */
+.school .wing, .school .dome { fill: var(--night); stroke: var(--moon); stroke-width: 1.1px;
+  stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.school .glass { fill: var(--lamp); }
+.school .glass-glow { fill: url(#lamp-glow); opacity: .32; }
 .school text { fill: var(--ink); font-family: var(--gothic); font-size: 20px; font-weight: bold;
   paint-order: stroke; stroke: var(--veil-thin); stroke-width: 3px; }
 .crossing path { stroke: var(--moon-soft); fill: none; }

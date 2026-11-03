@@ -484,7 +484,7 @@ function scene(width) {
     for (const entry of shelves) word(...toFrame(entry.name.x, entry.name.y), entry.words, TEXT_PX.shelf, 1, false);
     if (map.school) {
       const [x, y] = P(map.school.x, map.school.y, 1), k = Math.max(view.S, TEXT_PX.school * perPx() / 20);
-      word(...toFrame(x, y + 28 * k), map.school.label, 20 * k / perPx(), 1, true);
+      word(...toFrame(x, y + 25 * k), map.school.label, 20 * k / perPx(), 1, true);
     }
     return out;
   };
@@ -719,6 +719,23 @@ def test_an_empty_chair_takes_a_press_over_44px_and_shows_the_keyboard_there():
     css = _css()
     assert ".chair .hit { fill: transparent;" in css
     assert re.search(r"\.chair:focus-visible \.hit \{[^}]*stroke: var\(--lamp\)", css)
+
+
+def test_the_schools_mark_is_its_building_from_above_a_half_ring_and_the_lit_glass():
+    script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    school = _inner_function(script, "drawSchool")
+    # The north half of a ring (13, 8.3), the wing across (x -13.5..13.5, y 0..4.8),
+    # the round roof (4.8), the glass (1.6); no flag, no triangle roof.
+    assert 'd: "M -13 0 A 13 13 0 0 1 13 0 L 8.3 0 A 8.3 8.3 0 0 0 -8.3 0 Z"' in school
+    assert 'x: -13.5, y: 0, width: 27, height: 4.8' in school
+    assert 'd: "M -4.8 0 A 4.8 4.8 0 0 1 4.8 0 Z"' in school and '{ class: "glass", r: 1.6 }' in school
+    assert "flag" not in school and "pole" not in school and "polygon" not in school
+    assert 'label.textContent = school.label;' in school and 'group.setAttribute("aria-label", school.label);' in school
+    # Its size follows the zoom as before.
+    assert "Math.max(view.S, TEXT_PX.school * perPx / 20)" in _inner_function(script, "rescale")
+    css = _css()
+    assert re.search(r"\.school \.wing, \.school \.dome \{[^}]*fill: var\(--night\); stroke: var\(--moon\)", css)
+    assert ".school .glass { fill: var(--lamp); }" in css and ".flag" not in css
 
 
 def test_the_flat_map_has_no_mountain_marks():

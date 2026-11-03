@@ -278,17 +278,23 @@ const EbinoMap = (() => {
     }
   }
 
+  // The school as its building is, seen from above, north up: the wing that
+  // rings its north half, the wing across its diameter, the round roof in the
+  // middle, and the glass at the roof's top lit like a lamp (it does not
+  // move). The southern wing, the corridors, the gate and the grounds are
+  // left out: a mark this small would blur them.
   function drawSchool(group, school) {
     const [x, y] = view.proj(school.x, school.y, 1);
     schoolGroup = { node: group, x, y };
     group.setAttribute("role", "img");
     group.setAttribute("aria-label", school.label);
     group.append(
-      svgEl("rect", { x: -9, y: -4, width: 18, height: 12 }),
-      svgEl("polygon", { points: "-11,-4 0,-12 11,-4" }),
-      svgEl("line", { class: "pole", x1: 9, y1: -4, x2: 9, y2: -26 }),
-      svgEl("polygon", { class: "flag", points: "9,-26 20,-22 9,-18" }));
-    const label = svgEl("text", { x: 0, y: 28, "text-anchor": "middle" });
+      svgEl("path", { class: "wing", d: "M -13 0 A 13 13 0 0 1 13 0 L 8.3 0 A 8.3 8.3 0 0 0 -8.3 0 Z" }),
+      svgEl("rect", { class: "wing", x: -13.5, y: 0, width: 27, height: 4.8 }),
+      svgEl("path", { class: "dome", d: "M -4.8 0 A 4.8 4.8 0 0 1 4.8 0 Z" }),
+      svgEl("circle", { class: "glass-glow", r: 5.5 }),
+      svgEl("circle", { class: "glass", r: 1.6 }));
+    const label = svgEl("text", { x: 0, y: 25, "text-anchor": "middle" });
     label.textContent = school.label;
     group.append(label);
   }
