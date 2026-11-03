@@ -61,6 +61,13 @@ button:disabled { opacity: .5; cursor: wait; }
 .split { background: #fff6dc; border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
 .split .notice { font-size: .85rem; color: var(--soft); margin: 0; }
 .split button { margin-top: 4px; }
+/* The round's last word (SPEC 14-53 A): set apart from the quotes. */
+.closing { border-top: 2px dashed var(--line); margin-top: 12px; padding-top: 8px; }
+.closing-question { font-weight: bold; margin: 0 0 6px; }
+.closing-word { background: #f3f7f3; border-radius: 12px; padding: 8px 14px; margin: 6px 0; }
+.closing-word .label { font-size: .85rem; color: var(--soft); margin: 0; }
+.closing-word .words { margin: 2px 0; }
+.closing-word .source { color: var(--soft); font-size: .9rem; }
 
 .kind-group h3 { font-size: 1rem; margin: 12px 0 4px; }
 .kind-group h3::before { content: "●"; margin-right: 4px; }

@@ -74,6 +74,9 @@ class Round:
     # Related seats with no words: 「まだ誰も聞いていない」 (SPEC 14-12).
     silent_seats: list[str] = field(default_factory=list)
     card: QuestionCard | None = None  # Made only when no seat answered.
+    # 「最後に、何か伝えたいことはありますか」 (SPEC 14-53 A): closing.Closing,
+    # once the screen asked for it after an answered round.
+    closing: object = None
 
     @property
     def seat_order(self) -> list[str]:

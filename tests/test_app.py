@@ -133,6 +133,18 @@ def test_the_sheet_is_made_over_http_with_no_seat_picked(server):
     assert request(srv, "POST", "/api/harvest", {"use": "none"}) == (400, {"error": "not_ready_for_harvest"})
 
 
+def test_the_rounds_last_word_over_http(server):
+    srv, client = server
+    request(srv, "POST", "/api/start", {"lab": "creation"})
+    request(srv, "POST", "/api/ask", {"question": "休みの日って、みんな何してる？"})
+    # The invented seats here hold no words to high-school students: nothing shown.
+    assert request(srv, "POST", "/api/closing", {"round": 1}) == (
+        200, {"round": 1, "question": "", "label": "", "words": []})
+    assert request(srv, "POST", "/api/closing", {"round": 9}) == (400, {"error": "unknown_round"})
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert 'call("/api/closing"' in script and 'if (round.status === "answered") closeRound(' in script
+
+
 def test_the_screen_does_not_require_a_seat_before_the_sheet_is_made():
     script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
     finish = script[script.index("async function reflectFinish"):script.index("// --- today's harvest card")]

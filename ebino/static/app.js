@@ -136,6 +136,28 @@ function renderRound(round) {
   if (round.card) box.append(el("p", { class: "card-done", text: "この問いを質問カードにしました" }));
   $("rounds").prepend(box);
   renderSeats();
+  if (round.status === "answered") closeRound(round.round, box);
+}
+
+// 「最後に、何か伝えたいことはありますか」 (SPEC 14-53 A): asked after the
+// round is on screen. Shown apart from the quotes, never as an answer to the
+// question; when no seat's words passed, nothing is shown at all.
+async function closeRound(roundNo, box) {
+  let closing;
+  try {
+    closing = await call("/api/closing", { round: roundNo });
+  } catch (error) {
+    return;  // An extra at the round's end: the round itself is already shown.
+  }
+  if (!closing.words.length) return;
+  const part = el("section", { class: "closing" }, el("p", { class: "closing-question", text: closing.question }));
+  for (const word of closing.words) {
+    part.append(el("div", { class: "closing-word" },
+      el("p", { class: "label", text: closing.label }),
+      el("p", { class: "words", text: word.said ? `「${word.text}」` : word.text }),
+      el("span", { class: "source", text: sourceLine(word.source) })));
+  }
+  box.append(part);
 }
 
 function renderQuote(roundNo, quote) {

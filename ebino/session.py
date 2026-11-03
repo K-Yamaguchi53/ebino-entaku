@@ -17,10 +17,10 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import editor, harvest, reflection, roundtable
+from . import closing, editor, harvest, reflection, roundtable
 from .editor import QuestionCard
 from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
-from .texts import NAME_IN_QUESTION, load_text
+from .texts import CLOSING_LABEL, CLOSING_QUESTION, NAME_IN_QUESTION, load_text
 from .gate import Gate
 from .guard import Guard
 from .index import Entry, build_index, load_topics, load_utterances
@@ -73,16 +73,21 @@ class Library:
     entries: list[Entry]
     purposes: list[PurposeSample]
     show_private: bool = False
+    # Each seat's pieces to high-school students (SPEC 14-53 A).
+    to_students: dict[str, list[Entry]] = field(default_factory=dict)
 
     @classmethod
-    def build(cls, seats, utterances, topics, show_private=False) -> "Library":
-        return cls(seats, utterances, build_index(utterances, seats, topics),
-                   samples(utterances, seats), show_private)
+    def build(cls, seats, utterances, topics, show_private=False, hasshin_pages=None) -> "Library":
+        entries = build_index(utterances, seats, topics)
+        return cls(seats, utterances, entries, samples(utterances, seats), show_private,
+                   closing.pieces_by_seat(utterances, entries, hasshin_pages or {}))
 
     @classmethod
     def load(cls, data_dir: Path, show_private: bool = False) -> "Library":
-        return cls.build(load_seats(data_dir / "seats.tsv"), load_utterances(data_dir),
-                         load_topics(data_dir), show_private)
+        seats = load_seats(data_dir / "seats.tsv")
+        pages = closing.load_hasshin_pages(data_dir / closing.HASSHIN_PAGES_FILE,
+                                           {seat.seat_id for seat in seats})
+        return cls.build(seats, load_utterances(data_dir), load_topics(data_dir), show_private, pages)
 
     def seat_view(self, seat: Seat) -> dict:
         label = seat_label(seat, self.show_private)
@@ -177,6 +182,31 @@ class Session:
         self.pressed_splits.add((round_no, index))
         self.save()
         return splits[index].heading
+
+    def close_round(self, round_no: int) -> dict:
+        """「最後に、何か伝えたいことはありますか」 (SPEC 14-53 A): asked once at
+        the end of a round in which seats spoke; asking again gives the same."""
+        result = self._round(round_no)
+        if result.status != roundtable.ANSWERED:
+            raise Refused("no_seat_spoke")
+        if result.closing is None:
+            result.closing = closing.run(self.gate, self.guard, result.question, result.seat_order,
+                                         self.library.to_students)
+            self.save()
+        return self.closing_view(round_no)
+
+    def closing_view(self, round_no: int) -> dict:
+        """The fixed sentence and the words only when some seat's words passed;
+        otherwise nothing is shown (a seat without such words says nothing)."""
+        words = []
+        for word in self._round(round_no).closing.words:
+            utterance = self._utterances[word.utterance_id]
+            words.append({"seat_id": word.seat_id, "utterance_id": word.utterance_id, "text": word.text,
+                          "said": not utterance.note, "source": self.source(word.seat_id, utterance)})
+        if not words:
+            return {"round": round_no, "question": "", "label": "", "words": []}
+        return {"round": round_no, "question": load_text(CLOSING_QUESTION), "label": load_text(CLOSING_LABEL),
+                "words": words}
 
     def next_purposes(self) -> list[dict]:
         return [self.purpose_view(sample) for sample in self.shelf.next()]

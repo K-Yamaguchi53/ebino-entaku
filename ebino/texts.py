@@ -44,6 +44,10 @@ HARVEST_MEET_PREFIX = "harvest_meet_prefix"
 # Words that show going to meet someone, one per line, looked for in what the
 # student wrote on the sheet (the harvest card's ④). Not shown on screen.
 GO_WORDS = "go_words"
+# The round's last word (SPEC 14-53 A): the moderator's fixed sentence, and
+# the line over each seat's words to high-school students.
+CLOSING_QUESTION = "closing_question"
+CLOSING_LABEL = "closing_label"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (

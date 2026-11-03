@@ -90,6 +90,7 @@ def session_record(session) -> dict:
             "splits_dropped": result.splits_dropped,
             "silent_seats": result.silent_seats,
             "card_id": result.card.card_id if result.card else "",
+            "closing": _closing_record(result.closing),
         })
     return {
         "session_id": session.session_id,
@@ -105,6 +106,22 @@ def session_record(session) -> dict:
             for card in session.cards
         ],
         "reflection": _reflection_record(session.reflection),
+    }
+
+
+def _closing_record(closing) -> dict | None:
+    """SPEC 14-53 A: the seats that spoke and their pieces' IDs. None when
+    the screen never asked (a round in which no seat spoke)."""
+    if closing is None:
+        return None
+    return {
+        "status": closing.status,
+        "reason": closing.reason,
+        "seats_asked": list(closing.seats_asked),
+        "seats_shown": [word.seat_id for word in closing.words],
+        "utterance_ids": [word.utterance_id for word in closing.words],
+        "guard_stopped": closing.guard_stopped,
+        "dropped": closing.dropped,
     }
 
 
