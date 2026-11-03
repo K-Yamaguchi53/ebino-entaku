@@ -10,8 +10,8 @@ from ebino.ingest.utterance import TEACHER_ARTICLE_NOTE
 from ebino.reflection import Reflection
 from ebino.session import Refused
 from ebino.texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_OTHER_SIDE,
-                         ASK_OTHER_SIDE_COMPANY, ASK_OTHER_SIDE_WRITTEN, ASK_WHY, ASK_WHY_COMPANY,
-                         ASK_WHY_WRITTEN, load_text)
+                         ASK_OTHER_SIDE_COMPANY, ASK_OTHER_SIDE_SENIOR, ASK_OTHER_SIDE_WRITTEN, ASK_WHY,
+                         ASK_WHY_COMPANY, ASK_WHY_SENIOR, ASK_WHY_WRITTEN, load_text)
 from test_closing import QUESTION, says, sitting
 from test_session import ANSWERED, SPLIT, editor_says, librarian_finds, moderator_says, u
 
@@ -114,6 +114,49 @@ def test_a_companys_introduction_is_never_called_an_article():
     assert card["question"] == "『当社は、雨の日を社員の休みにしています。』と会社の紹介に書かれています。そう考えるのは、なぜですか？"
     assert load_text(ASK_OTHER_SIDE_COMPANY) != load_text(ASK_OTHER_SIDE_WRITTEN)
     assert load_text(ASK_WHY_COMPANY) != load_text(ASK_WHY_WRITTEN)
+
+
+E5 = ("e5", "朝のあいさつで、その日の調子が分かります。")  # A senior employee's words (S02).
+WITH_SENIOR = PIECES + [u("e5", "S02", E5[1], voice="senior")]
+
+
+def test_a_senior_employees_words_get_the_senior_form_and_never_article():
+    session = split_round([E5, A2], ["e5"], ["a2"], pieces=WITH_SENIOR)
+    card = session.ask_card(1)["card"]
+    assert card["form"] == "other_side" and card["seat_id"] == "S01"
+    assert card["question"] == "『朝のあいさつで、その日の調子が分かります。』と、この職場の先輩社員が書いています。あなたは？"
+    assert "記事" not in card["question"]
+    session.mark(1, "e5")
+    card = session.ask_card(1)["card"]
+    assert card["form"] == "why" and card["seat_id"] == "S02" and "記事" not in card["question"]
+    assert card["question"] == ("『朝のあいさつで、その日の調子が分かります。』と、この職場の先輩社員が書いています。"
+                                "そう書いたのは、なぜだと思いますか？")
+    assert "そう考えるのは" not in card["question"]
+    assert load_text(ASK_OTHER_SIDE_SENIOR) not in {load_text(ASK_OTHER_SIDE_WRITTEN), load_text(ASK_OTHER_SIDE_COMPANY)}
+    assert load_text(ASK_WHY_SENIOR) not in {load_text(ASK_WHY_WRITTEN), load_text(ASK_WHY_COMPANY)}
+
+
+A6 = ("a6", "店を継いだのは、父の背中を見ていたからです。")  # Said (S01).
+
+
+def test_words_with_no_note_come_before_a_senior_employees_words():
+    session = split_round([E5, A6], ["e5"], ["a6"], pieces=WITH_SENIOR)
+    card = session.ask_card(1)["card"]
+    assert card["seat_id"] == "S02"
+    assert card["question"] == "『店を継いだのは、父の背中を見ていたからです。』と言った人がいる。あなたは？"
+
+
+E4 = ("e4", "休みの日は、先輩と釣りに行きます。")  # A senior employee's words (S01).
+
+
+def test_an_article_and_a_company_keep_their_forms_beside_a_senior_employee():
+    session = split_round([A2, E5], ["a2"], ["e5"], pieces=WITH_SENIOR)
+    assert session.ask_card(1)["card"]["question"] == "『月曜は必ず店を閉める。』と記事に書かれた人がいる。あなたは？"
+    pieces = WITH_COMPANY + [u("e4", "S01", E4[1], voice="senior")]
+    session = split_round([C9, E4], ["c9"], ["e4"], pieces=pieces)
+    card = session.ask_card(1)["card"]
+    assert card["seat_id"] == "S01"
+    assert card["question"] == "『当社は、雨の日を社員の休みにしています。』と会社の紹介に書かれています。あなたは？"
 
 
 def test_an_interview_articles_quote_keeps_the_article_form_beside_a_company():

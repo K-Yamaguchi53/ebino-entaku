@@ -58,15 +58,18 @@ MORE_CARD_DONE = "more_card_done"
 # 「司会が○○に聞いてみる」 (SPEC 14-53 B): the card's line ({seat} is the
 # seat's title), the two forms of the question ({quote} is the record's own
 # words), each with a sentence for a piece shown with a source note
-# (_written) and one for a company's introduction (_company), the line over
-# an answer by its voice, and 「まだ答えていない」.
+# (_written), one for a company's introduction (_company) and one for a senior
+# employee's words (_senior), the line over an answer by its voice, and
+# 「まだ答えていない」.
 ASK_SEAT_HEADER = "ask_seat_header"
 ASK_WHY = "ask_why"
 ASK_WHY_WRITTEN = "ask_why_written"
 ASK_WHY_COMPANY = "ask_why_company"
+ASK_WHY_SENIOR = "ask_why_senior"
 ASK_OTHER_SIDE = "ask_other_side"
 ASK_OTHER_SIDE_WRITTEN = "ask_other_side_written"
 ASK_OTHER_SIDE_COMPANY = "ask_other_side_company"
+ASK_OTHER_SIDE_SENIOR = "ask_other_side_senior"
 ASK_ANSWER_SAID = "ask_answer_said"
 ASK_ANSWER_WRITTEN = "ask_answer_written"
 ASK_NOT_ANSWERED = "ask_not_answered"
