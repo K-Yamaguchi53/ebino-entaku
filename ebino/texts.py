@@ -76,13 +76,24 @@ ASK_NOT_ANSWERED = "ask_not_answered"
 # The small mark on a purpose sample shown as its summary (purpose_summary.py),
 # so it is never taken for the senior's own words.
 SAMPLE_SUMMARIZED = "sample_summarized"
+# The harvest card's ③ (SPEC 5-3, subjects.py): the teacher's tables of
+# candidates (札・科目・項目番号・本文の該当句・見出し・ひとこと・手がかりの言葉)
+# and of 札 (札・名前・説明), copied as they are from the teacher's side; the
+# words for 〔いつ〕 by the mark in 学ぶ人 (記号・いつ); the line with a
+# heading and without one ({いつ}{科目}{見出し}); and the button for the next.
+HARVEST_SUBJECTS = "harvest_subjects"
+HARVEST_FUDA = "harvest_fuda"
+HARVEST_SUBJECT_WHEN = "harvest_subject_when"
+HARVEST_SUBJECT_LINE = "harvest_subject_line"
+HARVEST_SUBJECT_LINE_PLAIN = "harvest_subject_line_plain"
+HARVEST_SUBJECT_MORE = "harvest_subject_more"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
     HEAVY_TALK_NOTICE, SPLIT_NOTICE, START_NOTICE, LAB_QUESTION, ANSWERED_COUNT,
     NOT_ASKED_YET, INPUT_EXAMPLE, PURPOSE_HEADING, WAITING_ASK, WAITING_REFLECTION,
     SEND_FAILED, MET_LIVES_EMPTY, HARVEST_HEADING, HARVEST_USE_QUESTION, MEET_QUESTION,
-    HARVEST_MEET_PREFIX, MORE_END, MORE_CARD_DONE, SAMPLE_SUMMARIZED,
+    HARVEST_MEET_PREFIX, MORE_END, MORE_CARD_DONE, SAMPLE_SUMMARIZED, HARVEST_SUBJECT_MORE,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 
@@ -95,18 +106,24 @@ def load_lines(name: str) -> list[str]:
     return [line.strip() for line in load_text(name).splitlines() if line.strip()]
 
 
-def load_table(name: str, columns: tuple[str, ...]) -> list[dict[str, str]]:
-    """A tab-separated table in texts/: its rows, in order. Errors give line
-    numbers only."""
-    lines = [line for line in (TEXTS_DIR / f"{name}.tsv").read_text(encoding="utf-8-sig").splitlines()
-             if line.strip()]
+def load_table(name: str, columns: tuple[str, ...], may_be_empty: tuple[str, ...] = ()) -> list[dict[str, str]]:
+    """A tab-separated table in texts/: its rows, in order."""
+    return read_table(TEXTS_DIR / f"{name}.tsv", columns, may_be_empty)
+
+
+def read_table(path: Path, columns: tuple[str, ...], may_be_empty: tuple[str, ...] = ()) -> list[dict[str, str]]:
+    """A tab-separated table with a header row: its rows, in order. Only the
+    columns in may_be_empty may hold an empty cell. Errors give the file's
+    name and line numbers only, never a path or a cell."""
+    lines = [line for line in path.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
     if not lines or tuple(cell.strip() for cell in lines[0].split("\t")) != columns:
-        raise ValueError(f"{name}.tsv columns do not match")
+        raise ValueError(f"{path.name} columns do not match")
     rows = []
     for number, line in enumerate(lines[1:], start=2):
         cells = [cell.strip() for cell in line.split("\t")]
-        if len(cells) != len(columns) or not all(cells):
-            raise ValueError(f"{name}.tsv line {number}: wrong column count or empty cell")
+        if len(cells) != len(columns) or not all(cell or column in may_be_empty
+                                                 for column, cell in zip(columns, cells)):
+            raise ValueError(f"{path.name} line {number}: wrong column count or empty cell")
         rows.append(dict(zip(columns, cells)))
     return rows
 

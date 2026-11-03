@@ -111,6 +111,8 @@ def test_the_reflection_sheet_over_http(server):
     assert status == 200 and sheet["move"]["label"] == "黙った席" and sheet["meet"]["title"] == "保育士"
     # The harvest card's ② comes with the sheet; ① and ② come after the pick.
     assert [use["force"] for use in sheet["uses"]] == ["1", "3", "4", "5"]
+    # ③ waits for ②.
+    assert request(srv, "POST", "/api/subject", {}) == (400, {"error": "not_ready_for_subject"})
     status, card = request(srv, "POST", "/api/harvest", {"use": "1"})
     assert status == 200 and card["meet"] == "もっと話を聞いてみたい人：保育士　／　会うときに：① 聞きたいことを、自分で決めて行く"
     assert card["moves"].startswith("今日の動き：最初の問い「休みの日って、みんな何してる？」を自分の言葉で入れた（① 自走する力）")
@@ -133,6 +135,18 @@ def test_the_sheet_is_made_over_http_with_no_seat_picked(server):
     assert sheet["harvest"]["moves"].startswith("今日の動き：「保育士さんに会ってみようと思った」と自分で書いた")
     assert sheet["harvest"]["meet"] == ""
     assert request(srv, "POST", "/api/harvest", {"use": "none"}) == (400, {"error": "not_ready_for_harvest"})
+    # No 学ぶ人 table in this library: no ③, and nothing to go round.
+    assert request(srv, "POST", "/api/subject", {}) == (200, {"subject": None})
+    assert request(srv, "POST", "/api/subject_more", {}) == (400, {"error": "no_other_subject"})
+
+
+def test_the_third_line_is_asked_for_only_after_the_first_two_are_on_screen():
+    script = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    finish = script[script.index("async function reflectFinish"):script.index("// --- today's harvest card")]
+    assert finish.index("renderSheet(sheet);") < finish.index("loadSubject();")
+    pick = script[script.index("async function pickUse"):script.index("async function loadSubject")]
+    assert pick.index("showHarvest(card);") < pick.index("loadSubject();")
+    assert "textContent = subject.line" in script and "textContent = subject.note" in script
 
 
 def test_the_rounds_last_word_over_http(server):

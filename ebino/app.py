@@ -128,6 +128,10 @@ class App:
                                           body.get("meet_reason", ""))
         if path == "/api/harvest":
             return session.harvest(body.get("use", ""))
+        if path == "/api/subject":
+            return session.subject()
+        if path == "/api/subject_more":
+            return session.subject_more()
         raise Refused("unknown_path")
 
 
@@ -234,9 +238,13 @@ def main(argv=None) -> int:
     except FileNotFoundError:
         print("ingested pieces not found: run python -m ebino.ingest.run first", file=sys.stderr)
         return 2
+    except ValueError as error:  # A table's file name and line number only.
+        print(error, file=sys.stderr)
+        return 2
     gate = Gate(anthropic.Anthropic(), load_names(folder, library.seats))
     server = make_server(App(library, gate, records, plant=args.plant), args.port)
     print(f"seats {len(library.seats)}  pieces {len(library.entries)}  purpose samples {len(library.purposes)}")
+    print(library.subject_catalog.report())  # The harvest card's ③: counts only.
     print(f"open http://{HOST}:{server.server_address[1]}/  (Ctrl+C to stop)")
     try:
         server.serve_forever()

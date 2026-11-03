@@ -133,6 +133,8 @@ class Reflection:
     # move's words came from (the words stay in that field only).
     harvest_moves: list[str] = field(default_factory=list)
     harvest_use: str = ""
+    # ③ (subjects.Pick), made once when the card's ① and ② are on screen.
+    subject: object = None
     harvest_go_field: str = ""
     harvest_moves_line: str = ""  # The card's ① line, as shown; not recorded.
 

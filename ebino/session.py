@@ -18,7 +18,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import ask_seat, closing, editor, harvest, more, purpose_summary, reflection, roundtable, talk_kinds
+from . import (ask_seat, closing, editor, harvest, more, purpose_summary, reflection, roundtable, subjects,
+               talk_kinds)
 from .editor import QuestionCard
 from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
 from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_SEAT_HEADER, CLOSING_KIND_LABELS,
@@ -84,10 +85,12 @@ class Library:
     # A ranking item's title (the nearest title piece before it in the same
     # seat and section), shown small over the item; never counted as shown.
     ranking_titles: dict[str, str] = field(default_factory=dict)
+    # The harvest card's ③ (subjects.py). None: ③ is not shown.
+    subject_catalog: subjects.Catalog | None = None
 
     @classmethod
     def build(cls, seats, utterances, topics, show_private=False, saved_kinds=None,
-              saved_summaries=None, names=None) -> "Library":
+              saved_summaries=None, names=None, subject_catalog=None) -> "Library":
         entries = build_index(utterances, seats, topics)
         kinds = talk_kinds.load_kinds()
         kind_of = {u.id: talk_kinds.kind_of(saved_kinds or {}, u.id, kinds) for u in utterances}
@@ -97,14 +100,14 @@ class Library:
                                                  names or NameList.build(seats, {}))
         return cls(seats, utterances, entries, purposes, show_private,
                    closing.pieces_by_seat(entries, kind_of), [kind.kind_id for kind in kinds],
-                   closing.ranking_titles(utterances))
+                   closing.ranking_titles(utterances), subject_catalog)
 
     @classmethod
     def load(cls, data_dir: Path, show_private: bool = False) -> "Library":
         seats = load_seats(data_dir / "seats.tsv")
         return cls.build(seats, load_utterances(data_dir), load_topics(data_dir), show_private,
                          talk_kinds.load_saved(data_dir), purpose_summary.load_saved(data_dir),
-                         load_names(data_dir, seats))
+                         load_names(data_dir, seats), subjects.load_catalog(data_dir))
 
     def seat_view(self, seat: Seat) -> dict:
         label = seat_label(seat, self.show_private)
@@ -135,6 +138,7 @@ class Session:
     mores: dict[str, more.More] = field(default_factory=dict)  # 「もっと聞く」, by the piece pressed under.
 
     def __post_init__(self):
+        self._subject_counts = Counter()  # With no records (tests): this sitting's only.
         self.guard = Guard(self.library.utterances)
         self.shelf = PurposeShelf(self.library.purposes, self.rng)
         self._seats = {seat.seat_id: seat for seat in self.library.seats}
@@ -438,6 +442,44 @@ class Session:
             "moves": current.harvest_moves_line,
             "meet": harvest.meet_line(title, None if use == harvest.CHOSE_NO_USE else int(use)),
         }
+
+    def subject(self) -> dict:
+        """③, under ① and ② once they are on screen (SPEC 5-3): the model is
+        asked once; asked again, the same ③ is sent back. {"subject": None}
+        when no ③ is shown."""
+        current = self._reflection()
+        if not current.finished or (current.meet_seat and not current.harvest_use):
+            raise Refused("not_ready_for_subject")
+        if current.subject is None:
+            current.subject = subjects.choose(self.gate, self.library.subject_catalog, self.lab,
+                                              subjects.record_words(current), self._shown_subjects())
+            self._count_shown_subject(current.subject)
+            self.save()
+        return {"subject": subjects.view(self.library.subject_catalog, current.subject)}
+
+    def subject_more(self) -> dict:
+        """「ほかの教科も見る」: the next candidate, round and round."""
+        current = self._reflection()
+        pick = current.subject
+        if pick is None or len(pick.order) < 2:
+            raise Refused("no_other_subject")
+        pick.index = (pick.index + 1) % len(pick.order)
+        pick.presses += 1
+        self._count_shown_subject(pick)
+        self.save()
+        return {"subject": subjects.view(self.library.subject_catalog, pick)}
+
+    def _shown_subjects(self) -> Counter:
+        return self.records.subject_counts() if self.records is not None else Counter(self._subject_counts)
+
+    def _count_shown_subject(self, pick) -> None:
+        shown = pick.shown()
+        if shown is None:
+            return
+        if self.records is not None:
+            self.records.count_subject(shown.row.key)
+        else:
+            self._subject_counts[shown.row.key] += 1
 
     def _reflection(self) -> Reflection:
         if self.reflection is None:

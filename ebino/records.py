@@ -7,10 +7,14 @@ has already checked is outside this repository and outside synced folders.
                        window loses nothing. The ID is random; there is no
                        name, class or seat number, and no clock time: the
                        date and the seconds used only.
-  prompts/<id>/        what was really sent to the moderator, the
+  prompts/<id>/        what was really sent to the moderator (and to the
+                       reflection and the harvest card's ③), the
                        instruction part (system and output form) and the
                        data part (question and pieces) in separate files,
                        so each can be searched on its own (SPEC 6).
+  subject_counts.json  how many times each candidate of the harvest card's
+                       ③ was shown, by candidate alone (SPEC 5-3). It goes
+                       with the rest of the records (SPEC 2-1).
 
     python -m ebino.records
 
@@ -25,11 +29,13 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+from . import subjects
 from .config import PlaceError, load_env_file, records_dir
 
 SESSIONS_DIR = "sessions"
 PROMPTS_DIR = "prompts"
-LOGGED_ROLES = ("moderator", "reflection")
+LOGGED_ROLES = ("moderator", "reflection", "subjects")
+SUBJECT_COUNTS_FILE = "subject_counts.json"
 
 
 def _write(path: Path, text: str) -> None:
@@ -49,6 +55,20 @@ class Records:
         path = self.folder / SESSIONS_DIR / f"{record['session_id']}.json"
         _write(path, json.dumps(record, ensure_ascii=False, indent=1))
         return path
+
+    def subject_counts(self) -> Counter:
+        """How many times each candidate of the harvest card's ③ was shown,
+        by its key alone: never with a name, a sitting or a time."""
+        path = self.folder / SUBJECT_COUNTS_FILE
+        if not path.exists():
+            return Counter()
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return Counter({k: v for k, v in data.items() if isinstance(v, int)} if isinstance(data, dict) else {})
+
+    def count_subject(self, key: str) -> None:
+        counts = self.subject_counts()
+        counts[key] += 1
+        _write(self.folder / SUBJECT_COUNTS_FILE, json.dumps(dict(counts), ensure_ascii=False, indent=1))
 
     def save_prompt(self, session_id: str, role: str, request: dict) -> None:
         if role not in LOGGED_ROLES:
@@ -179,6 +199,7 @@ def _reflection_record(reflection) -> dict | None:
         "harvest_moves": list(reflection.harvest_moves),
         "harvest_use": reflection.harvest_use,
         "harvest_go_field": reflection.harvest_go_field,
+        "harvest_subject": subjects.record(reflection.subject),
     }
 
 

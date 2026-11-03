@@ -509,6 +509,7 @@ async function reflectFinish(event) {
   // No seat picked: no ②; the card (if any move) and the sheet at once.
   if (sheet.harvest) showHarvest(sheet.harvest);
   renderSheet(sheet);
+  loadSubject();
 }
 
 // --- today's harvest card (SPEC 5-3) ---
@@ -549,6 +550,41 @@ async function pickUse(use) {
     message.textContent = sendFailed(error);
     message.hidden = false;
     for (const button of buttons) button.disabled = false;
+    return;
+  }
+  loadSubject();
+}
+
+// ③: asked for once ① and ② are on screen, so they never wait on the model.
+// No ③ (or a failure): nothing is added.
+async function loadSubject() {
+  try {
+    showSubject((await call("/api/subject", {})).subject);
+  } catch (error) {
+    // ③ is left out; ① and ② stay as they are.
+  }
+}
+
+function showSubject(subject) {
+  if (!subject) return;
+  $("harvest-heading").textContent = state.texts.harvest_heading;
+  $("harvest-subject-line").textContent = subject.line;
+  $("harvest-subject-note").textContent = subject.note;
+  const more = $("harvest-subject-more");
+  more.textContent = state.texts.harvest_subject_more;
+  more.hidden = !subject.more;
+  more.disabled = false;
+  $("harvest-subject").hidden = false;
+  $("harvest").hidden = false;
+}
+
+async function moreSubject() {
+  const more = $("harvest-subject-more");
+  more.disabled = true;
+  try {
+    showSubject((await call("/api/subject_more", {})).subject);
+  } catch (error) {
+    more.disabled = false;
   }
 }
 
@@ -591,5 +627,6 @@ $("reflect-first").addEventListener("submit", reflectFirst);
 $("reflect-answer").addEventListener("submit", (event) => { event.preventDefault(); reflectAnswer(false); });
 $("decline").addEventListener("click", () => reflectAnswer(true));
 $("reflect-finish").addEventListener("submit", reflectFinish);
+$("harvest-subject-more").addEventListener("click", moreSubject);
 $("more-purposes").addEventListener("click", async () => renderPurposes((await call("/api/purposes", {})).purposes));
 setup();
