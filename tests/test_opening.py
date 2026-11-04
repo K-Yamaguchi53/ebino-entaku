@@ -134,3 +134,42 @@ def test_the_plane_is_six_faces_lit_apart_turned_to_its_way_and_big_enough():
     assert got["banked"] != got["level"] and got["up"] != got["level"]
     # At its nearest, 8% of the map's width or more and 64px at least.
     assert "size: Math.max(64, w * 0.1)" in _top("playOpening") and got["size"] >= 64
+
+
+def test_it_takes_off_from_the_schools_picture_else_its_mark_else_the_lower_left():
+    play = _top("playOpening")
+    picture = play.index('sighted("#map-svg .school-picture image", 0.3)')
+    mark = play.index('sighted("#map-svg .school > :not(text)", 0.5)')
+    assert play.index("let from = [Math.min(48, w * 0.08), h - Math.min(48, h * 0.08)];") < picture < mark
+    # The plane is drawn over the map and the school's picture alike.
+    assert ".opening { position: absolute; inset: 0; z-index: 6;" in CSS
+    # The wings kept off the frame's edge by the plane's own reach.
+    assert "const m = Math.max(24, (run.size || 0) * 0.7);" in _top("planeAt")
+
+
+_NEAR = """
+%(source)s
+const node = () => ({ style: { opacity: ".2" } });
+const run = { reach: 40, points: [{ node: node(), x: 100, y: 100, lit: false }, { node: node(), x: 300, y: 100, lit: false }] };
+lightNear(run, 120, 110);
+const first = run.points.map((p) => p.lit);
+run.points[0].node.style.opacity = "x";
+lightNear(run, 110, 100);
+process.stdout.write(JSON.stringify({ first, again: run.points[0].node.style.opacity, shown: run.points[0].node.style.opacity }));
+"""
+
+
+@node
+def test_the_seats_it_passes_over_light_once_each_and_the_ring_lights_the_rest():
+    program = _NEAR % {"source": _top("lightNear")}
+    out = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=30)
+    assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
+    got = json.loads(out.stdout.decode("utf-8"))
+    assert got["first"] == [True, False] and got["again"] == "x"  # Lit once, not again.
+    draw = _top("drawOpening")
+    assert draw.index("if (fly < 1) lightNear(run, p.x, p.y);") < draw.index("if (!point.lit && point.d / run.far <= k) {")
+
+
+def test_no_school_picture_is_needed():
+    # The tests run with no picture; the opening asks for none of its own.
+    assert "school_picture" not in _top("playOpening") and "EBINO_SCHOOL_DIR" not in APP

@@ -119,11 +119,13 @@ async function start(lab, chosen) {
 // --- the opening (直し30-3) ---
 
 // Once a Lab is picked: over the dark map a paper plane of folded paper in
-// 3D takes off from the school's mark (or the lower left), coming near from
-// far, flies a loose S, nose to its way, banking into its turns and its nose
-// up a little before it lands, with a thin trail that fades at once,
-// slows and lands where the round table opens; the lamp's light spreads
-// once in a ring, the seats' points lighting nearest first, and the title
+// 3D takes off from the school (the roof of its 3D picture, else its mark,
+// else the lower left), coming near from far, flies a loose S over the
+// town of Ebino, nose to its way, banking into its turns and its nose up a
+// little before it lands, with a thin trail that fades at once; the seats'
+// points under it light as it passes (going to meet the town's people).
+// It slows and lands where the round table opens; the lamp's light spreads
+// once in a ring, the points not yet lit lighting nearest first, and the title
 // comes and goes up toward the question box. Under 3 seconds; 「とばす」,
 // Enter or Esc ends it at once. No flashing, the screen never shakes.
 const OPENING = { fly: 1400, land: 600, title: 800 };
@@ -146,17 +148,22 @@ function playOpening() {
   $("map").scrollIntoView({ block: "nearest" });
   const w = box.width, h = box.height;
   const end = [w / 2, h / 2];
-  // From the school's mark when it is on the map in sight; else the lower left.
+  // From the roof of the school's 3D picture when it is on the map in sight
+  // (直し30の続き-2); else from its mark; else the lower left. With no
+  // picture (none given, unread, or the school said no) the same opening.
   let from = [Math.min(48, w * 0.08), h - Math.min(48, h * 0.08)];
-  const school = document.querySelector("#map-svg .school > :not(text)");
-  if (school) {
-    const s = school.getBoundingClientRect();
-    const at = [s.left + s.width / 2 - box.left, s.top + s.height / 2 - box.top];
-    if (s.width && at[0] > 0 && at[0] < w && at[1] > 0 && at[1] < h) from = at;
-  }
+  const sighted = (selector, high) => {
+    const node = document.querySelector(selector);
+    if (!node) return null;
+    const s = node.getBoundingClientRect();
+    const at = [s.left + s.width / 2 - box.left, s.top + s.height * high - box.top];
+    return s.width && at[0] > 0 && at[0] < w && at[1] > 0 && at[1] < h ? at : null;
+  };
+  from = sighted("#map-svg .school-picture image", 0.3) || sighted("#map-svg .school > :not(text)", 0.5) || from;
   const points = [...document.querySelectorAll("#map-svg .pt")].map((node) => {
     const p = node.getBoundingClientRect();
-    return { node, d: Math.hypot(p.left + p.width / 2 - box.left - end[0], p.top + p.height / 2 - box.top - end[1]) };
+    const x = p.left + p.width / 2 - box.left, y = p.top + p.height / 2 - box.top;
+    return { node, x, y, d: Math.hypot(x - end[0], y - end[1]), lit: false };
   });
   const far = Math.max(1, ...points.map((p) => p.d));
   for (const p of points) p.node.style.opacity = ".2";
@@ -167,7 +174,9 @@ function playOpening() {
   $("map-frame").inert = true;  // The keyboard goes to 「とばす」, not the points behind.
   // At its nearest it is 10% of the map's width (64px at least): 8% or more.
   const run = { from, end, w, h, points, far, ring: Math.hypot(w, h) * 0.42, trail: [], last: null, lean: 0, frame: 0,
-    size: Math.max(64, w * 0.1) };
+    size: Math.max(64, w * 0.1), reach: Math.max(28, Math.min(w, h) * 0.07) };
+  // The town: where the seats' points are, the middle of them.
+  if (points.length) run.town = [points.reduce((t, p) => t + p.x, 0) / points.length, points.reduce((t, p) => t + p.y, 0) / points.length];
   openingRun = run;
   return new Promise((done) => {
     run.done = done;
@@ -201,8 +210,18 @@ function planeAt(run, u) {
   // stay in the frame (the curve keeps inside its four points).
   const swing = Math.max(len * 0.28, Math.min(run.w || 0, run.h || 0) * 0.22);
   const nx = -dy / len * swing, ny = dx / len * swing;
-  const keep = (x, y) => (run.w ? [Math.max(24, Math.min(run.w - 24, x)), Math.max(24, Math.min(run.h - 24, y))] : [x, y]);
-  const c1 = keep(x0 + dx / 3 + nx, y0 + dy / 3 + ny), c2 = keep(x0 + dx * 2 / 3 - nx, y0 + dy * 2 / 3 - ny);
+  // Kept off the frame's edge by the plane's own reach, so no wing goes out.
+  const m = Math.max(24, (run.size || 0) * 0.7);
+  const keep = (x, y) => (run.w ? [Math.max(m, Math.min(run.w - m, x)), Math.max(m, Math.min(run.h - m, y))] : [x, y]);
+  let c1 = keep(x0 + dx / 3 + nx, y0 + dy / 3 + ny), c2 = keep(x0 + dx * 2 / 3 - nx, y0 + dy * 2 / 3 - ny);
+  // Over the town (直し30の続き-2): out past the middle of the seats' points
+  // and back over them, bending one way then the other, to the table's spot.
+  if (run.town) {
+    const [tx, ty] = run.town, ox = tx - x3, oy = ty - y3, out = Math.hypot(ox, oy);
+    const far = Math.max(swing * 2.4, out * 2.6), ux = out > 1 ? ox / out : dy / len, uy = out > 1 ? oy / out : -dx / len;
+    c1 = keep(x3 + ux * far + uy * swing * 0.8, y3 + uy * far - ux * swing * 0.8);
+    c2 = keep(x3 + ux * far * 0.3 - uy * swing * 1.5, y3 + uy * far * 0.3 + ux * swing * 1.5);
+  }
   const v = 1 - u;
   const at = (a, b, c, d) => v * v * v * a + 3 * v * v * u * b + 3 * v * u * u * c + u * u * u * d;
   const slope = (a, b, c, d) => 3 * v * v * (b - a) + 6 * v * u * (c - b) + 3 * u * u * (d - c);
@@ -255,6 +274,16 @@ function planeFaces(pose) {
   return faces.sort((f, g) => f.depth - g.depth);
 }
 
+// The seats' points the plane is passing over light, once each.
+function lightNear(run, x, y) {
+  for (const point of run.points) {
+    if (!point.lit && Math.hypot(point.x - x, point.y - y) <= run.reach) {
+      point.lit = true;
+      point.node.style.opacity = "";
+    }
+  }
+}
+
 // The opening as it is t ms in.
 function drawOpening(run, t) {
   const plane = $("opening-plane"), trail = $("opening-trail"), ring = $("opening-ring"), title = $("opening-title");
@@ -278,6 +307,7 @@ function drawOpening(run, t) {
     node.setAttribute("points", faces[i].points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" "));
     node.style.filter = `brightness(${faces[i].light.toFixed(3)})`;
   });
+  if (fly < 1) lightNear(run, p.x, p.y);
   plane.style.opacity = t < OPENING.fly + OPENING.land ? "1"
     : String(Math.max(0, 1 - (t - OPENING.fly - OPENING.land) / (OPENING.title * 0.5)));
   // The trail: the last quarter second of the way only, so it fades at once.
@@ -292,7 +322,12 @@ function drawOpening(run, t) {
     ring.setAttribute("cy", run.end[1].toFixed(1));
     ring.setAttribute("r", (8 + (run.ring - 8) * (1 - Math.pow(1 - k, 2))).toFixed(1));
     ring.style.opacity = String(0.85 * (1 - k));
-    for (const point of run.points) if (point.d / run.far <= k) point.node.style.opacity = "";
+    for (const point of run.points) {
+      if (!point.lit && point.d / run.far <= k) {
+        point.lit = true;
+        point.node.style.opacity = "";
+      }
+    }
   }
   // The title: comes, stays a moment, and goes up toward the question box.
   const shown = (t - OPENING.fly - OPENING.land) / OPENING.title;
