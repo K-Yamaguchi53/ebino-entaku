@@ -45,6 +45,7 @@ const EbinoMap = (() => {
   // The round table (the picture only): round the basin's middle, flat at
   // the height of the ground there, in map units.
   const TABLE_RX = 150, TABLE_RY = 110, TABLE_LIFT = 7, SEAT_OUT = 48;
+  const TABLE_THICK = 9;  // The top's thickness: its side shows in front (直し29-2).
   const CAMERA_FOR = 1100, FLY_FOR = 1100, FLY_GAP = 160, BACK_FOR = 700;
   const CLOSEST = 3.5;  // The nearest zoom shows this part of the whole across.
   const ZOOM_STEP = 1.4;
@@ -1584,10 +1585,22 @@ const EbinoMap = (() => {
     const lamp = svgEl("g", { class: "table-lamp" });
     lamp.append(svgEl("circle", { class: "light", cx: lx, cy: ly, r: 70 * S }),
       svgEl("circle", { class: "core", cx: lx, cy: ly, r: 4.5 * S }));
-    top.append(polygon("table-edge", ring(center, 0, TABLE_LIFT - 6)), polygon("table-top", tableTop),
-      polygon("table-inner", ring(center, -16, TABLE_LIFT)), polygon("table-rim-glow", tableTop), lamp);
+    // A round table of wood (直し29-2): its side in front, under the top;
+    // the top's grain; the lamp's light on its near rim; its one leg and
+    // foot, a little seen under the front. Its size and the seats' spots
+    // are as before.
+    const under = ring(center, 0, TABLE_LIFT - TABLE_THICK);
+    const front = tableTop.filter((_, k) => k >= 38 && k <= 70);  // 190° to 350°: the side towards the camera.
+    const rimLight = svgEl("polyline", { class: "table-rim-light", points: front.map((p) => p.join(",")).join(" ") });
+    top.append(polygon("table-edge", under), polygon("table-top", tableTop),
+      polygon("table-grain", ring(center, -46, TABLE_LIFT)), polygon("table-grain", ring(center, -86, TABLE_LIFT)),
+      polygon("table-inner", ring(center, -16, TABLE_LIFT)), polygon("table-rim-glow", tableTop), rimLight, lamp);
+    const low = under.reduce((a, b) => (b[1] > a[1] ? b : a));
+    const foot = svgEl("g", { class: "table-foot" });
+    foot.append(svgEl("ellipse", { class: "base", cx: lx, cy: low[1] + 15 * S, rx: 36 * S, ry: 7 * S }),
+      svgEl("rect", { class: "leg", x: lx - 11 * S, y: low[1] - 8 * S, width: 22 * S, height: 23 * S, rx: 3 * S }));
     tableLayer.append(polygon("table-glow", ring(center, SEAT_OUT + 40, 0)),
-      polygon("table-shadow", ring(center, 4, 0)), top);
+      polygon("table-shadow", ring(center, 4, 0)), foot, top);
     if (motion) {
       top.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, easing: "ease-out" });
       await wait(350);
@@ -1605,12 +1618,12 @@ const EbinoMap = (() => {
     const landed = [];
     seats.forEach((sitting, k) => {
       const at = onTable(center, sitting.angle, SEAT_OUT);
-      if (sitting.group === "front") return landed.push(chair(sitting.id, at));
+      if (sitting.group === "front") return landed.push(chair(sitting.id, at, [lx, ly]));
       const kind = points[sitting.id].seat.kind;
       const node = svgEl("g", { class: `token pt lit kind-${kind}`, "aria-hidden": "true" });
-      // Its chair, lit, under the seat's own mark.
-      node.append(svgEl("circle", { class: "halo", r: 20 }), svgEl("ellipse", { class: "cushion", rx: 15, ry: 10, cy: 3 }),
-        shape(kind));
+      // Its chair, lit, its back to the outside (直し29-2); the seat's own mark sits on it.
+      node.append(svgEl("circle", { class: "halo", r: 20 }), chairBack(at, [lx, ly], 15, "chair-back"),
+        svgEl("ellipse", { class: "cushion", rx: 15, ry: 10, cy: 3 }), shape(kind));
       tableLayer.append(node);
       const token = { node, at, scale: TOKEN, id: sitting.id };
       tokens.push(token);
@@ -2374,13 +2387,22 @@ const EbinoMap = (() => {
     for (const node of overlay.querySelectorAll(".map-hint")) node.remove();
   }
 
-  // An empty chair 「？」: a seat nobody asked yet. Pressing it (or Enter or
-  // Space on it) opens the same 「聞きたいことを書く」 as the seat list.
-  function chair(seatId, at) {
+  // A chair's back (直し29-2), round a seat's spot at (at): on the side away
+  // from the table's middle, across that way, r from the spot.
+  function chairBack(at, middle, r, className) {
+    const a = Math.atan2(at[1] - middle[1], at[0] - middle[0]) * 180 / Math.PI;
+    return svgEl("rect", { class: className, x: -r * 0.85, y: -r - 9, width: r * 1.7, height: 7, rx: 3.5,
+      transform: `rotate(${a + 90})` });
+  }
+
+  // An empty chair 「？」: a seat nobody asked yet, the same chair in a dotted
+  // line (直し29-2). Pressing it (or Enter or Space on it) opens the same
+  // 「聞きたいことを書く」 as the seat list.
+  function chair(seatId, at, middle) {
     const seat = seatOf(seatId);
     const node = svgEl("g", { class: "chair", tabindex: 0, role: "button",
       "aria-label": [seat.title, app.state.texts.not_asked_yet].join("　") });
-    node.append(svgEl("rect", { class: "hit" }), svgEl("circle", { r: CHAIR_R }));
+    node.append(svgEl("rect", { class: "hit" }), chairBack(at, middle, CHAIR_R, "back"), svgEl("circle", { r: CHAIR_R }));
     const mark = svgEl("text", { y: 5.5, "text-anchor": "middle" });
     mark.textContent = "？";
     node.append(mark);

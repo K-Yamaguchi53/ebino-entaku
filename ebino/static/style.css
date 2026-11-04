@@ -34,6 +34,10 @@
   --moon: #9fb8dc;  /* Moonlight: lines, and the quieter words. */
   --moon-soft: rgba(159, 184, 220, .36);
   --moon-faint: rgba(159, 184, 220, .15);
+  --wood: #3b2a1c;  /* The round table's top: dark wood under the lamp (直し29-2). */
+  --wood-deep: #22170e;
+  --wood-side: #170f09;
+  --wood-lit: #7a5634;
   --moon-paper: #d8e3f3;  /* Moonlit paper: an AI's question at the round table (直し29-1). */
   --moon-paper-line: #9fb3d3;
   --moon-paper-soft: #4c5a72;
@@ -457,8 +461,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .paper-in { stop-color: var(--paper); stop-opacity: .5; }
 .paper-out { stop-color: var(--paper); stop-opacity: 0; }
 .top-in { stop-color: var(--lamp); stop-opacity: .26; }
-.top-mid { stop-color: var(--night-3); stop-opacity: 1; }
-.top-out { stop-color: var(--night-2); stop-opacity: 1; }
+.top-mid { stop-color: var(--wood); stop-opacity: 1; }
+.top-out { stop-color: var(--wood-deep); stop-opacity: 1; }
 
 .basin-fill polygon { fill: var(--moon-faint); stroke: none; }
 .relief .basin-fill polygon { fill: var(--lamp-faint); opacity: .4; }
@@ -522,26 +526,33 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
    are lit; an empty chair 「？」 waits in a dotted line. */
 .table-glow { fill: url(#lamp-glow); opacity: .22; }
 .table-shadow { fill: var(--night-deep); opacity: .55; }
-.table-edge { fill: var(--night-deep); stroke: var(--lamp-soft); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.table-top { fill: url(#table-light); stroke: var(--lamp); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
-.table-rim-glow { fill: none; stroke: var(--lamp-soft); stroke-width: 7; vector-effect: non-scaling-stroke; opacity: .55; }
-.table-inner { fill: none; stroke: var(--moon-faint); stroke-width: 1; vector-effect: non-scaling-stroke; }
+/* Wood (直し29-2): the side in front, the top lit from the lamp, its grain,
+   a thin light on its near rim, one leg and its foot under it. */
+.table-edge { fill: var(--wood-side); stroke: var(--wood-lit); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.table-top { fill: url(#table-light); stroke: var(--wood-lit); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.table-rim-glow { fill: none; stroke: var(--lamp-soft); stroke-width: 7; vector-effect: non-scaling-stroke; opacity: .4; }
+.table-rim-light { fill: none; stroke: var(--lamp-bright); stroke-width: 1.4; vector-effect: non-scaling-stroke; opacity: .85; }
+.table-grain { fill: none; stroke: var(--wood-lit); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: .35; }
+.table-inner { fill: none; stroke: var(--wood-lit); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: .6; }
+.table-foot .leg { fill: var(--wood-side); stroke: var(--wood-lit); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.table-foot .base { fill: var(--wood-side); stroke: var(--wood-lit); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: .9; }
 .table-lamp .light { fill: url(#lamp-glow); opacity: .7; }
 .table-lamp .core { fill: var(--lamp-bright); }
 .table-split path { stroke: var(--lamp-soft); fill: none; stroke-dasharray: 14 12; }
 .token { pointer-events: none; }
-.token .cushion { fill: var(--lamp-faint); stroke: var(--lamp-soft); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.token .cushion { fill: var(--wood); stroke: var(--lamp-soft); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.token .chair-back { fill: var(--wood-lit); stroke: var(--lamp-soft); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .chair { cursor: pointer; outline: none; opacity: 0; transition: opacity .5s; }
 .chair.ready { opacity: 1; }
 /* The part that takes a press: 44px square or more (map.js sizes it). */
 .chair .hit { fill: transparent; stroke: none; }
-.chair circle { fill: var(--veil-thin); stroke: var(--moon); stroke-width: 1.4; stroke-dasharray: 3 3;
+.chair circle, .chair .back { fill: var(--veil-thin); stroke: var(--moon); stroke-width: 1.4; stroke-dasharray: 3 3;
   vector-effect: non-scaling-stroke; }
 .chair text { fill: var(--ink); font-family: var(--mincho); font-size: 16px; }
-.chair:hover circle { fill: var(--moon-faint); stroke: var(--ink); stroke-dasharray: none; }
+.chair:hover circle, .chair:hover .back { fill: var(--moon-faint); stroke: var(--ink); stroke-dasharray: none; }
 /* Where the keyboard is: a solid ring of light round the whole part that takes a press. */
 .chair:focus-visible .hit { stroke: var(--lamp); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.chair:focus-visible circle { fill: var(--lamp-faint); stroke: var(--lamp); stroke-dasharray: none; }
+.chair:focus-visible circle, .chair:focus-visible .back { fill: var(--lamp-faint); stroke: var(--lamp); stroke-dasharray: none; }
 
 /* Labels, cards and headings over the map, in CSS pixels. */
 .map-tip, .map-bubble, .split-tag, .table-label { position: absolute; max-width: min(70%, 18em);
