@@ -510,11 +510,26 @@ function nowState() {
   if (now.asking) return "asking";
   if (!state.firstQuestion) return "write";
   if (now.reading) return "reading";
+  if (cardOpen()) return "card";
   if (now.choices) return "pressed";
   if (now.table && !now.pressed) return "table";
   if (!state.aiAnswered && now.band) return "answer_ai";
   return "after";
 }
+
+// A box to write a card in is open, wherever it is (直し31続き-3).
+function cardOpen() {
+  return Boolean(document.querySelector("form.card-form"));
+}
+
+// The line follows a card's box as it opens and goes, from any place.
+let cardWasOpen = false;
+new MutationObserver(() => {
+  if (cardOpen() !== cardWasOpen) {
+    cardWasOpen = !cardWasOpen;
+    setNow();
+  }
+}).observe(document.body, { childList: true, subtree: true });
 
 // The band's step for this state lit (by its words and a mark, not its
 // colour alone), and the one line under it. changes: flags to set first.
@@ -917,7 +932,7 @@ function renderQuote(roundNo, quote) {
   if (quote.spoken) node.classList.add("spoken");
   if (state.marks[quote.seat_id] === quote.utterance_id) node.classList.add("marked");
   const paragraph = el("p", { class: "paragraph", hidden: "" });
-  const back = el("button", { type: "button", text: "元の段落", onclick: async () => {
+  const back = el("button", { type: "button", text: state.texts.bubble_choices.paragraph, onclick: async () => {
     if (paragraph.hidden && !paragraph.textContent) {
       paragraph.append(el("span", { text: await paragraphOf(quote.utterance_id) }));
       if (quote.spoken && quote.source.note) paragraph.append(el("span", { class: "source", text: quote.source.note }));

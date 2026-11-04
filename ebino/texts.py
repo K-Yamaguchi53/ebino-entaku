@@ -94,6 +94,8 @@ HARVEST_SUBJECT_QUESTION = "harvest_subject_question"
 HARVEST_SUBJECT_CHOOSE = "harvest_subject_choose"
 HARVEST_SUBJECT_PICK = "harvest_subject_pick"
 HARVEST_SUBJECT_NONE = "harvest_subject_none"
+# The line over the two cards once the student chose neither (直し31続き-3).
+HARVEST_SUBJECT_NONE_LINE = "harvest_subject_none_line"
 # コーチとオブザーバー (SPEC 5-1, coach.py): each card's line (the role's name
 # and what it asks from), the mark that it is an AI's question, and the
 # observer's view, which is told to the model and never shown.
@@ -141,7 +143,7 @@ CARD_ALREADY = "card_already"
 NOW_STEPS = "now_steps"
 NOW_LINE = "now_line"
 NOW_STEP_IDS = ("write", "read", "ask", "reflect")
-NOW_LINE_IDS = ("start", "write", "asking", "reading", "table", "pressed", "after", "reflect")
+NOW_LINE_IDS = ("start", "write", "asking", "reading", "table", "pressed", "card", "after", "reflect")
 START_PURPOSE = "start_purpose"
 INSIDE_HEADING = "inside_heading"
 INSIDE_COUNTS = "inside_counts"

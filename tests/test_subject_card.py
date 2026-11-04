@@ -13,7 +13,7 @@ from ebino import subjects
 from ebino.gate import Gate, NameList
 from ebino.records import Records
 from ebino.session import Library, Refused, Session
-from ebino.texts import HARVEST_SUBJECT_CHOOSE, HARVEST_SUBJECT_LINK, load_text
+from ebino.texts import HARVEST_SUBJECT_CHOOSE, HARVEST_SUBJECT_LINK, HARVEST_SUBJECT_NONE_LINE, load_text
 from test_reflection import reflection_says
 from test_session import ANSWERED, SEATS, UTTERANCES
 from test_subjects import FIRST, ROWS, catalog, says
@@ -86,7 +86,8 @@ def test_neither_picked_leaves_both_on_the_card_and_is_kept(tmp_path):
     session.subject()
     view = session.subject_choose("none")["subject"]
     assert len(view["cards"]) == 2 and view["choose"] is False and view["more"] is False
-    assert view["link"] == load_text(HARVEST_SUBJECT_LINK)  # No longer asks to pick.
+    # No longer asks to pick, and does not say they are tied (直し31続き-3).
+    assert view["link"] == load_text(HARVEST_SUBJECT_NONE_LINE) != load_text(HARVEST_SUBJECT_LINK)
     with pytest.raises(Refused):
         session.subject_more()
     record = json.loads((tmp_path / "sessions" / f"{session.session_id}.json").read_text(encoding="utf-8"))

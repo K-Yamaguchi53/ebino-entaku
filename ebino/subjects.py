@@ -57,7 +57,7 @@ from .gate import Gate, GateError, ModelUnavailable, json_answer, json_request
 from .ingest.scrub import normalize_for_match
 from .prompts import SUBJECT_FUDA
 from .reflection import CHOSE_OWN, DIRECTION_LABELS
-from .texts import (HARVEST_SUBJECT_CHOOSE, HARVEST_SUBJECT_LINK, HARVEST_FUDA, HARVEST_SUBJECT_LINE, HARVEST_SUBJECT_LINE_PLAIN, HARVEST_SUBJECT_WHEN,
+from .texts import (HARVEST_SUBJECT_CHOOSE, HARVEST_SUBJECT_LINK, HARVEST_SUBJECT_NONE_LINE, HARVEST_FUDA, HARVEST_SUBJECT_LINE, HARVEST_SUBJECT_LINE_PLAIN, HARVEST_SUBJECT_WHEN,
                     HARVEST_SUBJECTS, load_table, load_text, read_table)
 
 ROLE = "subjects"
@@ -386,8 +386,15 @@ def view(catalog: Catalog | None, pick: Pick | None, question: str = "") -> dict
     two = pick.two_shown
     cards = [{"when": catalog.when_words[c.when], "subject": c.row.subject, "heading": c.row.heading,
               "note": c.row.note, "line": line(catalog, c)} for c in pick.on_screen()]
+    # Over the cards: pick one; or, once neither was picked, a line that does
+    # not say they are tied (直し31続き-3); else that they are tied.
+    link = HARVEST_SUBJECT_LINK
+    if two and not pick.chosen:
+        link = HARVEST_SUBJECT_CHOOSE
+    elif two and pick.chosen == CHOSE_NONE:
+        link = HARVEST_SUBJECT_NONE_LINE
     return {"line": line(catalog, shown), "note": shown.row.note, "more": len(pick.order) > 1 and not two,
-            "question": question, "link": load_text(HARVEST_SUBJECT_CHOOSE if two and not pick.chosen else HARVEST_SUBJECT_LINK),
+            "question": question, "link": load_text(link),
             "choose": two and not pick.chosen, "cards": cards}
 
 

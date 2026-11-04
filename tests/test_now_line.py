@@ -91,6 +91,7 @@ _STATE = """
 const hidden = %(hidden)s;
 const $ = (id) => ({ hidden: hidden[id] !== undefined ? hidden[id] : true });
 const state = %(state)s;
+const cardOpen = () => Boolean(state.cardOpen);
 %(source)s
 process.stdout.write(JSON.stringify(nowState()));
 """
@@ -121,6 +122,10 @@ def test_one_state_at_a_time_in_order():
     assert now({"now": {"pressed": True, "table": True, "band": True}}) == "answer_ai"
     assert now({"now": {"band": True}}) == "answer_ai"  # No table to press (the flat map).
     assert now({"aiAnswered": True, "now": {"pressed": True, "table": True, "band": True}}) == "after"
+    # A card's box open: its own line, over the pressed bubble's and the AI's (直し31続き-3).
+    assert now({"cardOpen": True, "now": {"choices": True, "pressed": True, "table": True, "band": True}}) == "card"
+    assert now({"cardOpen": True, "now": {"band": True}}) == "card"
+    assert now({"cardOpen": True, "now": {"reading": True}}) == "reading"
 
 
 def test_the_screen_changes_the_state_where_it_happens():
@@ -153,3 +158,22 @@ def test_the_purpose_is_over_the_seven_promises_and_the_counts_over_the_question
     render = _top("renderInside")
     assert "fill(" not in render and "onclick" not in render and "#question" not in render
     assert "EbinoMap.markOf(row.kind)" in render and "function markOf(kind)" in MAP
+
+
+# --- 直し31続き-3: the words that disagreed ---
+
+def test_a_card_box_open_has_its_own_line():
+    from ebino.texts import now_lines
+    lines = now_lines()
+    assert lines["card"]["step"] == "ask" and lines["card"]["text"]
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert 'if (cardOpen()) return "card";' in app
+    # Before the pressed bubble's line: the box is what is in front of the student.
+    assert app.index('if (cardOpen()) return "card";') < app.index('if (now.choices) return "pressed";')
+    assert "new MutationObserver" in app
+
+
+def test_the_quote_cards_button_says_what_the_bubbles_button_says():
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert 'text: "元の段落"' not in app
+    assert "text: state.texts.bubble_choices.paragraph" in app
