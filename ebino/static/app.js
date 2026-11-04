@@ -16,7 +16,7 @@ const state = {
   // the round's seats still lighting; a lamp card's choices open; one
   // pressed this round; the round's table open with its cards; AI
   // questions to answer below.
-  now: { asking: false, reading: false, choices: false, pressed: false, table: false, band: false },
+  now: { asking: false, reading: false, choices: false, pressed: false, table: false, band: false, preparing: false },
   // Whom the one box at the foot writes to (直し32-2): everyone (a question
   // to the town's adults), one seat (a question card), or an AI's question
   // (the answer starts the next round). Each keeps its own unsent words.
@@ -114,11 +114,18 @@ async function start(lab, chosen) {
   // The opening over the map while /api/start is waited for (直し30-3);
   // none with motion reduced or no map: the table at once, as before.
   const opening = still ? null : playOpening();
-  let data;
+  let data, ready = false;
+  // The opening over (or skipped) and the server not ready yet (直し32-5):
+  // the table now, the box shut, the line saying to wait; the keyboard goes
+  // to the box once it is ready.
+  if (opening) opening.then(() => { if (!ready) preparing(true); });
   try {
     [data] = await Promise.all([call("/api/start", { lab }),
       opening || new Promise((done) => setTimeout(done, still ? 0 : 320))]);
+    ready = true;
   } catch (error) {
+    ready = true;
+    preparing(false);
     if (opening) endOpening(true);
     for (const button of buttons) {
       button.setAttribute("aria-pressed", "false");
@@ -127,6 +134,7 @@ async function start(lab, chosen) {
     throw error;
   }
   if (opening) endOpening(false);
+  preparing(false);
   $("start").hidden = true;
   $("table").hidden = false;
   $("inside").hidden = !$("inside-counts").children.length;
@@ -134,6 +142,20 @@ async function start(lab, chosen) {
   onMap((map) => map.show());  // Draws the rim and the river once the map is on screen.
   renderPurposes(data.purposes);
   $("question").focus();
+}
+
+// Waiting for /api/start with the table out (直し32-5): the box and its
+// button shut, 「準備しています。…」 the line; on: off again.
+function preparing(on) {
+  if (!on && !state.now.preparing) return;
+  if (on) {
+    $("start").hidden = true;
+    $("table").hidden = false;
+    $("table").classList.remove("opening-on");  // The box at the foot shows, shut.
+  }
+  $("question").disabled = on;
+  $("ask-button").disabled = on;
+  setNow({ preparing: on });
 }
 
 // --- the opening (直し30-3) ---
@@ -367,11 +389,12 @@ const PLANE_LIGHT = [-0.36, -0.5, 0.79];
 
 // The plane's six faces on the screen, far ones first: at (x, y), size px
 // long, nose to a (radians, on the screen), banked by roll and its nose up
-// by pitch. Seen from above and from the south, as the map is, the near
-// side a little bigger; each face as bright as it turns to the lamp (both
-// sides are paper).
+// by pitch. Seen from above and from the south, as the map is (from
+// elev radians over the ground, 45° unless given), the near side a little
+// bigger; each face as bright as it turns to the lamp (both sides are paper).
 function planeFaces(pose) {
-  const { x, y, size, a, roll, pitch } = pose;
+  const { x, y, size, a, roll, pitch, elev = Math.PI / 4 } = pose;
+  const ce = Math.cos(elev), se = Math.sin(elev);
   const cp = Math.cos(pitch), sp = Math.sin(pitch), cr = Math.cos(roll), sr = Math.sin(roll);
   const ca = Math.cos(a), sa = Math.sin(a);
   const turned = {};
@@ -388,10 +411,10 @@ function planeFaces(pose) {
     return {
       names,
       points: names.map((name) => {
-        const [X, Y, Z] = turned[name], k = 1 / (1 - 0.3 * (Y * 0.7 + Z * 0.7));
-        return [x + X * size * k, y + (Y * 0.7 - Z * 0.7) * size * k];
+        const [X, Y, Z] = turned[name], k = 1 / (1 - 0.3 * (Y * ce + Z * se));
+        return [x + X * size * k, y + (Y * se - Z * ce) * size * k];
       }),
-      depth: (p[1] + q[1] + r[1]) * 0.7 + (p[2] + q[2] + r[2]) * 0.7,
+      depth: (p[1] + q[1] + r[1]) * ce + (p[2] + q[2] + r[2]) * se,
       light: 0.42 + 0.58 * cos,
     };
   });
@@ -406,6 +429,15 @@ function lightNear(run, x, y) {
       point.node.style.opacity = "";
     }
   }
+}
+
+// How far into its landing the plane is: 0 until LANDING_FROM of the way,
+// then smoothly to 1 at the end.
+const LANDING_FROM = 0.8;
+const LANDING_ELEV = 0.22;  // Radians over the ground at the end: nearly from the side.
+function landing(fly) {
+  const k = Math.max(0, Math.min(1, (fly - LANDING_FROM) / (1 - LANDING_FROM)));
+  return k * k * (3 - 2 * k);
 }
 
 // The opening as it is t ms in (after the fold, its way to the school first).
@@ -430,7 +462,15 @@ function drawOpening(run, t) {
   const near = Math.min(1, fly / 0.8);
   const size = run.size * (0.32 + 0.68 * (1 - Math.pow(1 - near, 2)));
   const pitch = 0.32 * Math.max(0, Math.min(1, (fly - 0.78) / 0.22));
-  const faces = planeFaces({ x: p.x, y: p.y, size, a: p.a, roll: -run.lean, pitch });
+  // Landing (直し32-5): from straight above its folds read as an umbrella,
+  // so for the last of the way it is seen more from the side (the camera
+  // low, its nose turned across the screen), its wings' thickness and its
+  // nose's way plain. The time it takes is as before.
+  const side = landing(fly);
+  const across = Math.cos(p.a) >= 0 ? 0 : Math.PI;
+  const turn = Math.atan2(Math.sin(across - p.a), Math.cos(across - p.a));
+  const faces = planeFaces({ x: p.x, y: p.y, size, a: p.a + turn * side * 0.75, roll: -run.lean * (1 - side), pitch,
+    elev: Math.PI / 4 - (Math.PI / 4 - LANDING_ELEV) * side });
   [...plane.children].forEach((node, i) => {
     node.setAttribute("points", faces[i].points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" "));
     node.style.filter = `brightness(${faces[i].light.toFixed(3)})`;
@@ -512,6 +552,7 @@ function nowState() {
   const now = state.now;
   if (!$("start").hidden) return "start";
   if (!$("reflect").hidden) return "reflect";
+  if (now.preparing) return "preparing";
   if (now.asking) return "asking";
   if (!state.firstQuestion) return "write";
   if (now.reading) return "reading";

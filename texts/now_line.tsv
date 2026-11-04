@@ -1,5 +1,6 @@
 ID	段階	文
 start		Lab を1つ選ぶと、始まります。
+preparing		準備しています。少し待ってください。
 write	write	町の大人に聞きたいことを、1つ書こう。何を聞いてもいい。
 asking	read	席の言葉を探しています。少し待ってください。
 reading	read	吹き出しを読んでいる間に、AI の問いも届きます。

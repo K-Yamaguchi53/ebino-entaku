@@ -1053,3 +1053,13 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { position: abso
 #drawer-paragraph .whose { margin: 10px 0 6px; font-size: 14px; font-weight: bold; color: var(--soft); }
 #drawer-paragraph .paragraph-text { margin: 0; padding: 14px 16px; border-radius: 6px; background: var(--paper);
   color: var(--paper-ink); font-family: var(--mincho); font-size: 17px; line-height: 1.9; }
+
+/* While the opening plays, 「とばす」 where the map's buttons go after: at
+   the foot of their column (under the map on an upright screen). */
+body:has(#table:not([hidden])):has(#map:not([hidden])) .opening-bar { flex: 0 0 200px; display: flex; flex-direction: column; justify-content: flex-end; margin: 0; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .opening-bar:not([hidden]) { display: flex; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #opening-skip { min-height: 44px; width: 100%; }
+@media (orientation: portrait) {
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .opening-bar { flex: none; flex-direction: row; justify-content: flex-end; padding-top: 6px; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #opening-skip { width: auto; }
+}
