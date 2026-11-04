@@ -61,7 +61,7 @@ def test_no_company_or_display_name_reaches_the_screen():
     shown = json.dumps(view, ensure_ascii=False)
     assert "架空理容" not in shown and "山川" not in shown
     assert view[0] == {"id": "adult", "kind": "adult", "before": "地域で働く大人", "number": 1,
-                       "after": "の事業所（志事図鑑などの取材記事）"}
+                       "after": "の事業所（地域の大人への取材記事）"}
     assert view[1]["before"] == "海外研修" and view[1]["number"] == 1
 
 
@@ -177,3 +177,14 @@ def test_the_quote_cards_button_says_what_the_bubbles_button_says():
     app = (STATIC / "app.js").read_text(encoding="utf-8")
     assert 'text: "元の段落"' not in app
     assert "text: state.texts.bubble_choices.paragraph" in app
+
+
+def test_no_name_of_the_schools_booklet_is_in_the_repository():
+    """直し31続き-4: until the school says its name may be shown, the
+    booklet's name is not in the repository's words."""
+    root = STATIC.parent.parent
+    name = "".join(chr(c) for c in (0x5FD7, 0x4E8B, 0x56F3, 0x9451))  # Not written out, so this file is clean too.
+    for path in [root / "README.md", *(root / "texts").glob("*.*"), *(root / "docs").glob("*.md"),
+                 *(root / "ebino").rglob("*.py"), *(root / "ebino" / "static").glob("*.*")]:
+        if path.suffix in (".py", ".md", ".txt", ".tsv", ".js", ".css", ".html"):
+            assert name not in path.read_text(encoding="utf-8"), path.name
