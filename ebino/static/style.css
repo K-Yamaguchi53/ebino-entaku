@@ -541,6 +541,11 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .table-split path { stroke: var(--lamp-soft); fill: none; stroke-dasharray: 14 12; }
 .token { pointer-events: none; }
 .token .cushion { fill: var(--wood); stroke: var(--lamp-soft); stroke-width: 1; vector-effect: non-scaling-stroke; }
+/* A seat's picture (直し29-3): its mark the frame, dark inside, the picture
+   one thin line in the lamp's light. */
+.token.has-icon .shape { fill: var(--night-3); stroke: var(--lamp-bright); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.token .icon { fill: none; stroke: var(--lamp-bright); stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round;
+  vector-effect: non-scaling-stroke; }
 .token .chair-back { fill: var(--wood-lit); stroke: var(--lamp-soft); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .chair { cursor: pointer; outline: none; opacity: 0; transition: opacity .5s; }
 .chair.ready { opacity: 1; }

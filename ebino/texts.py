@@ -112,6 +112,9 @@ MAP_AROUND_IDS = ("north", "west", "south", "east")
 # (columns ID・文字), with the button that closes them (直し27-1).
 BUBBLE_HINT = "bubble_hint"
 BUBBLE_CLOSE = "bubble_close"
+SEAT_ICONS = "seat_icons"  # 肩書きの言葉 -> 円卓の席の絵 (直し29-3), the first row that fits.
+SEAT_ICON_NAMES = ("medical", "care", "child", "beauty", "town", "food", "farm", "forest", "stay", "build",
+                   "make", "move", "safety", "culture", "shop", "animal")
 BUBBLE_ANSWER = "bubble_answer"  # コーチ・オブザーバーに「答える」 (直し29-1).
 BUBBLE_CHOICES = "bubble_choices"
 BUBBLE_CHOICE_IDS = ("paragraph", "mark", "card", "read")
@@ -171,7 +174,18 @@ def screen_texts() -> dict:
     texts[MAP_BUTTONS] = map_buttons()
     texts[MAP_AROUND] = map_around()
     texts[BUBBLE_CHOICES] = bubble_choices()
+    texts[SEAT_ICONS] = seat_icons()
     return texts
+
+
+def seat_icons() -> list[list[str]]:
+    """[[言葉, 絵], ...] in the table's order: a seat's title is looked at
+    from the top row down, the first word in it giving its picture."""
+    rows = [[row["言葉"], row["絵"]] for row in load_table(SEAT_ICONS, ("言葉", "絵"))]
+    unknown = sorted({icon for _, icon in rows} - set(SEAT_ICON_NAMES))
+    if unknown:
+        raise ValueError(f"{SEAT_ICONS}.tsv has pictures there is no drawing for: {', '.join(unknown)}")
+    return rows
 
 
 def map_buttons() -> dict[str, dict[str, str]]:

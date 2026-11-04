@@ -35,6 +35,41 @@ const EbinoMap = (() => {
   // A small flame in its holder: コーチ's and オブザーバー's seat, no seat's mark.
   const AI_FLAME = "M0,-11 C3.6,-6.5 5.2,-3.4 5.2,-0.8 A5.2,5.2 0 0 1 -5.2,-0.8 C-5.2,-3.4 -3.6,-6.5 0,-11 Z " +
     "M-7,5.5 H7 L5,10 H-5 Z";
+  // The pictures at the table's seats (直し29-3): lines on a 12px square
+  // round 0,0, one thin line in the lamp's light, no words. Drawn here,
+  // nothing read from outside.
+  const SEAT_ICON_PATHS = {
+    medical: "M0,-5 V5 M-5,0 H5",
+    care: "M0,4.8 C-6,0.5 -5.6,-4.8 -2.7,-4.8 C-1.3,-4.8 0,-3.8 0,-2.6 C0,-3.8 1.3,-4.8 2.7,-4.8 C5.6,-4.8 6,0.5 0,4.8 Z",
+    child: "M-5.5,5.5 H0 V0 H-5.5 Z M0,5.5 H5.5 V0 H0 Z M-2.7,0 V-5.5 H2.7 V0",
+    beauty: "M-1.4,4 A1.9,1.9 0 1 1 -5.2,4 A1.9,1.9 0 1 1 -1.4,4 Z M5.2,4 A1.9,1.9 0 1 1 1.4,4 A1.9,1.9 0 1 1 5.2,4 Z " +
+      "M-2,2.4 L4.6,-5.6 M2,2.4 L-4.6,-5.6",
+    town: "M-6,-2 L0,-5.8 L6,-2 Z M-4.2,-0.6 V4 M0,-0.6 V4 M4.2,-0.6 V4 M-6,5.5 H6",
+    food: "M-5.5,0 H5.5 A5.5,4.6 0 0 1 -5.5,0 Z M-2,5 H2 M-1.5,-1.6 L3.5,-6 M1.2,-1.6 L6,-5",
+    farm: "M0,5.5 V-0.5 M0,1 C-0.8,-3 -4.2,-4.4 -5.6,-3.6 C-4.6,-0.8 -2.2,0.6 0,1 Z " +
+      "M0,-0.5 C0.8,-4.5 4.2,-5.8 5.6,-5 C4.6,-2.2 2.2,-0.8 0,-0.5 Z M-4,5.5 H4",
+    forest: "M0,-6 L4,-1 H-4 Z M0,-3 L5.5,3 H-5.5 Z M0,3 V6",
+    stay: "M-5.5,2 A5.5,3.4 0 0 0 5.5,2 M-2.6,0 C-4.2,-2 -1,-3.4 -2.6,-6 M0,0 C-1.6,-2 1.6,-3.4 0,-6 " +
+      "M2.6,0 C1,-2 4.2,-3.4 2.6,-6",
+    build: "M-6,0 L0,-5.6 L6,0 M-4.5,-1.4 V5.5 H4.5 V-1.4 M-1.4,5.5 V2 H1.4 V5.5",
+    make: "M3.5,0 A3.5,3.5 0 1 1 -3.5,0 A3.5,3.5 0 1 1 3.5,0 Z M1.3,0 A1.3,1.3 0 1 1 -1.3,0 A1.3,1.3 0 1 1 1.3,0 Z " +
+      "M0,-3.5 V-5.8 M0,3.5 V5.8 M-3.5,0 H-5.8 M3.5,0 H5.8 M2.5,-2.5 L4.1,-4.1 M-2.5,2.5 L-4.1,4.1 M2.5,2.5 L4.1,4.1 M-2.5,-2.5 L-4.1,-4.1",
+    move: "M-6,2.6 V-3.6 H1.4 V2.6 Z M1.4,-1.6 H4 L6,1 V2.6 H1.4 M-2.2,4.2 A1.5,1.5 0 1 1 -5.2,4.2 A1.5,1.5 0 1 1 -2.2,4.2 Z " +
+      "M5,4.2 A1.5,1.5 0 1 1 2,4.2 A1.5,1.5 0 1 1 5,4.2 Z",
+    safety: "M0,-6 L5,-4 V0 C5,3 2.6,5 0,6 C-2.6,5 -5,3 -5,0 V-4 Z",
+    culture: "M5.5,-5.5 L0.6,-0.6 M0.6,-0.6 L-0.8,0.8 C-2.8,2.4 -4.4,4.4 -5.6,5.6 C-3.6,5 -1.6,3.6 0,2 Z",
+    shop: "M-6,-2.2 H6 L5,-5.6 H-5 Z M-6,-2.2 A1.5,1.5 0 0 0 -3,-2.2 A1.5,1.5 0 0 0 0,-2.2 A1.5,1.5 0 0 0 3,-2.2 " +
+      "A1.5,1.5 0 0 0 6,-2.2 M-5,-0.6 V5.6 H5 V-0.6 M-1.5,5.6 V2 H1.5 V5.6",
+    animal: "M-2.8,3.2 A2.8,2.3 0 1 0 2.8,3.2 A2.8,2.3 0 1 0 -2.8,3.2 Z M-3,-0.8 A1.2,1.2 0 1 0 -5.4,-0.8 A1.2,1.2 0 1 0 -3,-0.8 Z " +
+      "M-0.3,-3.6 A1.2,1.2 0 1 0 -2.7,-3.6 A1.2,1.2 0 1 0 -0.3,-3.6 Z M2.7,-3.6 A1.2,1.2 0 1 0 0.3,-3.6 A1.2,1.2 0 1 0 2.7,-3.6 Z " +
+      "M5.4,-0.8 A1.2,1.2 0 1 0 3,-0.8 A1.2,1.2 0 1 0 5.4,-0.8 Z",
+    poster: "M2.6,-1.2 A3.8,3.8 0 1 1 -5,-1.2 A3.8,3.8 0 1 1 2.6,-1.2 Z M1.5,1.6 L5.6,5.6",
+    cross: "M0,-6 C0.9,-6 1,-5 1,-4 V-1 L6,2 V3.2 L1,1.6 V4.2 L2.6,5.4 V6 L0,5.3 L-2.6,6 V5.4 L-1,4.2 V1.6 L-6,3.2 V2 " +
+      "L-1,-1 V-4 C-1,-5 -0.9,-6 0,-6 Z",
+  };
+  // Inside each kind's mark (shape): its frame, the picture fitted in.
+  const SEAT_ICON_FIT = { adult: "scale(.78)", poster: "scale(1)", cross: "translate(0 1.6) scale(.62)",
+    outsider_teacher: "scale(.74)" };
   const SEAT_ROOM = 4;  // px the paragraph apart keeps from a seat's mark at the table.
   const PARAGRAPH_LINES = 5;  // The paragraph's lines seen at the least, where there is room.
   // The paragraph's lines tried, in order: all of it (0), then fewer; under PARAGRAPH_LINES only failing those.
@@ -1624,6 +1659,12 @@ const EbinoMap = (() => {
       // Its chair, lit, its back to the outside (直し29-2); the seat's own mark sits on it.
       node.append(svgEl("circle", { class: "halo", r: 20 }), chairBack(at, [lx, ly], 15, "chair-back"),
         svgEl("ellipse", { class: "cushion", rx: 15, ry: 10, cy: 3 }), shape(kind));
+      // Its work in a picture, its mark the picture's frame (直し29-3); none fits, its mark as before.
+      const icon = seatIcon(kind, seatOf(sitting.id).title, app.state.texts.seat_icons || []);
+      if (icon) {
+        node.classList.add("has-icon");
+        node.append(svgEl("path", { class: "icon", d: SEAT_ICON_PATHS[icon], transform: SEAT_ICON_FIT[kind] || "" }));
+      }
       tableLayer.append(node);
       const token = { node, at, scale: TOKEN, id: sitting.id };
       tokens.push(token);
@@ -2385,6 +2426,18 @@ const EbinoMap = (() => {
   function dropHint() {
     pressedOnce = true;
     for (const node of overlay.querySelectorAll(".map-hint")) node.remove();
+  }
+
+  // A seat's picture at the table (直し29-3): 探究をした先輩 a magnifier, 県外・
+  // 海外に出た人 an aeroplane; 地域で働く大人 and 外から来た大人・先生 by their
+  // title, the first row of texts/seat_icons.tsv (table: [[言葉, 絵], ...])
+  // whose word is in it; none, null. It reads nothing but what it is given.
+  function seatIcon(kind, title, table) {
+    if (kind === "poster") return "poster";
+    if (kind === "cross") return "cross";
+    if (kind !== "adult" && kind !== "outsider_teacher") return null;
+    const row = table.find(([word]) => word && (title || "").includes(word));
+    return row && SEAT_ICON_PATHS[row[1]] ? row[1] : null;
   }
 
   // A chair's back (直し29-2), round a seat's spot at (at): on the side away
