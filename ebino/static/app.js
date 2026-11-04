@@ -618,6 +618,15 @@ function renderRound(round) {
   for (const id of round.silent_seats) state.silent.add(id);
 
   state.lastRound = round.round;
+  // The first round with spoken words says once what they are (直し31-7).
+  const spokenNote = $("spoken-note");
+  if (round.quotes.some((quote) => quote.spoken) && !state.spokenNoted) {
+    state.spokenNoted = round.round;
+    spokenNote.textContent = state.texts.spoken_note;
+    spokenNote.hidden = false;
+  } else if (state.spokenNoted && state.spokenNoted !== round.round) {
+    spokenNote.hidden = true;
+  }
   const box = el("article", { class: "round", "data-round": round.round });
   // A round that answers an AI's question shows that question over the answer.
   if (round.ai_question) {
@@ -901,19 +910,27 @@ function moreButton(utteranceId, node) {
 }
 
 function renderQuote(roundNo, quote) {
-  const words = quote.said ? `「${quote.text}」` : quote.text;
+  // As spoken words (直し31-7): marked small, the source's note with the
+  // original paragraph rather than the spoken words.
+  const words = quote.spoken || (quote.said ? `「${quote.text}」` : quote.text);
   const node = el("div", { class: "quote", "data-utterance": quote.utterance_id });
+  if (quote.spoken) node.classList.add("spoken");
   if (state.marks[quote.seat_id] === quote.utterance_id) node.classList.add("marked");
   const paragraph = el("p", { class: "paragraph", hidden: "" });
   const back = el("button", { type: "button", text: "元の段落", onclick: async () => {
-    if (paragraph.hidden && !paragraph.textContent) paragraph.textContent = await paragraphOf(quote.utterance_id);
+    if (paragraph.hidden && !paragraph.textContent) {
+      paragraph.append(el("span", { text: await paragraphOf(quote.utterance_id) }));
+      if (quote.spoken && quote.source.note) paragraph.append(el("span", { class: "source", text: quote.source.note }));
+    }
     paragraph.hidden = !paragraph.hidden;
   } });
   const mark = el("button", { type: "button", text: "印をつける", onclick: () => markQuote(roundNo, quote.utterance_id) });
   node.dataset.seat = quote.seat_id;
+  // node.append writes a null as the word "null": only what is there goes in.
+  if (quote.spoken) node.append(el("span", { class: "spoken-mark", text: state.texts.spoken_mark }));
   node.append(
     el("p", { class: "words", text: words }),
-    el("span", { class: "source", text: sourceLine(quote.source) }),
+    el("span", { class: "source", text: sourceLine(quote.spoken ? { ...quote.source, note: "" } : quote.source) }),
     el("div", { class: "actions" }, back, mark),
     paragraph);
   return node;

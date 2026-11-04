@@ -101,7 +101,8 @@ def test_the_choices_go_against_their_card_never_over_it_the_table_or_the_seat()
 
 def test_the_paragraph_says_whose_it_is_and_shows_five_lines_where_there_is_room():
     opened = _inner("openChoices")
-    assert 'paragraph.append(div("whose", seatOf(seatId).title), text);' in opened  # The name only.
+    # The name only; a bubble shown as spoken words adds its source's note (直し31-7).
+    assert 'paragraph.append(div("whose", [seatOf(seatId).title, card.dataset.note].filter(Boolean).join("　")), text);' in opened
     assert "text.textContent = await app.paragraph(utteranceId);" in opened
     put = _inner("putChoices")
     # All of it first, then PARAGRAPH_LINES or more, only then fewer (it scrolls).

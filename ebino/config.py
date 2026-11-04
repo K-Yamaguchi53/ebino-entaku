@@ -61,11 +61,18 @@ def data_dir(environ=os.environ) -> Path:
 
 
 COACH_ENV = "EBINO_COACH"
+SPEAKER_ENV = "EBINO_SPEAKER"
 
 
 def coach_on(environ=os.environ) -> bool:
     """コーチとオブザーバー's band is shown unless EBINO_COACH=0 (SPEC 5-1)."""
     return environ.get(COACH_ENV, "").strip() != "0"
+
+
+def speaker_on(environ=os.environ) -> bool:
+    """The bubbles as spoken words (直し31-7) unless EBINO_SPEAKER=0: then
+    every bubble shows its original words, and no request is made for them."""
+    return environ.get(SPEAKER_ENV, "").strip() != "0"
 
 
 def load_env_file(path: Path = ENV_FILE, environ=os.environ) -> None:

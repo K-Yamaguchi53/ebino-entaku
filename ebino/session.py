@@ -2,7 +2,9 @@
 (SPEC 5-1, 14-12, 14-51, 14-65: the map over the seat list, which stays).
 
 The screen gets plain data built here, never a model's words except the
-quotes the guard passed (which are the pieces' own text) and split headings.
+quotes the guard passed (which are the pieces' own text), split headings,
+and since 直し31-7 the quotes as spoken words that code checked
+(speaker.py), each beside its original.
 Seat labels come from the seat table through seat_label, so company and
 display name reach the screen only when EBINO_SHOW_COMPANY=1 and never reach
 a model. The year is never sent (SPEC 14-34).
@@ -19,7 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import (ask_seat, closing, coach, config, editor, harvest, more, purpose_summary, reflection, relief,
-               roundtable,
+               roundtable, speaker,
                seat_map, subjects, talk_kinds)
 from .editor import QuestionCard
 from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
@@ -209,6 +211,10 @@ class Session:
         if self.records is not None:
             record = session_record(self)
             record["ai_answered_after_notice"] = self.ai_answered_after_notice
+            # Each bubble shown: its original and its spoken words, which was
+            # shown, and why the original was kept (直し31-7).
+            record["spoken"] = [dict(spoken.record(), round=number) for number, r in enumerate(self.rounds, start=1)
+                                for spoken in r.spoken.values()]
             self.records.save_session(record)
 
     # --- what the student does ---
@@ -227,12 +233,21 @@ class Session:
             raise Refused("question_too_long")
         result = roundtable.run(self.gate, self.library.entries, self.library.seats, self.guard,
                                 question, plant=self.plant)
+        self._speak(result)
         self.rounds.append(result)
         if result.card:
             # The same question again with no seat answering: the card there is.
             result.card = self._keep_card(result.card)
         self.save()
         return self.round_view(len(self.rounds))
+
+    def _speak(self, result: roundtable.Round) -> None:
+        """The round's bubbles as spoken words, in one request (直し31-7)."""
+        if not result.quotes or not config.speaker_on():
+            return
+        quotes = [{"id": q.utterance_id, "voice": q.voice, "text": q.text,
+                   "paragraph": self._utterances[q.utterance_id].paragraph or q.text} for q in result.quotes]
+        result.spoken = {spoken.utterance_id: spoken for spoken in speaker.speak(self.gate, quotes)}
 
     def card_like(self, seat_id: str, text: str) -> QuestionCard | None:
         """The card already made to this seat ("" for none) with these words,
@@ -359,6 +374,7 @@ class Session:
             return {"status": roundtable.ASK_AGAIN, "message": load_text(NAME_IN_QUESTION)}
         result = roundtable.run(self.gate, self.library.entries, self.library.seats, self.guard,
                                 answer, plant=self.plant, ai_question=asked)
+        self._speak(result)
         self.rounds.append(result)
         if result.status != roundtable.UNAVAILABLE:  # Unavailable: the card may be answered again.
             band.answered, band.answer = role, answer
@@ -719,6 +735,8 @@ class Session:
                 "utterance_id": quote.utterance_id,
                 "seat_id": quote.seat_id,
                 "text": quote.text,
+                # The same as spoken words, "" when the original is shown (直し31-7).
+                "spoken": result.spoken[quote.utterance_id].spoken if quote.utterance_id in result.spoken else "",
                 # A person's own words get 「」; article text gets its note instead.
                 "said": not utterance.note,
                 "source": self.source(quote.seat_id, utterance),

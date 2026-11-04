@@ -3,7 +3,9 @@ and puts a heading only where views split (SPEC 5-1, 6).
 
 The moderator names pieces by ID and copies the words it wants to show; the
 guard then checks each copy against its piece, and the screen shows the
-piece's own text (SPEC 6, 14-51). What comes back here is only the model's
+piece's own text (SPEC 6, 14-51), or since 直し31-7 the same as spoken words
+that code checked (speaker.py), the piece's own text always readable beside
+it. What comes back here is only the model's
 choice, cleaned by code: unknown pieces and extra quotes are dropped. Which
 seat a quote belongs to is taken from the piece, never from the model.
 """

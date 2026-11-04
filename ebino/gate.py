@@ -55,6 +55,8 @@ MODELS = {
     "subjects": "claude-haiku-5-5",
     # コーチとオブザーバー: two questions to the student at a round's end.
     "coach": "claude-opus-5-5",
+    # The round's bubbles as spoken words (直し31-7; the teacher chose Haiku, low).
+    "speaker": "claude-haiku-5-5",
 }
 EFFORT = {
     "tagger": "low",
@@ -65,6 +67,7 @@ EFFORT = {
     "editor": "low",
     "subjects": "low",
     "coach": "medium",
+    "speaker": "low",
 }
 
 

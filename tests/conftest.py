@@ -12,6 +12,14 @@ PHONE = "0984-00-0000"
 ADDRESS = "えびの市大字架空町123番地"
 DISPLAY_NAME = "山川さん"
 
+
+@pytest.fixture(autouse=True)
+def no_speaker_unless_asked(monkeypatch):
+    """The bubbles as spoken words (直し31-7) are one more model request a
+    round: off where a test scripts the model's answers, on where asked for."""
+    monkeypatch.setenv("EBINO_SPEAKER", "0")
+
+
 ROWS = [
     ("番号", "項目", "記事", "字数"),
     ("1", "名前", PERSON, ""),

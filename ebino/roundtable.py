@@ -1,5 +1,6 @@
 """One round of the round table: a student's question in, the seats' own
-words out (SPEC 5-1).
+words out (SPEC 5-1); since 直し31-7 each may be shown as spoken words
+(speaker.py, checked by code), its original always readable.
 
     librarian (finds pieces) -> moderator (picks and orders quotes, splits)
     -> guard (each quote against its piece) -> what the screen may show
@@ -85,6 +86,9 @@ class Round:
     # own two questions, once the screen asked for them.
     ai_question: object = None
     band: object = None
+    # The bubbles as spoken words (speaker.py, 直し31-7): utterance ID ->
+    # speaker.Spoken, for the quotes shown; empty when none was asked for.
+    spoken: dict = field(default_factory=dict)
 
     @property
     def seat_order(self) -> list[str]:

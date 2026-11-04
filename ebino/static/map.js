@@ -1391,6 +1391,7 @@ const EbinoMap = (() => {
     if (!inView(x, y)) return;
     const node = div("map-bubble");
     node.append(div("voice", voiceOf(quote)), div("who", whoOf(seat)));
+    spokenMark(node, quote);
     overlay.append(node);
     place(node, x, y, 18);
     thread(node, ...toFrame(x, y));
@@ -1400,10 +1401,18 @@ const EbinoMap = (() => {
 
   // A lamp card's words: the quote cut at BUBBLE_CHARS with 「…」, and which
   // seat, in the words the seat's label already shows.
+  // As spoken words (直し31-7) when code let them through: no 「」, a small mark.
   function voiceOf(quote) {
-    const chars = [...quote.text];
-    const cut = chars.length > BUBBLE_CHARS ? chars.slice(0, BUBBLE_CHARS).join("") + "…" : quote.text;
-    return quote.said ? `「${cut}」` : cut;
+    const text = quote.spoken || quote.text;
+    const chars = [...text];
+    const cut = chars.length > BUBBLE_CHARS ? chars.slice(0, BUBBLE_CHARS).join("") + "…" : text;
+    return quote.said && !quote.spoken ? `「${cut}」` : cut;
+  }
+
+  function spokenMark(node, quote) {
+    if (!quote.spoken) return;
+    node.classList.add("spoken");
+    node.prepend(div("spoken-mark", app.state.texts.spoken_mark));
   }
 
   function whoOf(seat) { return [seat.title, seat.detail].filter(Boolean).join("　"); }
@@ -1752,6 +1761,8 @@ const EbinoMap = (() => {
   function tableBubble(seatId, quote, at, k) {
     const node = div("table-bubble unplaced");
     node.append(div("voice", voiceOf(quote)), div("who", whoOf(seatOf(seatId))));
+    spokenMark(node, quote);
+    if (quote.spoken) node.dataset.note = (quote.source && quote.source.note) || "";
     Object.assign(node.dataset, { seat: seatId, utterance: quote.utterance_id, x: at[0], y: at[1] });
     node.style.setProperty("--k", String(k));
     node.tabIndex = 0;
@@ -2011,7 +2022,8 @@ const EbinoMap = (() => {
     paragraph.hidden = true;
     // At its head, whose paragraph it is: the name only (直し27-3).
     const text = div("text");
-    paragraph.append(div("whose", seatOf(seatId).title), text);
+    // A bubble shown as spoken words: its source's note goes with the original (直し31-7).
+    paragraph.append(div("whose", [seatOf(seatId).title, card.dataset.note].filter(Boolean).join("　")), text);
     // While a choice waits on the server it stays where it is (a disabled
     // button would drop the keyboard's focus): a second press then does nothing.
     let busy = false;

@@ -716,6 +716,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   color: var(--paper-ink); box-shadow: 0 0 0 1px var(--paper-line), 0 0 18px var(--lamp-soft), 0 8px 20px var(--shadow);
   animation: kindle .45s ease-out both; animation-delay: calc(var(--k, 0) * 250ms); }
 .table-bubble .voice { font-family: var(--mincho); font-size: 15px; line-height: 1.7; max-width: 13em; }
+/* A bubble as spoken words (直し31-7): a small mark at its top, nothing more. */
+.spoken-mark { display: block; width: max-content; margin-bottom: 2px; padding: 0 6px; border: 1px solid currentColor;
+  border-radius: 8px; font-family: var(--gothic); font-size: 11px; line-height: 1.5; opacity: .75; }
+.quote .spoken-mark { color: var(--paper-soft); opacity: 1; }
+.spoken-note { margin: 4px 0 0; font-size: 14px; color: var(--soft); }
+.quote .paragraph .source { display: block; margin-top: 4px; }
 .table-bubble .who { width: 0; min-width: 100%; margin-top: 2px; font-family: var(--gothic); font-size: 12px;
   line-height: 1.5; color: var(--paper-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .table-bubble .tail { position: absolute; height: 14px; margin-top: -7px; transform-origin: 0 50%;
