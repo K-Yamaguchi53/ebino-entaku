@@ -44,7 +44,11 @@
           <svg id="opening-svg" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
             <circle id="opening-ring" class="opening-ring" r="0"></circle>
             <polyline id="opening-trail" class="opening-trail" points=""></polyline>
-            <path id="opening-plane" class="opening-plane" d="M22,0 L-16,-13 L-7,0 L-16,13 Z M22,0 L-7,0"></path>
+            <!-- The paper plane (直し30の続き-1): six triangles of folded paper, set by app.js each frame. -->
+            <g id="opening-plane" class="opening-plane">
+              <polygon></polygon><polygon></polygon><polygon></polygon>
+              <polygon></polygon><polygon></polygon><polygon></polygon>
+            </g>
           </svg>
           <p id="opening-title" class="opening-title" aria-hidden="true"></p>
         </div>

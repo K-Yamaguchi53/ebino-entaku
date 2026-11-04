@@ -351,7 +351,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 #table.opening-on > :not(#map), #table.opening-on .map-bar { display: none; }
 .opening { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
 .opening svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
-.opening-plane { fill: var(--night-2); stroke: var(--lamp); stroke-width: 1.8; stroke-linejoin: round; }
+/* The paper plane: the cream of the people's words' paper, its edges and folds in the lamp's colour. */
+.opening-plane polygon { fill: var(--paper); stroke: var(--lamp); stroke-width: 1.2; stroke-linejoin: round; }
 .opening-trail { fill: none; stroke: var(--lamp-soft); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .opening-ring { fill: var(--lamp-faint); stroke: var(--lamp-glow); stroke-width: 2; opacity: 0; }
 .opening-title { position: absolute; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%); opacity: 0;

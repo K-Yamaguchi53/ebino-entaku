@@ -72,15 +72,17 @@ def test_it_is_under_three_seconds_and_skipped_at_once():
     assert ".opening-bar button:focus { outline: 2px solid var(--lamp);" in CSS
 
 
-def test_the_plane_is_lines_in_the_code_in_the_lamps_colour_and_nothing_flashes():
-    plane = re.search(r'<path id="opening-plane" class="opening-plane" d="([^"]+)">', HTML).group(1)
-    assert plane == "M22,0 L-16,-13 L-7,0 L-16,13 Z M22,0 L-7,0"  # A dart and its one fold.
-    assert ".opening-plane { fill: var(--night-2); stroke: var(--lamp);" in CSS
+def test_the_plane_is_folded_paper_in_the_code_and_nothing_flashes():
+    group = HTML[HTML.index('<g id="opening-plane" class="opening-plane">'):]
+    group = group[:group.index("</g>")]
+    assert group.count("<polygon></polygon>") == 6 and "href" not in group  # Six triangles, no picture.
+    # The cream of the people's words' paper, its folds in the lamp's colour.
+    assert ".opening-plane polygon { fill: var(--paper); stroke: var(--lamp);" in CSS
     rules = CSS[CSS.index("/* The opening (直し30-3)"):CSS.index("/* 最初にもどる under the sheet")]
     assert "animation" not in rules and "#" not in rules.replace("#table", "").replace("#map", "")
     assert "http" not in rules and "url(" not in rules
     # The aeroplane of 県外・海外 at the table is another shape.
-    assert "cross: \"M0,-6 C0.9,-6" in MAP and plane not in MAP
+    assert "cross: \"M0,-6 C0.9,-6" in MAP and "planeFaces" not in MAP
 
 
 _PLANE = """
@@ -102,3 +104,33 @@ def test_the_plane_flies_a_loose_s_from_its_start_to_the_tables_spot():
     assert (round(got["end"]["x"]), round(got["end"]["y"])) == (500, 300)
     # One side of the straight way, then the other: an S.
     assert got["sides"][0] == -got["sides"][1] != 0
+
+
+_FACES = """
+%(source)s
+const pose = (o) => Object.assign({ x: 500, y: 300, size: 100, a: 0, roll: 0, pitch: 0 }, o);
+const box = (faces) => { const xs = faces.flatMap((f) => f.points.map((p) => p[0])), ys = faces.flatMap((f) => f.points.map((p) => p[1]));
+  return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]; };
+const level = planeFaces(pose({})), right = planeFaces(pose({ a: Math.PI / 2 })),
+  banked = planeFaces(pose({ roll: 0.5 })), up = planeFaces(pose({ pitch: 0.3 }));
+process.stdout.write(JSON.stringify({ n: level.length, lights: [...new Set(level.map((f) => f.light.toFixed(2)))].length,
+  level: box(level), right: box(right), banked: box(banked), up: box(up),
+  sorted: level.every((f, i) => !i || level[i - 1].depth <= f.depth),
+  size: (_size) }));
+"""
+
+
+@node
+def test_the_plane_is_six_faces_lit_apart_turned_to_its_way_and_big_enough():
+    program = _FACES.replace("(_size)", "Math.max(64, 1180 * 0.1)") % {"source": APP[APP.index("const PLANE = {"):APP.index("// The opening as it is t ms in.")]}
+    out = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=30)
+    assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
+    got = json.loads(out.stdout.decode("utf-8"))
+    assert got["n"] == 6 and got["lights"] >= 3 and got["sorted"]  # The folds show by their light.
+    x0, x1, y0, y1 = got["level"]
+    assert 92 <= x1 - x0 <= 112 and x1 > 500 + 55  # Nose to the right, about 100px long.
+    x0, x1, y0, y1 = got["right"]
+    assert y1 > 300 + 45 and round(x1 - x0) < 70  # Turned to fly down the screen.
+    assert got["banked"] != got["level"] and got["up"] != got["level"]
+    # At its nearest, 8% of the map's width or more and 64px at least.
+    assert "size: Math.max(64, w * 0.1)" in _top("playOpening") and got["size"] >= 64

@@ -118,9 +118,10 @@ async function start(lab, chosen) {
 
 // --- the opening (直し30-3) ---
 
-// Once a Lab is picked: over the dark map a paper plane drawn in lines takes
-// off from the school's mark (or the lower left), flies a loose S, nose to
-// its way and leaning into its turns with a thin trail that fades at once,
+// Once a Lab is picked: over the dark map a paper plane of folded paper in
+// 3D takes off from the school's mark (or the lower left), coming near from
+// far, flies a loose S, nose to its way, banking into its turns and its nose
+// up a little before it lands, with a thin trail that fades at once,
 // slows and lands where the round table opens; the lamp's light spreads
 // once in a ring, the seats' points lighting nearest first, and the title
 // comes and goes up toward the question box. Under 3 seconds; 「とばす」,
@@ -164,7 +165,9 @@ function playOpening() {
   $("opening").hidden = false;
   $("opening-bar").hidden = false;
   $("map-frame").inert = true;  // The keyboard goes to 「とばす」, not the points behind.
-  const run = { from, end, w, h, points, far, ring: Math.hypot(w, h) * 0.42, trail: [], last: null, lean: 0, frame: 0 };
+  // At its nearest it is 10% of the map's width (64px at least): 8% or more.
+  const run = { from, end, w, h, points, far, ring: Math.hypot(w, h) * 0.42, trail: [], last: null, lean: 0, frame: 0,
+    size: Math.max(64, w * 0.1) };
   openingRun = run;
   return new Promise((done) => {
     run.done = done;
@@ -207,6 +210,51 @@ function planeAt(run, u) {
     a: Math.atan2(slope(y0, c1[1], c2[1], y3), slope(x0, c1[0], c2[0], x3)) };
 }
 
+// The paper plane (直し30の続き-1): a sheet folded in half down the middle,
+// its two sides folded down into wings, opened. x to the nose, y to the
+// right wing, z up; its length is 1. Six triangles: the keel's two sides,
+// and each wing in two, so every fold shows.
+const PLANE = {
+  points: { nose: [0.62, 0, 0], tl: [-0.38, -0.03, 0], tr: [-0.38, 0.03, 0], keel: [-0.38, 0, -0.2],
+    ml: [-0.38, -0.16, 0.025], mr: [-0.38, 0.16, 0.025], wl: [-0.38, -0.32, 0.1], wr: [-0.38, 0.32, 0.1] },
+  faces: [["nose", "tl", "keel"], ["nose", "tr", "keel"], ["nose", "tl", "ml"], ["nose", "tr", "mr"],
+    ["nose", "ml", "wl"], ["nose", "mr", "wr"]],
+};
+// The lamp's light, from the upper left and in front.
+const PLANE_LIGHT = [-0.36, -0.5, 0.79];
+
+// The plane's six faces on the screen, far ones first: at (x, y), size px
+// long, nose to a (radians, on the screen), banked by roll and its nose up
+// by pitch. Seen from above and from the south, as the map is, the near
+// side a little bigger; each face as bright as it turns to the lamp (both
+// sides are paper).
+function planeFaces(pose) {
+  const { x, y, size, a, roll, pitch } = pose;
+  const cp = Math.cos(pitch), sp = Math.sin(pitch), cr = Math.cos(roll), sr = Math.sin(roll);
+  const ca = Math.cos(a), sa = Math.sin(a);
+  const turned = {};
+  for (const [name, [px, py, pz]] of Object.entries(PLANE.points)) {
+    const x1 = px * cp - pz * sp, z1 = px * sp + pz * cp;
+    const y2 = py * cr - z1 * sr, z2 = py * sr + z1 * cr;
+    turned[name] = [x1 * ca - y2 * sa, x1 * sa + y2 * ca, z2];
+  }
+  const faces = PLANE.faces.map((names) => {
+    const [p, q, r] = names.map((name) => turned[name]);
+    const u = [q[0] - p[0], q[1] - p[1], q[2] - p[2]], v = [r[0] - p[0], r[1] - p[1], r[2] - p[2]];
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const cos = Math.abs(n[0] * PLANE_LIGHT[0] + n[1] * PLANE_LIGHT[1] + n[2] * PLANE_LIGHT[2]) / (Math.hypot(...n) || 1);
+    return {
+      points: names.map((name) => {
+        const [X, Y, Z] = turned[name], k = 1 / (1 - 0.3 * (Y * 0.7 + Z * 0.7));
+        return [x + X * size * k, y + (Y * 0.7 - Z * 0.7) * size * k];
+      }),
+      depth: (p[1] + q[1] + r[1]) * 0.7 + (p[2] + q[2] + r[2]) * 0.7,
+      light: 0.42 + 0.58 * cos,
+    };
+  });
+  return faces.sort((f, g) => f.depth - g.depth);
+}
+
 // The opening as it is t ms in.
 function drawOpening(run, t) {
   const plane = $("opening-plane"), trail = $("opening-trail"), ring = $("opening-ring"), title = $("opening-title");
@@ -217,11 +265,19 @@ function drawOpening(run, t) {
   if (run.last !== null) {
     let turn = p.a - run.last;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-    run.lean += (Math.min(0.45, Math.abs(turn) * 14) - run.lean) * 0.25;
+    run.lean += (Math.max(-0.6, Math.min(0.6, turn * 14)) - run.lean) * 0.25;
   }
   run.last = p.a;
-  const deg = p.a * 180 / Math.PI;
-  plane.setAttribute("transform", `translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) rotate(${deg.toFixed(1)}) scale(1 ${(1 - run.lean).toFixed(3)})`);
+  // From far to near (small to its full size), settled before it lands;
+  // banked into the turn (the inner wing down); the nose up a little at the end.
+  const near = Math.min(1, fly / 0.8);
+  const size = run.size * (0.32 + 0.68 * (1 - Math.pow(1 - near, 2)));
+  const pitch = 0.32 * Math.max(0, Math.min(1, (fly - 0.78) / 0.22));
+  const faces = planeFaces({ x: p.x, y: p.y, size, a: p.a, roll: -run.lean, pitch });
+  [...plane.children].forEach((node, i) => {
+    node.setAttribute("points", faces[i].points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" "));
+    node.style.filter = `brightness(${faces[i].light.toFixed(3)})`;
+  });
   plane.style.opacity = t < OPENING.fly + OPENING.land ? "1"
     : String(Math.max(0, 1 - (t - OPENING.fly - OPENING.land) / (OPENING.title * 0.5)));
   // The trail: the last quarter second of the way only, so it fades at once.
