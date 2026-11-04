@@ -31,7 +31,7 @@ def _top(name):
 def test_the_skip_button_is_the_teachers_word():
     assert texts.screen_texts()["opening_skip"] == "とばす"
     assert '"とばす"' not in APP and ">とばす<" not in HTML
-    assert '$("opening-skip").textContent = state.texts.opening_skip;' in _top("playOpening")
+    assert '$("opening-skip").textContent = state.texts.opening_skip;' in (_top("playOpening") + _top("mapStage"))
 
 
 def test_it_plays_while_start_is_waited_for_and_never_shows_the_box_before_it():
@@ -49,7 +49,7 @@ def test_it_plays_while_start_is_waited_for_and_never_shows_the_box_before_it():
 
 
 def test_no_map_or_motion_reduced_means_no_opening():
-    play = _top("playOpening")
+    play = (_top("playOpening") + _top("mapStage"))
     assert play.index('if (typeof EbinoMap === "undefined" || $("map").hidden) return null;') \
         < play.index('$("table").classList.add("opening-on");')
     assert "if (!box.width || !box.height" in play
@@ -61,9 +61,9 @@ def test_no_map_or_motion_reduced_means_no_opening():
 def test_it_is_under_three_seconds_and_skipped_at_once():
     times = re.search(r"const OPENING = \{ fly: (\d+), land: (\d+), title: (\d+) \};", APP)
     assert sum(int(n) for n in times.groups()) <= 3000
-    play = _top("playOpening")
+    play = (_top("playOpening") + _top("mapStage"))
     assert 'event.key === "Enter" || event.key === "Escape"' in play
-    assert '$("opening-skip").onclick = () => finishOpening(run);' in play and '$("opening-skip").focus();' in play
+    assert '$("opening-skip").onclick = () => finishOpening(run);' in play and '$(run.sheet ? "fold-skip" : "opening-skip").focus();' in play
     finish = _top("finishOpening")
     assert "cancelAnimationFrame(run.frame);" in finish and 'document.removeEventListener("keydown", run.keys);' in finish
     assert "run.done();" in finish
@@ -122,7 +122,7 @@ process.stdout.write(JSON.stringify({ n: level.length, lights: [...new Set(level
 
 @node
 def test_the_plane_is_six_faces_lit_apart_turned_to_its_way_and_big_enough():
-    program = _FACES.replace("(_size)", "Math.max(64, 1180 * 0.1)") % {"source": APP[APP.index("const PLANE = {"):APP.index("// The opening as it is t ms in.")]}
+    program = _FACES.replace("(_size)", "Math.max(64, 1180 * 0.1)") % {"source": APP[APP.index("const PLANE = {"):APP.index("// The opening as it is t ms in")]}
     out = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=30)
     assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
     got = json.loads(out.stdout.decode("utf-8"))
@@ -133,11 +133,11 @@ def test_the_plane_is_six_faces_lit_apart_turned_to_its_way_and_big_enough():
     assert y1 > 300 + 45 and round(x1 - x0) < 70  # Turned to fly down the screen.
     assert got["banked"] != got["level"] and got["up"] != got["level"]
     # At its nearest, 8% of the map's width or more and 64px at least.
-    assert "size: Math.max(64, w * 0.1)" in _top("playOpening") and got["size"] >= 64
+    assert "size: Math.max(64, w * 0.1)" in (_top("playOpening") + _top("mapStage")) and got["size"] >= 64
 
 
 def test_it_takes_off_from_the_schools_picture_else_its_mark_else_the_lower_left():
-    play = _top("playOpening")
+    play = (_top("playOpening") + _top("mapStage"))
     picture = play.index('sighted("#map-svg .school-picture image", 0.3)')
     mark = play.index('sighted("#map-svg .school > :not(text)", 0.5)')
     assert play.index("let from = [Math.min(48, w * 0.08), h - Math.min(48, h * 0.08)];") < picture < mark
@@ -172,4 +172,55 @@ def test_the_seats_it_passes_over_light_once_each_and_the_ring_lights_the_rest()
 
 def test_no_school_picture_is_needed():
     # The tests run with no picture; the opening asks for none of its own.
-    assert "school_picture" not in _top("playOpening") and "EBINO_SCHOOL_DIR" not in APP
+    assert "school_picture" not in (_top("playOpening") + _top("mapStage")) and "EBINO_SCHOOL_DIR" not in APP
+
+
+def test_the_lab_board_folds_into_the_plane_first_all_in_four_and_a_half_seconds():
+    times = re.search(r"const FOLD = \{ paper: (\d+), fold: (\d+), away: (\d+) \};", APP)
+    opening = re.search(r"const OPENING = \{ fly: (\d+), land: (\d+), title: (\d+) \};", APP)
+    assert sum(int(n) for n in times.groups()) + sum(int(n) for n in opening.groups()) <= 4500
+    play = _top("playOpening")
+    # No map or motion reduced: none, the fold too (start() asks for none).
+    assert play.index('if (typeof EbinoMap === "undefined" || $("map").hidden) return null;')         < play.index('foldSheet($("start").getBoundingClientRect())')
+    # 「とばす」, Enter and Esc end it while it folds too.
+    assert '$("fold-skip").onclick = () => finishOpening(run);' in play
+    assert '$("fold-skip").textContent = state.texts.opening_skip;' in play
+    # Resized or turned while folding: the board is measured again.
+    assert 'run.sheet = foldSheet($("start").getBoundingClientRect()) || run.sheet;' in play
+    finish = _top("finishOpening")
+    assert '$("fold").hidden = true;' in finish and '$("start").style.opacity = "";' in finish
+    # The sheet's six faces are the plane's own, the paper's colour.
+    fold = HTML[HTML.index('<div id="fold" class="fold" hidden>'):]
+    fold = fold[:fold.index("</div>")]
+    assert fold.count("<polygon></polygon>") == 6 and 'class="opening-plane"' in fold
+    assert ".fold-sheet { fill: var(--paper); stroke: var(--lamp);" in CSS
+
+
+_FOLD = """
+%(source)s
+const nodes = () => Array.from({ length: 6 }, () => ({ pts: "", style: {}, setAttribute(k, v) { this.pts = v; } }));
+const sheetNode = { pts: "", style: {}, setAttribute(k, v) { this.pts = v; } }, planeNodes = nodes(), start = { style: {} };
+const $ = (id) => ({ "fold-sheet": sheetNode, "fold-plane": { children: planeNodes }, start })[id];
+globalThis.window = { innerHeight: 700 };
+const run = { sheet: foldSheet({ left: 100, right: 400, top: 50, bottom: 800, width: 300 }) };
+const seen = [];
+for (const t of [0, 300, 500, 800, 1200]) {
+  drawFold(run, t);
+  seen.push({ t, sheet: sheetNode.pts.split(" ").filter(Boolean).length, faces: planeNodes.filter((n) => n.pts).length, words: start.style.opacity });
+}
+process.stdout.write(JSON.stringify({ sheet: run.sheet, seen }));
+"""
+
+
+@node
+def test_the_tall_board_becomes_a_sheet_then_a_long_triangle_then_the_plane():
+    source = APP[APP.index("const PLANE = {"):APP.index("// The seats' points the plane is passing over")]
+    program = _FOLD % {"source": "const FOLD = { paper: 300, fold: 900, away: 500 };" + source + _top("foldSheet") + _top("drawFold")}
+    out = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=30)
+    assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
+    got = json.loads(out.stdout.decode("utf-8"))
+    assert got["sheet"]["T"] == 50 and got["sheet"]["B"] == 700  # Only what is on the screen.
+    seen = {s["t"]: s for s in got["seen"]}
+    assert seen[0]["words"] == "1" and seen[300]["words"] == "0"  # The words fade, the sheet stays.
+    assert seen[500]["sheet"] == 5 and seen[500]["faces"] == 0
+    assert seen[1200]["sheet"] == 0 and seen[1200]["faces"] == 6

@@ -129,12 +129,64 @@ async function start(lab, chosen) {
 // comes and goes up toward the question box. Under 3 seconds; 「とばす」,
 // Enter or Esc ends it at once. No flashing, the screen never shakes.
 const OPENING = { fly: 1400, land: 600, title: 800 };
+// Before it (直し30の続き-3): the Lab's board becomes one sheet of paper, the
+// words fading; the sheet folds into the plane (in half down the middle,
+// the two top corners to the middle, the wings opened); the map comes up
+// behind and the plane goes off far, small, to the school, turns there and
+// flies the opening as above. In all 4.5 seconds at most.
+const FOLD = { paper: 300, fold: 900, away: 500 };
 let openingRun = null;
 
 // Starts it and returns a promise kept when it has ended (or at once, with
 // no map on screen to fly over: then null).
 function playOpening() {
   if (typeof EbinoMap === "undefined" || $("map").hidden) return null;
+  const run = { trail: [], last: null, lean: 0, frame: 0, points: [], sheet: foldSheet($("start").getBoundingClientRect()) };
+  if (run.sheet) {
+    $("fold-skip").textContent = state.texts.opening_skip;
+    $("fold").hidden = false;
+  } else if (!mapStage(run)) return null;
+  openingRun = run;
+  return new Promise((done) => {
+    run.done = done;
+    const began = performance.now();
+    const step = (now) => {
+      if (openingRun !== run) return;
+      let t = now - began;
+      if (run.sheet) {
+        if (t < FOLD.paper + FOLD.fold) {
+          // The window turned or resized while folding: the board measured again.
+          if (run.sheet.vw !== window.innerWidth || run.sheet.vh !== window.innerHeight) {
+            run.sheet = foldSheet($("start").getBoundingClientRect()) || run.sheet;
+          }
+          drawFold(run, t);
+          run.frame = requestAnimationFrame(step);
+          return;
+        }
+        if (!run.w && !mapStage(run)) return finishOpening(run);
+        t -= FOLD.paper + FOLD.fold;
+      }
+      drawOpening(run, t);
+      if (t >= (run.away ? FOLD.away : 0) + OPENING.fly + OPENING.land + OPENING.title) return finishOpening(run);
+      run.frame = requestAnimationFrame(step);
+    };
+    run.keys = (event) => {
+      if (event.key === "Enter" || event.key === "Escape") {
+        event.preventDefault();
+        finishOpening(run);
+      }
+    };
+    document.addEventListener("keydown", run.keys);
+    $("opening-skip").onclick = () => finishOpening(run);
+    $("fold-skip").onclick = () => finishOpening(run);
+    $(run.sheet ? "fold-skip" : "opening-skip").focus();
+    run.frame = requestAnimationFrame(step);
+  });
+}
+
+// The map's part: the table screen up with the map alone, the way worked out
+// on the spot (false: no map on screen after all).
+function mapStage(run) {
   $("start").hidden = true;
   $("table").hidden = false;
   $("table").classList.add("opening-on");
@@ -143,7 +195,7 @@ function playOpening() {
   const box = frame.getBoundingClientRect();
   if (!box.width || !box.height || $("map").hidden) {
     $("table").classList.remove("opening-on");
-    return null;
+    return false;
   }
   $("map").scrollIntoView({ block: "nearest" });
   const w = box.width, h = box.height;
@@ -173,31 +225,82 @@ function playOpening() {
   $("opening-bar").hidden = false;
   $("map-frame").inert = true;  // The keyboard goes to 「とばす」, not the points behind.
   // At its nearest it is 10% of the map's width (64px at least): 8% or more.
-  const run = { from, end, w, h, points, far, ring: Math.hypot(w, h) * 0.42, trail: [], last: null, lean: 0, frame: 0,
-    size: Math.max(64, w * 0.1), reach: Math.max(28, Math.min(w, h) * 0.07) };
+  Object.assign(run, { from, end, w, h, points, far, ring: Math.hypot(w, h) * 0.42,
+    size: Math.max(64, w * 0.1), reach: Math.max(28, Math.min(w, h) * 0.07) });
   // The town: where the seats' points are, the middle of them.
   if (points.length) run.town = [points.reduce((t, p) => t + p.x, 0) / points.length, points.reduce((t, p) => t + p.y, 0) / points.length];
-  openingRun = run;
-  return new Promise((done) => {
-    run.done = done;
-    const began = performance.now();
-    const step = (now) => {
-      if (openingRun !== run) return;
-      const t = now - began;
-      drawOpening(run, t);
-      if (t >= OPENING.fly + OPENING.land + OPENING.title) return finishOpening(run);
-      run.frame = requestAnimationFrame(step);
-    };
-    run.keys = (event) => {
-      if (event.key === "Enter" || event.key === "Escape") {
-        event.preventDefault();
-        finishOpening(run);
-      }
-    };
-    document.addEventListener("keydown", run.keys);
-    $("opening-skip").onclick = () => finishOpening(run);
-    $("opening-skip").focus();
-    run.frame = requestAnimationFrame(step);
+  if (run.sheet) {
+    // The folded plane, where it is on the screen, goes on over the map.
+    const m = run.size * 0.7, [x, y] = run.sheet.plane;
+    run.away = { x: Math.max(m, Math.min(w - m, x - box.left)), y: Math.max(m, Math.min(h - m, y - box.top)), size: run.sheet.size };
+    $("fold").hidden = true;
+    if (document.activeElement === $("fold-skip")) $("opening-skip").focus();
+  }
+  return true;
+}
+
+// The Lab's board as one sheet on the screen (null: not on screen to fold).
+function foldSheet(board) {
+  const T = Math.max(0, board.top), B = Math.min(window.innerHeight, board.bottom);
+  if (board.width < 80 || B - T < 80) return null;
+  const L = board.left, R = board.right, cx = (L + R) / 2;
+  const size = Math.min(B - T, R - L) * 0.5;
+  return { L, R, T, B, cx, size, plane: [cx, (T + B) / 2], vw: window.innerWidth, vh: window.innerHeight };
+}
+
+// The fold as it is t ms in: the words fading over the cream sheet; folded
+// in half and opened again (a crease down the middle); the two top corners
+// to the middle (a long triangle); the triangle's six faces taking the
+// plane's shape, the wings coming in to the middle and opening.
+function drawFold(run, t) {
+  const { L, R, T, B, cx, size, plane } = run.sheet;
+  const clamp = (x) => Math.max(0, Math.min(1, x)), ease = (x) => x * x * (3 - 2 * x);
+  const paper = clamp(t / FOLD.paper), k = clamp((t - FOLD.paper) / FOLD.fold);
+  const half = ease(clamp(k / 0.3)), corner = ease(clamp((k - 0.3) / 0.3)), wing = ease(clamp((k - 0.6) / 0.4));
+  $("start").style.opacity = String(1 - paper);
+  const sheet = $("fold-sheet"), faces = [...$("fold-plane").children];
+  const line = (pts) => pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const mix = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+  if (k < 0.6) {
+    const over = Math.sin(Math.PI * half) * 0.92;  // The left half laid over the right, and back.
+    const l = L + (cx - L) * over, nose = [cx, T];
+    const tl = mix([l, T], mix(nose, [l, B], 0.35), corner), tr = mix([R, T], mix(nose, [R, B], 0.35), corner);
+    sheet.setAttribute("points", line([tl, nose, tr, [R, B], [l, B]]));
+    sheet.style.fillOpacity = String(paper);
+    sheet.style.strokeOpacity = String(paper);
+    for (const node of faces) node.setAttribute("points", "");
+    return;
+  }
+  sheet.setAttribute("points", "");
+  const flat = { nose: [cx, T], keel: [cx, B], tl: [cx - 1, B], tr: [cx + 1, B], ml: [(L + cx) / 2, B], mr: [(R + cx) / 2, B],
+    wl: [L, B], wr: [R, B] };
+  const shaped = planeFaces({ x: plane[0], y: plane[1], size, a: -Math.PI / 2, roll: 0, pitch: 0 });
+  const at = {};
+  for (const face of shaped) face.names.forEach((name, i) => { at[name] = face.points[i]; });
+  const pull = Math.sin(Math.PI * wing) * 0.6;  // The wings in to the middle on the way, then opened.
+  const middle = plane[0] + (cx - plane[0]) * (1 - wing);
+  shaped.forEach((face, i) => {
+    faces[i].setAttribute("points", line(face.names.map((name) => {
+      const [x, y] = mix(flat[name], at[name], wing);
+      return [x - (x - middle) * pull, y];
+    })));
+    faces[i].style.filter = `brightness(${(1 + (face.light - 1) * wing).toFixed(3)})`;
+  });
+}
+
+// From where it was folded, off far (smaller) to the school, turning there.
+function drawAway(run, t) {
+  const u = Math.min(1, t / FOLD.away), e = u * u * (3 - 2 * u);
+  const a = [run.away.x, run.away.y], b = run.from;
+  const c = [(a[0] + b[0]) / 2, Math.max(run.size * 0.7, Math.min(a[1], b[1]) - run.h * 0.12)];
+  const v = 1 - e;
+  const x = v * v * a[0] + 2 * v * e * c[0] + e * e * b[0], y = v * v * a[1] + 2 * v * e * c[1] + e * e * b[1];
+  const dir = Math.atan2(2 * v * (c[1] - a[1]) + 2 * e * (b[1] - c[1]), 2 * v * (c[0] - a[0]) + 2 * e * (b[0] - c[0]));
+  const size = run.away.size + (run.size * 0.32 - run.away.size) * e;
+  const faces = planeFaces({ x, y, size, a: dir, roll: 0, pitch: 0 });
+  [...$("opening-plane").children].forEach((node, i) => {
+    node.setAttribute("points", faces[i].points.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(" "));
+    node.style.filter = `brightness(${faces[i].light.toFixed(3)})`;
   });
 }
 
@@ -263,6 +366,7 @@ function planeFaces(pose) {
     const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
     const cos = Math.abs(n[0] * PLANE_LIGHT[0] + n[1] * PLANE_LIGHT[1] + n[2] * PLANE_LIGHT[2]) / (Math.hypot(...n) || 1);
     return {
+      names,
       points: names.map((name) => {
         const [X, Y, Z] = turned[name], k = 1 / (1 - 0.3 * (Y * 0.7 + Z * 0.7));
         return [x + X * size * k, y + (Y * 0.7 - Z * 0.7) * size * k];
@@ -284,8 +388,12 @@ function lightNear(run, x, y) {
   }
 }
 
-// The opening as it is t ms in.
+// The opening as it is t ms in (after the fold, its way to the school first).
 function drawOpening(run, t) {
+  if (run.away) {
+    if (t < FOLD.away) return drawAway(run, t);
+    t -= FOLD.away;
+  }
   const plane = $("opening-plane"), trail = $("opening-trail"), ring = $("opening-ring"), title = $("opening-title");
   const fly = Math.min(1, t / OPENING.fly);
   // Slowing down to land: fast at first, the last stretch gently.
@@ -308,8 +416,8 @@ function drawOpening(run, t) {
     node.style.filter = `brightness(${faces[i].light.toFixed(3)})`;
   });
   if (fly < 1) lightNear(run, p.x, p.y);
-  plane.style.opacity = t < OPENING.fly + OPENING.land ? "1"
-    : String(Math.max(0, 1 - (t - OPENING.fly - OPENING.land) / (OPENING.title * 0.5)));
+  // Gone before the title comes, so it never lies over it.
+  plane.style.opacity = String(Math.max(0, Math.min(1, (OPENING.fly + OPENING.land - t) / (OPENING.land * 0.5))));
   // The trail: the last quarter second of the way only, so it fades at once.
   run.trail.push([t, p.x, p.y]);
   while (run.trail.length && t - run.trail[0][0] > 240) run.trail.shift();
@@ -347,6 +455,8 @@ function finishOpening(run) {
   for (const point of run.points) point.node.style.opacity = "";
   for (const id of ["opening-svg", "opening-title"]) $(id).style.visibility = "hidden";
   $("opening-bar").hidden = true;
+  $("fold").hidden = true;
+  $("start").style.opacity = "";
   run.done();
 }
 

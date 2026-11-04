@@ -362,6 +362,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .opening-bar button { min-height: 44px; padding: 6px 22px; }
 /* Focused as the opening starts, by a click or a key alike: its ring shows either way. */
 .opening-bar button:focus { outline: 2px solid var(--lamp); outline-offset: 3px; }
+/* The Lab's board folded into the plane first (直し30の続き-3): over the whole screen a moment. */
+.fold { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
+.fold svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+.fold-sheet { fill: var(--paper); stroke: var(--lamp); stroke-width: 1.2; stroke-linejoin: round; }
+.fold button { position: absolute; right: 16px; bottom: 16px; min-height: 44px; padding: 6px 22px; pointer-events: auto; }
+.fold button:focus { outline: 2px solid var(--lamp); outline-offset: 3px; }
 /* 最初にもどる under the sheet (直し30-2), and its line and two buttons. */
 .back-to-start { max-width: 720px; margin: 28px auto 48px; text-align: center; }
 .back-to-start > button, .back-confirm button { min-height: 48px; padding: 8px 24px; }

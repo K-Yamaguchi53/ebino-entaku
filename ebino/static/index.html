@@ -21,6 +21,19 @@
     </div>
   </section>
 
+  <!-- The Lab's board folded into the paper plane (直し30の続き-3): over the
+       screen a moment; 「とばす」, Enter or Esc ends it. -->
+  <div id="fold" class="fold" hidden>
+    <svg id="fold-svg" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+      <polygon id="fold-sheet" class="fold-sheet"></polygon>
+      <g id="fold-plane" class="opening-plane">
+        <polygon></polygon><polygon></polygon><polygon></polygon>
+        <polygon></polygon><polygon></polygon><polygon></polygon>
+      </g>
+    </svg>
+    <button type="button" id="fold-skip" class="quiet"></button>
+  </div>
+
   <section id="table" hidden>
     <p id="heavy-talk" class="heavy-talk"></p>
 
