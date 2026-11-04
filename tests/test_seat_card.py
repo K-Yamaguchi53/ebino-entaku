@@ -1,5 +1,5 @@
 """The question card in the seat list (直し25-4): opened, it goes right under
-its seat's line of seats at the list's full width, so the seat keeps its
+its seat's line of seats, as wide as the seats' columns (直し26-4), so the seat keeps its
 size and no hole opens beside it; it says whose seat it is for in the seat
 list's own words; one is open at a time."""
 
@@ -34,6 +34,11 @@ def test_it_goes_after_the_last_seat_on_its_line_names_its_seat_and_closes_anoth
     assert not re.search(r"seat\.(company|display_name|name)\b", put)
     assert 'querySelectorAll("#seat-list .card-form")' in put and "other.closeCard()" in put
     assert "open.hidden = true" in put and "open.hidden = false" in put
-    assert ".seat-row > .card-form { flex: 1 0 100%; max-width: none;" in CSS
+    # As wide as the seats' columns (直し26-4), alone on its line.
+    assert ".seat-row > .card-form { flex: 0 0 var(--line, 100%); max-width: none;" in CSS
+    assert "margin-right: calc(100% - var(--line, 100%))" in CSS
+    assert "form.fit = () => fitToSeats(node, form);" in put
+    fit = _function("fitToSeats")
+    assert "seat.offsetLeft + seat.offsetWidth" in fit and 'form.style.setProperty("--line"' in fit
     rule = re.search(r"\.card-form \.card-for \{[^}]*\}", CSS).group(0)
     assert "#" not in rule and "var(--gothic)" in rule

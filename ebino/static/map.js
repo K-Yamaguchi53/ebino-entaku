@@ -62,6 +62,7 @@ const EbinoMap = (() => {
   const SCHOOL_SHARE = 0.072, SCHOOL_MIN_PX = 56, SCHOOL_MAX_PX = 130;
   const SCHOOL_TEXT_MAX_PX = 24, SCHOOL_MARK_MAX_PX = 64;
   const WORD_PAD = 2;  // CSS px kept clear round a word drawn on the map.
+  const SLIDE_MOST = 40;  // CSS px the school's name may slide off a seat's point.
   // Where a seat's 「？」 may go, by its point (x, y, which way the text runs
   // from there), in the order tried: upper right first.
   const ASK_CORNERS = [[9, -6, "start"], [-9, -6, "end"], [9, 16, "start"], [-9, 16, "end"]];
@@ -1199,15 +1200,24 @@ const EbinoMap = (() => {
     }
   }
 
-  // The school's name stays under its mark; a place name in its way (or in
-  // the way of the school's picture) moves up or down (whichever is nearer
-  // its own side), just clear of both, as the zoom is now.
+  // The school's name stays under its mark, slid left or right off the
+  // seats' points by as little as it takes (直し26-4); a place name in its
+  // way (or in the way of the school's picture) moves up or down (whichever
+  // is nearer its own side), just clear of both, as the zoom is now.
   function clearSchoolName() {
     const label = svg.querySelector(".school text");
     const names = [...svg.querySelectorAll(".place-names text")];
     for (const name of names) name.removeAttribute("dy");
+    if (label) label.removeAttribute("dx");
     let school = label && label.getBoundingClientRect();
     if (!school || !school.width) return;
+    const dots = [...svg.querySelectorAll(".points .pt .shape")].map((node) => node.getBoundingClientRect()).filter((r) => r.width)
+      .map((r) => [r.left - WORD_PAD, r.top - WORD_PAD, r.width + 2 * WORD_PAD, r.height + 2 * WORD_PAD]);
+    const slide = nameSlide([school.left, school.top, school.width, school.height], dots);
+    if (slide) {
+      label.setAttribute("dx", slide * label.getBBox().width / school.width);
+      school = label.getBoundingClientRect();
+    }
     const picture = svg.querySelector(".school-picture image");
     if (picture) {
       const p = picture.getBoundingClientRect();
@@ -1223,6 +1233,21 @@ const EbinoMap = (() => {
       const shift = below ? school.bottom + WORD_PAD - r.top : school.top - WORD_PAD - r.bottom;
       name.setAttribute("dy", shift * perPx);
     }
+  }
+
+  // How far a name ([left, top, width, height]) slides left (less than 0) or
+  // right to cover none of the boxes given: 0 when it covers none already;
+  // the smaller slide, up to SLIDE_MOST px, the left first when they are the
+  // same; 0 when no slide that small frees it. It reads nothing but what it
+  // is given.
+  function nameSlide([left, top, w, h], boxes) {
+    const free = (dx) => !boxes.some((b) => boxesMeet([left + dx, top, w, h], b));
+    if (free(0)) return 0;
+    for (let d = 1; d <= SLIDE_MOST; d++) {
+      if (free(-d)) return -d;
+      if (free(d)) return d;
+    }
+    return 0;
   }
 
   // Of a few boxes, the first that covers none of the others given, or the

@@ -796,6 +796,8 @@ def test_the_flat_maps_heading_wraps_between_pieces_and_labels_keep_off_the_scho
     # The school's name stays under its mark: a place name in its way moves, before the labels are put.
     clear = _inner_function(script, "clearSchoolName")
     assert 'name.setAttribute("dy",' in clear and 'name.removeAttribute("dy")' in clear
+    # The name itself slides off the seats' points (直し26-4).
+    assert ".points .pt .shape" in clear and "nameSlide(" in clear and 'label.setAttribute("dx",' in clear
     relayout = _inner_function(script, "relayout")
     assert relayout.index("clearSchoolName();") < relayout.index("fixedBoxes(frameBox)")
     # A seat's 「？」 keeps a little room round the words, not only off them.

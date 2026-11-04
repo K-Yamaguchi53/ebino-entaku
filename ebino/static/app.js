@@ -606,6 +606,19 @@ function putUnderLine(seat, form, open) {
   open.hidden = true;
   node.classList.add("writing");
   last.after(form);
+  // As wide as the seats' columns, not the whole list (直し26-4), again
+  // when the window's width changes.
+  form.fit = () => fitToSeats(node, form);
+  form.fit();
+}
+
+// The width the seats of a row take: from the left of the leftmost to the
+// right of the rightmost, whichever line they are on.
+function fitToSeats(node, form) {
+  const seats = [...node.parentElement.children].filter((next) => next.classList.contains("seat"));
+  const left = Math.min(...seats.map((seat) => seat.offsetLeft));
+  const right = Math.max(...seats.map((seat) => seat.offsetLeft + seat.offsetWidth));
+  form.style.setProperty("--line", `${right - left}px`);
 }
 
 // The seat list's question card for any seat, opened from its lamp card at
@@ -874,4 +887,7 @@ $("decline").addEventListener("click", () => reflectAnswer(true));
 $("reflect-finish").addEventListener("submit", reflectFinish);
 $("harvest-subject-more").addEventListener("click", moreSubject);
 $("more-purposes").addEventListener("click", async () => renderPurposes((await call("/api/purposes", {})).purposes));
+window.addEventListener("resize", () => {
+  for (const form of document.querySelectorAll("#seat-list .card-form")) if (form.fit) form.fit();
+});
 setup();
