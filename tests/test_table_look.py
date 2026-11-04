@@ -39,7 +39,9 @@ def test_the_top_is_thick_wood_with_a_lit_rim_and_one_leg():
 def test_the_size_and_the_seats_spots_are_as_before():
     assert "const TABLE_RX = 150, TABLE_RY = 110, TABLE_LIFT = 7, SEAT_OUT = 48;" in MAP
     assert "tableTop = ring(center, 0, TABLE_LIFT);" in _opened()
-    assert "const at = onTable(center, sitting.angle, SEAT_OUT);" in _opened()
+    # The seats that spoke sit where their cards have room (直し33-4); the
+    # empty chairs, and a seat with no room there, round the table as before.
+    assert "const at = spot ? spot.at : onTable(center, sitting.angle, SEAT_OUT);" in _opened()
 
 
 def test_each_seat_sits_on_a_chair_its_back_to_the_outside():

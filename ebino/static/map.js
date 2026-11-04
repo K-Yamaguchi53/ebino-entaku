@@ -77,6 +77,20 @@ const EbinoMap = (() => {
   // the height of the ground there, in map units.
   const TABLE_RX = 150, TABLE_RY = 110, TABLE_LIFT = 7, SEAT_OUT = 48;
   const TABLE_THICK = 9;  // The top's thickness: its side shows in front (直し29-2).
+  // The gathering (直し33-4): the table is no longer on the basin. Its middle
+  // is where the map meets the school (upright: between the two), flat, seen
+  // a little from above (TABLE_TILT); its top TABLE_PX CSS px from its middle
+  // to its side (this part of the room, within TABLE_PX_MOST), so the seats
+  // that spoke gather round it wherever they live and their cards have the
+  // room round it.
+  const TABLE_TILT = 0.55, TABLE_PART = 0.075, TABLE_PX_MOST = [54, 96];
+  // The seats that spoke sit where their cards have room (直し33-4): in two
+  // columns, left and right of the table, a card's height apart, each at
+  // the inner edge of where its card goes. GATHER_CARD: the CSS px a card
+  // takes at the table (style.css: two lines of words, whose under them),
+  // and the gap between two. On a wide screen the right column stays over
+  // the room the AI's seat takes under the school (AI_ROOM of the height).
+  const GATHER_CARD = { w: 236, h: 112, gap: 10 }, AI_ROOM = 0.42;
   // Quicker since 直し31-6 (were 1100, 1100, 160): the table is there sooner.
   const CAMERA_FOR = 700, FLY_FOR = 700, FLY_GAP = 90, BACK_FOR = 700;
   const CLOSEST = 3.5;  // The nearest zoom shows this part of the whole across.
@@ -115,7 +129,8 @@ const EbinoMap = (() => {
   // round them is the round table's and its cards' (直し33-4).
   const MAP_SHARE = 0.56;  // Landscape: the map at most this part of the room's width,
   const YARD_SHARE = 0.56;  // the yard at most this part of its height (the AI's seat under it).
-  const MAP_SHARE_UP = 0.58;  // Upright: the map at most this part of the room's height.
+  const MAP_SHARE_UP = 0.52;  // Upright: the map at most this part of the room's height,
+  const AI_BAND_UP = 0.26;  // and this part at its foot left for the AI's seat (直し33-4: the room keeps its size).
   const ROOM_GAP = 16;  // CSS px between the map and the yard.
   const UPRIGHT_UNDER = 1.4;  // A room narrower than this (width to height): the yard under the map.
   const RECOMPOSE = 0.03;  // The room's shape this much off the drawing's: it is drawn again.
@@ -153,6 +168,8 @@ const EbinoMap = (() => {
   let pressedOnce = false;  // A card was pressed: the line that says so goes, for good.
   let tableRoundNo = 0;  // The round the table is for.
   let tableAt = null;  // The table open: { center, angles, split }, for the band's seats.
+  let tableOf = null;  // The round the table is open for, to open it again laid out afresh (直し33-4).
+  let playing = false;  // A round's seats lighting or gathering: not drawn again meanwhile.
 
   const reduced = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = (id) => document.getElementById(id);
@@ -301,7 +318,7 @@ const EbinoMap = (() => {
       column = [left, room.w];
     } else {
       [mx, my] = [(room.w - mw) / 2, 0];
-      const top = mh + ROOM_GAP, free = room.h - top;
+      const top = mh + ROOM_GAP, free = room.h * (1 - AI_BAND_UP) - top;
       yw = Math.min(room.w * 0.94, (free - ROOM_GAP) / ratio);
       [yx, yy] = [(room.w - yw) / 2, top + (free - yw * ratio) / 2];
       column = [0, room.w];
@@ -502,7 +519,7 @@ const EbinoMap = (() => {
       } else ground.push(seat);
     }
     const first = ground.filter((seat) => seat.kind === "outsider_teacher");
-    const squares = groundSquares(field, ground.length, step);
+    const squares = groundSquares(field, ground.length, step, 2.2 * r);
     [...first, ...ground.filter((seat) => seat.kind !== "outsider_teacher")].forEach((seat, n) => {
       spots[seat.id] = squares[n];
     });
@@ -525,15 +542,16 @@ const EbinoMap = (() => {
 
   // n squares on a ground (its four corners: north-west, north-east,
   // south-east, south-west), step apart where it is large enough (closer
-  // where it is not), the block in its middle, row by row from the north.
-  // It reads nothing but what it is given.
-  function groundSquares([nw, ne, se, sw], n, step) {
+  // where it is not, but never under least: then the block goes past the
+  // ground's edge rather than two touching), the block in its middle, row by
+  // row from the north. It reads nothing but what it is given.
+  function groundSquares([nw, ne, se, sw], n, step, least = 0) {
     if (!n) return [];
     const wide = Math.hypot(ne[0] - nw[0], ne[1] - nw[1]), deep = Math.hypot(sw[0] - nw[0], sw[1] - nw[1]);
-    const most = Math.max(1, Math.floor(wide / step) - 1);
+    const most = Math.max(1, Math.floor(wide / Math.max(least, Math.min(step, wide / 2))) - 1);
     const columns = Math.min(most, n, Math.max(1, Math.ceil(Math.sqrt(n * wide / deep))));
     const rows = Math.ceil(n / columns);
-    const across = Math.min(step, wide / (columns + 1)), down = Math.min(step, deep / (rows + 1));
+    const across = Math.max(least, Math.min(step, wide / (columns + 1))), down = Math.max(least, Math.min(step, deep / (rows + 1)));
     const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
     return Array.from({ length: n }, (_, m) => {
       const c = m % columns, r = Math.floor(m / columns);
@@ -556,13 +574,18 @@ const EbinoMap = (() => {
   // Drawn again for the room's shape as it is now, when that is not the
   // drawing's (the window turned or was resized) and no round is playing or
   // its table open: true when it was. The lit seats stay lit.
+  // With the table open (直し33-4), it is opened again for the same round,
+  // at once, its seats where the new shape gives them room.
   function recompose() {
-    if (!view || tableAt || camera || timers.length || flights.length) return false;
+    if (!view || camera || playing || flights.length) return false;
     const room = roomSize(), want = room.w / room.h, have = view.W / view.H;
     if (Math.abs(want - have) <= RECOMPOSE * have) return false;
     const lit = Object.keys(points).filter((id) => points[id].node.classList.contains("lit"));
+    const reopen = tableAt && tableOf;
+    if (reopen) clearTable();
     draw(lastSeats, view.relief);
     for (const id of lit) if (points[id]) points[id].node.classList.add("lit");
+    if (reopen) openTable(reopen.result, reopen.order, tableCenter(), () => true, true);
     return true;
   }
 
@@ -1338,12 +1361,14 @@ const EbinoMap = (() => {
   // One card's spot: first the eight round its seat (above first), then the
   // nearest free one within reach. [spot, its tail] or null.
   function tableBubbleSpot(frame, item, taken, block, tails, reach) {
-    const { w, h, px, py, gap, r } = item, m = 4;
+    const { w, h, px, py, gap, r, side } = item, m = 4;
     if (w > frame.w - 2 * m || h > frame.h - 2 * m) return null;
     const clamp = ([left, top]) => [Math.max(m, Math.min(left, frame.w - w - m)), Math.max(m, Math.min(top, frame.h - h - m))];
     const away = ([left, top]) => Math.hypot(Math.max(left - px, 0, px - left - w), Math.max(top - py, 0, py - top - h));
     const d = gap * 0.7;
-    const round = [[px - w / 2, py - h - gap], [px - w / 2, py + gap], [px + gap, py - h / 2], [px - w - gap, py - h / 2],
+    // A seat gathered by the table (直し33-4): its card on its own side first.
+    const first = side === "left" ? [[px - w - gap, py - h / 2]] : side === "right" ? [[px + gap, py - h / 2]] : [];
+    const round = [...first, [px - w / 2, py - h - gap], [px - w / 2, py + gap], [px + gap, py - h / 2], [px - w - gap, py - h / 2],
       [px + d, py - h - d], [px - w - d, py - h - d], [px + d, py + d], [px - w - d, py + d]].map(clamp);
     const grid = [];
     for (let top = py - reach - h; top <= py + reach; top += TABLE_STEP) {
@@ -1450,6 +1475,9 @@ const EbinoMap = (() => {
     const [x0, x1] = view.column.map((x) => f.left - s.left + x / view.W * f.width);
     stage.style.setProperty("--yard-left", `${Math.round(x0)}px`);
     stage.style.setProperty("--yard-w", `${Math.round(x1 - x0)}px`);
+    // Upright: the band at the room's foot, over which the AI's seat sits.
+    stage.style.setProperty("--room-foot", `${Math.round(s.bottom - f.bottom)}px`);
+    stage.style.setProperty("--ai-band", `${Math.round(f.height * AI_BAND_UP)}px`);
   }
 
   // A 「？」 by its seat, at the first of its four corners that covers no word
@@ -1669,6 +1697,7 @@ const EbinoMap = (() => {
 
   function clearRound() {
     roundNo += 1;
+    playing = false;
     for (const timer of timers) clearTimeout(timer);
     timers = [];
     for (const flight of flights) flight.cancel();
@@ -1740,19 +1769,70 @@ const EbinoMap = (() => {
 
   // --- the round table (the picture only) ---
 
-  const tableCenter = () => {
-    const [x, y] = centroid(map.boundary);
-    return { x, y, level: view.zAt(x, y) };
-  };
+  // Where the seats gather (直し33-4): the table's middle where the map
+  // meets the school (upright: between the two), and its own flat
+  // projection there (the table's units, as on the basin before, to the
+  // drawing's), whatever the seats' homes.
+  const tableCenter = () => gatherAt({ W: view.W, H: view.H, mapBox: view.mapBox, upright: view.upright, unit: view.unit });
+
+  // The gathering's middle and projection for a drawing ({ W, H, mapBox,
+  // upright, unit }). It reads nothing but what it is given.
+  function gatherAt({ W, H, mapBox: [mx, my, mw, mh], upright, unit }) {
+    const [cx, cy] = upright ? [W / 2, my + mh + ROOM_GAP * unit / 2] : [mx + mw + ROOM_GAP * unit / 2, H / 2];
+    const across = Math.min(W, H * 1.6) / unit * TABLE_PART;
+    const s = Math.min(Math.max(across, TABLE_PX_MOST[0]), TABLE_PX_MOST[1]) * unit / TABLE_RX;
+    return { x: 0, y: 0, level: 0, at: [cx, cy], scale: s,
+      proj: (x, y, lift = 0) => [cx + x * s, cy + y * s * TABLE_TILT - lift * s * TABLE_TILT] };
+  }
 
   function onTable(center, angle, out, lift = TABLE_LIFT) {
     const a = angle * Math.PI / 180;
-    return view.proj(center.x + (TABLE_RX + out) * Math.cos(a), center.y + (TABLE_RY + out) * Math.sin(a),
+    return (center.proj || view.proj)(center.x + (TABLE_RX + out) * Math.cos(a), center.y + (TABLE_RY + out) * Math.sin(a),
       lift, center.level);
   }
 
   function ring(center, out, lift) {
     return Array.from({ length: 72 }, (_, k) => onTable(center, k * 5, out, lift));
+  }
+
+  // Where each seat that spoke sits (直し33-4), from the seating's groups
+  // (a: one side of the split, b: the other, back: neither) and the
+  // gathering's middle, in a drawing ({ W, H, unit, upright }): side a in
+  // the left column, side b in the right, the others where there is room,
+  // each column as many rows as fit (on a wide screen the right one over
+  // the AI's room), centred on the table. Returns id -> { at, side }; a seat
+  // with no room has none (it sits round the table and its seat shows its
+  // card when pressed). It reads nothing but what it is given.
+  function gatherSpots(sittings, center, { W, H, unit, upright }) {
+    const [cx, cy] = center.at, card = GATHER_CARD;
+    const step = (card.h + card.gap) * unit, margin = 6 * unit;
+    const half = (TABLE_RX + 18) * center.scale + 22 * unit;  // The table's side and a little room.
+    const foot = upright ? H * (1 - AI_BAND_UP) - margin : H - margin;
+    const limits = { left: foot, right: upright ? foot : H * (1 - AI_ROOM) - margin };
+    const fits = (limit) => Math.max(0, Math.floor((limit - margin + card.gap * unit) / step));
+    const room = { left: fits(limits.left), right: fits(limits.right) };
+    const columns = { left: [], right: [] };
+    const put = (id, side) => {
+      const other = side === "left" ? "right" : "left";
+      if (columns[side].length < room[side]) columns[side].push(id);
+      else if (columns[other].length < room[other]) columns[other].push(id);
+    };
+    for (const { id, group } of sittings) if (group === "a") put(id, "left"); else if (group === "b") put(id, "right");
+    for (const { id, group } of sittings) {
+      if (group === "a" || group === "b") continue;
+      put(id, columns.left.length - room.left <= columns.right.length - room.right ? "left" : "right");
+    }
+    const out = {};
+    for (const side of ["left", "right"]) {
+      const ids = columns[side];
+      if (!ids.length) continue;
+      // Centred on the table, moved up or down as little as keeps it in the room.
+      const tall = ids.length * step - card.gap * unit;
+      const top = Math.min(Math.max(cy - tall / 2, margin), limits[side] - tall);
+      const x = side === "left" ? cx - half : cx + half;
+      ids.forEach((id, k) => { out[id] = { at: [x, top + k * step + card.h * unit / 2], side }; });
+    }
+    return out;
   }
 
   // The side of the table towards the camera, in degrees round it (0° the
@@ -1814,40 +1894,36 @@ const EbinoMap = (() => {
     return out.concat(order.filter((id) => !out.includes(id)));
   }
 
-  function tableView(center) {
-    const spots = ring(center, SEAT_OUT + 70, TABLE_LIFT);
-    const xs = spots.map((p) => p[0]), ys = spots.map((p) => p[1]);
-    let w = (Math.max(...xs) - Math.min(...xs)) * 1.2, h = (Math.max(...ys) - Math.min(...ys)) * 1.3;
-    if (w / h < view.W / view.H) w = h * view.W / view.H; else h = w * view.H / view.W;
-    return { x: (Math.max(...xs) + Math.min(...xs)) / 2 - w / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 - h / 2, w, h };
-  }
-
   async function tableRound(result, order, first, mine) {
     const still = () => mine === roundNo;
+    playing = true;
     // From the whole map, so every seat that lights can be seen.
     if (vb.w < view.W - 0.5) await moveTo({ x: 0, y: 0, w: view.W, h: view.H }, reduced() ? 0 : 500);
     if (!still()) return;
     if (reduced()) {
       for (const id of order) points[id].node.classList.add("lit");
     } else {
+      // Each lights at its home, no card there (直し33-4: the cards come
+      // from the seats gathered at the table, no line from their homes).
       for (const id of order) {
         light(id);
-        bubble(id, first[id]);
         await wait(LIGHT_EVERY);
         if (!still()) return;
       }
       await wait(150);
       if (!still()) return;
     }
-    const center = tableCenter();
-    // Motion reduced: the camera is at the table at once, nothing flies.
-    await moveTo(tableView(center), CAMERA_FOR);
-    if (!still()) return;
-    openTable(result, order, center, still);
+    // The seats gather where their cards have room (直し33-4): the camera
+    // stays on the whole drawing; they fly there from their homes (motion
+    // reduced: they are there at once).
+    openTable(result, order, tableCenter(), still);
   }
 
-  async function openTable(result, order, center, still) {
-    const motion = !reduced();
+  // again: the same round's table opened again for the room's new shape
+  // (recompose): at once, nothing flies.
+  async function openTable(result, order, center, still, again = false) {
+    const motion = !reduced() && !again;
+    tableOf = { result, order };
     const front = frontAngle(center);
     const { split, sides, seats } = seating(result, order, front);
     tableAt = { center, angles: seats.map((sitting) => sitting.angle), split: Boolean(split), front };
@@ -1861,14 +1937,14 @@ const EbinoMap = (() => {
     for (const { node } of Object.values(points)) node.setAttribute("tabindex", "-1");
     $("map-back").hidden = false;
     const rc = rough.svg(svg);
-    const S = view.S;
+    const S = center.scale || view.S;
     const polygon = (className, spots) => svgEl("polygon", { class: className, points: spots.map((p) => p.join(",")).join(" ") });
     tableTop = ring(center, 0, TABLE_LIFT);
     // The lamp's light on the ground round the table, its shadow, the top's
     // edge (so it reads as a top, not a ring), the top lit from its middle,
     // its rim of light, and the lamp.
     const top = svgEl("g", { class: "table-top-group" });
-    const [lx, ly] = view.proj(center.x, center.y, TABLE_LIFT, center.level);
+    const [lx, ly] = center.proj(center.x, center.y, TABLE_LIFT, center.level);
     const lamp = svgEl("g", { class: "table-lamp" });
     lamp.append(svgEl("circle", { class: "light", cx: lx, cy: ly, r: 70 * S }),
       svgEl("circle", { class: "core", cx: lx, cy: ly, r: 4.5 * S }));
@@ -1896,16 +1972,19 @@ const EbinoMap = (() => {
     }
     // The split: a dashed line down the table's middle, between the sides.
     if (split) {
-      const [n0, n1] = [view.proj(center.x, center.y - TABLE_RY + 6, TABLE_LIFT, center.level),
-        view.proj(center.x, center.y + TABLE_RY - 6, TABLE_LIFT, center.level)];
+      const [n0, n1] = [center.proj(center.x, center.y - TABLE_RY + 6, TABLE_LIFT, center.level),
+        center.proj(center.x, center.y + TABLE_RY - 6, TABLE_LIFT, center.level)];
       const line = rc.line(n0[0], n0[1], n1[0], n1[1], { stroke: "#000", strokeWidth: 1.8 * S, roughness: 0.9,
         seed: 5 });
       line.classList.add("table-split");
       tableLayer.append(line);
     }
     const landed = [];
+    const spots = gatherSpots(seats.filter((sitting) => sitting.group !== "front"), center,
+      { W: view.W, H: view.H, unit: view.unit, upright: view.upright });
     seats.forEach((sitting, k) => {
-      const at = onTable(center, sitting.angle, SEAT_OUT);
+      const spot = spots[sitting.id];
+      const at = spot ? spot.at : onTable(center, sitting.angle, SEAT_OUT);
       if (sitting.group === "front") return landed.push(chair(sitting.id, at, [lx, ly]));
       const kind = points[sitting.id].seat.kind;
       const node = svgEl("g", { class: `token pt lit kind-${kind}`, "aria-hidden": "true" });
@@ -1919,8 +1998,10 @@ const EbinoMap = (() => {
         node.append(svgEl("path", { class: "icon", d: SEAT_ICON_PATHS[icon], transform: SEAT_ICON_FIT[kind] || "" }));
       }
       tableLayer.append(node);
-      const token = { node, at, scale: TOKEN, id: sitting.id };
+      const token = { node, at, scale: TOKEN, id: sitting.id, side: spot ? spot.side : "" };
       tokens.push(token);
+      // It has left its home for the table (直し33-4): its home stays empty until it goes back.
+      points[sitting.id].node.classList.add("away");
       if (!motion) return landed.push(Promise.resolve(token));
       const f = pointScale();
       const [x0, y0] = spotOf(sitting.id);
@@ -1958,6 +2039,7 @@ const EbinoMap = (() => {
       const token = tokens.find((t) => t.id === id && !t.chair);
       if (!token || !first[id]) return;
       const card = tableBubble(id, first[id], token.at, k);
+      card.dataset.side = token.side;  // Its card goes this side of it first (直し33-4).
       card.dataset.rank = String(rank.indexOf(id));
       overlay.append(card, seatPress(id, token.at));
     });
@@ -1968,6 +2050,7 @@ const EbinoMap = (() => {
     for (const chairNode of tableLayer.querySelectorAll(".chair")) chairNode.classList.add("ready");
     tableRoundNo = result.round;
     if (!pressedOnce) overlay.append(div("map-hint", app.state.texts.bubble_hint));
+    playing = false;
     relayout();
     marked();
     app.setNow({ reading: false, table: true });
@@ -2040,7 +2123,7 @@ const EbinoMap = (() => {
     const items = cards.map((card) => {
       const { px, py, r } = seatAtTable(card);
       // Its tail TAIL_LENGTH long at least, so it shows which seat it is.
-      return { ...measure(card, frameBox), px, py, gap: r + TAIL_LENGTH, r,
+      return { ...measure(card, frameBox), px, py, gap: r + TAIL_LENGTH, r, side: card.dataset.side,
         inView: inView(Number(card.dataset.x), Number(card.dataset.y)) };
     });
     const reach = Math.max(TABLE_REACH, frameSize.w * TABLE_REACH_PART);
@@ -2636,6 +2719,7 @@ const EbinoMap = (() => {
   }
 
   function clearTable() {
+    tableOf = null;
     tokens = [];
     tableTop = null;
     tableAt = null;
@@ -2644,20 +2728,40 @@ const EbinoMap = (() => {
     if ($("map-heading")) $("map-heading").replaceChildren();
     if (tableLayer) tableLayer.replaceChildren();
     if (svg) svg.classList.remove("dim");
-    for (const { node } of Object.values(points)) node.setAttribute("tabindex", "0");
+    for (const { node } of Object.values(points)) {
+      node.setAttribute("tabindex", "0");
+      node.classList.remove("away");
+    }
     if ($("map-back")) $("map-back").hidden = true;
   }
 
   // 「地図にもどす」: the table goes, the camera goes back to the whole map
   // (at once when motion is reduced). The lit seats and the marks stay.
-  function closeTable() {
+  async function closeTable() {
     roundNo += 1;
+    playing = false;
+    const mine = roundNo;
     for (const flight of flights) flight.cancel();
     flights = [];
     for (const node of overlay.querySelectorAll(".split-tag, .table-label, .map-bubble, .table-bubble, .seat-press, .map-hint")) node.remove();
-    clearTable();
     $("map-zoom-all").focus();
     moveTo({ x: 0, y: 0, w: view.W, h: view.H }, BACK_FOR);
+    // Each seat flies back to its home (直し33-4; motion reduced: at once).
+    if (!reduced()) {
+      closeChoices(false);
+      const f = pointScale();
+      const back = tokens.filter((t) => !t.chair && points[t.id]).map((t) => {
+        const [x, y] = spotOf(t.id);
+        const flight = t.node.animate([
+          { transform: `translate(${t.at[0]}px, ${t.at[1]}px) scale(${f * TOKEN})` },
+          { transform: `translate(${x}px, ${y}px) scale(${f})` },
+        ], { duration: FLY_FOR * 0.7, easing: "cubic-bezier(.3,.7,.2,1)", fill: "forwards" });
+        return flight.finished.catch(() => {});
+      });
+      await Promise.all(back);
+      if (mine !== roundNo) return;
+    }
+    clearTable();
   }
 
   // --- marks that stay: met seats, and 「？」 on seats nobody asked yet ---

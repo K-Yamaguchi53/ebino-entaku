@@ -41,7 +41,7 @@ def _consts(*names):
 
 
 def _compose(rooms, yard=PICTURE):
-    program = "\n".join([_consts("MAP_SHARE", "YARD_SHARE", "MAP_SHARE_UP", "ROOM_GAP", "UPRIGHT_UNDER"), _inner("compose"),
+    program = "\n".join([_consts("MAP_SHARE", "YARD_SHARE", "MAP_SHARE_UP", "ROOM_GAP", "UPRIGHT_UNDER", "AI_BAND_UP"), _inner("compose"),
                          f"const rooms = {json.dumps(rooms)}, yard = {json.dumps(yard)};",
                          "const out = {};",
                          f"for (const [k, [w, h]] of Object.entries(rooms)) out[k] = compose({{ w, h }}, {RELIEF[0]}, {RELIEF[1]}, yard);",
@@ -70,7 +70,8 @@ def test_the_map_is_left_and_the_school_right_or_under_it_upright(yard):
         for box in (m, s):
             assert box[0] >= -1e-6 and box[1] >= -1e-6 and box[2] <= one["W"] + 1e-6 and box[3] <= one["H"] + 1e-6, size
         if size == "768x1024":
-            assert one["upright"] and s[1] >= m[3]  # The school under the map.
+            assert one["upright"] and s[1] >= m[3]  # The school under the map,
+            assert s[3] <= one["H"] * (1 - 0.26) + 1e-6  # over the band left for the AI's seat.
         else:
             assert not one["upright"] and s[0] >= m[2] and m[0] == 0  # The map on the left, the school right of it.
         # Large: the map at least half the room one way, the school a fifth of its width.
@@ -107,7 +108,10 @@ def test_the_large_picture_first_and_without_it_the_plain_yard():
 
 def test_the_drawing_follows_the_rooms_shape_but_not_while_a_round_plays():
     again = _inner("recompose")
-    assert "if (!view || tableAt || camera || timers.length || flights.length) return false;" in again
+    assert "if (!view || camera || playing || flights.length) return false;" in again
+    # The table open: opened again for the same round, at once (直し33-4).
+    assert "if (reopen) openTable(reopen.result, reopen.order, tableCenter(), () => true, true);" in again
+    assert "const motion = !reduced() && !again;" in MAP
     assert "recompose();" in _inner("show") and "if (recompose()) return;" in _inner("watchSize")
 
 

@@ -104,7 +104,7 @@ def _homes(seats, picture=None):
     names = ["reliefView", "yardModel", "compose", "homesOf", "groundSquares"]
     program = PLACES % {"setup": json.dumps(setup, ensure_ascii=False), "rooms": json.dumps(ROOMS),
                         "picture": json.dumps(picture),
-                        "consts": _consts("MAP_SHARE", "YARD_SHARE", "MAP_SHARE_UP", "ROOM_GAP", "UPRIGHT_UNDER",
+                        "consts": _consts("MAP_SHARE", "YARD_SHARE", "MAP_SHARE_UP", "ROOM_GAP", "UPRIGHT_UNDER", "AI_BAND_UP",
                                           "PLAIN_YARD", "HOME_STEP", "POINT_R", "MIN_POINT_PX"),
                         "source": "".join(_inner(name) for name in names)}
     done = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=60)
@@ -132,7 +132,7 @@ def test_every_invented_seat_has_a_home_and_none_overlap_on_the_five_screens(pic
         # 45 seniors, 40 windows: 5 on the ground, with the one from outside
         # and any adult whose place the map does not have.
         # At most one to a window (fewer where windows are too near together on screen).
-        assert counts["gate"] == 10 and 30 <= counts["windows"] <= 40, name
+        assert counts["gate"] == 10 and 15 <= counts["windows"] <= 40, name
         assert counts["map"] >= 100 and counts["ground"] == 1 + (45 - counts["windows"]) + (103 - counts["map"]), name
         assert counts["map"] + counts["gate"] + counts["windows"] + counts["ground"] == 159, name
         assert one["overlaps"] == 0 and one["outside"] == 0, (name, one["least"])

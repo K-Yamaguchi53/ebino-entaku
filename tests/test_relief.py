@@ -390,11 +390,12 @@ def test_a_box_is_measured_from_the_frames_corner_and_put_by_planlabels_alone():
         assert outside not in plan
 
 
-def test_with_motion_reduced_the_camera_still_goes_to_the_table_at_once():
+def test_with_motion_reduced_the_seats_are_at_the_table_at_once():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     table = _inner_function(script, "tableRound")
-    assert "await moveTo(tableView(center), CAMERA_FOR);" in table
-    assert "if (!reduced()) await moveTo(tableView" not in table
+    # No camera goes to the table (直し33-4): it is on the whole drawing; the seats gather.
+    assert "tableView" not in script and "openTable(result, order, tableCenter(), still);" in table
+    assert "if (!motion) return landed.push(Promise.resolve(token));" in _inner_function(script, "openTable")
     move = _inner_function(script, "moveTo")
     assert "if (reduced() || !ms) {" in move and "setView(target);" in move  # At once, no steps.
 
@@ -545,9 +546,8 @@ function scene(width) {
   // empty chair takes a press over a square HIT_PX each way), every label
   // put by planLabels clear of the table's top. The split's heading is
   // under the map, not in the frame.
-  const [cx, cy] = centroid(map.boundary);
-  const center = { x: cx, y: cy, level: view.zAt(cx, cy) };
-  vb = tableView(center);
+  // Where the seats gather (直し33-4): by the map's side, the camera on the whole drawing.
+  const center = gatherAt({ W: view.W, H: view.H, mapBox: view.mapBox, upright: false, unit: view.W / width });
   const f = pointScale();
   const { seats } = seating(round, round.seat_order, frontAngle(center));
   const cover = ring(center, 0, TABLE_LIFT).map((p) => toFrame(...p));
@@ -588,7 +588,7 @@ process.stdout.write(JSON.stringify(result));
 def _scenes():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     consts = script[script.index("  const NS ="):script.index("  let map = null;")]
-    names = ["centroid", "reliefView", "onTable", "ring", "tableView", "frontAngle", "seating", "pointScale", "yardModel",
+    names = ["centroid", "reliefView", "onTable", "ring", "gatherAt", "frontAngle", "seating", "pointScale", "yardModel",
              "homesOf", "groundSquares", "chooseSpot", "planLabels", "within", "seenWords", "planBubble", "topStrips"]
     source = "".join(_inner_function(script, name) for name in names)
     seats = [make_seat(seat_id=seat, kind=kind, title=f"架空の席{seat}", company="", display_name="",

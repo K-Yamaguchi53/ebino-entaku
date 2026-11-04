@@ -724,6 +724,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   color: var(--paper-ink); box-shadow: 0 0 0 1px var(--paper-line), 0 0 18px var(--lamp-soft), 0 8px 20px var(--shadow);
   animation: kindle .45s ease-out both; animation-delay: calc(var(--k, 0) * 250ms); }
 .table-bubble .voice { font-family: var(--mincho); font-size: 15px; line-height: 1.7; max-width: 13em; }
+/* At the gathering (直し33-4): the head of the words only, in two lines;
+   pressed, all of them. */
+.table-bubble:not([aria-expanded="true"]) .voice { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  line-clamp: 2; overflow: hidden; }
+/* A seat gone to the table: its home empty until it comes back. */
+.pt.away { visibility: hidden; }
 /* A bubble as spoken words (直し31-7): a small mark at its top, nothing more. */
 .spoken-mark { display: block; width: max-content; margin-bottom: 2px; padding: 0 6px; border: 1px solid currentColor;
   border-radius: 8px; font-family: var(--gothic); font-size: 11px; line-height: 1.5; opacity: .75; }
@@ -1061,8 +1067,10 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { position: abso
   body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-head { margin-bottom: 4px; }
 }
 @media (orientation: portrait) {
-  body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { position: static; width: auto; max-height: none; flex: 0 1 auto; min-height: 0; margin: 8px 0 0;
-    padding: 8px 10px; }
+  /* Over the band left for it at the map's room's foot (直し33-4), so the
+     room keeps its size when it comes and the round table its room. */
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { position: absolute; left: 0; right: 0; width: auto;
+    bottom: var(--room-foot, 0px); max-height: var(--ai-band, 150px); margin: 0; padding: 8px 10px; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-head { margin-bottom: 4px; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-cards { grid-template-columns: 1fr 1fr; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-question { padding: 6px 10px; }
