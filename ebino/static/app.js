@@ -241,11 +241,6 @@ function mapStage(run) {
   }
   $("map").scrollIntoView({ block: "nearest" });
   const w = box.width, h = box.height;
-  const end = [w / 2, h / 2];
-  // From the roof of the school's 3D picture when it is on the map in sight
-  // (直し30の続き-2); else from its mark; else the lower left. With no
-  // picture (none given, unread, or the school said no) the same opening.
-  let from = [Math.min(48, w * 0.08), h - Math.min(48, h * 0.08)];
   const sighted = (selector, high) => {
     const node = document.querySelector(selector);
     if (!node) return null;
@@ -253,6 +248,13 @@ function mapStage(run) {
     const at = [s.left + s.width / 2 - box.left, s.top + s.height * high - box.top];
     return s.width && at[0] > 0 && at[0] < w && at[1] > 0 && at[1] < h ? at : null;
   };
+  // It lands at the school beside the map (直し33-2: its picture, or the
+  // plain building); with neither in sight, the middle.
+  const end = sighted("#map-svg .yard-landing", 0.5) || [w / 2, h / 2];
+  // From the roof of the school's 3D picture when it is on the map in sight
+  // (直し30の続き-2); else from its mark; else the lower left. With no
+  // picture (none given, unread, or the school said no) the same opening.
+  let from = [Math.min(48, w * 0.08), h - Math.min(48, h * 0.08)];
   from = sighted("#map-svg .school-picture image", 0.3) || sighted("#map-svg .school > :not(text)", 0.5) || from;
   const points = [...document.querySelectorAll("#map-svg .pt")].map((node) => {
     const p = node.getBoundingClientRect();

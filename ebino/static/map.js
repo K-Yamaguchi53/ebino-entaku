@@ -103,6 +103,21 @@ const EbinoMap = (() => {
   // line mark (with no picture) never over SCHOOL_MARK_MAX_PX across.
   const SCHOOL_SHARE = 0.072, SCHOOL_MIN_PX = 56, SCHOOL_MAX_PX = 130;
   const SCHOOL_TEXT_MAX_PX = 24, SCHOOL_MARK_MAX_PX = 64;
+  // The one drawing (直し33-2): the map on the left and the school with its
+  // sports ground on the right (on an upright screen the map on top, the
+  // school under it), both as large as the room lets them be; the room left
+  // round them is the round table's and its cards' (直し33-4).
+  const MAP_SHARE = 0.56;  // Landscape: the map at most this part of the room's width,
+  const YARD_SHARE = 0.56;  // the yard at most this part of its height (the AI's seat under it).
+  const MAP_SHARE_UP = 0.58;  // Upright: the map at most this part of the room's height.
+  const ROOM_GAP = 16;  // CSS px between the map and the yard.
+  const UPRIGHT_UNDER = 1.4;  // A room narrower than this (width to height): the yard under the map.
+  const RECOMPOSE = 0.03;  // The room's shape this much off the drawing's: it is drawn again.
+  // With no picture of the school (直し33-2): a plain building and its ground,
+  // no name, in its own units; its windows (two rows on the building's
+  // front) and its ground's corners are where seats go, as on the picture.
+  const PLAIN_YARD = { width: 1400, height: 760, field: [[40, 150], [560, 150], [560, 720], [40, 720]],
+    roof: [[680, 290], [1360, 290], [1360, 540], [680, 540]], wall: 110, rows: [565, 615], columns: 20 };
   const WORD_PAD = 2;  // CSS px kept clear round a word drawn on the map.
   const SLIDE_MOST = 40;  // CSS px the school's name may slide off a seat's point.
   // Where a seat's 「？」 may go, by its point (x, y, which way the text runs
@@ -112,6 +127,8 @@ const EbinoMap = (() => {
   let map = null;  // The drawing from /api/setup.
   let app = null;  // What app.js lends: state, cardEntry, renderSeats, shownQuotes.
   let svg, overlay, frame, card;
+  let lastSeats = [];  // The seats as last drawn, to draw them again (直し33-2).
+  let yardPicture = null;  // The school's large picture once it has loaded (直し33-2).
   let view = null;  // How the map's (x, y) reach the drawing (flatView, reliefView).
   let vb = null;  // The part of the drawing on screen.
   let splitLayer, tableLayer, schoolGroup = null;
@@ -214,14 +231,82 @@ const EbinoMap = (() => {
     frame = $("map-frame");
     card = $("map-card");
     controls();
-    if (!map.relief) return build(seats, false);
-    const picture = new Image();
-    picture.onload = () => build(seats, true);
-    picture.onerror = () => build(seats, false);
-    picture.src = map.relief.image;
+    const go = () => {
+      if (!map.relief) return build(seats, false);
+      const picture = new Image();
+      picture.onload = () => build(seats, true);
+      picture.onerror = () => build(seats, false);
+      picture.src = map.relief.image;
+    };
+    // The school's large picture first (直し33-2): the seats on it are put
+    // from it. Not loaded (none, or it fails): the plain yard.
+    const yard = map.school_picture && map.school_picture.yard;
+    if (!yard) return go();
+    const image = new Image();
+    image.onload = () => { yardPicture = yard; go(); };
+    image.onerror = go;
+    image.src = yard.image;
+  }
+
+  // The yard as drawn: the picture's size and where its seats go, or the
+  // plain one's, in its own units.
+  function yardModel() {
+    if (yardPicture) return { picture: true, ...yardPicture };
+    const { width, height, field, roof, rows, columns } = PLAIN_YARD;
+    const [left, right] = [roof[0][0] + 24, roof[1][0] - 24];
+    const windows = rows.flatMap((y) => Array.from({ length: columns },
+      (_, k) => [left + (right - left) * k / (columns - 1), y]));
+    return { picture: false, width, height, field, roof, windows };
+  }
+
+  // The room the drawing has on screen (the map's room), or a guess from
+  // the window before it is on screen.
+  function roomSize() {
+    const room = frame.parentElement;
+    if (room && room.clientWidth > 80 && room.clientHeight > 80) return { w: room.clientWidth, h: room.clientHeight };
+    const upright = window.innerHeight > window.innerWidth * 0.9;
+    return upright ? { w: window.innerWidth - 32, h: Math.max(300, window.innerHeight - 380) }
+      : { w: Math.max(400, window.innerWidth - 260), h: Math.max(240, window.innerHeight - 220) };
+  }
+
+  // Where the map (mapW x mapH, kept in its own units) and the yard ({ width,
+  // height }) go in a room ({ w, h } CSS px): the drawing's size W x H (the
+  // room's shape), the map's corner, the yard's corner and scale, the column
+  // the yard is in. It reads nothing but what it is given.
+  function compose(room, mapW, mapH, yard) {
+    const upright = room.w / room.h < UPRIGHT_UNDER;
+    let mw, mh;
+    if (!upright) {
+      mh = room.h;
+      mw = mh * mapW / mapH;
+      if (mw > room.w * MAP_SHARE) [mw, mh] = [room.w * MAP_SHARE, room.w * MAP_SHARE * mapH / mapW];
+    } else {
+      mw = room.w;
+      mh = mw * mapH / mapW;
+      if (mh > room.h * MAP_SHARE_UP) [mw, mh] = [room.h * MAP_SHARE_UP * mapW / mapH, room.h * MAP_SHARE_UP];
+    }
+    const u = mapW / mw;  // The drawing's units to a CSS px.
+    const ratio = yard.height / yard.width;
+    let mx, my, yx, yy, yw, column;
+    if (!upright) {
+      [mx, my] = [0, (room.h - mh) / 2];
+      const left = mw + ROOM_GAP, free = room.w - left;
+      yw = Math.min(free - ROOM_GAP, room.h * YARD_SHARE / ratio);
+      [yx, yy] = [left + (free - yw) / 2, Math.max(8, room.h * 0.04)];
+      column = [left, room.w];
+    } else {
+      [mx, my] = [(room.w - mw) / 2, 0];
+      const top = mh + ROOM_GAP, free = room.h - top;
+      yw = Math.min(room.w * 0.94, (free - ROOM_GAP) / ratio);
+      [yx, yy] = [(room.w - yw) / 2, top + (free - yw * ratio) / 2];
+      column = [0, room.w];
+    }
+    return { W: room.w * u, H: room.h * u, upright, map: [mx * u, my * u],
+      yard: { x: yx * u, y: yy * u, k: yw * u / yard.width }, column: column.map((v) => v * u) };
   }
 
   function build(seats, withRelief) {
+    lastSeats = seats;
     try {
       draw(seats, withRelief);
     } catch (error) {
@@ -244,7 +329,16 @@ const EbinoMap = (() => {
     shelves = [];
     tokens = [];
     schoolGroup = null;
-    view = withRelief ? reliefView(map.relief) : flatView();
+    const base = withRelief ? reliefView(map.relief) : flatView();
+    const model = yardModel();
+    const laid = compose(roomSize(), base.W, base.H, model);
+    const [ox, oy] = laid.map;
+    view = { ...base, W: laid.W, H: laid.H, upright: laid.upright, yard: { ...laid.yard, model }, column: laid.column,
+      mapBox: [ox, oy, base.W, base.H],
+      proj: (...at) => {
+        const [x, y] = base.proj(...at);
+        return [x + ox, y + oy];
+      } };
     vb = { x: 0, y: 0, w: view.W, h: view.H };
     svg.setAttribute("viewBox", `0 0 ${view.W} ${view.H}`);
     frame.classList.toggle("relief", view.relief);
@@ -262,15 +356,17 @@ const EbinoMap = (() => {
 
     if (view.relief) {
       const image = layer("relief-image");
-      image.append(svgEl("image", { href: map.relief.image, width: view.W, height: view.H }));
+      image.append(svgEl("image", { href: map.relief.image, x: ox, y: oy, width: base.W, height: base.H }));
     }
+    // The school and its ground, beside the map (直し33-2).
+    drawYard(layer("yard"));
     const fill = layer("basin-fill");
-    const rimLine = view.relief ? dense(map.boundary, true).map(([x, y]) => P(x, y, 1)) : map.boundary;
+    const rimLine = view.relief ? dense(map.boundary, true).map(([x, y]) => P(x, y, 1)) : map.boundary.map(([x, y]) => P(x, y));
     fill.append(svgEl("polygon", { points: rimLine.map((p) => p.join(",")).join(" ") }));
 
     const river = layer("river draw-later");
     for (const line of map.river) {
-      const shown = view.relief ? dense(line, false).map(([x, y]) => P(x, y, 0.5)) : line;
+      const shown = view.relief ? dense(line, false).map(([x, y]) => P(x, y, 0.5)) : line.map(([x, y]) => P(x, y));
       river.append(rc.linearPath(shown, { ...ink, strokeWidth: 3 * S, roughness: 0.9, bowing: 0.6 }));
     }
     const rim = layer("rim draw-first");
@@ -285,7 +381,8 @@ const EbinoMap = (() => {
     for (const shelf of mapShelves) {
       const words = app.state.kinds[shelf.kind];
       if (!words) continue;
-      const text = svgEl("text", { x: shelf.label[0], y: shelf.label[1] });
+      const [nx, ny] = view.relief ? shelf.label : P(...shelf.label);
+      const text = svgEl("text", { x: nx, y: ny });
       text.textContent = words;
       shelfNames.append(text);
       if (!view.relief) continue;
@@ -309,7 +406,7 @@ const EbinoMap = (() => {
     for (const seat of seats) {
       if (seat.x === undefined) continue;
       const node = drawPoint(seat);
-      const spot = !view.relief ? [seat.x, seat.y] : seat.outer ? null : P(seat.x, seat.y, 1.5);
+      const spot = !view.relief ? P(seat.x, seat.y) : seat.outer ? null : P(seat.x, seat.y, 1.5);
       points[seat.seat_id] = { node, seat, at: spot ? () => spot : () => shelfSpot(seat.seat_id) };
       seatLayer.append(node);
     }
@@ -334,6 +431,48 @@ const EbinoMap = (() => {
     watchSize();
     setView(vb);
     refresh();
+  }
+
+  // The school and its ground (直し33-2), in the yard's own units scaled to
+  // its place: the picture (from outside the repo), or with none a plain
+  // building and a ground with no name. They take no presses.
+  function drawYard(group) {
+    const { x, y, k, model } = view.yard;
+    group.setAttribute("transform", `translate(${x} ${y}) scale(${k})`);
+    group.setAttribute("aria-hidden", "true");
+    const building = svgEl("g", { class: "yard-building" });
+    // Where the paper plane lands (直し33-2): the middle of the school's
+    // windows, on the building, not the ground beside it.
+    const xs = model.windows.map((p) => p[0]), ys = model.windows.map((p) => p[1]);
+    group.append(svgEl("circle", { class: "yard-landing", r: 1,
+      cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2 }));
+    if (model.picture) {
+      building.append(svgEl("image", { href: model.image, width: model.width, height: model.height }));
+      group.append(building);
+      return;
+    }
+    group.classList.add("plain");
+    const polygon = (className, spots) => svgEl("polygon", { class: className, points: spots.map((p) => p.join(",")).join(" ") });
+    const [nw, ne, se, sw] = model.roof, wall = PLAIN_YARD.wall;
+    group.append(polygon("yard-ground", model.field));
+    building.append(polygon("yard-wall", [sw, se, [se[0], se[1] + wall], [sw[0], sw[1] + wall]]), polygon("yard-roof", [nw, ne, se, sw]));
+    for (const [wx, wy] of model.windows) {
+      building.append(svgEl("rect", { class: "yard-window", x: wx - 9, y: wy - 14, width: 18, height: 28, rx: 2 }));
+    }
+    group.append(building);
+  }
+
+  // Drawn again for the room's shape as it is now, when that is not the
+  // drawing's (the window turned or was resized) and no round is playing or
+  // its table open: true when it was. The lit seats stay lit.
+  function recompose() {
+    if (!view || tableAt || camera || timers.length || flights.length) return false;
+    const room = roomSize(), want = room.w / room.h, have = view.W / view.H;
+    if (Math.abs(want - have) <= RECOMPOSE * have) return false;
+    const lit = Object.keys(points).filter((id) => points[id].node.classList.contains("lit"));
+    draw(lastSeats, view.relief);
+    for (const id of lit) if (points[id]) points[id].node.classList.add("lit");
+    return true;
   }
 
   // --- which way is north (直し25-3) ---
@@ -401,9 +540,16 @@ const EbinoMap = (() => {
       node.style.top = `${top}px`;
       avoid.push(boxIn(node, frameBox));
     };
-    put(compass, compassSpot(frameWH, { w: compass.offsetWidth, h: compass.offsetHeight }, avoid));
+    // The arrow and the ways' names by the map's own edges (直し33-2), inside the frame.
+    const [mx, my, mw, mh] = view.mapBox;
+    const [left0, top0] = toFrame(mx, my), [right0, bottom0] = toFrame(mx + mw, my + mh);
+    const [left, top] = [Math.max(0, left0), Math.max(0, top0)];
+    const room = { w: Math.min(frameWH.w, right0) - left, h: Math.min(frameWH.h, bottom0) - top };
+    const back = ([x, y]) => [x + left, y + top];
+    const shifted = () => avoid.map(([x, y, w, h]) => [x - left, y - top, w, h]);
+    put(compass, back(compassSpot(room, { w: compass.offsetWidth, h: compass.offsetHeight }, shifted())));
     for (const note of overlay.querySelectorAll(".map-around")) {
-      put(note, aroundSpot(frameWH, { w: note.offsetWidth, h: note.offsetHeight }, ways[note.dataset.way], avoid));
+      put(note, back(aroundSpot(room, { w: note.offsetWidth, h: note.offsetHeight }, ways[note.dataset.way], shifted())));
     }
     // The line that says a lamp card can be pressed: by the lower edge, off
     // the arrow, the edge names, the table and its seats (the dimmed map's
@@ -629,11 +775,12 @@ const EbinoMap = (() => {
   function layoutShelves(f) {
     const margin = 14 * f;
     const corners = [[0, 0], [1, 0], [0, 1], [1, 1]];
+    const [mx, my, mw, mh] = view.mapBox;
     shelves.forEach((entry, k) => {
       const [x0, y0, x1, y1] = entry.shelf.box;
       const w = (x1 - x0) * f, h = (y1 - y0) * f;
       const [cx, cy] = corners[k % corners.length];
-      const left = cx ? view.W - w - margin : margin, top = cy ? view.H - h - margin : margin;
+      const left = mx + (cx ? mw - w - margin : margin), top = my + (cy ? mh - h - margin : margin);
       entry.origin = [left, top];
       entry.scale = f;
       Object.entries({ x: left, y: top, width: w, height: h }).forEach(([key, value]) => entry.rect.setAttribute(key, value));
@@ -645,7 +792,7 @@ const EbinoMap = (() => {
   function shelfSpot(seatId) {
     const seat = points[seatId].seat;
     const entry = shelves.find((s) => s.seats.includes(seatId));
-    if (!entry || !entry.origin) return [seat.x * view.S, seat.y * view.S];
+    if (!entry || !entry.origin) return [view.mapBox[0] + seat.x * view.S, view.mapBox[1] + seat.y * view.S];
     const [x0, y0] = entry.shelf.box;
     return [entry.origin[0] + (seat.x - x0) * entry.scale, entry.origin[1] + (seat.y - y0) * entry.scale];
   }
@@ -830,13 +977,21 @@ const EbinoMap = (() => {
     if (watchSize.on) return;
     watchSize.on = true;
     let width = frame.clientWidth;
+    let room = "";
     const changed = () => {
-      if (!view || frame.clientWidth === width) return;
+      const now = roomSize(), key = `${now.w}x${now.h}`;
+      if (!view || (frame.clientWidth === width && key === room)) return;
       width = frame.clientWidth;
+      room = key;
+      if (recompose()) return;
       rescale();
       relayout();
     };
-    if (window.ResizeObserver) new ResizeObserver(changed).observe(frame);
+    if (window.ResizeObserver) {
+      const watch = new ResizeObserver(changed);
+      watch.observe(frame);
+      if (frame.parentElement) watch.observe(frame.parentElement);
+    }
     window.addEventListener("resize", changed);
     // The screen's keyboard takes the lower part of the screen: the card
     // being written in stays in sight.
@@ -854,6 +1009,7 @@ const EbinoMap = (() => {
   // screen (a path's length needs it laid out).
   function show() {
     if (!view) { wantShow = true; return; }
+    recompose();
     rescale();
     relayout();
     if (drawn) return;
@@ -1030,7 +1186,9 @@ const EbinoMap = (() => {
       return shelves.filter((entry) => entry.origin).map(({ shelf: { box: [x0, y0, x1, y1] }, origin: [left, top], scale }) =>
         [left, top, left + (x1 - x0) * scale, top + (y1 - y0) * scale]);
     }
-    return (map.shelves || []).filter((shelf) => app.state.kinds[shelf.kind]).map((shelf) => shelf.box);
+    const [ox, oy] = view.mapBox;
+    return (map.shelves || []).filter((shelf) => app.state.kinds[shelf.kind])
+      .map(({ box: [x0, y0, x1, y1] }) => [x0 + ox, y0 + oy, x1 + ox, y1 + oy]);
   }
 
   // The round table's top (a ring of spots in a frame) as a few boxes, band
@@ -1191,6 +1349,7 @@ const EbinoMap = (() => {
   function relayout() {
     if (!view) return;
     clearSchoolName();
+    placeYardColumn();
     for (const node of overlay.querySelectorAll(".map-bubble")) node.remove();
     placeAround();
     const frameBox = overlay.getBoundingClientRect();
@@ -1234,6 +1393,17 @@ const EbinoMap = (() => {
     placeSeatPresses(planned);
     putChoices();
     placeAskMarks();
+  }
+
+  // The yard's column on screen, for what the one screen puts in it (the
+  // AI's seat, under the yard: style.css --yard-left, --yard-w).
+  function placeYardColumn() {
+    const stage = frame.closest(".stage");
+    if (!stage) return;
+    const s = stage.getBoundingClientRect(), f = frame.getBoundingClientRect();
+    const [x0, x1] = view.column.map((x) => f.left - s.left + x / view.W * f.width);
+    stage.style.setProperty("--yard-left", `${Math.round(x0)}px`);
+    stage.style.setProperty("--yard-w", `${Math.round(x1 - x0)}px`);
   }
 
   // A 「？」 by its seat, at the first of its four corners that covers no word

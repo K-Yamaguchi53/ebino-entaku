@@ -442,6 +442,8 @@ const setup = %(setup)s, round = %(round)s, screens = %(screens)s;
 const map = setup.map;
 const app = { state: { kinds: setup.kinds } };
 view = reliefView(map.relief);
+// The map alone, as before the yard beside it (直し33-2): its box the whole drawing.
+view.mapBox = [0, 0, view.W, view.H];
 const P = view.proj;
 const stub = () => { const node = {}; node.setAttribute = (key, value) => { node[key] = value; }; return node; };
 for (const seat of setup.seats) points[seat.seat_id] = { seat };

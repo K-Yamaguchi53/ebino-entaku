@@ -6,11 +6,17 @@ Only these three files are read there, nothing else:
 
     school_relief.png   the building as the relief picture's camera sees it
     school_flat.png     the building as the flat map's camera sees it
-    school_sprite.json  for each picture, the spot in it (px) that is the
-                        school's point on the map ("school_point_px")
+    school_yard.png     the building and its sports ground, large, for the
+                        right of the screen (直し33-2), seen as the map is
+    school_sprite.json  for the two small pictures, the spot in each (px)
+                        that is the school's point on the map
+                        ("school_point_px"); for the large one, where seats
+                        go on it: the ring's windows ("windows_px") and the
+                        ground's four corners ("field_px")
 
-Both pictures are drawn at twice the size they are shown. With no folder, a
-missing or broken file, the school keeps its line mark, as before.
+The pictures are drawn at about twice the size they are shown. With no
+folder, a missing or broken file, the school keeps its line mark and the
+right of the screen a plain drawing of a building and a ground, as before.
 """
 
 import json
@@ -21,7 +27,8 @@ from pathlib import Path
 
 ENV = "EBINO_SCHOOL_DIR"
 SPRITE = "school_sprite.json"
-PICTURES = {"relief": "school_relief.png", "flat": "school_flat.png"}
+PICTURES = {"relief": "school_relief.png", "flat": "school_flat.png", "yard": "school_yard.png"}
+YARD_MOST_WINDOWS = 200  # More is not a picture this app drew.
 URL = "/school/"  # Each picture is served at URL + its file name, from the folder only.
 PNG_HEAD = b"\x89PNG\r\n\x1a\n"
 
@@ -72,9 +79,38 @@ def _picture(folder: Path, kind: str, about: dict) -> dict | None:
     return {"image": URL + name, "width": width, "height": height, "point": [round(v, 2) for v in point]}
 
 
+def _points(value, most: int) -> list[list[float]]:
+    if not isinstance(value, list) or not 0 < len(value) <= most:
+        raise ValueError("not a list of points")
+    out = []
+    for point in value:
+        if not isinstance(point, list) or len(point) != 2:
+            raise ValueError("a point has two numbers")
+        out.append([round(_number(v), 2) for v in point])
+    return out
+
+
+def _yard(folder: Path, about: dict) -> dict | None:
+    """The large picture of the building and its ground (直し33-2), with
+    where its seats go, or None."""
+    try:
+        width, height = png_size((folder / PICTURES["yard"]).read_bytes())
+        entry = about["yard"]
+        windows = _points(entry["windows_px"], YARD_MOST_WINDOWS)
+        field = _points(entry["field_px"], 4)
+        if len(field) != 4:
+            raise ValueError("a ground has four corners")
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if not all(0 <= x <= width and 0 <= y <= height for x, y in windows + field):
+        return None
+    return {"image": URL + PICTURES["yard"], "width": width, "height": height, "windows": windows, "field": field}
+
+
 def load(folder: Path | None) -> dict | None:
-    """{"relief": picture or None, "flat": picture or None} for the screen,
-    each {"image", "width", "height", "point"}; None with neither."""
+    """{"relief", "flat", "yard": picture or None} for the screen, the
+    first two {"image", "width", "height", "point"}, the yard {"image",
+    "width", "height", "windows", "field"}; None with none."""
     if folder is None:
         return None
     try:
@@ -83,7 +119,8 @@ def load(folder: Path | None) -> dict | None:
         return None
     if not isinstance(about, dict):
         return None
-    pictures = {kind: _picture(folder, kind, about) for kind in PICTURES}
+    pictures = {kind: _picture(folder, kind, about) for kind in ("relief", "flat")}
+    pictures["yard"] = _yard(folder, about)
     return pictures if any(pictures.values()) else None
 
 

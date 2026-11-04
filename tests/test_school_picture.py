@@ -57,6 +57,7 @@ def test_the_picture_sizes_and_the_schools_point_are_read_from_the_three_files(t
     assert view == {
         "relief": {"image": "/school/school_relief.png", "width": 173, "height": 168, "point": [92.38, 104.85]},
         "flat": {"image": "/school/school_flat.png", "width": 173, "height": 147, "point": [80.67, 77.06]},
+        "yard": None,  # No large picture in this folder (直し33-2).
     }
     assert png_size(png(7, 5)) == (7, 5)
 
