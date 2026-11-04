@@ -13,6 +13,7 @@ out (SPEC 6).
 """
 
 import json
+import time
 from collections import Counter
 from dataclasses import dataclass, field
 
@@ -22,6 +23,11 @@ from .ingest.scrub import normalize_for_match
 from .prompts import LIBRARIAN
 
 MAX_REQUESTS = 6
+# The wait for the model, with no retry (直し31-1): each request at most
+# TIMEOUT_SECONDS, and one search's requests together at most TOTAL_SECONDS.
+# Past either the search is unavailable, as when the model cannot be used.
+TIMEOUT_SECONDS = 30.0
+TOTAL_SECONDS = 45.0
 MAX_PICKED = 24
 SEARCH_LIMIT = 20
 READ_LIMIT = 40
@@ -167,8 +173,12 @@ def find(gate: Gate, entries: list[Entry], question: str, ai_question: str = "")
     request["tools"] = TOOLS
     messages = request["messages"]
     found = Found([], ENDED_REQUEST_LIMIT)
+    began = time.monotonic()
     for _ in range(MAX_REQUESTS):
-        response = gate.send("librarian", request)
+        left = TOTAL_SECONDS - (time.monotonic() - began)
+        if left <= 0:
+            raise ModelUnavailable("timeout")
+        response = gate.send("librarian", request, timeout=min(TIMEOUT_SECONDS, left))
         found.requests += 1
         calls = [block for block in response.content if getattr(block, "type", None) == "tool_use"]
         if not calls:

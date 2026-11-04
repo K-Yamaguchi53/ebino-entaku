@@ -75,6 +75,9 @@ MAX_CHARS = reflection.MAX_ASK_BACK_CHARS
 ANSWERED = "answered"
 NOT_FOUND = "not_found"
 UNAVAILABLE = "unavailable"
+# The wait for the moderator's pick, with no retry (直し31-1); the librarian
+# keeps its own (librarian.TIMEOUT_SECONDS). Past it: the fixed sentence.
+TIMEOUT_SECONDS = 30.0
 
 # A sentence ends at 。！？!? or at a line break, as for the guard (SPEC 14-51):
 # a copied poster's table row is never run into the next one.
@@ -186,7 +189,8 @@ def run(session, card: Plan) -> AskSeat:
         if not gathered:
             asked.status = NOT_FOUND
             return asked
-        answer = json_answer(session.gate.send("moderator", pick_request(card.text, gathered)))
+        answer = json_answer(session.gate.send("moderator", pick_request(card.text, gathered),
+                                               timeout=TIMEOUT_SECONDS))
         quotes, _ = closing.clean(answer, gathered)
     except (GateError, ModelUnavailable) as error:
         asked.status, asked.reason = UNAVAILABLE, str(error)

@@ -48,6 +48,9 @@ CHOSE_OWN = "own"  # 「自分で書く」
 MAX_ASK_BACK_CHARS = 160  # Room for one whole sentence of a quote.
 MAX_MOVE_CHARS = 80
 MAX_LINE_CHARS = 120  # Each line the student writes (SPEC 5-2: one line).
+# The wait for the model, with no retry (直し31-1): past it the question
+# back is the fixed sentence (ASK_BACK_FALLBACK) and no next move is shown.
+TIMEOUT_SECONDS = 45.0
 
 STOP_NAME = "name"
 STOP_BANNED = "banned_word"
@@ -256,7 +259,8 @@ def begin(gate: Gate, session, changed: str, now_question: str) -> Reflection:
                          {"id": "N", "kind": "now_question", "text": now_question}))
     materials = record.by_id()
     try:
-        answer = json_answer(gate.send("reflection", request_for(session, record, changed, now_question)))
+        answer = json_answer(gate.send("reflection", request_for(session, record, changed, now_question),
+                                       timeout=TIMEOUT_SECONDS))
         if not isinstance(answer, dict):
             raise ModelUnavailable("bad_output")
     except (GateError, ModelUnavailable) as error:

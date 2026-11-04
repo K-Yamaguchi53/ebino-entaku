@@ -89,6 +89,8 @@ STATUS_NONE = "fuda_none"  # The model said なし.
 STATUS_NO_CANDIDATE = "no_candidate"  # The 札 has no candidate for this student.
 STATUS_NO_CLUE = "no_clue_word"  # No model; the record holds no clue word.
 BAD_FUDA = "unknown_fuda"
+# The wait for the model, with no retry (直し31-1): past it the clue words pick.
+TIMEOUT_SECONDS = 20.0
 
 
 @dataclass(frozen=True)
@@ -269,7 +271,7 @@ def request_for(catalog: Catalog, numbered: list[Candidate], words: dict[str, st
 def _ask(gate: Gate, catalog: Catalog, numbered: list[Candidate], words) -> tuple[str, list, str]:
     """(札, numbers, error code); 札 is "" when the answer cannot be used."""
     try:
-        answer = json_answer(gate.send(ROLE, request_for(catalog, numbered, words)))
+        answer = json_answer(gate.send(ROLE, request_for(catalog, numbered, words), timeout=TIMEOUT_SECONDS))
     except (GateError, ModelUnavailable) as error:
         return "", [], str(error)
     fuda = answer.get("fuda") if isinstance(answer, dict) else None

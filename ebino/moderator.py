@@ -21,6 +21,10 @@ MAX_SEATS = 8
 MAX_QUOTES_PER_SEAT = 2
 MAX_SPLITS = 3
 MAX_SILENT = 8
+# The wait for the model, with no retry (直し31-1): past it the round is
+# unavailable, as when the model cannot be used, and the question stays in
+# the box to be sent again.
+TIMEOUT_SECONDS = 60.0
 
 SCHEMA = {
     "type": "object",
@@ -121,5 +125,6 @@ def clean(answer, candidates: list[Entry], seats: list[Seat] = ()) -> Plan:
 
 def plan(gate: Gate, question: str, candidates: list[Entry], seats: list[Seat], ai_question: str = "") -> Plan:
     """Raises GateError or ModelUnavailable (reason codes only)."""
-    answer = json_answer(gate.send("moderator", request_for(question, candidates, seats, ai_question)))
+    answer = json_answer(gate.send("moderator", request_for(question, candidates, seats, ai_question),
+                                   timeout=TIMEOUT_SECONDS))
     return clean(answer, candidates, seats)

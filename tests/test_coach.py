@@ -136,8 +136,10 @@ def test_a_band_past_the_wait_limit_is_not_shown_and_the_next_question_is_answer
     assert band.status == coach.STATUS_UNAVAILABLE and band.reason == "api_error:APITimeoutError"
     view = session.ask("休みを決めるのは、自分？")
     assert view["status"] == "answered" and view["round"] == 2
-    # Only the band's call has the wait limit, with no retry.
-    assert client.options == [{}, {}, {"timeout": 30.0, "max_retries": 0}, {}, {}]
+    # The band's call has its wait limit, with no retry; so does every call
+    # the screen waits on (直し31-1).
+    assert client.options[2] == {"timeout": 30.0, "max_retries": 0}
+    assert all(option.get("max_retries") == 0 for option in client.options)
     kept = json.loads((tmp_path / "sessions" / f"{session.session_id}.json").read_text(encoding="utf-8")
                       )["rounds"][0]["band"]
     assert kept["status"] == coach.STATUS_UNAVAILABLE and kept["shown"] == [] and kept["stopped"] == {}

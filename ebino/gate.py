@@ -58,7 +58,8 @@ EFFORT = {
     "tagger": "low",
     "librarian": "medium",
     "moderator": "high",
-    "reflection": "high",
+    # Lowered from high so the student is not kept waiting (直し31-1).
+    "reflection": "medium",
     "editor": "low",
     "subjects": "low",
     "coach": "medium",

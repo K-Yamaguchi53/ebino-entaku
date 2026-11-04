@@ -18,8 +18,8 @@ question that asks only for a fact, a rephrasing that asks why. The back is
 for the teacher and next year's interviewers; it is never on the student's
 screen, and nothing on it is offered to the student (SPEC 14-13).
 
-If the editor cannot answer, the card is still made without a back, and the
-reason code is kept.
+If the editor cannot answer, or does not within TIMEOUT_SECONDS (no retry;
+直し31-1), the card is still made without a back, and the reason code is kept.
 """
 
 import json
@@ -37,6 +37,7 @@ ORIGIN_STUDENT = "student"
 ORIGIN_NOT_HEARD = "not_heard_yet"
 MAX_ASK = 3
 MAX_REPHRASE_CHARS = 80
+TIMEOUT_SECONDS = 20.0  # The wait for the model, with no retry (直し31-1).
 
 SCHEMA = {
     "type": "object",
@@ -80,7 +81,7 @@ def write_back(gate: Gate, text: str, seats: list[Seat]) -> Back:
     data = {"question": text, "seats": [seat.for_model() for seat in seats]}
     request = json_request("editor", EDITOR, json.dumps(data, ensure_ascii=False), SCHEMA)
     try:
-        answer = json_answer(gate.send("editor", request))
+        answer = json_answer(gate.send("editor", request, timeout=TIMEOUT_SECONDS))
     except (GateError, ModelUnavailable) as error:
         return Back(reason=str(error))
     if not isinstance(answer, dict):

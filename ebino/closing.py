@@ -35,6 +35,8 @@ from .prompts import CLOSING
 from .talk_kinds import NONE
 
 MAX_SEATS = 3
+# The wait for the model, with no retry (直し31-1): past it nothing is shown.
+TIMEOUT_SECONDS = 30.0
 # 「やってよかったことベスト3」「好きな場所ランキング５」: a ranking's title alone.
 _RANKING_TITLE = re.compile(r"(?:ベスト|ランキング)\s*[0-9０-９一二三四五六七八九十]+\s*[!！]?\s*$")
 MIN_PIECE_CHARS = 8
@@ -192,7 +194,7 @@ def run(gate: Gate, guard: Guard, question: str, seat_order: list[str],
     if not asked:
         return Closing(NONE_HOLD)
     try:
-        answer = json_answer(gate.send("moderator", request_for(question, pieces)))
+        answer = json_answer(gate.send("moderator", request_for(question, pieces), timeout=TIMEOUT_SECONDS))
         quotes, dropped = clean(answer, pieces)
     except (GateError, ModelUnavailable) as error:
         return Closing(UNAVAILABLE, asked, kinds, reason=str(error))

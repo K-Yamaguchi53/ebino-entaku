@@ -50,7 +50,7 @@ def test_a_question_back_and_moves_that_hold_the_records_words_are_shown_in_fixe
     assert [m["direction"] for m in moves] == ["left_split", "silent_seat", "question_shift"]
     assert moves[0]["label"] == "置いてきた割れ目"
     request = client.requests[-1]
-    assert request["model"] == "claude-opus-5-5" and request["output_config"]["effort"] == "high"
+    assert request["model"] == "claude-opus-5-5" and request["output_config"]["effort"] == "medium"
 
 
 @pytest.mark.parametrize("text, reason", [
