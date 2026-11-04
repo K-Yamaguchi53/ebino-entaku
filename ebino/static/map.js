@@ -15,7 +15,7 @@
 
 const EbinoMap = (() => {
   const NS = "http://www.w3.org/2000/svg";
-  const LIGHT_EVERY = 400;  // ms between two seats lighting up.
+  const LIGHT_EVERY = 250;  // ms between two seats lighting up (直し31-6: was 400).
   const BUBBLE_FOR = 1500;  // ms a quote's bubble stays.
   const BUBBLE_CHARS = 36;  // A longer quote is cut here, with 「…」.
   // CSS px: a card further from its seat reads as another seat's (on a wide
@@ -81,7 +81,8 @@ const EbinoMap = (() => {
   // the height of the ground there, in map units.
   const TABLE_RX = 150, TABLE_RY = 110, TABLE_LIFT = 7, SEAT_OUT = 48;
   const TABLE_THICK = 9;  // The top's thickness: its side shows in front (直し29-2).
-  const CAMERA_FOR = 1100, FLY_FOR = 1100, FLY_GAP = 160, BACK_FOR = 700;
+  // Quicker since 直し31-6 (were 1100, 1100, 160): the table is there sooner.
+  const CAMERA_FOR = 700, FLY_FOR = 700, FLY_GAP = 90, BACK_FOR = 700;
   const CLOSEST = 3.5;  // The nearest zoom shows this part of the whole across.
   const ZOOM_STEP = 1.4;
   const POINT_R = 7.5;  // A point's radius at scale 1 (see shape()).
@@ -1608,7 +1609,7 @@ const EbinoMap = (() => {
         await wait(LIGHT_EVERY);
         if (!still()) return;
       }
-      await wait(300);
+      await wait(150);
       if (!still()) return;
     }
     const center = tableCenter();
@@ -1662,8 +1663,8 @@ const EbinoMap = (() => {
     tableLayer.append(polygon("table-glow", ring(center, SEAT_OUT + 40, 0)),
       polygon("table-shadow", ring(center, 4, 0)), foot, top);
     if (motion) {
-      top.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, easing: "ease-out" });
-      await wait(350);
+      top.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: "ease-out" });
+      await wait(200);
       if (!still()) return;
     }
     // The split: a dashed line down the table's middle, between the sides.

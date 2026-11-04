@@ -129,7 +129,7 @@ def test_each_lit_seat_answers_with_one_piece_of_the_kind_code_picked():
     # Fewest shown, then the table's order: 高校生へ for S01, 楽しいところ for S02.
     assert session.rounds[0].closing.kinds_asked == ["to_students", "joy"]
     assert sorted(sent_ids(client)) == ["a9", "b9"]
-    assert client.requests[-1]["model"] == "claude-opus-5-5"
+    assert client.requests[-1]["model"] == "claude-sonnet-5-5"
     assert view["question"] == load_text(CLOSING_QUESTION) == "最後に、何か伝えたいことはありますか"
     assert [(w["seat_id"], w["utterance_id"], w["kind"], w["label"]) for w in view["words"]] == [
         ("S01", "a9", "to_students", "高校生に向けた言葉"), ("S02", "b9", "joy", "楽しいところ・魅力")]

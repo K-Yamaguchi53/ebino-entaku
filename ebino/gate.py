@@ -46,7 +46,9 @@ KIND_MASK_WORD = "mask_word"
 MODELS = {
     "tagger": "claude-haiku-5-5",
     "librarian": "claude-sonnet-5-5",
-    "moderator": "claude-opus-5-5",
+    # Lowered from Opus with effort high so the round table comes in about
+    # ten seconds (直し31-6; the teacher allowed the model or effort lowered).
+    "moderator": "claude-sonnet-5-5",
     "reflection": "claude-opus-5-5",
     "editor": "claude-sonnet-5-5",
     # The harvest card's ③: sorts the record into one 札 and two numbers.
@@ -57,7 +59,7 @@ MODELS = {
 EFFORT = {
     "tagger": "low",
     "librarian": "medium",
-    "moderator": "high",
+    "moderator": "medium",
     # Lowered from high so the student is not kept waiting (直し31-1).
     "reflection": "medium",
     "editor": "low",

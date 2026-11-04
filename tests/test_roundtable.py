@@ -73,12 +73,12 @@ def test_an_answered_round_shows_the_pieces_own_words_in_order_with_a_split():
     assert result.quotes[1].text == "休みは決めて取ります。"
     assert [(s.side_a, s.side_b) for s in result.splits] == [(("a1",), ("b1",))]
     assert (result.guard_passed, result.guard_stopped) == (2, 0)
-    assert [r["model"] for r in client.requests] == ["claude-sonnet-5-5", "claude-opus-5-5"]
+    assert [r["model"] for r in client.requests] == ["claude-sonnet-5-5", "claude-sonnet-5-5"]
 
 
 def test_no_company_or_name_reaches_the_moderator_or_the_editor():
     _, client, _ = run([librarian_finds("a1", "b1"), moderator_says([]), editor_says(["S02"])])
-    assert [r["model"] for r in client.requests] == ["claude-sonnet-5-5", "claude-opus-5-5", "claude-sonnet-5-5"]
+    assert [r["model"] for r in client.requests] == ["claude-sonnet-5-5", "claude-sonnet-5-5", "claude-sonnet-5-5"]
     data = json.loads(client.requests[1]["messages"][0]["content"])
     assert data["question"] == QUESTION
     assert [p["utterance_id"] for p in data["pieces"]] == ["a1", "b1"]

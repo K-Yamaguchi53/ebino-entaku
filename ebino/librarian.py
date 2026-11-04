@@ -22,7 +22,9 @@ from .index import Entry
 from .ingest.scrub import normalize_for_match
 from .prompts import LIBRARIAN
 
-MAX_REQUESTS = 6
+# At most two requests (直し31-6, was six): one to search and one to answer;
+# at the cap the pieces the searches showed go on to the moderator.
+MAX_REQUESTS = 2
 # The wait for the model, with no retry (直し31-1): each request at most
 # TIMEOUT_SECONDS, and one search's requests together at most TOTAL_SECONDS.
 # Past either the search is unavailable, as when the model cannot be used.

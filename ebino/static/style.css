@@ -714,7 +714,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
    pointing at its chair. They come one after another; they stay. */
 .table-bubble { position: absolute; padding: 8px 12px 7px; border-radius: 4px; background: var(--paper);
   color: var(--paper-ink); box-shadow: 0 0 0 1px var(--paper-line), 0 0 18px var(--lamp-soft), 0 8px 20px var(--shadow);
-  animation: kindle .45s ease-out both; animation-delay: calc(var(--k, 0) * 140ms); }
+  animation: kindle .45s ease-out both; animation-delay: calc(var(--k, 0) * 250ms); }
 .table-bubble .voice { font-family: var(--mincho); font-size: 15px; line-height: 1.7; max-width: 13em; }
 .table-bubble .who { width: 0; min-width: 100%; margin-top: 2px; font-family: var(--gothic); font-size: 12px;
   line-height: 1.5; color: var(--paper-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -205,7 +205,7 @@ def test_pressed_the_librarian_gathers_that_seats_pieces_and_the_moderator_picks
     view = session.ask_the_seat(1)
     assert client.requests[-2]["model"] == "claude-sonnet-5-5"
     assert OTHER_SIDE in json.dumps(client.requests[-2], ensure_ascii=False)
-    assert client.requests[-1]["model"] == "claude-opus-5-5"  # The moderator picks, by ID.
+    assert client.requests[-1]["model"] == "claude-sonnet-5-5"  # The moderator picks, by ID.
     assert client.requests[-1]["output_config"]["format"]["type"] == "json_schema"
     assert picked_ids(client) == ["b7", "b6"]
     assert OTHER_SIDE in client.requests[-1]["messages"][0]["content"]
@@ -221,7 +221,7 @@ def test_when_no_gathered_piece_answers_the_question_it_says_not_answered_yet():
     view = session.ask_the_seat(1)
     assert view["status"] == "not_found" and view["piece"] is None
     assert view["not_answered"] == load_text(ASK_NOT_ANSWERED)
-    assert client.requests[-1]["model"] == "claude-opus-5-5"
+    assert client.requests[-1]["model"] == "claude-sonnet-5-5"
 
 
 @pytest.mark.parametrize("pick", [("a6", "店を継いだのは、父の背中を見ていたからです。"), ("b7", "雨の日は畑に出ない。")])

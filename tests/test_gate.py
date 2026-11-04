@@ -102,8 +102,8 @@ def test_a_clean_request_is_sent_and_answered():
     assert json_answer(response) == {"ok": True}
     assert sent == ["moderator"]
     request = client.requests[0]
-    assert request["model"] == "claude-opus-5-5"
-    assert request["output_config"]["effort"] == "high"
+    assert request["model"] == "claude-sonnet-5-5"
+    assert request["output_config"]["effort"] == "medium"
     assert "fallbacks" not in request and "betas" not in request  # SPEC 14-51.
 
 

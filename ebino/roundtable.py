@@ -128,7 +128,10 @@ def run(
             if not asked:
                 result.card = editor.card_for_no_answer(gate, question, seats)
             return result
-        plan = moderator.plan(gate, question, [by_id[i] for i in found.utterance_ids], seats, asked)
+        candidates = [by_id[i] for i in found.utterance_ids]
+        # Only the seats that matter to these pieces (直し31-6): a shorter request.
+        plan = moderator.plan(gate, question, candidates, seats, asked,
+                              sent=moderator.related_seats(candidates, entries, seats))
     except (GateError, ModelUnavailable) as error:
         return Round(question, UNAVAILABLE, reason=str(error), message=load_text(MODEL_UNAVAILABLE),
                      ai_question=ai_question)

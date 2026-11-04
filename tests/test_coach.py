@@ -190,7 +190,8 @@ def test_a_seat_kept_off_the_map_is_on_neither_the_map_nor_the_moderators_list()
 def test_a_seat_shown_on_the_map_stays_a_seat_and_is_the_coachs_source_too():
     session, client = round_one({"coach": GOOD_COACH, "observer": GOOD_OBSERVER}, coach_seats={"S03": True})
     assert "S03" in [seat["seat_id"] for seat in session.library.seat_list()]
-    assert "S03" in [seat["seat_id"] for seat in json.loads(client.requests[1]["messages"][0]["content"])["seats"]]
+    # A seat the moderator may name (it is sent when its pieces share a topic; 直し31-6).
+    assert "S03" in [seat.seat_id for seat in session.library.seats]
     session.coach_band(1)
     assert json.loads(client.requests[2]["messages"][0]["content"])["coach_sources"] == ["子どもの声で元気が出ます。"]
 

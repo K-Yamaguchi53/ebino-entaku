@@ -21,6 +21,10 @@ MAX_SEATS = 8
 MAX_QUOTES_PER_SEAT = 2
 MAX_SPLITS = 3
 MAX_SILENT = 8
+# The seats sent with the pieces (直し31-6): those the pieces are of, and at
+# most this many more whose pieces share a topic with them (the seats
+# 「まだ誰も聞いていない」 may come from), not the whole table.
+MAX_OTHER_SEATS = 12
 # The wait for the model, with no retry (直し31-1): past it the round is
 # unavailable, as when the model cannot be used, and the question stays in
 # the box to be sent again.
@@ -89,6 +93,20 @@ def request_for(question: str, candidates: list[Entry], seats: list[Seat], ai_qu
     return json_request("moderator", MODERATOR, json.dumps(data, ensure_ascii=False), SCHEMA)
 
 
+def related_seats(candidates: list[Entry], entries: list[Entry], seats: list[Seat]) -> list[Seat]:
+    """The seats of the pieces, then the others whose pieces share the most
+    topics with the pieces' (ties in table order), at most MAX_OTHER_SEATS."""
+    own = {entry.seat_id for entry in candidates}
+    topics = {topic for entry in candidates for topic in entry.topics}
+    shared: dict[str, int] = {}
+    for entry in entries:
+        if entry.seat_id not in own:
+            shared[entry.seat_id] = shared.get(entry.seat_id, 0) + len(topics & set(entry.topics))
+    others = sorted((seat for seat in seats if shared.get(seat.seat_id)), key=lambda s: -shared[s.seat_id])
+    keep = own | {seat.seat_id for seat in others[:MAX_OTHER_SEATS]}
+    return [seat for seat in seats if seat.seat_id in keep]
+
+
 def _ids(value) -> tuple[str, ...]:
     return tuple(dict.fromkeys(v for v in value if isinstance(v, str))) if isinstance(value, list) else ()
 
@@ -123,8 +141,11 @@ def clean(answer, candidates: list[Entry], seats: list[Seat] = ()) -> Plan:
     return Plan(tuple(quotes), tuple(splits[:MAX_SPLITS]), tuple(silent[:MAX_SILENT]))
 
 
-def plan(gate: Gate, question: str, candidates: list[Entry], seats: list[Seat], ai_question: str = "") -> Plan:
-    """Raises GateError or ModelUnavailable (reason codes only)."""
-    answer = json_answer(gate.send("moderator", request_for(question, candidates, seats, ai_question),
-                                   timeout=TIMEOUT_SECONDS))
+def plan(gate: Gate, question: str, candidates: list[Entry], seats: list[Seat], ai_question: str = "",
+         sent: list[Seat] | None = None) -> Plan:
+    """Raises GateError or ModelUnavailable (reason codes only). sent: the
+    seats put in the request (related_seats; 直し31-6), all when None; the
+    answer is checked against every seat."""
+    answer = json_answer(gate.send("moderator", request_for(question, candidates, seats if sent is None else sent,
+                                                            ai_question), timeout=TIMEOUT_SECONDS))
     return clean(answer, candidates, seats)
