@@ -2531,10 +2531,10 @@ const EbinoMap = (() => {
       if (returnFocus && returnFocus.isConnected) returnFocus.focus();
     });
     if (app.state.carded.has(seatId)) {
-      card.append(div("card-done", "質問カードにしました"));
+      card.append(app.cardDone(seatId));
     } else {
       const open = app.cardEntry(seatId, (form) => {
-        form.replaceWith(div("card-done", "質問カードにしました"));
+        form.replaceWith(app.cardDone(seatId));
         app.renderSeats();
       });
       card.append(open);

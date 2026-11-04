@@ -126,6 +126,8 @@ REFLECT_NEEDS_ANSWER = "reflect_needs_answer"
 OPENING_SKIP = "opening_skip"
 # Just over the two cards of コーチ and オブザーバー, until one is answered (直し30の続き-0).
 AI_ANSWER_HINT = "ai_answer_hint"
+# The same words to the same seat a second time: no new card, the one there is (直し31-2).
+CARD_ALREADY = "card_already"
 BACK_TO_START_CONFIRM = "back_to_start_confirm"
 BACK_TO_START_YES = "back_to_start_yes"
 BACK_TO_START_NO = "back_to_start_no"
@@ -139,7 +141,7 @@ SCREEN_TEXTS = (
     HARVEST_MEET_PREFIX, MORE_END, MORE_CARD_DONE, SAMPLE_SUMMARIZED, HARVEST_SUBJECT_MORE,
     BUBBLE_HINT, BUBBLE_CLOSE, BUBBLE_ANSWER,
     BACK_TO_START, BACK_TO_START_CONFIRM, BACK_TO_START_YES, BACK_TO_START_NO, REFLECT_NEEDS_ANSWER,
-    OPENING_SKIP, AI_ANSWER_HINT,
+    OPENING_SKIP, AI_ANSWER_HINT, CARD_ALREADY,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 

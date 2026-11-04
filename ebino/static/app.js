@@ -10,6 +10,8 @@ const state = {
   // Before the reflection, one answer to コーチ or オブザーバー (直し30-1):
   // one that started the next round; or the model was out once.
   aiAnswered: false, aiUnavailable: false, needsShown: false,
+  // Seat -> the card's words, when the same card was sent to it again (直し31-2).
+  cardAgain: {},
 };
 
 const $ = (id) => document.getElementById(id);
@@ -79,7 +81,7 @@ async function setup() {
   // the seat list alone, as before.
   // What the map may use: the round's own ways to a quote's paragraph, its
   // mark, a seat's question card and the quote's card (直し26-2).
-  const lent = { state, cardEntry, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
+  const lent = { state, cardEntry, cardDone, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
     readBelow, shownQuotes, phrased, answerForm };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
@@ -723,7 +725,7 @@ function renderAsked(roundNo, box, asked) {
     // Shown only, never a button: the question is the app's sentence, not
     // the student's. Under it, the seat's 「聞きたいことを書く」, box empty.
     node.append(el("p", { class: "not-answered", text: asked.not_answered }));
-    const done = () => el("p", { class: "card-done", text: "質問カードにしました" });
+    const done = () => cardDone(asked.seat_id, "p");
     if (asked.carded || state.carded.has(asked.seat_id)) node.append(done());
     else node.append(cardEntry(asked.seat_id, (form) => form.replaceWith(done())));
   } else if (asked.message) {
@@ -981,7 +983,7 @@ function renderSeat(seat) {
 function renderNotAsked(seat) {
   const box = el("div", { class: "not-asked" }, el("div", { text: state.texts.not_asked_yet }));
   if (state.carded.has(seat.seat_id)) {
-    box.append(el("div", { class: "card-done", text: "質問カードにしました" }));
+    box.append(cardDone(seat.seat_id));
     return box;
   }
   box.append(cardEntry(seat.seat_id, renderSeats, (form, open) => putUnderLine(seat, form, open)));
@@ -1048,6 +1050,13 @@ function openCardFor(seatId, { quiet = false } = {}) {
   return form;
 }
 
+// Where a seat's card was made: 「質問カードにしました」, or when the same
+// words were sent to it again, the card there is (直し31-2).
+function cardDone(seatId, tag = "div") {
+  const again = state.cardAgain[seatId];
+  return el(tag, { class: "card-done", text: again ? state.texts.card_already.replace("{card}", again) : "質問カードにしました" });
+}
+
 // 「聞きたいことを書く」: opens an empty box; the card holds the student's
 // words only (SPEC 2-2). put: where the open card goes (in the button's place).
 function cardEntry(seatId, done, put = (form, open) => open.replaceWith(form)) {
@@ -1059,8 +1068,19 @@ function cardEntry(seatId, done, put = (form, open) => open.replaceWith(form)) {
       event.preventDefault();
       const text = form.querySelector("textarea").value.trim();
       if (!text) return;
-      await call("/api/card", { seat_id: seatId, text });
+      // One press makes one card: the button waits while it is sent (直し31-2).
+      const send = form.querySelector("button[type=submit]");
+      if (send.disabled) return;
+      send.disabled = true;
+      let card;
+      try {
+        card = await call("/api/card", { seat_id: seatId, text });
+      } catch (error) {
+        send.disabled = false;
+        return;
+      }
       state.carded.add(seatId);
+      if (card.again) state.cardAgain[seatId] = card.text;
       done(form);
     });
     put(form, open);

@@ -29,6 +29,7 @@ from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_S
 from .gate import Gate, NameList, load_names
 from .guard import Guard
 from .index import Entry, build_index, load_topics, load_utterances
+from .ingest.scrub import normalize_for_match
 from .ingest.seats import Seat, load_seats
 from .ingest.utterance import Utterance
 from .purpose import PurposeSample, PurposeShelf, samples
@@ -228,9 +229,25 @@ class Session:
                                 question, plant=self.plant)
         self.rounds.append(result)
         if result.card:
-            self.cards.append(result.card)
+            # The same question again with no seat answering: the card there is.
+            result.card = self._keep_card(result.card)
         self.save()
         return self.round_view(len(self.rounds))
+
+    def card_like(self, seat_id: str, text: str) -> QuestionCard | None:
+        """The card already made to this seat ("" for none) with these words,
+        spaces and letter widths aside (直し31-2), or None."""
+        words = normalize_for_match(text or "")
+        return next((card for card in self.cards
+                     if card.seat_id == seat_id and normalize_for_match(card.text) == words), None)
+
+    def _keep_card(self, card: QuestionCard) -> QuestionCard:
+        """One card per seat and words: a second is not kept; the first is given back."""
+        same = self.card_like(card.seat_id, card.text)
+        if same is not None:
+            return same
+        self.cards.append(card)
+        return card
 
     def write_card(self, seat_id: str, text: str) -> dict:
         """A card the student writes at a seat shown as 「まだ誰も聞いていない」,
@@ -242,12 +259,17 @@ class Session:
             raise Refused("not_a_silent_seat")
         if len((text or "").strip()) > MAX_CARD_CHARS:
             raise Refused("card_too_long")
+        # Pressed again (or sent from a second box for the seat): no new
+        # card and no model; the card there is is shown (直し31-2).
+        same = self.card_like(seat_id, (text or "").strip()) if (text or "").strip() else None
+        if same is not None:
+            return same.front() | {"again": True}
         card = editor.card_from_student(self.gate, seat_id, text or "", self.library.seats)
         if card is None:
             raise Refused("empty_card")
         self.cards.append(card)
         self.save()
-        return card.front()
+        return card.front() | {"again": False}
 
     def mark(self, round_no: int, utterance_id: str) -> dict:
         """One marked quote per seat (SPEC 5-2). Marking it again takes it off."""
@@ -456,9 +478,8 @@ class Session:
         if state is None or not state.ended or state.card_id:
             raise Refused("not_ready_for_card")
         question = self._round(state.round_no).question
-        card = editor.card_for_seat(self.gate, editor.ORIGIN_NOT_HEARD, state.seat_id, question,
-                                    self.library.seats)
-        self.cards.append(card)
+        card = self.card_like(state.seat_id, question) or self._keep_card(
+            editor.card_for_seat(self.gate, editor.ORIGIN_NOT_HEARD, state.seat_id, question, self.library.seats))
         state.card_id = card.card_id
         self.save()
         return card.front()
