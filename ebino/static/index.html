@@ -11,9 +11,17 @@
   <h1>えびの円卓</h1>
 </header>
 
+<!-- 「いまやること」 (直し31-5): the four steps, the one now lit, and under
+     them the one thing to do now. Kept at the top while the page scrolls. -->
+<nav id="now" class="now" aria-label="いまやること">
+  <ol id="now-steps" class="now-steps"></ol>
+  <p id="now-line" class="now-line" aria-live="polite"></p>
+</nav>
+
 <main>
   <!-- Before starting: the seven notices and the one Lab question (SPEC 2-1). -->
   <section id="start">
+    <p id="start-purpose" class="start-purpose"></p>
     <div class="promises"><ol id="start-notice" class="notice-list"></ol></div>
     <div class="lab-pick">
       <p id="lab-question" class="lab-question"></p>
@@ -36,6 +44,26 @@
 
   <section id="table" hidden>
     <p id="heavy-talk" class="heavy-talk"></p>
+
+    <!-- Whose words are in the app, and examples of questions (直し31-5):
+         open until the first question is sent, then folded. -->
+    <section id="inside" class="inside" hidden>
+      <details id="inside-fold" open>
+        <summary id="inside-open"></summary>
+        <div class="inside-body">
+          <div class="inside-counts-part">
+            <p id="inside-heading" class="inside-heading"></p>
+            <ul id="inside-counts" class="inside-counts"></ul>
+            <p id="inside-end" class="inside-end"></p>
+          </div>
+          <div class="inside-examples">
+            <p id="examples-lead" class="examples-lead"></p>
+            <ul id="examples" class="examples-list"></ul>
+            <p id="examples-end" class="examples-end"></p>
+          </div>
+        </div>
+      </details>
+    </section>
 
     <form id="ask-form" class="ask">
       <label for="question" class="visually-hidden">問い</label>

@@ -135,6 +135,21 @@ OPENING_SKIP = "opening_skip"
 AI_ANSWER_HINT = "ai_answer_hint"
 # The same words to the same seat a second time: no new card, the one there is (直し31-2).
 CARD_ALREADY = "card_already"
+# 「いまやること」 (直し31-5): the four steps, the one line for each state, the
+# first screen's line of what this is for, and over the first question box
+# the counts of whose words are in the app, with examples of questions.
+NOW_STEPS = "now_steps"
+NOW_LINE = "now_line"
+NOW_STEP_IDS = ("write", "read", "ask", "reflect")
+NOW_LINE_IDS = ("start", "write", "asking", "reading", "table", "pressed", "after", "reflect")
+START_PURPOSE = "start_purpose"
+INSIDE_HEADING = "inside_heading"
+INSIDE_COUNTS = "inside_counts"
+INSIDE_END = "inside_end"
+INSIDE_OPEN = "inside_open"
+QUESTION_EXAMPLES = "question_examples"
+QUESTION_EXAMPLES_LEAD = "question_examples_lead"
+QUESTION_EXAMPLES_END = "question_examples_end"
 BACK_TO_START_CONFIRM = "back_to_start_confirm"
 BACK_TO_START_YES = "back_to_start_yes"
 BACK_TO_START_NO = "back_to_start_no"
@@ -150,8 +165,9 @@ SCREEN_TEXTS = (
     BACK_TO_START, BACK_TO_START_CONFIRM, BACK_TO_START_YES, BACK_TO_START_NO, REFLECT_NEEDS_ANSWER,
     OPENING_SKIP, AI_ANSWER_HINT, CARD_ALREADY,
     HARVEST_SUBJECT_QUESTION, HARVEST_SUBJECT_PICK, HARVEST_SUBJECT_NONE,
+    START_PURPOSE, INSIDE_HEADING, INSIDE_END, INSIDE_OPEN, QUESTION_EXAMPLES_LEAD, QUESTION_EXAMPLES_END,
 )
-SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
+SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS, QUESTION_EXAMPLES)
 
 
 def load_text(name: str) -> str:
@@ -199,7 +215,28 @@ def screen_texts() -> dict:
     texts[MAP_AROUND] = map_around()
     texts[BUBBLE_CHOICES] = bubble_choices()
     texts[SEAT_ICONS] = seat_icons()
+    texts[NOW_STEPS] = now_steps()
+    texts[NOW_LINE] = now_lines()
     return texts
+
+
+def now_steps() -> list[dict[str, str]]:
+    """[{"id", "text"}] in the band's order (直し31-5)."""
+    rows = {row["ID"]: row["文"] for row in load_table(NOW_STEPS, ("ID", "文"))}
+    if set(rows) != set(NOW_STEP_IDS):
+        raise ValueError(f"{NOW_STEPS}.tsv must have the rows {', '.join(NOW_STEP_IDS)}")
+    return [{"id": key, "text": rows[key]} for key in NOW_STEP_IDS]
+
+
+def now_lines() -> dict[str, dict[str, str]]:
+    """{state: {"step": the step lit ("" none), "text": the one line}}. The
+    line for an AI question still to answer is ai_answer_hint.txt's."""
+    rows = {row["ID"]: row for row in load_table(NOW_LINE, ("ID", "段階", "文"), may_be_empty=("段階",))}
+    if set(rows) != set(NOW_LINE_IDS) or any(rows[k]["段階"] not in ("",) + NOW_STEP_IDS for k in rows):
+        raise ValueError(f"{NOW_LINE}.tsv must have the rows {', '.join(NOW_LINE_IDS)}, each with a known step")
+    lines = {key: {"step": rows[key]["段階"], "text": rows[key]["文"]} for key in NOW_LINE_IDS}
+    lines["answer_ai"] = {"step": "ask", "text": load_text(AI_ANSWER_HINT)}
+    return lines
 
 
 def seat_icons() -> list[list[str]]:

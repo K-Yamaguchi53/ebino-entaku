@@ -29,7 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from . import relief
+from . import inside, relief
 from .config import PlaceError, data_dir, load_env_file, records_dir
 from .gate import Gate, load_names
 from .records import Records
@@ -99,6 +99,8 @@ class App:
             "changed_choices": CHANGED_CHOICES,
             "seats": self.library.seat_list(),
             "map": view,
+            # Whose words are in the app, as counts from the seat table (直し31-5).
+            "inside": inside.view(self.library.seats),
         }
 
     def start(self, body: dict) -> dict:

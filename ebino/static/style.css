@@ -66,7 +66,7 @@
 * { box-sizing: border-box; }
 /* A class that sets display (.sheet is a grid) must not show a hidden box. */
 [hidden] { display: none !important; }
-html { background: var(--night); }
+html { background: var(--night); scroll-padding-top: var(--now-h, 0px); }
 body {
   margin: 0;
   min-height: 100vh;
@@ -102,6 +102,47 @@ main { padding-bottom: 72px; }
 }
 body:has(#start[hidden]) .masthead { padding-top: 20px; }
 body:has(#start[hidden]) .masthead h1 { font-size: 36px; letter-spacing: .12em; margin-bottom: 4px; }
+
+/* --- 「いまやること」 (直し31-5): the four steps and the one line, kept at the top --- */
+.now { position: sticky; top: 0; z-index: 25; max-width: 1200px; margin: 0 auto; padding: 8px 16px 10px;
+  background: linear-gradient(var(--night) 85%, transparent); }
+.now-steps { display: flex; flex-wrap: wrap; gap: 4px 0; margin: 0; padding: 0; list-style: none; font-size: 14px;
+  color: var(--faint); }
+.now-steps li { display: flex; align-items: center; padding: 2px 10px; border-bottom: 3px solid transparent; }
+.now-steps li + li::before { content: "─"; margin-right: 10px; margin-left: -10px; padding-left: 0; color: var(--moon-soft); }
+.now-steps li + li { padding-left: 20px; }
+.now-steps li.lit { color: var(--lamp-bright); font-weight: bold; border-bottom-color: var(--lamp); }
+.now-line { margin: 4px 0 0; padding: 6px 14px; border-left: 4px solid var(--lamp); background: var(--night-2);
+  border-radius: 0 6px 6px 0; font-size: 18px; line-height: 1.6; color: var(--ink); }
+@media (max-height: 720px) {
+  .now { padding: 4px 16px 6px; }
+  .now-steps { font-size: 13px; }
+  .now-line { margin-top: 2px; padding: 3px 12px; font-size: 16px; }
+}
+.start-purpose { grid-column: 1 / -1; margin: 0; font-family: var(--mincho); font-size: 20px; line-height: 1.7; color: var(--ink); }
+
+/* --- whose words are in the app, and examples of questions (直し31-5) --- */
+.inside { margin-top: 14px; padding: 12px 18px; border: 1px solid var(--moon-faint); border-radius: 8px; background: var(--night-2); }
+.inside summary { cursor: pointer; color: var(--soft); font-size: 15px; min-height: 32px; }
+.inside details[open] summary { margin-bottom: 6px; }
+.inside-body { display: grid; gap: 10px 32px; }
+@media (min-width: 900px) { .inside-body { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+.inside-heading { margin: 0 0 6px; font-family: var(--mincho); font-size: 17px; color: var(--ink); }
+.inside-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 14px; margin: 0;
+  padding: 0; list-style: none; }
+.inside-counts li { display: grid; grid-template-columns: 22px 1fr; column-gap: 8px; align-items: center; }
+.inside-counts .mark { grid-row: 1 / 3; align-self: start; padding-top: 4px; }
+.inside-counts .pt-mark { width: 22px; height: 22px; overflow: visible; }
+.inside-counts .pt-mark .shape { fill: var(--night-3); stroke: var(--kind); stroke-width: 2.2; }
+.inside-counts .label { font-size: 14px; color: var(--soft); line-height: 1.5; }
+.inside-counts .count { line-height: 1.2; }
+.inside-counts .number { font-family: var(--mincho); font-size: 34px; font-weight: 600; color: var(--lamp-bright); margin-right: 4px; }
+.inside-counts .unit { font-size: 13px; color: var(--soft); }
+.inside-end { margin: 8px 0 0; color: var(--ink); font-size: 15px; }
+.inside-examples { border-left: 1px solid var(--moon-faint); padding-left: 18px; }
+@media (max-width: 899px) { .inside-examples { border-left: 0; padding-left: 0; border-top: 1px solid var(--moon-faint); padding-top: 8px; } }
+.examples-lead, .examples-end { margin: 0; font-size: 15px; color: var(--soft); }
+.examples-list { margin: 4px 0; padding-left: 1.2em; font-size: 15px; line-height: 1.7; color: var(--ink); }
 
 h2 { font-family: var(--mincho); font-size: 1.25rem; font-weight: 600; letter-spacing: .08em; margin: 28px 0 10px; color: var(--ink); }
 h3 { font-family: var(--mincho); }

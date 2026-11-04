@@ -1,8 +1,8 @@
-"""One line just over the two cards of コーチ and オブザーバー (直し30の続き-0):
-「コーチかオブザーバーの問いに、1つ答えよう。」 while no AI question has been
-answered in this session. Once one is (counted as in 直し30-1), it goes from
-over every round's cards. A round with no cards has none; the round table's
-bubbles are left as they are."""
+"""「コーチかオブザーバーの問いに、1つ答えよう。」 (直し30の続き-0), said once in
+one place (直し31-5): it is now the line of 「いまやること」 at the top while
+the newest round has AI questions and none has been answered in this
+session, and no longer over the cards as well. A round with no cards does
+not ask for it; the round table's bubbles are left as they are."""
 
 import json
 import shutil
@@ -28,12 +28,14 @@ function el(tag, attrs, ...kids) { return { tag, cls: attrs.class, text: attrs.t
   append(...more) { this.kids.push(...more); }, classList: { add() {} } }; }
 function answerEntry() { return el("button", { class: "quiet" }); }
 const onMap = () => {};
-const state = { texts: { ai_answer_hint: "HINT" }, bands: {}, aiAnswered: %(answered)s };
+const asked = [];
+function setNow(changes) { asked.push(changes); }
+const state = { texts: { ai_answer_hint: "HINT" }, bands: {}, aiAnswered: %(answered)s, lastRound: 1 };
 const box = el("div", {});
 async function call() { return %(band)s; }
 loadBand(1, box).then(() => {
   const part = box.kids[0];
-  process.stdout.write(JSON.stringify(part ? part.kids.map((k) => k.cls + ":" + (k.text || "")) : null));
+  process.stdout.write(JSON.stringify({ kids: part ? part.kids.map((k) => k.cls + ":" + (k.text || "")) : null, asked }));
 });
 """
 
@@ -49,27 +51,28 @@ def run(band, answered="false"):
 
 
 @node
-def test_before_any_answer_the_line_is_just_over_the_two_cards():
-    assert run(CARDS % "null") == ["ai-hint:HINT", "ai-card:", "ai-card:"]
+def test_cards_to_answer_ask_for_the_line_at_the_top_and_not_over_the_cards():
+    got = run(CARDS % "null")
+    assert got["kids"] == ["ai-card:", "ai-card:"]  # No second line over the cards.
+    assert got["asked"] == [{"band": True}]
 
 
 @node
-def test_once_one_is_answered_it_is_not_shown_and_goes_from_every_round():
-    assert run(CARDS % "null", answered="true") == ["ai-card:", "ai-card:"]
-    assert run(CARDS % '"coach"') == ["ai-card:", "ai-card:"]
-    # On the answer that counts, every round's line goes, with the lamp on the cards.
+def test_once_answered_it_is_not_asked_for():
+    assert run(CARDS % '"coach"')["asked"] == []
+    # The state that shows it holds only until one AI question is answered.
     form = _top("answerForm")
-    assert form.index("state.aiAnswered = true;") \
-        < form.index('for (const node of document.querySelectorAll(".ai-hint")) node.remove();') \
-        < form.index("renderRound(round);")
+    assert form.index("state.aiAnswered = true;") < form.index("renderRound(round);")
+    assert '!state.aiAnswered && now.band' in _top("nowState")
 
 
 @node
-def test_a_round_with_no_cards_has_no_line():
-    assert run("{ cards: [], answered: null }") is None
+def test_a_round_with_no_cards_asks_for_nothing():
+    assert run("{ cards: [], answered: null }") == {"kids": None, "asked": []}
 
 
 def test_the_line_is_the_teachers_and_not_at_the_round_table():
     assert texts.screen_texts()["ai_answer_hint"] == "コーチかオブザーバーの問いに、1つ答えよう。"
-    assert "答えよう" not in APP
+    assert texts.screen_texts()["now_line"]["answer_ai"]["text"] == "コーチかオブザーバーの問いに、1つ答えよう。"
+    assert "答えよう" not in APP and ".ai-hint" not in APP
     assert "ai_answer_hint" not in (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")

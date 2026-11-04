@@ -12,6 +12,11 @@ const state = {
   aiAnswered: false, aiUnavailable: false, needsShown: false,
   // Seat -> the card's words, when the same card was sent to it again (直し31-2).
   cardAgain: {},
+  // What 「いまやること」 is worked out from (直し31-5): a question being sent;
+  // the round's seats still lighting; a lamp card's choices open; one
+  // pressed this round; the round's table open with its cards; AI
+  // questions to answer below.
+  now: { asking: false, reading: false, choices: false, pressed: false, table: false, band: false },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -65,6 +70,12 @@ async function setup() {
   Object.assign(state, { texts: data.texts, kinds: data.kinds, seats: data.seats, changedChoices: data.changed_choices });
   for (const seat of data.seats) state.seatById[seat.seat_id] = seat;
   for (const line of data.texts.start_notice) $("start-notice").append(el("li", { text: line }));
+  $("start-purpose").textContent = data.texts.start_purpose;
+  for (const step of data.texts.now_steps) {
+    $("now-steps").append(el("li", { "data-step": step.id, text: step.text }));
+  }
+  renderInside(data.inside || []);
+  setNow();
   $("lab-question").textContent = data.texts.lab_question;
   for (const [key, label] of Object.entries(data.labs)) {
     $("lab-choices").append(el("button", { type: "button", class: "lab-choice", "aria-pressed": "false",
@@ -81,7 +92,7 @@ async function setup() {
   // the seat list alone, as before.
   // What the map may use: the round's own ways to a quote's paragraph, its
   // mark, a seat's question card and the quote's card (直し26-2).
-  const lent = { state, cardEntry, cardDone, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
+  const lent = { state, cardEntry, cardDone, setNow, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
     readBelow, shownQuotes, phrased, answerForm };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
@@ -113,6 +124,8 @@ async function start(lab, chosen) {
   if (opening) endOpening(false);
   $("start").hidden = true;
   $("table").hidden = false;
+  $("inside").hidden = !$("inside-counts").children.length;
+  setNow();
   onMap((map) => map.show());  // Draws the rim and the river once the map is on screen.
   renderPurposes(data.purposes);
   $("question").focus();
@@ -487,6 +500,64 @@ function fill(text) {
   $("question").focus();
 }
 
+// --- 「いまやること」 (直し31-5) ---
+
+// The one state the screen is in, from the first that holds.
+function nowState() {
+  const now = state.now;
+  if (!$("start").hidden) return "start";
+  if (!$("reflect").hidden) return "reflect";
+  if (now.asking) return "asking";
+  if (!state.firstQuestion) return "write";
+  if (now.reading) return "reading";
+  if (now.choices) return "pressed";
+  if (now.table && !now.pressed) return "table";
+  if (!state.aiAnswered && now.band) return "answer_ai";
+  return "after";
+}
+
+// The band's step for this state lit (by its words and a mark, not its
+// colour alone), and the one line under it. changes: flags to set first.
+function setNow(changes = {}) {
+  Object.assign(state.now, changes);
+  const lines = state.texts.now_line;
+  if (!lines) return;
+  const line = lines[nowState()];
+  for (const step of $("now-steps").children) {
+    const lit = step.dataset.step === line.step;
+    step.classList.toggle("lit", lit);
+    if (lit) step.setAttribute("aria-current", "step");
+    else step.removeAttribute("aria-current");
+  }
+  if ($("now-line").textContent !== line.text) $("now-line").textContent = line.text;
+  keepUnderNow();
+}
+
+// Whatever the page scrolls to stops under the band, not behind it.
+function keepUnderNow() {
+  document.documentElement.style.setProperty("--now-h", `${Math.ceil($("now").getBoundingClientRect().height) + 8}px`);
+}
+
+// Over the first question box: whose words are in the app, as counts from
+// the seat table, each with the mark its seats have on the map; then
+// examples of questions, to read only (the box is never filled from them).
+function renderInside(rows) {
+  $("inside-open").textContent = state.texts.inside_open;
+  $("inside-heading").textContent = state.texts.inside_heading;
+  for (const row of rows) {
+    const mark = typeof EbinoMap !== "undefined" ? EbinoMap.markOf(row.kind) : null;
+    $("inside-counts").append(el("li", { class: `kind-${row.kind}` },
+      el("span", { class: "mark", "aria-hidden": "true" }, mark),
+      el("span", { class: "label", text: row.before }),
+      el("span", { class: "count" }, el("span", { class: "number", text: String(row.number) }),
+        el("span", { class: "unit", text: row.after }))));
+  }
+  $("inside-end").textContent = state.texts.inside_end;
+  $("examples-lead").textContent = state.texts.question_examples_lead;
+  for (const text of state.texts.question_examples) $("examples").append(el("li", { text }));
+  $("examples-end").textContent = state.texts.question_examples_end;
+}
+
 // --- purposes ---
 
 function renderPurposes(purposes) {
@@ -511,10 +582,14 @@ async function ask(event) {
   if (!question) return;
   const button = $("ask-button");
   button.disabled = true;
-  showMessage(state.texts.waiting_ask);
+  // The waiting line is the one at the top now (直し31-5).
+  hideMessage();
+  setNow({ asking: true });
   try {
     const round = await call("/api/ask", { question });
-    hideMessage();
+    setNow({ asking: false });
+    // The counts and examples fold once a question is sent; they open again.
+    $("inside-fold").open = false;
     if (round.status === "ask_again" || round.status === "unavailable") {
       showMessage(round.message);  // The question stays in the box to be changed.
       return;
@@ -525,6 +600,7 @@ async function ask(event) {
     showMessage(sendFailed(error));
   } finally {
     button.disabled = false;
+    setNow({ asking: false });
   }
 }
 
@@ -534,11 +610,14 @@ function hideMessage() { $("ask-message").hidden = true; }
 
 function renderRound(round) {
   if (!state.firstQuestion) state.firstQuestion = round.question;
+  // A new round: its seats light (map.js says when they are done).
+  setNow({ reading: false, choices: false, pressed: false, table: false, band: false });
   $("to-reflect").hidden = false;
   state.lastOrder = round.seat_order;
   for (const id of round.met_seats) state.met.add(id);
   for (const id of round.silent_seats) state.silent.add(id);
 
+  state.lastRound = round.round;
   const box = el("article", { class: "round", "data-round": round.round });
   // A round that answers an AI's question shows that question over the answer.
   if (round.ai_question) {
@@ -605,9 +684,9 @@ async function loadBand(roundNo, box) {
   }
   if (!band.cards.length) return;
   const part = el("section", { class: "ai-band" });
-  // One line just over the two cards, until one AI question is answered in
-  // this session (直し30の続き-0).
-  if (!state.aiAnswered && !band.answered) part.append(el("p", { class: "ai-hint", text: state.texts.ai_answer_hint }));
+  // The line asking for one answer is the one at the top (直し31-5), not
+  // over the cards as well (直し30の続き-0): said once, in one place.
+  if (!band.answered && roundNo === state.lastRound) setNow({ band: true });
   for (const card of band.cards) {
     const node = el("div", { class: "ai-card" },
       el("p", { class: "label", text: card.label }),
@@ -645,9 +724,11 @@ function answerForm(roundNo, role) {
     const answer = input.value.trim();
     if (!answer) return;
     for (const node of form.querySelectorAll("input, button")) node.disabled = true;
-    showMessage(state.texts.waiting_ask);
+    hideMessage();
+    setNow({ asking: true });
     try {
       const round = await call("/api/coach_answer", { round: roundNo, role, answer, after_notice: state.needsShown });
+      setNow({ asking: false });
       if (round.status === "unavailable") state.aiUnavailable = true;
       if (round.status === "ask_again" || round.status === "unavailable") {
         showMessage(round.message);
@@ -658,10 +739,10 @@ function answerForm(roundNo, role) {
       state.aiAnswered = true;
       $("reflect-needs-answer").hidden = true;
       for (const node of document.querySelectorAll(".ai-card.needs-answer")) node.classList.remove("needs-answer");
-      for (const node of document.querySelectorAll(".ai-hint")) node.remove();
       bandAnswered(roundNo, role);
       renderRound(round);
     } catch (error) {
+      setNow({ asking: false });
       showMessage(sendFailed(error));
       for (const node of form.querySelectorAll("input, button")) node.disabled = false;
     }
@@ -1142,6 +1223,7 @@ function answerable() {
 function openReflection() {
   $("table").hidden = true;
   $("reflect").hidden = false;
+  setNow();
   document.querySelector(".reflect-heavy-talk").textContent = state.texts.heavy_talk_notice;
   $("first-question").textContent = state.firstQuestion;
   radios($("changed-choices"), "changed", Object.entries(state.changedChoices));
@@ -1426,6 +1508,7 @@ $("back-yes").addEventListener("click", backToStart);
 $("back-no").addEventListener("click", stayHere);
 $("back-confirm").addEventListener("keydown", (event) => { if (event.key === "Escape") stayHere(); });
 $("more-purposes").addEventListener("click", async () => renderPurposes((await call("/api/purposes", {})).purposes));
+window.addEventListener("resize", keepUnderNow);
 window.addEventListener("resize", () => {
   for (const form of document.querySelectorAll("#seat-list .card-form")) if (form.fit) form.fit();
 });

@@ -1467,6 +1467,9 @@ const EbinoMap = (() => {
     const order = result.seat_order.filter((id) => points[id]);
     if (!order.length) return;
     roundSeats = order;
+    // 「いまやること」 (直し31-5): the seats are lighting until the table's
+    // cards (or, on the flat map, the last bubble) are out.
+    app.setNow({ reading: true });
     // The whole map and its sources on screen while the round plays (on a
     // low screen it starts under the question). At once, as the round starts.
     $("map").scrollIntoView({ block: "nearest" });
@@ -1477,6 +1480,7 @@ const EbinoMap = (() => {
       sticky = last;
       showTip(last);
       drawSplits(result);
+      app.setNow({ reading: false });
       return;
     }
     order.forEach((id, k) => timers.push(setTimeout(() => {
@@ -1484,7 +1488,7 @@ const EbinoMap = (() => {
       bubble(id, first[id]);
     }, k * LIGHT_EVERY)));
     const end = (order.length - 1) * LIGHT_EVERY;
-    timers.push(setTimeout(() => drawSplits(result), end + LIGHT_EVERY));
+    timers.push(setTimeout(() => { drawSplits(result); app.setNow({ reading: false }); }, end + LIGHT_EVERY));
     timers.push(setTimeout(() => { sticky = last; showTip(last); }, end + BUBBLE_FOR));
   }
 
@@ -1739,6 +1743,7 @@ const EbinoMap = (() => {
     if (!pressedOnce) overlay.append(div("map-hint", app.state.texts.bubble_hint));
     relayout();
     marked();
+    app.setNow({ reading: false, table: true });
   }
 
   // A seat's lamp card at the table: the same words as on the map, kept.
@@ -1980,6 +1985,7 @@ const EbinoMap = (() => {
     dropHint();
     const ai = tokens.find((t) => t.id === seatId && t.ai);
     if (ai) return openAnswer(seatId, card, ai.ai);
+    app.setNow({ choices: true, pressed: true });
     const words = app.state.texts.bubble_choices, utteranceId = card.dataset.utterance;
     const node = div("map-choices");
     node.setAttribute("role", "group");
@@ -2117,6 +2123,7 @@ const EbinoMap = (() => {
     const { node, card, seatId, moved } = choices;
     choices = null;
     node.remove();
+    app.setNow({ choices: false });
     for (const other of overlay.querySelectorAll(".under-choices")) other.classList.remove("under-choices");
     for (const token of tableLayer.querySelectorAll(".token.chosen")) token.classList.remove("chosen");
     card.setAttribute("aria-expanded", "false");
@@ -2568,5 +2575,17 @@ const EbinoMap = (() => {
     card.scrollIntoView({ block: "nearest" });
   }
 
-  return { init, show, round, refresh, marked, band: setBand };
+  // A seat kind's mark as on the map, small, for the counts over the
+  // question box (直し31-5): the same shape and colour as its points.
+  function markOf(kind) {
+    const mark = document.createElementNS(NS, "svg");
+    mark.setAttribute("viewBox", "-11 -11 22 22");
+    mark.setAttribute("class", `pt-mark kind-${kind}`);
+    mark.setAttribute("aria-hidden", "true");
+    mark.setAttribute("focusable", "false");
+    mark.append(shape(kind));
+    return mark;
+  }
+
+  return { init, show, round, refresh, marked, band: setBand, markOf };
 })();

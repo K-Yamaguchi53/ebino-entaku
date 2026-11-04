@@ -25,6 +25,9 @@ class Seat:
     source_file: str
     table_no: int | None
     is_crossing_target: bool
+    # The 「越境の線の先」 cell as written: "1" marks the crossing line's
+    # target; 県外 or 海外 splits the count of those who went out (直し31-5).
+    crossing_to: str = ""
 
     def for_model(self) -> dict:
         """The only seat fields a model may see: no company, name or year."""
@@ -58,6 +61,7 @@ def load_seats(path: Path) -> list[Seat]:
                     source_file=row["元ファイル"].strip(),
                     table_no=int(table) if table else None,
                     is_crossing_target=(row["越境の線の先"] or "").strip() == "1",
+                    crossing_to=(row["越境の線の先"] or "").strip(),
                 )
             )
     return seats
