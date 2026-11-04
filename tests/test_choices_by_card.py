@@ -123,3 +123,17 @@ def test_choices_with_no_tail_keep_off_the_pressed_seats_ring_and_the_paragraph_
     assert '[block, top, "near"]' in put
     room = _inner("seatRoom")
     assert "SEAT_ROOM" in room and ".shape" in room
+
+
+def test_where_no_card_spot_has_room_the_paragraph_still_goes_apart_not_over_the_table():
+    # 1366x650, a seat by the table's edge with no card spot (直し27, the
+    # screen check): the choices go by their card as before, and the
+    # paragraph on paper of its own; in them only where that covers none
+    # of hard and shows PARAGRAPH_LINES or more.
+    put = _inner("putChoices")
+    last = put[put.index("// No such spot: as before"):]
+    assert "const inOwn = chosen.clear ? seen(chosen.way[2]) : -1;" in last
+    assert "if (!paragraph.hidden && inOwn < PARAGRAPH_LINES) {" in last
+    assert "const closedChosen = byOwn(closed);" in last
+    assert last.index("putParagraphApart(") < last.index("if (!apart) place(chosen);")  # Laying again would undo its lines.
+    assert "if (apart) for (const other of shown) if (overlaps(paragraph, other))" in last

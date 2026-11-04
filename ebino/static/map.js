@@ -2055,22 +2055,44 @@ const EbinoMap = (() => {
     }
     setApart(false);
     // No such spot: as before, by the card, over it rather than the table.
-    let chosen = null;
-    search: for (const overOwn of [false, true]) {
-      for (const way of ways) {
-        lay(way);
-        const { width, height } = node.getBoundingClientRect();
-        const [found, clear] = choiceSpot(frameWH, { w: width, h: height }, own, hard, others, overOwn);
-        if (!chosen || clear) chosen = { way, found };
-        if (clear) break search;
+    const byOwn = (tried) => {
+      let chosen = null;
+      for (const overOwn of [false, true]) {
+        for (const way of tried) {
+          lay(way);
+          const { width, height } = node.getBoundingClientRect();
+          const [found, clear] = choiceSpot(frameWH, { w: width, h: height }, own, hard, others, overOwn);
+          if (!chosen || (clear && !chosen.clear)) chosen = { way, found, clear };
+          if (clear) return chosen;
+        }
       }
+      return chosen;
+    };
+    const place = ({ way, found }) => {
+      lay(way);
+      node.style.left = `${found[0]}px`;
+      node.style.top = `${found[1]}px`;
+    };
+    let chosen = byOwn(ways);
+    // The paragraph stays in the choices only where that covers none of
+    // the table, its seats and chairs, and shows all of it or
+    // PARAGRAPH_LINES lines or more; else the choices as they are closed,
+    // and the paragraph on paper of its own (直し27-3), whichever shows more.
+    const inOwn = chosen.clear ? seen(chosen.way[2]) : -1;
+    if (!paragraph.hidden && inOwn < PARAGRAPH_LINES) {
+      setApart(true);
+      const closedChosen = byOwn(closed);
+      place(closedChosen);
+      const lines = putParagraphApart(paragraph, text, lineHeight, frameBox, [...hard, ...seatRoom(frameBox), boxIn(card, frameBox)], others);
+      if (lines !== null && seen(lines) > inOwn) apart = true;
+      else setApart(false);
     }
-    lay(chosen.way);
-    node.style.left = `${chosen.found[0]}px`;
-    node.style.top = `${chosen.found[1]}px`;
+    // Laid again only when the paragraph is in them (laying sets its lines).
+    if (!apart) place(chosen);
     // What it covers steps behind it while it is open (its own card too,
-    // when there was no room but over it).
+    // when there was no room but over it), and what its paragraph covers.
     for (const other of [...shown, card]) if (overlaps(node, other)) other.classList.add("under-choices");
+    if (apart) for (const other of shown) if (overlaps(paragraph, other)) other.classList.add("under-choices");
   }
 
   // The paragraph apart from its choices (直し27-3), where the map has no
