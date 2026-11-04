@@ -1963,23 +1963,19 @@ const EbinoMap = (() => {
     // While a choice waits on the server it stays where it is (a disabled
     // button would drop the keyboard's focus): a second press then does nothing.
     let busy = false;
+    // In the drawer, not here (直し32-4): the paragraph and whose it is.
     const read = button("paragraph", async () => {
       if (busy) return;
-      if (!text.textContent) {
-        busy = true;
-        try {
-          text.textContent = await app.paragraph(utteranceId);
-        } catch (error) {
-          return;
-        } finally {
-          busy = false;
-        }
+      busy = true;
+      try {
+        await app.openParagraph(utteranceId, paragraph.querySelector(".whose").textContent, read);
+      } catch (error) {
+        // As below the map: nothing changes.
+      } finally {
+        busy = false;
       }
-      paragraph.hidden = !paragraph.hidden;
-      read.setAttribute("aria-expanded", String(!paragraph.hidden));
-      putChoices();
     });
-    read.setAttribute("aria-expanded", "false");
+    read.setAttribute("aria-controls", "drawer");
     const mark = button("mark", async () => {
       if (busy) return;
       busy = true;
@@ -1995,6 +1991,20 @@ const EbinoMap = (() => {
       : button("card", () => { closeChoices(false); app.askSeat(seatId); });
     const below = button("read", () => { closeChoices(false); app.readBelow(tableRoundNo, utteranceId, card); });
     node.append(head, read, paragraph, mark, write, below);
+    // The first time a bubble is pressed, a line under each button says what
+    // it does (直し32-4); after that the buttons alone.
+    const help = app.firstHelp();
+    if (help) {
+      node.classList.add("with-help");
+      for (const item of [read, mark, write, below]) {
+        const key = item.dataset.choice;
+        if (!key || !help[key]) continue;
+        const line = div("help", help[key]);
+        line.id = `choice-help-${key}`;
+        item.setAttribute("aria-describedby", line.id);
+        item.after(line);
+      }
+    }
     node.addEventListener("keydown", (event) => moveInChoices(event, node));
     card.after(node);  // Tab goes on from the lamp card into its choices.
     card.setAttribute("aria-expanded", "true");

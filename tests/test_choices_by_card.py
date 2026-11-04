@@ -103,7 +103,8 @@ def test_the_paragraph_says_whose_it_is_and_shows_five_lines_where_there_is_room
     opened = _inner("openChoices")
     # The name only; a bubble shown as spoken words adds its source's note (直し31-7).
     assert 'paragraph.append(div("whose", [seatOf(seatId).title, card.dataset.note].filter(Boolean).join("　")), text);' in opened
-    assert "text.textContent = await app.paragraph(utteranceId);" in opened
+    # Read in the drawer now (直し32-4), with whose it is at its head.
+    assert 'await app.openParagraph(utteranceId, paragraph.querySelector(".whose").textContent, read);' in opened
     put = _inner("putChoices")
     # All of it first, then PARAGRAPH_LINES or more, only then fewer (it scrolls).
     assert "PARAGRAPH_STEPS.flatMap(" in put and "const PARAGRAPH_STEPS = [0, 8, PARAGRAPH_LINES, 4, 3, 2];" in MAP

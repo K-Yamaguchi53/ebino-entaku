@@ -98,7 +98,7 @@ async function setup() {
   // What the map may use: the round's own ways to a quote's paragraph, its
   // mark, a seat's question card and the quote's card (直し26-2).
   const lent = { state, cardEntry, cardDone, setNow, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
-    readBelow, shownQuotes, phrased, askSeat, answerTo };
+    readBelow, shownQuotes, phrased, askSeat, answerTo, firstHelp, openParagraph };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
 
@@ -1170,6 +1170,25 @@ function renderQuote(roundNo, quote) {
     el("div", { class: "actions" }, back, mark),
     paragraph);
   return node;
+}
+
+// The help under the bubble's buttons (直し32-4): the first time this
+// student presses a bubble, and not again. 「最初にもどる」 reads the page
+// afresh, so the next student has it again.
+function firstHelp() {
+  if (state.helpShown) return null;
+  state.helpShown = true;
+  return state.texts.bubble_choices_help;
+}
+
+// 「元の段落を読む」 at the table (直し32-4): the paragraph as recorded and
+// whose it is (with its source's note) in the drawer, not by the map. 閉じる
+// or Esc closes it, the keyboard back on the button pressed.
+async function openParagraph(utteranceId, whose, from) {
+  const text = await paragraphOf(utteranceId);
+  $("drawer-paragraph").replaceChildren(el("p", { class: "whose", text: whose }),
+    el("p", { class: "paragraph-text", text }));
+  openDrawer("paragraph", from);
 }
 
 // A quote's paragraph, as recorded (/api/paragraph).

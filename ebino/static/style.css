@@ -775,7 +775,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .map-choices.low .head .who { grid-column: 1 / -1; order: -1; width: 0; min-width: 100%; box-sizing: border-box; padding: 0 4px; font-size: 12px; line-height: 18px; }
 .map-choices.low .head .close { order: 1; }
 .map-choices.low button { min-height: 34px; padding: 2px 8px; font-size: 12px; }
-.map-choices.column { grid-template-columns: minmax(0, 96px); }
+.map-choices.column { grid-template-columns: minmax(0, 132px); }
 .map-choices.column .head { flex-wrap: wrap; }
 .map-choices.column .head .who { flex-basis: 100%; white-space: normal; }
 /* Their tail, in the lamp's light, to the seat; the seat a ring brighter. */
@@ -883,7 +883,7 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .now-steps { grid-area: s
 body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line { grid-area: line; margin: 4px 0 8px; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) main { grid-area: main; min-height: 0; max-width: none; width: 100%; padding: 0 0 8px; display: flex; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #table { flex: 1 1 auto; min-width: 0; min-height: 0; display: grid; gap: 8px 14px;
-  grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr) auto auto; }
+  grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { grid-column: 1; grid-row: 1; position: relative; min-width: 0; min-height: 0; container-type: size; }
 /* The map as large as its room lets it be, its shape kept (map.js sets
    it); its buttons in a column on its right. */
@@ -915,10 +915,15 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #inside:not(:has(details[
    room, and comes back to its full size when it folds. */
 @media (orientation: landscape) {
   body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { --inside-w: min(320px, 30cqw); }
-  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage:has(#inside:not([hidden]) details[open]) .map-room { padding-left: calc(var(--inside-w) + 12px); }
+  /* Only as far as it must: none where the room beside the map is enough. */
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage:has(#inside:not([hidden]) details[open]) .map-room {
+    padding-left: min(var(--inside-w) + 12px, max(0px, 2 * (var(--inside-w) + 12px) - (100cqw - 212px - min(100cqw - 212px, 100cqh * var(--map-ratio, 1.3))))); }
 }
 /* The drawer: closed, nothing; open, one part, scrolling inside itself. */
-body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer { grid-column: 2; grid-row: 1 / 3; width: clamp(300px, 30vw, 440px); min-height: 0; display: none;
+/* Over the right of the stage (its buttons' column first), so the map never
+   moves for it and the card that opened it stays where it was. */
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer { grid-column: 1; grid-row: 1; justify-self: end; z-index: 30; width: clamp(300px, 30vw, 440px);
+  min-height: 0; display: none;
   flex-direction: column; background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: 10px;
   box-shadow: 0 14px 34px var(--shadow); }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer.open { display: flex; }
@@ -980,7 +985,7 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .map-card { position: abs
   body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: static; width: auto; max-height: none; flex: 1 1 auto; min-height: 0; margin-top: 8px;
     overflow: auto; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) #inside:not(:has(details[open])) { flex: none; }
-  body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer { grid-column: 1; grid-row: 1; align-self: end; width: auto; max-height: 46%; z-index: 30; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer { grid-column: 1; grid-row: 1; align-self: end; justify-self: stretch; width: auto; max-height: 46%; z-index: 30; }
 }
 
 /* --- the one box (直し32-2): to whom on its left, its button's word after --- */
@@ -1029,7 +1034,8 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { position: abso
    steps right for it, as for the card of whose words are in, so it covers
    no seat at the table. */
 @media (orientation: landscape) {
-  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage:has(#ai-seat:not([hidden])) .map-room { padding-left: calc(var(--ai-w) + 12px); }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage:has(#ai-seat:not([hidden])) .map-room {
+    padding-left: min(var(--ai-w) + 12px, max(0px, 2 * (var(--ai-w) + 12px) - (100cqw - 212px - min(100cqw - 212px, 100cqh * var(--map-ratio, 1.3))))); }
 }
 @media (orientation: portrait) {
   body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { position: static; width: auto; max-height: none; flex: 0 1 auto; min-height: 0; margin: 8px 0 0;
@@ -1038,3 +1044,12 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { position: abso
   body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-cards { grid-template-columns: 1fr 1fr; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-question { padding: 6px 10px; }
 }
+
+/* The first time a bubble is pressed (直し32-4): under each button, one
+   small line of what it does, the buttons one to a line then. */
+.map-choices.with-help { grid-template-columns: minmax(0, 21em); }
+.map-choices .help { margin: -2px 0 4px; padding: 0 6px; font-size: 13px; line-height: 1.5; color: var(--soft); }
+/* 「元の段落を読む」 in the drawer: whose, then the paragraph as recorded. */
+#drawer-paragraph .whose { margin: 10px 0 6px; font-size: 14px; font-weight: bold; color: var(--soft); }
+#drawer-paragraph .paragraph-text { margin: 0; padding: 14px 16px; border-radius: 6px; background: var(--paper);
+  color: var(--paper-ink); font-family: var(--mincho); font-size: 17px; line-height: 1.9; }

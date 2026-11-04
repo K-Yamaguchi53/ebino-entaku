@@ -179,6 +179,8 @@ BACK_TO_START_CONFIRM = "back_to_start_confirm"
 BACK_TO_START_YES = "back_to_start_yes"
 BACK_TO_START_NO = "back_to_start_no"
 BUBBLE_CHOICE_IDS = ("paragraph", "mark", "card", "read")
+# Under each of them, the first time a student presses a bubble (直し32-4).
+BUBBLE_CHOICES_HELP = "bubble_choices_help"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
@@ -241,6 +243,7 @@ def screen_texts() -> dict:
     texts[MAP_AROUND] = map_around()
     texts[BUBBLE_CHOICES] = bubble_choices()
     texts[DRAWER_PARTS] = id_table(DRAWER_PARTS, DRAWER_PART_IDS)
+    texts[BUBBLE_CHOICES_HELP] = id_table(BUBBLE_CHOICES_HELP, BUBBLE_CHOICE_IDS)
     texts[INPUT_TO] = id_table(INPUT_TO, INPUT_TO_IDS)
     texts[INPUT_SEND] = id_table(INPUT_SEND, INPUT_SEND_IDS)
     texts[INPUT_DONE] = id_table(INPUT_DONE, INPUT_DONE_IDS)

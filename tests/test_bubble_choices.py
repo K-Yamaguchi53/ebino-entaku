@@ -73,7 +73,8 @@ def test_a_card_and_a_seat_left_out_take_a_press_that_opens_one_card_of_choices(
 
 def test_each_choice_calls_what_the_round_below_already_does():
     opened = _inner("openChoices")
-    assert "app.paragraph(utteranceId)" in opened and "app.mark(tableRoundNo, utteranceId)" in opened
+    # The paragraph in the drawer (直し32-4).
+    assert "app.openParagraph(utteranceId" in opened and "app.mark(tableRoundNo, utteranceId)" in opened
     assert "app.askSeat(seatId)" in opened and "app.readBelow(tableRoundNo, utteranceId, card)" in opened
     assert "fetch(" not in MAP and "call(" not in MAP  # The map asks the server nothing itself.
     lent = APP[APP.index("const lent = {"):APP.index("};", APP.index("const lent = {"))]
