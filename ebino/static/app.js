@@ -6,6 +6,7 @@ const state = {
   texts: {}, kinds: {}, seats: [], seatById: {},
   lastOrder: [], met: new Set(), silent: new Set(), carded: new Set(), marks: {},
   askBoxes: {},  // Round number -> the box of 「司会が○○に聞いてみる」.
+  bands: {},  // Round number -> the band of コーチ and オブザーバー below.
 };
 
 const $ = (id) => document.getElementById(id);
@@ -76,7 +77,7 @@ async function setup() {
   // What the map may use: the round's own ways to a quote's paragraph, its
   // mark, a seat's question card and the quote's card (直し26-2).
   const lent = { state, cardEntry, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
-    readBelow, shownQuotes, phrased };
+    readBelow, shownQuotes, phrased, answerForm };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
 
@@ -235,45 +236,67 @@ async function loadBand(roundNo, box) {
       el("p", { class: "label", text: card.label }),
       el("p", { class: "badge", text: card.badge }),
       el("p", { class: "words", text: card.question }));
-    if (!band.answered) node.append(answerEntry(roundNo, card.role, part));
+    node.dataset.role = card.role;
+    if (!band.answered) node.append(answerEntry(roundNo, card.role));
     else if (band.answered === card.role) node.classList.add("answered");
     part.append(node);
   }
   box.append(part);
+  state.bands[roundNo] = part;
+  // The same two sit at the round table (直し29-1), from this one call.
+  if (!band.answered) onMap((map) => map.band(roundNo, band.cards));
 }
 
-function answerEntry(roundNo, role, part) {
-  const open = el("button", { type: "button", class: "quiet", text: "答える" });
+function answerEntry(roundNo, role) {
+  const open = el("button", { type: "button", class: "quiet", text: state.texts.bubble_answer });
   open.addEventListener("click", () => {
-    const input = el("input", { type: "text", maxlength: "120", autocomplete: "off" });
-    const form = el("form", { class: "ai-answer" }, input, el("button", { type: "submit", text: "送る" }));
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const answer = input.value.trim();
-      if (!answer) return;
-      for (const node of form.querySelectorAll("input, button")) node.disabled = true;
-      showMessage(state.texts.waiting_ask);
-      try {
-        const round = await call("/api/coach_answer", { round: roundNo, role, answer });
-        if (round.status === "ask_again" || round.status === "unavailable") {
-          showMessage(round.message);
-          for (const node of form.querySelectorAll("input, button")) node.disabled = false;
-          return;
-        }
-        hideMessage();
-        // One answer per band: the other card's button goes away.
-        for (const button of part.querySelectorAll(".ai-card > button")) button.remove();
-        form.closest(".ai-card").classList.add("answered");
-        renderRound(round);
-      } catch (error) {
-        showMessage(sendFailed(error));
-        for (const node of form.querySelectorAll("input, button")) node.disabled = false;
-      }
-    });
+    const form = answerForm(roundNo, role);
     open.replaceWith(form);
-    input.focus();
+    form.querySelector("input").focus();
   });
   return open;
+}
+
+// The one-line box an answer to コーチ or オブザーバー goes in, empty: below
+// the map and in the round table's choices alike (直し29-1). Sent, the next
+// round starts.
+function answerForm(roundNo, role) {
+  const input = el("input", { type: "text", maxlength: "120", autocomplete: "off" });
+  const form = el("form", { class: "ai-answer" }, input, el("button", { type: "submit", text: "送る" }));
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const answer = input.value.trim();
+    if (!answer) return;
+    for (const node of form.querySelectorAll("input, button")) node.disabled = true;
+    showMessage(state.texts.waiting_ask);
+    try {
+      const round = await call("/api/coach_answer", { round: roundNo, role, answer });
+      if (round.status === "ask_again" || round.status === "unavailable") {
+        showMessage(round.message);
+        for (const node of form.querySelectorAll("input, button")) node.disabled = false;
+        return;
+      }
+      hideMessage();
+      bandAnswered(roundNo, role);
+      renderRound(round);
+    } catch (error) {
+      showMessage(sendFailed(error));
+      for (const node of form.querySelectorAll("input, button")) node.disabled = false;
+    }
+  });
+  return form;
+}
+
+// One answer per band: the other card's 「答える」 goes away and the card
+// answered is marked, wherever the answer was written.
+function bandAnswered(roundNo, role) {
+  const part = state.bands[roundNo];
+  if (!part) return;
+  for (const card of part.querySelectorAll(".ai-card")) {
+    for (const button of card.querySelectorAll(":scope > button")) button.remove();
+    if (card.dataset.role === role) card.classList.add("answered");
+    else for (const form of card.querySelectorAll(":scope > form")) form.remove();
+  }
 }
 
 // 「司会が○○に聞いてみる」 (SPEC 14-53 B): a card with one question to one

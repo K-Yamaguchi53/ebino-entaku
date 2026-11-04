@@ -193,7 +193,10 @@ def test_the_coach_and_observer_band_over_http(server, monkeypatch):
     assert script.index("closeRound(round.round, closingBox)") < script.index("loadBand(round.round, bandBox)")
     entry = script[script.index("function answerEntry"):]
     entry = entry[:entry.index("\n}\n")]
-    assert 'el("input", { type: "text"' in entry and ".value =" not in entry
+    assert "answerForm(roundNo, role)" in entry
+    form = script[script.index("function answerForm"):]
+    form = form[:form.index("\n}\n")]
+    assert 'el("input", { type: "text"' in form and ".value =" not in form
 
 
 def test_not_answered_yet_is_shown_only_with_the_seats_empty_card_box_under_it():

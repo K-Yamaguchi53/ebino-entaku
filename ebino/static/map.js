@@ -31,6 +31,10 @@ const EbinoMap = (() => {
   const TAIL_LENGTH = 16;  // px: a card's tail, at the least.
   const SEAT_PRESS = 44;  // px: the square a seat with no card up takes a press over.
   const TOUCH = 6;  // px between a lamp card and its choices, against its side.
+  const AI_APART = 24;  // Degrees コーチ and オブザーバー keep from every seat at the table (直し29-1).
+  // A small flame in its holder: コーチ's and オブザーバー's seat, no seat's mark.
+  const AI_FLAME = "M0,-11 C3.6,-6.5 5.2,-3.4 5.2,-0.8 A5.2,5.2 0 0 1 -5.2,-0.8 C-5.2,-3.4 -3.6,-6.5 0,-11 Z " +
+    "M-7,5.5 H7 L5,10 H-5 Z";
   const SEAT_ROOM = 4;  // px the paragraph apart keeps from a seat's mark at the table.
   const PARAGRAPH_LINES = 5;  // The paragraph's lines seen at the least, where there is room.
   // The paragraph's lines tried, in order: all of it (0), then fewer; under PARAGRAPH_LINES only failing those.
@@ -93,6 +97,8 @@ const EbinoMap = (() => {
   let choices = null;  // The card of choices open at the table: { seatId, node, card }.
   let pressedOnce = false;  // A card was pressed: the line that says so goes, for good.
   let tableRoundNo = 0;  // The round the table is for.
+  let band = null;  // コーチ and オブザーバー of a round (直し29-1): { round, cards }.
+  let tableAt = null;  // The table open: { center, angles, split }, for the band's seats.
 
   const reduced = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = (id) => document.getElementById(id);
@@ -1556,6 +1562,7 @@ const EbinoMap = (() => {
   async function openTable(result, order, center, still) {
     const motion = !reduced();
     const { split, sides, seats } = seating(result, order);
+    tableAt = { center, angles: seats.map((sitting) => sitting.angle), split: Boolean(split) };
     svg.classList.add("dim");
     // While the table is open the map's points behind take no mouse, press
     // or touch (style.css; 直し27-4): the name card the mouse showed goes.
@@ -1653,6 +1660,7 @@ const EbinoMap = (() => {
     if (split && overlay.clientWidth >= TAG_ON_MAP) $("map-heading").replaceChildren(app.phrased(app.shownQuotes(split.heading)));
     for (const chairNode of tableLayer.querySelectorAll(".chair")) chairNode.classList.add("ready");
     tableRoundNo = result.round;
+    if (band && band.round === result.round) seatBand();
     if (!pressedOnce) overlay.append(div("map-hint", app.state.texts.bubble_hint));
     relayout();
     marked();
@@ -1672,6 +1680,77 @@ const EbinoMap = (() => {
     return node;
   }
 
+  // コーチ and オブザーバー (直し29-1), from the band app.js got with its one
+  // call to /api/coach: kept for the round's table, seated at once if it is
+  // open. A band with no cards, or answered, is not sent.
+  function setBand(roundNo, cards) {
+    band = { round: roundNo, cards };
+    if (tableTop && tableAt && tableRoundNo === roundNo && !tokens.some((token) => token.ai)) {
+      seatBand();
+      relayout();
+    }
+  }
+
+  // Their two seats: off the seats and chairs (aiAngles), a small flame in
+  // moonlight each, no seat's mark; their names as on the cards below; their
+  // questions in moonlit cards that find room before the seats' (rank).
+  function seatBand() {
+    const { center, angles, split } = tableAt;
+    const spots = aiAngles(angles, split, band.cards.length);
+    band.cards.forEach((card, k) => {
+      const id = `ai-${card.role}`, at = onTable(center, spots[k], SEAT_OUT);
+      const node = svgEl("g", { class: "token ai-seat lit", "aria-hidden": "true" });
+      node.append(svgEl("circle", { class: "halo", r: 20 }), svgEl("path", { class: "shape", d: AI_FLAME }));
+      tableLayer.append(node);
+      tokens.push({ node, at, scale: TOKEN, id, ai: card });
+      const label = div("table-label ai", card.label);
+      Object.assign(label.dataset, { seat: id, x: at[0], y: at[1], gap: 16, full: card.label, short: card.label });
+      const bubble = aiBubble(id, card, at);
+      bubble.dataset.rank = String(k - band.cards.length);
+      overlay.append(label, bubble, seatPress(id, at));
+    });
+    rescale();
+  }
+
+  // Where コーチ and オブザーバー sit (直し29-1), in degrees round the table:
+  // with a split, at the ends of its dashed line (270°, 90°: on neither
+  // side) where no seat is near; else between the groups; the first tried
+  // that is AI_APART from every seat (taken) and from each other, or failing
+  // that the furthest. It reads nothing but what it is given.
+  function aiAngles(taken, split, count = 2) {
+    const tried = [...(split ? [270, 90] : []), 225, 315, 135, 45, ...Array.from({ length: 72 }, (_, k) => k * 5)];
+    const apart = (a, b) => { const d = (((a - b) % 360) + 360) % 360; return Math.min(d, 360 - d); };
+    const out = [];
+    for (let k = 0; k < count; k++) {
+      const near = (angle) => Math.min(360, ...[...taken, ...out].map((other) => apart(angle, other)));
+      const free = tried.find((angle) => near(angle) >= AI_APART);
+      out.push(free !== undefined ? free : tried.reduce((best, angle) => (near(angle) > near(best) ? angle : best)));
+    }
+    return out;
+  }
+
+  // An AI question's card at the table: in moonlight, not the seats' paper,
+  // so a recorded voice and an AI's question are told apart at a glance.
+  // Pressed, its choices: 「答える」 and 「閉じる」.
+  function aiBubble(id, card, at) {
+    const node = div("table-bubble ai unplaced");
+    node.append(div("badge", card.badge), div("voice", card.question), div("who", card.label));
+    Object.assign(node.dataset, { seat: id, utterance: "", x: at[0], y: at[1] });
+    node.style.setProperty("--k", "0");
+    node.tabIndex = 0;
+    node.setAttribute("role", "button");
+    node.setAttribute("aria-expanded", "false");
+    pressable(node, () => toggleChoices(id));
+    return node;
+  }
+
+  // Whose a seat at the table is, in words: a seat's title and detail, or
+  // コーチ's or オブザーバー's label.
+  function nameAt(seatId) {
+    const token = tokens.find((t) => t.id === seatId && t.ai);
+    return token ? token.ai.label : whoOf(seatOf(seatId));
+  }
+
   // Over a seat at the table whose card has no room: pressing it (or Enter
   // or Space on it) shows that card.
   function seatPress(seatId, at) {
@@ -1679,7 +1758,7 @@ const EbinoMap = (() => {
     Object.assign(node.dataset, { seat: seatId, x: at[0], y: at[1] });
     node.tabIndex = 0;
     node.setAttribute("role", "button");
-    node.setAttribute("aria-label", whoOf(seatOf(seatId)));
+    node.setAttribute("aria-label", nameAt(seatId));
     pressable(node, () => {
       opened = seatId;
       relayout();
@@ -1821,6 +1900,8 @@ const EbinoMap = (() => {
     const card = [...overlay.querySelectorAll(".table-bubble")].find((node) => node.dataset.seat === seatId);
     if (!card || card.classList.contains("unplaced")) return;
     dropHint();
+    const ai = tokens.find((t) => t.id === seatId && t.ai);
+    if (ai) return openAnswer(seatId, card, ai.ai);
     const words = app.state.texts.bubble_choices, utteranceId = card.dataset.utterance;
     const node = div("map-choices");
     node.setAttribute("role", "group");
@@ -1891,6 +1972,46 @@ const EbinoMap = (() => {
     marked();
     putChoices();
     read.focus({ preventScroll: true });
+  }
+
+  // The choices of コーチ's or オブザーバー's card (直し29-1): 「答える」, the
+  // same one-line box as below the map (app.answerForm; sent, the next round
+  // starts), and 「閉じる」. Not answering is fine: nothing waits on it.
+  function openAnswer(seatId, card, ai) {
+    const node = div("map-choices ai");
+    node.setAttribute("role", "group");
+    node.setAttribute("aria-label", ai.label);
+    const head = div("head");
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "close";
+    close.textContent = app.state.texts.bubble_close;
+    close.addEventListener("click", () => closeChoices(true));
+    head.append(div("who", ai.label), close);
+    const answer = document.createElement("button");
+    answer.type = "button";
+    answer.textContent = app.state.texts.bubble_answer;
+    answer.dataset.choice = "answer";
+    const roundNo = tableRoundNo;
+    answer.addEventListener("click", () => {
+      const form = app.answerForm(roundNo, ai.role);
+      answer.replaceWith(form);
+      putChoices();
+      form.querySelector("input").focus({ preventScroll: true });
+    });
+    // No paragraph here; putChoices lays out one, kept hidden.
+    const paragraph = div("paragraph");
+    paragraph.hidden = true;
+    paragraph.append(div("text"));
+    node.append(head, answer, paragraph);
+    node.addEventListener("keydown", (event) => moveInChoices(event, node));
+    card.after(node);
+    card.setAttribute("aria-expanded", "true");
+    const { token } = seatAtTable(card);
+    if (token) token.node.classList.add("chosen");
+    choices = { seatId, node, card, moved: false };
+    putChoices();
+    answer.focus({ preventScroll: true });
   }
 
   // Esc closes the choices, back to their lamp card; the arrows go from
@@ -2273,6 +2394,7 @@ const EbinoMap = (() => {
   function clearTable() {
     tokens = [];
     tableTop = null;
+    tableAt = null;
     opened = null;
     closeChoices(false);
     if ($("map-heading")) $("map-heading").replaceChildren();
@@ -2344,5 +2466,5 @@ const EbinoMap = (() => {
     card.scrollIntoView({ block: "nearest" });
   }
 
-  return { init, show, round, refresh, marked };
+  return { init, show, round, refresh, marked, band: setBand };
 })();

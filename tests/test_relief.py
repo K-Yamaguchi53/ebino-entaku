@@ -770,7 +770,7 @@ def test_a_heading_and_a_labs_name_wrap_only_between_their_pieces():
     assert json.loads(done.stdout.decode("utf-8")) == [
         ["ここで割れた：", "休みを「決めて取る」か", "「空いたら取る」か"], ["Creation", "（生活文化科）"],
         ["ここで割れた：", "「空いたら取る」と", "「決めて取る」"], ["割れ目のない言葉"]]
-    assert 'phrased(label)' in script and "shownQuotes, phrased }" in script
+    assert 'phrased(label)' in script and "shownQuotes, phrased, answerForm }" in script
     css = _css()
     assert ".phrase { display: inline-block; max-width: 100%; }" in css
 

@@ -34,6 +34,9 @@
   --moon: #9fb8dc;  /* Moonlight: lines, and the quieter words. */
   --moon-soft: rgba(159, 184, 220, .36);
   --moon-faint: rgba(159, 184, 220, .15);
+  --moon-paper: #d8e3f3;  /* Moonlit paper: an AI's question at the round table (直し29-1). */
+  --moon-paper-line: #9fb3d3;
+  --moon-paper-soft: #4c5a72;
   --river: #86b3dd;
   --ink: #ece6d8;  /* Words on the night. */
   --soft: #a9bdd9;  /* Quieter words on the night. */
@@ -604,6 +607,20 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .table-bubble { pointer-events: auto; cursor: pointer; outline: none; }
 .table-bubble:focus-visible { outline: 2px solid var(--lamp); outline-offset: 3px; }
 .table-bubble.marked { box-shadow: 0 0 0 3px var(--lamp), 0 0 24px var(--lamp-soft), 0 8px 20px var(--shadow); }
+/* コーチ's and オブザーバー's questions (直し29-1): moonlit paper, not the
+   seats' cream, so an AI's question is told from a recorded voice at a glance. */
+.table-bubble.ai { background: var(--moon-paper); box-shadow: 0 0 0 1px var(--moon-paper-line), 0 0 18px var(--moon-soft), 0 8px 20px var(--shadow); }
+.table-bubble.ai .tail { background: var(--moon-paper); }
+.table-bubble.ai .badge { font-family: var(--gothic); font-size: 11px; line-height: 1.5; color: var(--moon-paper-soft); }
+.table-bubble.ai .who { color: var(--moon-paper-soft); }
+.table-label.ai { background: var(--moon-paper); color: var(--paper-ink); }
+.token.ai-seat .halo { fill: var(--moon-faint); stroke: var(--moon-soft); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.token.ai-seat .shape { fill: var(--moon-paper); stroke: var(--moon); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+/* Their choices: 「答える」 and 「閉じる」 in a row; the box, once open, a line of its own. */
+.map-choices.ai { display: flex; flex-wrap: wrap; align-items: center; }
+.map-choices.ai .head { flex: 1 1 100%; }
+.map-choices.ai .ai-answer { flex: 1 1 100%; display: flex; gap: 4px; }
+.map-choices.ai .ai-answer input { flex: 1 1 auto; min-width: 10em; width: 12em; }
 /* Its choices: a small card of the night by it, two choices to a line, in
    Gothic; the paragraph on paper, in Mincho, under them. */
 .map-choices { position: absolute; z-index: 1; max-width: calc(100% - 16px); pointer-events: auto;
