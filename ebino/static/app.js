@@ -7,6 +7,9 @@ const state = {
   lastOrder: [], met: new Set(), silent: new Set(), carded: new Set(), marks: {},
   askBoxes: {},  // Round number -> the box of 「司会が○○に聞いてみる」.
   bands: {},  // Round number -> the band of コーチ and オブザーバー below.
+  // Before the reflection, one answer to コーチ or オブザーバー (直し30-1):
+  // one that started the next round; or the model was out once.
+  aiAnswered: false, aiUnavailable: false, needsShown: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -270,13 +273,17 @@ function answerForm(roundNo, role) {
     for (const node of form.querySelectorAll("input, button")) node.disabled = true;
     showMessage(state.texts.waiting_ask);
     try {
-      const round = await call("/api/coach_answer", { round: roundNo, role, answer });
+      const round = await call("/api/coach_answer", { round: roundNo, role, answer, after_notice: state.needsShown });
+      if (round.status === "unavailable") state.aiUnavailable = true;
       if (round.status === "ask_again" || round.status === "unavailable") {
         showMessage(round.message);
         for (const node of form.querySelectorAll("input, button")) node.disabled = false;
         return;
       }
       hideMessage();
+      state.aiAnswered = true;
+      $("reflect-needs-answer").hidden = true;
+      for (const node of document.querySelectorAll(".ai-card.needs-answer")) node.classList.remove("needs-answer");
       bandAnswered(roundNo, role);
       renderRound(round);
     } catch (error) {
@@ -704,6 +711,41 @@ function picked(name) {
   return input ? input.value : "";
 }
 
+// 「ふりかえりへ」 (直し30-1): once, in any round, an answer to コーチ or
+// オブザーバー first. Not yet: a line by the button, and the newest card
+// that can still be answered brought into view, its 「答える」 focused. The
+// button itself is never taken away. Nothing to answer anywhere, or the
+// model was out once: on to the reflection, so no student is ever held.
+function toReflection() {
+  const entry = state.aiAnswered || state.aiUnavailable ? null : answerable();
+  const line = $("reflect-needs-answer");
+  if (!entry) {
+    line.hidden = true;
+    openReflection();
+    return;
+  }
+  line.textContent = state.texts.reflect_needs_answer;
+  line.hidden = false;
+  state.needsShown = true;
+  const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const card = entry.closest(".ai-card");
+  for (const node of document.querySelectorAll(".ai-card.needs-answer")) node.classList.remove("needs-answer");
+  card.classList.add("needs-answer");
+  card.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "center" });
+  entry.focus({ preventScroll: true });
+}
+
+// The newest round's card that can still be answered: its 「答える」, or the
+// box already open under it. None: null.
+function answerable() {
+  const rounds = Object.keys(state.bands).map(Number).sort((a, b) => b - a);
+  for (const roundNo of rounds) {
+    const entry = state.bands[roundNo].querySelector(".ai-card > button, .ai-card > form input:not(:disabled)");
+    if (entry) return entry;
+  }
+  return null;
+}
+
 function openReflection() {
   $("table").hidden = true;
   $("reflect").hidden = false;
@@ -941,7 +983,7 @@ function backToStart() {
 }
 
 $("ask-form").addEventListener("submit", ask);
-$("to-reflect").addEventListener("click", openReflection);
+$("to-reflect").addEventListener("click", toReflection);
 $("reflect-first").addEventListener("submit", reflectFirst);
 $("reflect-answer").addEventListener("submit", (event) => { event.preventDefault(); reflectAnswer(false); });
 $("decline").addEventListener("click", () => reflectAnswer(true));

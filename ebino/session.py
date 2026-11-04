@@ -192,6 +192,9 @@ class Session:
     records: Records | None = None  # None: nothing is kept (tests only).
     reflection: Reflection | None = None
     mores: dict[str, more.More] = field(default_factory=dict)  # 「もっと聞く」, by the piece pressed under.
+    # An AI question answered after the screen asked for one before the
+    # reflection (直し30-1): one mark, no name, no time.
+    ai_answered_after_notice: bool = False
 
     def __post_init__(self):
         self._subject_counts = Counter()  # With no records (tests): this sitting's only.
@@ -203,7 +206,9 @@ class Session:
     def save(self) -> None:
         """Kept after every step (SPEC 2-1: every action is recorded by itself)."""
         if self.records is not None:
-            self.records.save_session(session_record(self))
+            record = session_record(self)
+            record["ai_answered_after_notice"] = self.ai_answered_after_notice
+            self.records.save_session(record)
 
     # --- what the student does ---
 
@@ -316,9 +321,11 @@ class Session:
         return {"round": round_no, "cards": [coach.card_view(card) for card in band.cards],
                 "answered": band.answered}
 
-    def coach_answer(self, round_no: int, role: str, answer: str) -> dict:
+    def coach_answer(self, round_no: int, role: str, answer: str, after_notice: bool = False) -> dict:
         """The student's one line to one card of a band: it goes with that
-        question to the next round, where the seats answer as always."""
+        question to the next round, where the seats answer as always.
+        after_notice: sent after the screen's line asking for one answer
+        before the reflection (直し30-1); kept as one mark."""
         band = self._round(round_no).band
         if band is None or band.answered:
             raise Refused("no_band_to_answer")
@@ -333,6 +340,8 @@ class Session:
         self.rounds.append(result)
         if result.status != roundtable.UNAVAILABLE:  # Unavailable: the card may be answered again.
             band.answered, band.answer = role, answer
+            if after_notice:
+                self.ai_answered_after_notice = True
         self.save()
         return self.round_view(len(self.rounds))
 

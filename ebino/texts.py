@@ -120,6 +120,8 @@ BUBBLE_CHOICES = "bubble_choices"
 # Under the reflection sheet (直し30-2): 最初にもどる, and the line and the two
 # buttons it asks with, on the page itself.
 BACK_TO_START = "back_to_start"
+# By 「ふりかえりへ」 when no AI question has been answered yet (直し30-1).
+REFLECT_NEEDS_ANSWER = "reflect_needs_answer"
 BACK_TO_START_CONFIRM = "back_to_start_confirm"
 BACK_TO_START_YES = "back_to_start_yes"
 BACK_TO_START_NO = "back_to_start_no"
@@ -132,7 +134,7 @@ SCREEN_TEXTS = (
     SEND_FAILED, MET_LIVES_EMPTY, HARVEST_HEADING, HARVEST_USE_QUESTION, MEET_QUESTION,
     HARVEST_MEET_PREFIX, MORE_END, MORE_CARD_DONE, SAMPLE_SUMMARIZED, HARVEST_SUBJECT_MORE,
     BUBBLE_HINT, BUBBLE_CLOSE, BUBBLE_ANSWER,
-    BACK_TO_START, BACK_TO_START_CONFIRM, BACK_TO_START_YES, BACK_TO_START_NO,
+    BACK_TO_START, BACK_TO_START_CONFIRM, BACK_TO_START_YES, BACK_TO_START_NO, REFLECT_NEEDS_ANSWER,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 

@@ -342,6 +342,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 /* --- the reflection: one card at a time, in the middle, unhurried --- */
 .to-reflect { text-align: center; margin: 36px 0; }
+/* The line by 「ふりかえりへ」 (直し30-1), and the card it points to, lit once (no blinking). */
+.reflect-needs { max-width: 34em; margin: -20px auto 36px; text-align: center; color: var(--lamp-bright); line-height: 1.7; }
+.ai-card.needs-answer { border-color: var(--lamp); box-shadow: 0 0 0 1px var(--lamp-soft), 0 0 22px var(--lamp-faint); }
 /* 最初にもどる under the sheet (直し30-2), and its line and two buttons. */
 .back-to-start { max-width: 720px; margin: 28px auto 48px; text-align: center; }
 .back-to-start > button, .back-confirm button { min-height: 48px; padding: 8px 24px; }

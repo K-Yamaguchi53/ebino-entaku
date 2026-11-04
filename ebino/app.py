@@ -124,7 +124,8 @@ class App:
         if path == "/api/coach":
             return session.coach_band(body.get("round"))
         if path == "/api/coach_answer":
-            return session.coach_answer(body.get("round"), body.get("role", ""), body.get("answer", ""))
+            return session.coach_answer(body.get("round"), body.get("role", ""), body.get("answer", ""),
+                                        after_notice=body.get("after_notice") is True)
         if path == "/api/ask_card":
             return session.ask_card(body.get("round"))
         if path == "/api/ask_seat":
