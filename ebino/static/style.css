@@ -470,6 +470,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .dim .relief-image { opacity: .42; }
 .dim .basin-fill, .dim .river, .dim .rim, .dim .points, .dim .place-names, .dim .school, .dim .school-picture,
 .dim .shelf-boxes, .dim .shelf-names, .dim .crossing { opacity: .26; }
+/* While the round table is open, the map's points behind take no mouse,
+   press or touch (直し27-4); the table's own seats and chairs do. */
+.dim .points { pointer-events: none; }
 /* Place names: small, a little spaced out, in moonlight; a thin halo only. */
 .place-names { pointer-events: none; }
 .place-names text { fill: var(--soft); font-family: var(--gothic); font-size: 22px; letter-spacing: .18em;

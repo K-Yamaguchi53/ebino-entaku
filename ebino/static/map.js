@@ -530,6 +530,7 @@ const EbinoMap = (() => {
     point.addEventListener("blur", restoreTip);
     // A mouse's press goes to the seat whose name it shows; a touch, as before.
     pressable(point, (event) => {
+      if (svg.classList.contains("dim")) return;  // Not while the table is open (直し27-4).
       const id = event && event.pointerType === "mouse" && hovered ? hovered : seat.seat_id;
       press(id, points[id].node);
     });
@@ -542,6 +543,7 @@ const EbinoMap = (() => {
   // while the mouse is there and goes when it leaves. A touch is left as it was.
   function hoverAt(event) {
     if (event.pointerType !== "mouse" || event.buttons) return;
+    if (svg.classList.contains("dim")) return;  // The table is open: the points behind keep still (直し27-4).
     const id = nearestPoint(event.clientX, event.clientY);
     if (id === hovered) return;
     if (hovered && points[hovered]) points[hovered].node.classList.remove("hover");
@@ -1554,6 +1556,11 @@ const EbinoMap = (() => {
     const motion = !reduced();
     const { split, sides, seats } = seating(result, order);
     svg.classList.add("dim");
+    // While the table is open the map's points behind take no mouse, press
+    // or touch (style.css; 直し27-4): the name card the mouse showed goes.
+    if (hovered && points[hovered]) points[hovered].node.classList.remove("hover");
+    hovered = null;
+    hideTip();
     // The map's points step back from the keyboard too: Tab goes to the chairs.
     for (const { node } of Object.values(points)) node.setAttribute("tabindex", "-1");
     $("map-back").hidden = false;
