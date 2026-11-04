@@ -124,6 +124,8 @@ BACK_TO_START = "back_to_start"
 REFLECT_NEEDS_ANSWER = "reflect_needs_answer"
 # The button that ends the opening after a Lab is picked (直し30-3).
 OPENING_SKIP = "opening_skip"
+# Just over the two cards of コーチ and オブザーバー, until one is answered (直し30の続き-0).
+AI_ANSWER_HINT = "ai_answer_hint"
 BACK_TO_START_CONFIRM = "back_to_start_confirm"
 BACK_TO_START_YES = "back_to_start_yes"
 BACK_TO_START_NO = "back_to_start_no"
@@ -137,7 +139,7 @@ SCREEN_TEXTS = (
     HARVEST_MEET_PREFIX, MORE_END, MORE_CARD_DONE, SAMPLE_SUMMARIZED, HARVEST_SUBJECT_MORE,
     BUBBLE_HINT, BUBBLE_CLOSE, BUBBLE_ANSWER,
     BACK_TO_START, BACK_TO_START_CONFIRM, BACK_TO_START_YES, BACK_TO_START_NO, REFLECT_NEEDS_ANSWER,
-    OPENING_SKIP,
+    OPENING_SKIP, AI_ANSWER_HINT,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 

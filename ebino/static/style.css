@@ -287,6 +287,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .ai-band { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-top: 1px solid var(--moon-faint);
   margin-top: 24px; padding-top: 14px; }
 @media (max-width: 560px) { .ai-band { grid-template-columns: 1fr; } }
+.ai-hint { grid-column: 1 / -1; margin: 0; color: var(--lamp); font-size: 16px; }
 .ai-card { border: 1px dashed var(--faint); border-radius: 8px; padding: 12px 16px; background: var(--night-2); }
 .ai-card .label { font-size: 14px; color: var(--soft); margin: 0; }
 .ai-card .badge { font-size: 13px; color: var(--soft); margin: 0 0 4px; }

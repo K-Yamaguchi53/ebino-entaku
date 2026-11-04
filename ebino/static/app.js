@@ -402,6 +402,9 @@ async function loadBand(roundNo, box) {
   }
   if (!band.cards.length) return;
   const part = el("section", { class: "ai-band" });
+  // One line just over the two cards, until one AI question is answered in
+  // this session (直し30の続き-0).
+  if (!state.aiAnswered && !band.answered) part.append(el("p", { class: "ai-hint", text: state.texts.ai_answer_hint }));
   for (const card of band.cards) {
     const node = el("div", { class: "ai-card" },
       el("p", { class: "label", text: card.label }),
@@ -452,6 +455,7 @@ function answerForm(roundNo, role) {
       state.aiAnswered = true;
       $("reflect-needs-answer").hidden = true;
       for (const node of document.querySelectorAll(".ai-card.needs-answer")) node.classList.remove("needs-answer");
+      for (const node of document.querySelectorAll(".ai-hint")) node.remove();
       bandAnswered(roundNo, role);
       renderRound(round);
     } catch (error) {
