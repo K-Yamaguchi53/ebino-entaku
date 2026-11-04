@@ -234,7 +234,21 @@ def test_ba_ii_lets_these_moves_through(text):
     assert not banned_in(text)
 
 
+# Outside the list: the question examples are the teacher's own samples of a
+# student's question (直し31続き-2), not words a model writes to a student.
+NOT_A_MODELS_SENTENCE = {"question_examples", "question_examples_lead", "question_examples_end"}
+
+
 def test_no_screen_text_holds_a_banned_word():
     for path in TEXTS_DIR.glob("*.txt"):
-        if path.stem != "planted_fake_quote":  # The fake is meant to be stopped.
-            assert not banned_in(path.read_text(encoding="utf-8")), path.name
+        if path.stem == "planted_fake_quote":  # The fake is meant to be stopped.
+            continue
+        if path.stem in NOT_A_MODELS_SENTENCE:
+            continue
+        assert not banned_in(path.read_text(encoding="utf-8")), path.name
+
+
+def test_the_question_examples_are_the_teachers_words_and_outside_the_list():
+    examples = (TEXTS_DIR / "question_examples.txt").read_text(encoding="utf-8")
+    assert "進路で迷っている。みんなはどうやって決めた？" in examples
+    assert "これからの道" not in examples
