@@ -37,7 +37,7 @@ def _run(program):
 def test_the_table_opens_with_each_speakers_card_in_seat_order_and_the_map_cards_stay():
     table = _inner_function(SCRIPT, "openTable")
     assert "order.forEach((id, k) =>" in table
-    assert "overlay.append(tableBubble(id, first[id], token.at, k), seatPress(id, token.at))" in table
+    assert "const card = tableBubble(id, first[id], token.at, k);" in table and "overlay.append(card, seatPress(id, token.at));" in table
     # The same words as the short card on the map: one place cuts them.
     bubble = _inner_function(SCRIPT, "bubble")
     assert 'div("voice", voiceOf(quote)), div("who", whoOf(seat))' in bubble

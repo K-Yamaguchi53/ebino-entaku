@@ -1495,7 +1495,24 @@ const EbinoMap = (() => {
       const gap = ids.length > 1 ? Math.min(26, arc / (ids.length - 1)) : 0;
       ids.forEach((id, k) => seats.push({ id, group: name, angle: middle + (k - (ids.length - 1) / 2) * gap }));
     }
-    return { split: split && split.split, seats };
+    return { split: split && split.split, sides: split ? [split.a, split.b] : null, seats };
+  }
+
+  // The order the cards at the table are put in, so the first that find
+  // room are these (直し27-2): with a split, one from each side by turns
+  // (side_a first), each side in seat_order; when one side has no one
+  // left, the other's; then the seats on neither side, in seat_order.
+  // Without a split, seat_order. It reads nothing but what it is given.
+  function cardOrder(order, sides) {
+    if (!sides) return [...order];
+    const [a, b] = sides;
+    const sideA = order.filter((id) => a.has(id)), sideB = order.filter((id) => b.has(id) && !a.has(id));
+    const out = [];
+    for (let k = 0; k < Math.max(sideA.length, sideB.length); k++) {
+      if (k < sideA.length) out.push(sideA[k]);
+      if (k < sideB.length) out.push(sideB[k]);
+    }
+    return out.concat(order.filter((id) => !out.includes(id)));
   }
 
   function tableView(center) {
@@ -1532,7 +1549,7 @@ const EbinoMap = (() => {
 
   async function openTable(result, order, center, still) {
     const motion = !reduced();
-    const { split, seats } = seating(result, order);
+    const { split, sides, seats } = seating(result, order);
     svg.classList.add("dim");
     // The map's points step back from the keyboard too: Tab goes to the chairs.
     for (const { node } of Object.values(points)) node.setAttribute("tabindex", "-1");
@@ -1606,13 +1623,18 @@ const EbinoMap = (() => {
       Object.assign(label.dataset, { seat: item.id, x: item.at[0], y: item.at[1], gap: item.chair ? CHAIR_GAP : 16,
         full: title, short: chars.length > LABEL_CHARS ? chars.slice(0, LABEL_CHARS).join("") + "…" : title });
     }
-    // Each seat that spoke: its lamp card by its chair, in seat_order, and
-    // the part that takes a press when the card has no room (直し26-1).
+    // Each seat that spoke: its lamp card by its chair, in seat_order (as
+    // Tab goes), and the part that takes a press when the card has no room
+    // (直し26-1). They find room in cardOrder: both sides of a split first.
     const first = {};
     for (const quote of result.quotes) if (!(quote.seat_id in first)) first[quote.seat_id] = quote;
+    const rank = cardOrder(order, sides);
     order.forEach((id, k) => {
       const token = tokens.find((t) => t.id === id && !t.chair);
-      if (token && first[id]) overlay.append(tableBubble(id, first[id], token.at, k), seatPress(id, token.at));
+      if (!token || !first[id]) return;
+      const card = tableBubble(id, first[id], token.at, k);
+      card.dataset.rank = String(rank.indexOf(id));
+      overlay.append(card, seatPress(id, token.at));
     });
     // The split's heading: under the map, over neither the table's top nor
     // its chairs; on a map narrower than TAG_ON_MAP, in the split block only.
@@ -1668,7 +1690,8 @@ const EbinoMap = (() => {
   function placeTableBubbles(frameBox, frameSize, taken) {
     const named = new Set(), planned = new Set();
     for (const node of overlay.querySelectorAll(".behind")) node.classList.remove("behind");
-    const cards = [...overlay.querySelectorAll(".table-bubble")];
+    // In cardOrder (直し27-2), not as they stand in the page.
+    const cards = [...overlay.querySelectorAll(".table-bubble")].sort((x, y) => Number(x.dataset.rank) - Number(y.dataset.rank));
     if (!cards.length) return { named, planned };
     const before = [...taken];
     const fixed = fixedBoxes(frameBox, true, false);
