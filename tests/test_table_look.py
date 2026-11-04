@@ -51,3 +51,16 @@ def test_each_seat_sits_on_a_chair_its_back_to_the_outside():
     # The empty chair: the same chair, dotted.
     assert ".chair circle, .chair .back { fill: var(--veil-thin); stroke: var(--moon); stroke-width: 1.4; stroke-dasharray: 3 3;" in CSS
     assert ".token .chair-back { fill: var(--wood-lit);" in CSS
+
+
+def test_cards_and_names_keep_off_the_chairs_backs_and_the_tables_leg():
+    fixed = _inner("fixedBoxes")
+    assert '".token .shape, .chair circle, .chair .hit"' in fixed
+    assert '", .token .chair-back, .chair .back, .table-foot .leg, .table-foot .base"' in fixed
+
+
+def test_the_choices_give_up_the_chairs_backs_only_where_they_find_no_room_else():
+    put = _inner("putChoices")
+    assert "fixedBoxes(frameBox, false, false, withBacks)" in put
+    assert put.index("if (withBacks) return putChoices(false);") < put.index("// No such spot: as before")
+    assert "withBacks = true" in _inner("fixedBoxes")

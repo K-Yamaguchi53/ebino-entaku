@@ -996,8 +996,10 @@ const EbinoMap = (() => {
   // takes a press; the shelves with their rows of points; and what is drawn
   // on the map in words: the place names, the shelves' names, the school's
   // name and its mark.
-  function fixedBoxes(frameBox, withAround = true, withWords = true) {
-    const nodes = [...tableLayer.querySelectorAll(".token .shape, .chair circle, .chair .hit")];
+  function fixedBoxes(frameBox, withAround = true, withWords = true, withBacks = true) {
+    // The chairs' backs and the table's leg and foot too (直し29-2): cards and names keep off them.
+    const nodes = [...tableLayer.querySelectorAll(".token .shape, .chair circle, .chair .hit" +
+      (withBacks ? ", .token .chair-back, .chair .back, .table-foot .leg, .table-foot .base" : ""))];
     // A seat of the round at the size it has once lit (not met yet, it is drawn smaller).
     const reach = 9.5 * pointScale() * frameBox.width / vb.w;
     const seats = tableTop ? [] : roundSeats.map((id) => toFrame(...spotOf(id)))
@@ -2112,7 +2114,7 @@ const EbinoMap = (() => {
   // inside the frame, clear of the table's top, its seats and chairs
   // (choicesPlan). Its card moves, while they are open, if that is what
   // keeps the others in sight. Closed when their card is no longer up.
-  function putChoices() {
+  function putChoices(withBacks = true) {
     if (!choices) return;
     const { node, card } = choices;
     if (!card.isConnected || card.classList.contains("unplaced")) return closeChoices(false, true);
@@ -2126,7 +2128,7 @@ const EbinoMap = (() => {
       ".map-compass, .map-around, .map-hint")].filter((other) => other !== card && getComputedStyle(other).visibility !== "hidden");
     const others = shown.map((other) => boxIn(other, frameBox));
     const seat = seatAtTable(card);
-    const own = boxIn(card, frameBox), hard = fixedBoxes(frameBox, false, false);
+    const own = boxIn(card, frameBox), hard = fixedBoxes(frameBox, false, false, withBacks);
     // A tail never crosses the table's top (top); it crosses no seat or chair either (block) but as a last resort.
     const top = tableTop ? topStrips(tableTop.map(([x, y]) => toFrame(x, y))) : [];
     const block = [...tableLayer.querySelectorAll(".token .shape, .chair circle")].map((other) => boxIn(other, frameBox)).concat(top);
@@ -2228,6 +2230,9 @@ const EbinoMap = (() => {
       }
       return;
     }
+    // No such spot: the chairs' backs given up (直し29-2; the seats, chairs
+    // and the table never), then as before, by the card, over it rather than the table.
+    if (withBacks) return putChoices(false);
     setApart(false);
     // No such spot: as before, by the card, over it rather than the table.
     const byOwn = (tried) => {

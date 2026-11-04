@@ -630,7 +630,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .table-bubble.ai .badge { font-family: var(--gothic); font-size: 11px; line-height: 1.5; color: var(--moon-paper-soft); }
 .table-bubble.ai .who { color: var(--moon-paper-soft); }
 .table-label.ai { background: var(--moon-paper); color: var(--paper-ink); }
-.token.ai-seat .halo { fill: var(--moon-faint); stroke: var(--moon-soft); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.token.ai-seat .halo { fill: var(--moon-faint); stroke: none; opacity: .7; }
 .token.ai-seat .shape { fill: var(--moon-paper); stroke: var(--moon); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 /* Their choices: 「答える」 and 「閉じる」 in a row; the box, once open, a line of its own. */
 .map-choices.ai { display: flex; flex-wrap: wrap; align-items: center; }
