@@ -518,6 +518,9 @@ function renderSplit(roundNo, split, byId, [quotesA, quotesB]) {
 
 function renderSeats() {
   const list = $("seat-list");
+  // A card being written in stays open, its words as they were, when the
+  // list is drawn again (直し26-3).
+  const draft = keptDraft(list);
   list.replaceChildren();
   for (const [kind, label] of Object.entries(state.kinds)) {
     const seats = state.seats.filter((seat) => seat.kind === kind);
@@ -527,7 +530,33 @@ function renderSeats() {
     list.append(el("section", { class: `kind-group kind-${kind}` }, el("h3", { text: label }), row));
   }
   $("met-count").textContent = String(state.met.size);
+  putBackDraft(draft);
   onMap((map) => map.refresh());  // The same count and marks on the map.
+}
+
+// The seat list's open card, if any: whose seat, the student's words in it
+// so far, and whether the keyboard was in it (and where).
+function keptDraft(list) {
+  const form = list.querySelector(".card-form");
+  if (!form || !form.dataset.seat) return null;
+  const box = form.querySelector("textarea");
+  return { seatId: form.dataset.seat, text: box.value, focused: document.activeElement === box,
+    start: box.selectionStart, end: box.selectionEnd };
+}
+
+// The card open again under its seat's line, with the student's own words
+// put back (the box is never filled with anything else); the page does not
+// move, and the keyboard stays where it is unless it was in the card.
+// A card already sent is not opened again.
+function putBackDraft(draft) {
+  if (!draft || state.carded.has(draft.seatId)) return;
+  const form = openCardFor(draft.seatId, { quiet: true });
+  if (!form) return;
+  const box = form.querySelector("textarea");
+  box.value = draft.text;
+  if (!draft.focused) return;
+  box.focus({ preventScroll: true });
+  box.setSelectionRange(draft.start, draft.end);
 }
 
 function renderSeat(seat) {
@@ -583,10 +612,10 @@ function putUnderLine(seat, form, open) {
 // the table (直し26-2): the same card as 「聞きたいことを書く」, under its
 // seat's line, its box empty. A seat that spoke has no button for it in the
 // list: one is made for the card to go by, and goes with it.
-function openCardFor(seatId) {
+function openCardFor(seatId, { quiet = false } = {}) {
   const seat = state.seatById[seatId];
   const node = [...$("seat-list").querySelectorAll(".seat")].find((item) => item.dataset.seat === seatId);
-  if (!seat || !node) return;
+  if (!seat || !node) return null;
   let open = node.querySelector(".not-asked > button");
   if (!open) {
     open = cardEntry(seatId, renderSeats, (form, button) => putUnderLine(seat, form, button));
@@ -594,9 +623,13 @@ function openCardFor(seatId) {
     open.hidden = true;
     node.append(open);
   }
+  // Quiet (put back after the list is drawn again): no focus, no scroll.
+  open.dataset.still = quiet ? "1" : "";
   open.click();
+  delete open.dataset.still;
   const form = node.parentElement.querySelector(".card-form");
-  if (form) form.scrollIntoView({ block: "center" });
+  if (form && !quiet) form.scrollIntoView({ block: "center" });
+  return form;
 }
 
 // 「聞きたいことを書く」: opens an empty box; the card holds the student's
@@ -605,6 +638,7 @@ function cardEntry(seatId, done, put = (form, open) => open.replaceWith(form)) {
   const open = el("button", { type: "button", class: "quiet", text: "聞きたいことを書く" });
   open.addEventListener("click", () => {
     const form = $("card-form-template").content.firstElementChild.cloneNode(true);
+    form.dataset.seat = seatId;  // Whose card it is, so it can be opened again (直し26-3).
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const text = form.querySelector("textarea").value.trim();
@@ -614,7 +648,7 @@ function cardEntry(seatId, done, put = (form, open) => open.replaceWith(form)) {
       done(form);
     });
     put(form, open);
-    form.querySelector("textarea").focus();
+    if (!open.dataset.still) form.querySelector("textarea").focus();
   });
   return open;
 }
