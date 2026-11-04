@@ -694,7 +694,8 @@ def test_the_maps_buttons_and_the_tables_heading_are_under_the_map_not_over_it()
     html = (app_module.STATIC_DIR / "index.html").read_text(encoding="utf-8")
     frame = html[html.index('<div id="map-frame"'):html.index('<div id="map-overlay"')]
     assert "<button" not in frame
-    bar = html[html.index('class="map-bar'):html.index('<div class="map-foot">')]
+    # Beside the map on the one screen (直し32-1), never over it.
+    bar = html[html.index('class="map-bar'):html.index('<div id="map-card"')]
     for button in ("map-back", "map-zoom-in", "map-zoom-out", "map-zoom-all"):
         assert f'id="{button}"' in bar
     assert 'id="map-heading"' in bar

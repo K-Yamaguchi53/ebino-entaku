@@ -82,6 +82,7 @@ async function setup() {
       onclick: (event) => start(key, event.currentTarget) }, phrased(label)));
   }
   $("heavy-talk").textContent = data.texts.heavy_talk_notice;
+  setupDrawer();
   $("question").placeholder = "例：" + data.texts.input_example;
   $("purpose-heading").textContent = data.texts.purpose_heading;
   for (const text of data.texts.work_questions) {
@@ -573,6 +574,87 @@ function renderInside(rows) {
   $("examples-end").textContent = state.texts.question_examples_end;
 }
 
+// --- the drawer (直し32-1) ---
+
+// On the right of the one screen, only when opened: one part at a time (the
+// paragraph, the rounds so far, the seat list, the seniors' questions).
+// 閉じる or Esc closes it, and the keyboard goes back where it came from.
+// With no map the parts are the page's, one under the other, as before.
+const drawer = { from: null };
+
+function setupDrawer() {
+  const parts = state.texts.drawer_parts;
+  $("drawer-close").textContent = state.texts.bubble_close;
+  for (const part of ["rounds", "seats", "purposes"]) {
+    $("drawer-buttons").append(el("button", { type: "button", class: "drawer-button", "data-part": part,
+      "aria-expanded": "false", "aria-controls": "drawer", text: parts[part],
+      onclick: (event) => toggleDrawer(part, event.currentTarget) }));
+  }
+  $("drawer-close").addEventListener("click", () => closeDrawer());
+  // The card of whose words are in, opened or folded, moves the map too.
+  $("inside-fold").addEventListener("toggle", mapMoved);
+  $("drawer").addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !drawerOpen()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeDrawer();
+  });
+}
+
+// The one screen is on: the table is out and the map with it.
+function oneScreen() {
+  return !$("table").hidden && !$("map").hidden;
+}
+
+// The map stands somewhere else now: its cards are laid out again, once the
+// page has its new shape.
+function mapMoved() {
+  requestAnimationFrame(() => onMap((map) => map.layoutAgain()));
+}
+
+function drawerOpen() {
+  return $("drawer").classList.contains("open");
+}
+
+// Opens the drawer at a part (the same part again: closes it). from: what
+// the keyboard goes back to when it closes.
+function toggleDrawer(part, from) {
+  if (drawerOpen() && $("drawer").dataset.part === part) return closeDrawer();
+  openDrawer(part, from);
+}
+
+// focus: the keyboard goes into the drawer, to its title (so Esc closes it
+// from there); false when the caller puts it on something inside.
+function openDrawer(part, from = document.activeElement, { focus = true } = {}) {
+  if (!oneScreen()) return;
+  const box = $("drawer");
+  if (!drawerOpen()) drawer.from = from;
+  box.dataset.part = part;
+  box.classList.add("open");
+  $("drawer-title").textContent = state.texts.drawer_parts[part];
+  for (const button of $("drawer-buttons").children) {
+    button.setAttribute("aria-expanded", String(button.dataset.part === part));
+  }
+  box.querySelector(".drawer-body").scrollTop = 0;
+  mapMoved();
+  if (focus) $("drawer-title").focus({ preventScroll: true });
+}
+
+function closeDrawer() {
+  const box = $("drawer");
+  if (!drawerOpen()) return;
+  box.classList.remove("open");
+  for (const button of $("drawer-buttons").children) button.setAttribute("aria-expanded", "false");
+  mapMoved();
+  const back = drawer.from;
+  drawer.from = null;
+  const inside = box.contains(document.activeElement);
+  // Back where it came from; that gone (or never kept) while the keyboard
+  // was in the drawer, to the box at the foot rather than to nowhere.
+  if (back && back.isConnected && back.offsetParent !== null) back.focus({ preventScroll: true });
+  else if (inside || document.activeElement === document.body) $("question").focus({ preventScroll: true });
+}
+
 // --- purposes ---
 
 function renderPurposes(purposes) {
@@ -676,7 +758,7 @@ function renderRound(round) {
   // map's points before it (直し25-5); the page does not jump for it.
   const asked = box.querySelector(".round-question");
   asked.tabIndex = -1;
-  asked.focus({ preventScroll: true });
+  if (!oneScreen()) asked.focus({ preventScroll: true });
   renderSeats();
   onMap((map) => map.round(round));  // The quoted seats light up on the map, in order.
   if (round.status === "answered") {
@@ -973,10 +1055,12 @@ async function markQuote(roundNo, utteranceId) {
 
 // 「下のやりとりで読む」 (直し26-2): the page goes to that quote's card in its
 // round, and the keyboard's focus with it.
-function readBelow(roundNo, utteranceId) {
+function readBelow(roundNo, utteranceId, from) {
   const quote = [...document.querySelectorAll(`#rounds .round[data-round="${roundNo}"] .quote`)]
     .find((node) => node.dataset.utterance === utteranceId);
   if (!quote) return;
+  // On the one screen, in the drawer's rounds (直し32-1).
+  openDrawer("rounds", from, { focus: false });
   quote.tabIndex = -1;
   const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   quote.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
@@ -1143,10 +1227,11 @@ function fitToSeats(node, form) {
 // the table (直し26-2): the same card as 「聞きたいことを書く」, under its
 // seat's line, its box empty. A seat that spoke has no button for it in the
 // list: one is made for the card to go by, and goes with it.
-function openCardFor(seatId, { quiet = false } = {}) {
+function openCardFor(seatId, { quiet = false, from } = {}) {
   const seat = state.seatById[seatId];
   const node = [...$("seat-list").querySelectorAll(".seat")].find((item) => item.dataset.seat === seatId);
   if (!seat || !node) return null;
+  if (!quiet) openDrawer("seats", from, { focus: false });
   let open = node.querySelector(".not-asked > button");
   if (!open) {
     open = cardEntry(seatId, renderSeats, (form, button) => putUnderLine(seat, form, button));
@@ -1235,6 +1320,7 @@ function toReflection() {
   state.needsShown = true;
   const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const card = entry.closest(".ai-card");
+  openDrawer("rounds", document.activeElement, { focus: false });
   for (const node of document.querySelectorAll(".ai-card.needs-answer")) node.classList.remove("needs-answer");
   card.classList.add("needs-answer");
   card.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "center" });
@@ -1253,6 +1339,7 @@ function answerable() {
 }
 
 function openReflection() {
+  closeDrawer();
   $("table").hidden = true;
   $("reflect").hidden = false;
   setNow();

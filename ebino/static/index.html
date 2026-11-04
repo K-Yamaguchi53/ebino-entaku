@@ -9,6 +9,7 @@
 <body>
 <header class="masthead">
   <h1>えびの円卓</h1>
+  <p id="heavy-talk" class="heavy-talk"></p>
 </header>
 
 <!-- 「いまやること」 (直し31-5): the four steps, the one now lit, and under
@@ -42,100 +43,127 @@
     <button type="button" id="fold-skip" class="quiet"></button>
   </div>
 
+  <!-- One screen (直し32-1): from the first question to 「ふりかえりへ」 the
+       page itself never scrolls. In the middle the map and the round table
+       (all the height left); at the foot the one box to write in; on the
+       right, only when opened, a drawer (the paragraph, the rounds so far,
+       the seat list, the seniors' questions). -->
   <section id="table" hidden>
-    <p id="heavy-talk" class="heavy-talk"></p>
-
-    <!-- Whose words are in the app, and examples of questions (直し31-5):
-         open until the first question is sent, then folded. -->
-    <section id="inside" class="inside" hidden>
-      <details id="inside-fold" open>
-        <summary id="inside-open"></summary>
-        <div class="inside-body">
-          <div class="inside-counts-part">
-            <p id="inside-heading" class="inside-heading"></p>
-            <ul id="inside-counts" class="inside-counts"></ul>
-            <p id="inside-end" class="inside-end"></p>
+    <div id="stage" class="stage">
+      <!-- The map (SPEC 5-1, 14-65): over the seat list, which stays in the
+           drawer for the keyboard and screen readers. Hidden when there is no
+           map: then the page is as long as before. -->
+      <section id="map" class="map" hidden>
+        <div class="map-room">
+          <div id="map-frame" class="map-frame">
+            <svg id="map-svg" role="group" aria-label="えびのの地図と席の点" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div id="map-overlay" class="map-overlay"></div>
+            <!-- The opening (直し30-3): over the map once a Lab is picked, a few
+                 seconds; 「とばす」, Enter or Esc ends it. -->
+            <div id="opening" class="opening" hidden>
+              <svg id="opening-svg" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+                <circle id="opening-ring" class="opening-ring" r="0"></circle>
+                <polyline id="opening-trail" class="opening-trail" points=""></polyline>
+                <!-- The paper plane (直し30の続き-1): six triangles of folded paper, set by app.js each frame. -->
+                <g id="opening-plane" class="opening-plane">
+                  <polygon></polygon><polygon></polygon><polygon></polygon>
+                  <polygon></polygon><polygon></polygon><polygon></polygon>
+                </g>
+              </svg>
+              <p id="opening-title" class="opening-title" aria-hidden="true"></p>
+            </div>
           </div>
-          <div class="inside-examples">
-            <p id="examples-lead" class="examples-lead"></p>
-            <ul id="examples" class="examples-list"></ul>
-            <p id="examples-end" class="examples-end"></p>
+        </div>
+        <!-- Under the map while the opening plays, where its buttons are after. -->
+        <div id="opening-bar" class="opening-bar" hidden>
+          <button type="button" id="opening-skip" class="quiet"></button>
+        </div>
+        <!-- Under the map, never over it: 地図にもどす, the table's heading,
+             the drawer's buttons and the zoom buttons; the buttons' words
+             come from texts/map_buttons.tsv and texts/drawer_parts.tsv. -->
+        <div class="map-bar map-controls">
+          <button type="button" id="map-back" class="map-back" hidden></button>
+          <p class="map-met">会った席 <span id="map-met-count">0</span></p>
+          <p id="map-heading" class="map-heading"></p>
+          <div id="drawer-buttons" class="drawer-buttons"></div>
+          <div class="map-zoom">
+            <button type="button" id="map-zoom-in"></button>
+            <button type="button" id="map-zoom-out"></button>
+            <button type="button" id="map-zoom-all"></button>
           </div>
         </div>
-      </details>
-    </section>
+        <div id="map-card" class="map-card" hidden></div>
+      </section>
 
-    <form id="ask-form" class="ask">
-      <label for="question" class="visually-hidden">問い</label>
-      <textarea id="question" rows="2" maxlength="200"></textarea>
-      <button type="submit" id="ask-button">聞く</button>
-    </form>
-    <div id="work-questions" class="hints"></div>
-    <p id="ask-message" class="message" hidden></p>
+      <!-- Whose words are in the app, and examples of questions (直し31-5):
+           over the map, so the counts' marks and the map's points are seen
+           together (直し32-1); open until the first question is sent. -->
+      <section id="inside" class="inside" hidden>
+        <details id="inside-fold" open>
+          <summary id="inside-open"></summary>
+          <div class="inside-body">
+            <div class="inside-counts-part">
+              <p id="inside-heading" class="inside-heading"></p>
+              <ul id="inside-counts" class="inside-counts"></ul>
+              <p id="inside-end" class="inside-end"></p>
+            </div>
+            <div class="inside-examples">
+              <p id="examples-lead" class="examples-lead"></p>
+              <ul id="examples" class="examples-list"></ul>
+              <p id="examples-end" class="examples-end"></p>
+              <div id="work-questions" class="hints"></div>
+            </div>
+          </div>
+        </details>
+      </section>
+    </div>
 
-    <!-- The map (SPEC 5-1, 14-65): added over the seat list below, which stays
-         for the keyboard and screen readers. Hidden when there is no map. -->
-    <section id="map" class="map" hidden>
-      <div id="map-frame" class="map-frame">
-        <svg id="map-svg" role="group" aria-label="えびのの地図と席の点" xmlns="http://www.w3.org/2000/svg"></svg>
-        <div id="map-overlay" class="map-overlay"></div>
-        <!-- The opening (直し30-3): over the map once a Lab is picked, a few
-             seconds; 「とばす」, Enter or Esc ends it. -->
-        <div id="opening" class="opening" hidden>
-          <svg id="opening-svg" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
-            <circle id="opening-ring" class="opening-ring" r="0"></circle>
-            <polyline id="opening-trail" class="opening-trail" points=""></polyline>
-            <!-- The paper plane (直し30の続き-1): six triangles of folded paper, set by app.js each frame. -->
-            <g id="opening-plane" class="opening-plane">
-              <polygon></polygon><polygon></polygon><polygon></polygon>
-              <polygon></polygon><polygon></polygon><polygon></polygon>
-            </g>
-          </svg>
-          <p id="opening-title" class="opening-title" aria-hidden="true"></p>
-        </div>
+    <!-- The drawer (直し32-1): one part at a time, opened by its button;
+         閉じる or Esc closes it, the keyboard back where it was. With no map
+         every part is shown, one under the other, as before. -->
+    <aside id="drawer" class="drawer" aria-labelledby="drawer-title">
+      <div class="drawer-head">
+        <h2 id="drawer-title" class="drawer-title" tabindex="-1"></h2>
+        <button type="button" id="drawer-close" class="quiet drawer-close"></button>
       </div>
-      <!-- Under the map while the opening plays, where its buttons are after. -->
-      <div id="opening-bar" class="opening-bar" hidden>
-        <button type="button" id="opening-skip" class="quiet"></button>
+      <div class="drawer-body">
+        <section id="drawer-paragraph" class="drawer-part" data-part="paragraph"></section>
+        <section class="drawer-part" data-part="rounds">
+          <section id="rounds"></section>
+        </section>
+        <section class="seats drawer-part" data-part="seats">
+          <h2>席</h2>
+          <p class="met">会った席：<span id="met-count">0</span></p>
+          <div id="seat-list"></div>
+        </section>
+        <section id="purposes" class="purposes drawer-part" data-part="purposes">
+          <h2 id="purpose-heading"></h2>
+          <ul id="purpose-list"></ul>
+          <button type="button" id="more-purposes" class="quiet">ほかの見本</button>
+        </section>
       </div>
-      <!-- Under the map, never over it: 地図にもどす, the table's heading and
-           the zoom buttons; the buttons' words come from texts/map_buttons.tsv. -->
-      <div class="map-bar map-controls">
-        <button type="button" id="map-back" class="map-back" hidden></button>
-        <p id="map-heading" class="map-heading"></p>
-        <!-- Said once, the first time bubbles come as spoken words (直し31-7). -->
-        <p id="spoken-note" class="spoken-note" hidden></p>
-        <div class="map-zoom">
-          <button type="button" id="map-zoom-in"></button>
-          <button type="button" id="map-zoom-out"></button>
-          <button type="button" id="map-zoom-all"></button>
-        </div>
+    </aside>
+
+    <!-- At the foot: the one box to write in (直し32-1・2), what came of a
+         send just over it, and 「ふりかえりへ」. -->
+    <div class="input-area">
+      <!-- Said once, the first time bubbles come as spoken words (直し31-7). -->
+      <p id="spoken-note" class="spoken-note" hidden></p>
+      <p id="ask-message" class="message" hidden></p>
+      <!-- Before the reflection, one answer to コーチ or オブザーバー (直し30-1). -->
+      <p id="reflect-needs-answer" class="reflect-needs" role="status" hidden></p>
+      <div class="input-row">
+        <form id="ask-form" class="ask">
+          <label for="question" class="visually-hidden">問い</label>
+          <textarea id="question" rows="2" maxlength="200"></textarea>
+          <button type="submit" id="ask-button">聞く</button>
+        </form>
+        <p class="to-reflect"><button type="button" id="to-reflect" hidden>ふりかえりへ</button></p>
       </div>
-      <div class="map-foot">
-        <p class="map-met">会った席 <span id="map-met-count">0</span></p>
-        <!-- The map's sources: OpenStreetMap, and Copernicus for the picture. -->
-        <p class="map-source"><span id="map-source"></span><span id="map-dem" hidden></span></p>
-      </div>
-      <div id="map-card" class="map-card" hidden></div>
-    </section>
-
-    <section id="purposes" class="purposes">
-      <h2 id="purpose-heading"></h2>
-      <ul id="purpose-list"></ul>
-      <button type="button" id="more-purposes" class="quiet">ほかの見本</button>
-    </section>
-
-    <section id="rounds"></section>
-
-    <p class="to-reflect"><button type="button" id="to-reflect" hidden>ふりかえりへ</button></p>
-    <!-- Before the reflection, one answer to コーチ or オブザーバー (直し30-1). -->
-    <p id="reflect-needs-answer" class="reflect-needs" role="status" hidden></p>
-
-    <section class="seats">
-      <h2>席</h2>
-      <p class="met">会った席：<span id="met-count">0</span></p>
-      <div id="seat-list"></div>
-    </section>
+    </div>
+    <!-- The map's sources (OpenStreetMap, and Copernicus for the picture), in
+         one small line at the very foot. -->
+    <p class="map-source"><span id="map-source"></span><span id="map-dem" hidden></span></p>
   </section>
 
   <!-- The reflection sheet (SPEC 5-2). The student writes first. -->

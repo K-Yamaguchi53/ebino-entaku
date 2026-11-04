@@ -110,6 +110,9 @@ SCHOOL_LABEL = "school_label"
 # The map's buttons (map.js): 地図にもどす and the zoom buttons. Columns
 # ID・文字・読み上げ; an empty 読み上げ reads the 文字 itself.
 MAP_BUTTONS = "map_buttons"
+# The drawer's parts (直し32-1): each one's name, on its button and over it.
+DRAWER_PARTS = "drawer_parts"
+DRAWER_PART_IDS = ("paragraph", "rounds", "seats", "purposes")
 MAP_BUTTON_IDS = ("back", "zoom_in", "zoom_out", "zoom_all")
 # Round the map (map.js): the word on the mark that points north (the north
 # row's 方位), and by each of the map's four sides what lies that way.
@@ -225,6 +228,7 @@ def screen_texts() -> dict:
     texts[MAP_BUTTONS] = map_buttons()
     texts[MAP_AROUND] = map_around()
     texts[BUBBLE_CHOICES] = bubble_choices()
+    texts[DRAWER_PARTS] = id_table(DRAWER_PARTS, DRAWER_PART_IDS)
     texts[SEAT_ICONS] = seat_icons()
     texts[NOW_STEPS] = now_steps()
     texts[NOW_LINE] = now_lines()
@@ -267,6 +271,14 @@ def map_buttons() -> dict[str, dict[str, str]]:
         raise ValueError(f"{MAP_BUTTONS}.tsv must have the rows {', '.join(MAP_BUTTON_IDS)}")
     return {key: {"text": rows[key]["文字"], "label": rows[key]["読み上げ"] or rows[key]["文字"]}
             for key in MAP_BUTTON_IDS}
+
+
+def id_table(name: str, ids: tuple[str, ...]) -> dict[str, str]:
+    """{ID: 文字} from a table of exactly these rows."""
+    rows = {row["ID"]: row["文字"] for row in load_table(name, ("ID", "文字"))}
+    if set(rows) != set(ids):
+        raise ValueError(f"{name}.tsv must have the rows {', '.join(ids)}")
+    return {key: rows[key] for key in ids}
 
 
 def bubble_choices() -> dict[str, str]:

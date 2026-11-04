@@ -389,7 +389,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .ai-card.needs-answer { border-color: var(--lamp); box-shadow: 0 0 0 1px var(--lamp-soft), 0 0 22px var(--lamp-faint); }
 /* The opening (直し30-3): the map alone while it plays, a paper plane in the
    lamp's colour over it, a ring of the lamp's light, the title. */
-#table.opening-on > :not(#map), #table.opening-on .map-bar { display: none; }
+#table.opening-on > :not(.stage), #table.opening-on .stage > :not(#map), #table.opening-on .map-bar { display: none; }
 .opening { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
 .opening svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
 /* The paper plane: the cream of the people's words' paper, its edges and folds in the lamp's colour. */
@@ -870,4 +870,125 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .round, .ai-band, .ai-card, .closing, .ask-seat, .split, .map-hint, .heavy-talk, .seats, #reflect {
   word-break: auto-phrase;
   overflow-wrap: break-word;
+}
+
+/* The safety line sits in the title's row, and only while the table is out
+   (直し32-1): never on the first screen; the reflection has its own. */
+.masthead .heavy-talk { display: none; }
+body:has(#table:not([hidden])) .masthead .heavy-talk { display: block; }
+/* --- one screen (直し32-1) ---
+   From the first question to 「ふりかえりへ」 the page never scrolls: the
+   title, the four steps and the safety line in one thin row, the one line
+   of what to do now under them; the map and the round table in all the
+   height left, their buttons beside them; the one box to write in at the
+   foot; on the right, only when opened, the drawer. Only the drawer and
+   long boxes scroll inside themselves. With no map (it failed, or none was
+   given) none of this: the page is as long as before. */
+body:has(#table:not([hidden])):has(#map:not([hidden])) { height: var(--vh); min-height: 0; display: grid; column-gap: 18px; padding: 0 16px;
+  grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-areas: "title steps heavy" "line line line" "main main main"; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .masthead, body:has(#table:not([hidden])):has(#map:not([hidden])) .now { display: contents; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .masthead h1 { grid-area: title; align-self: center; margin: 0; padding-top: 4px; font-size: 22px;
+  letter-spacing: .12em; text-shadow: none; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .masthead .heavy-talk { grid-area: heavy; align-self: center; margin: 4px 0 0; padding: 2px 12px; font-size: 14px;
+  line-height: 1.5; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .now-steps { grid-area: steps; align-self: center; padding-top: 4px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line { grid-area: line; margin: 4px 0 8px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) main { grid-area: main; min-height: 0; max-width: none; width: 100%; padding: 0 0 8px; display: flex; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #table { flex: 1 1 auto; min-width: 0; min-height: 0; display: grid; gap: 8px 14px;
+  grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr) auto auto; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { grid-column: 1; grid-row: 1; position: relative; min-width: 0; min-height: 0; container-type: size; }
+/* The map as large as its room lets it be, its shape kept (map.js sets
+   it); its buttons in a column on its right. */
+body:has(#table:not([hidden])):has(#map:not([hidden])) #map { width: 100%; height: 100%; margin: 0; display: flex; gap: 12px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-room { flex: 1 1 auto; min-width: 0; min-height: 0; container-type: size; display: grid; place-items: center; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-frame { width: min(100cqw, 100cqh * var(--ratio, 1.3)); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar { flex: 0 0 200px; flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: flex-end;
+  min-height: 0; padding: 0; gap: 8px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar button { min-height: 40px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-met { order: -1; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-heading { flex: 0 1 auto; min-height: 0; overflow: auto; font-size: 1rem; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-buttons { flex-direction: column; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom { margin: 0; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom button { flex: 1; }
+/* Whose words are in the app: a card over the map's left side, in the
+   room beside the map where there is room (直し32-1). */
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: absolute; z-index: 6; top: 0; left: 0; margin: 0; width: var(--inside-w, 320px);
+  overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--moon-soft) transparent;
+  max-height: 100%; overflow: auto; background: color-mix(in srgb, var(--night-2) 94%, transparent);
+  box-shadow: 0 10px 28px var(--shadow); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .inside-body { grid-template-columns: 1fr; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .inside-examples { border-left: 0; padding-left: 0; border-top: 1px solid var(--moon-faint); padding-top: 8px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .inside-counts { grid-template-columns: 1fr; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .inside-counts .number { font-size: 26px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .hints { margin: 8px 0 0; }
+/* Folded once a question is sent: only its line, as narrow as its words. */
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside:not(:has(details[open])) { width: auto; }
+/* Open (before the first question): the map steps right to leave it its
+   room, and comes back to its full size when it folds. */
+@media (orientation: landscape) {
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { --inside-w: min(320px, 30cqw); }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage:has(#inside:not([hidden]) details[open]) .map-room { padding-left: calc(var(--inside-w) + 12px); }
+}
+/* The drawer: closed, nothing; open, one part, scrolling inside itself. */
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer { grid-column: 2; grid-row: 1 / 3; width: clamp(300px, 30vw, 440px); min-height: 0; display: none;
+  flex-direction: column; background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: 10px;
+  box-shadow: 0 14px 34px var(--shadow); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer.open { display: flex; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-head { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 16px;
+  border-bottom: 1px solid var(--moon-faint); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-title { flex: 1; margin: 0; font-size: 17px; font-family: var(--mincho); color: var(--ink); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-close { min-height: 40px; padding: 0 14px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 4px 16px 16px; overscroll-behavior: contain; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-part { display: none; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer[data-part="paragraph"] [data-part="paragraph"], body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer[data-part="rounds"] [data-part="rounds"],
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer[data-part="seats"] [data-part="seats"], body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer[data-part="purposes"] [data-part="purposes"] { display: block; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer .seats h2, body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer .purposes h2 { display: none; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer .round:first-child { margin-top: 8px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer .purposes ul { grid-template-columns: 1fr; }
+/* Without a map the drawer's parts are the page's, one under the other. */
+.drawer-head, .drawer-buttons:empty { display: none; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-head { display: flex; }
+.drawer-buttons { display: flex; gap: 6px; }
+/* The foot: what came of a send, then the one box, and 「ふりかえりへ」. */
+body:has(#table:not([hidden])):has(#map:not([hidden])) .input-area { grid-column: 1; grid-row: 2; min-width: 0; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .input-row { display: flex; align-items: flex-end; gap: 14px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .ask { flex: 1 1 auto; min-width: 0; margin: 0; gap: 12px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .ask textarea { --rule: calc(18px * 1.6); min-height: 0; height: calc(var(--rule) * 2 + 16px);
+  padding: 8px 16px; font-size: 18px; line-height: 1.6; resize: none; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #ask-button, body:has(#table:not([hidden])):has(#map:not([hidden])) #to-reflect { min-height: 52px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .to-reflect { margin: 0; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .input-area .message, body:has(#table:not([hidden])):has(#map:not([hidden])) .input-area .reflect-needs, body:has(#table:not([hidden])):has(#map:not([hidden])) .input-area .spoken-note { margin: 0 0 6px; padding: 4px 12px;
+  max-width: none; text-align: left; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-met { white-space: nowrap; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #table > .map-source { grid-column: 1 / -1; grid-row: 3; margin: -4px 0 0; font-size: .6rem; line-height: 1.3; }
+/* The card of an empty chair's 「？」, over the map's lower left. */
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-card { position: absolute; z-index: 8; left: 8px; bottom: 8px; width: min(380px, 90%); margin: 0;
+  box-shadow: 0 10px 28px var(--shadow); }
+/* A low screen (1366×650): the box one line shorter. */
+@media (max-height: 700px) {
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .masthead h1 { font-size: 18px; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line { margin: 2px 0 6px; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .ask textarea { height: calc(var(--rule) + 16px); }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #ask-button, body:has(#table:not([hidden])):has(#map:not([hidden])) #to-reflect { min-height: 46px; }
+}
+/* An upright screen (768×1024): the map the width, its buttons under it in
+   rows, the counts card under them; the drawer over the lower part. */
+@media (orientation: portrait) {
+  body:has(#table:not([hidden])):has(#map:not([hidden])) { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "title heavy" "steps steps" "line line" "main main";
+    grid-template-rows: auto auto auto minmax(0, 1fr); }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #table { grid-template-columns: minmax(0, 1fr); }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { display: flex; flex-direction: column; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #map { height: auto; flex: none; flex-direction: column; gap: 0; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-room { flex: none; container-type: inline-size; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-frame { width: 100cqw; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar { flex: none; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 6px 0 0; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-heading { flex: 1 1 100%; order: 9; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-buttons { flex-direction: row; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom { margin-left: auto; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom button { flex: none; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { container-type: normal; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: static; width: auto; max-height: none; flex: 1 1 auto; min-height: 0; margin-top: 8px; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #inside:not(:has(details[open])) { flex: none; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer { grid-column: 1; grid-row: 1; align-self: end; width: auto; max-height: 46%; z-index: 30; }
 }

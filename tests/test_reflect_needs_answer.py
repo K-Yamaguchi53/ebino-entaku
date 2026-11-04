@@ -41,6 +41,7 @@ const entry = { closest: () => card, focus() { focused += 1; } };
 const band = (open) => ({ querySelector: () => (open ? entry : null) });
 globalThis.document = { querySelectorAll: () => [] };
 globalThis.window = { matchMedia: () => ({ matches: %(still)s }) };
+const openDrawer = () => {};  // The drawer (直し32-1): the card is in it.
 const state = { texts: { reflect_needs_answer: "LINE" }, bands: %(bands)s,
   aiAnswered: %(answered)s, aiUnavailable: %(unavailable)s, needsShown: false };
 toReflection();
@@ -97,7 +98,9 @@ def test_only_an_answer_that_started_the_next_round_counts():
 def test_the_button_stays_and_the_line_is_the_teachers():
     assert '$("to-reflect").addEventListener("click", toReflection);' in APP
     assert "disabled" not in _top("toReflection") and "to-reflect" not in _top("toReflection")
-    assert HTML.index('id="to-reflect"') < HTML.index('id="reflect-needs-answer"') < HTML.index('class="seats"')
+    # At the foot of the one screen (直し32-1): the line just over the box, the button beside it.
+    foot = HTML[HTML.index('class="input-area"'):]
+    assert foot.index('id="reflect-needs-answer"') < foot.index('id="ask-form"') < foot.index('id="to-reflect"')
     assert texts.screen_texts()["reflect_needs_answer"] == \
         "ふりかえりの前に、コーチかオブザーバーの問いに、1つだけ答えてください。"
 

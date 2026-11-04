@@ -35,11 +35,11 @@ def _top(name):
 
 def test_the_words_are_the_teachers():
     assert texts.bubble_choices() == {"paragraph": "元の段落を読む", "mark": "印をつける",
-                                      "card": "この人に聞きたいことを書く", "read": "下のやりとりで読む"}
+                                      "card": "この人に聞きたいことを書く", "read": "これまでの円卓で読む"}
     shown = texts.screen_texts()
     assert shown["bubble_choices"] == texts.bubble_choices()
     assert shown["bubble_hint"] == "吹き出しを押すと、次にできることが出ます"
-    for word in ("元の段落を読む", "この人に聞きたいことを書く", "下のやりとりで読む", "吹き出しを押すと"):
+    for word in ("元の段落を読む", "この人に聞きたいことを書く", "これまでの円卓で読む", "吹き出しを押すと"):
         # Not written into the screen's code (a comment may name it).
         assert f'"{word}' not in MAP and f'"{word}' not in APP
     assert "app.state.texts.bubble_choices" in _inner("openChoices")
@@ -74,7 +74,7 @@ def test_a_card_and_a_seat_left_out_take_a_press_that_opens_one_card_of_choices(
 def test_each_choice_calls_what_the_round_below_already_does():
     opened = _inner("openChoices")
     assert "app.paragraph(utteranceId)" in opened and "app.mark(tableRoundNo, utteranceId)" in opened
-    assert "app.openCard(seatId)" in opened and "app.readBelow(tableRoundNo, utteranceId)" in opened
+    assert "app.openCard(seatId, { from: card })" in opened and "app.readBelow(tableRoundNo, utteranceId, card)" in opened
     assert "fetch(" not in MAP and "call(" not in MAP  # The map asks the server nothing itself.
     lent = APP[APP.index("const lent = {"):APP.index("};", APP.index("const lent = {"))]
     for part in ("paragraph: paragraphOf", "mark: markQuote", "openCard: openCardFor", "readBelow"):
@@ -91,7 +91,7 @@ def test_one_mark_in_one_place_and_the_map_follows_it():
     assert "onMap((map) => map.marked())" in mark
     marked = _inner("marked")
     assert "app.state.marks" in marked and 'setAttribute("aria-pressed"' in marked
-    assert "return { init, show, round, refresh, marked, band: setBand, markOf };" in MAP
+    assert "return { init, show, round, refresh, marked, band: setBand, markOf, layoutAgain };" in MAP
 
 
 def test_the_card_is_the_seat_lists_own_with_its_box_empty():

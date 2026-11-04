@@ -254,6 +254,8 @@ const EbinoMap = (() => {
     svg.setAttribute("viewBox", `0 0 ${view.W} ${view.H}`);
     frame.classList.toggle("relief", view.relief);
     $("map").style.setProperty("--ratio", String(view.W / view.H));
+    // The map's shape for what sits beside it on the one screen (直し32-1).
+    document.documentElement.style.setProperty("--map-ratio", String(view.W / view.H));
     frame.style.aspectRatio = `${view.W} / ${view.H}`;
     const rc = rough.svg(svg);
     const layer = (className) => svg.appendChild(svgEl("g", { class: className }));
@@ -1016,6 +1018,8 @@ const EbinoMap = (() => {
     });
     // The arrow and the four ways' names (直し25-3), once they are put.
     const around = withAround ? [...overlay.querySelectorAll(".map-compass, .map-around, .map-hint")].map((node) => boxIn(node, frameBox)) : [];
+    // What the one screen lays over the map's side (直し32-1): the card of whose words are in.
+    for (const node of document.querySelectorAll("#inside:not([hidden])")) around.push(boxIn(node, frameBox));
     return [...nodes.map((node) => boxIn(node, frameBox)), ...seats, ...(cover ? topStrips(cover) : []),
       ...shelfBoxes, ...(withWords ? seenWords({ w: frameBox.width, h: frameBox.height }, words, cover) : []), ...around];
   }
@@ -1754,6 +1758,11 @@ const EbinoMap = (() => {
     relayout();
     marked();
     app.setNow({ reading: false, table: true });
+    // Nothing has the keyboard (the box sent the question): the first card has it (直し32-1).
+    if (document.activeElement === document.body || !document.activeElement) {
+      const firstCard = overlay.querySelector(".table-bubble:not(.unplaced)");
+      if (firstCard) firstCard.focus({ preventScroll: true });
+    }
   }
 
   // A seat's lamp card at the table: the same words as on the map, kept.
@@ -2056,8 +2065,8 @@ const EbinoMap = (() => {
       }
     });
     const write = app.state.carded.has(seatId) ? div("done", "質問カードにしました")
-      : button("card", () => { closeChoices(false); app.openCard(seatId); });
-    const below = button("read", () => { closeChoices(false); app.readBelow(tableRoundNo, utteranceId); });
+      : button("card", () => { closeChoices(false); app.openCard(seatId, { from: card }); });
+    const below = button("read", () => { closeChoices(false); app.readBelow(tableRoundNo, utteranceId, card); });
     node.append(head, read, paragraph, mark, write, below);
     node.addEventListener("keydown", (event) => moveInChoices(event, node));
     card.after(node);  // Tab goes on from the lamp card into its choices.
@@ -2600,5 +2609,13 @@ const EbinoMap = (() => {
     return mark;
   }
 
-  return { init, show, round, refresh, marked, band: setBand, markOf };
+  // Laid out again where the map now stands (直し32-1): the drawer or the
+  // card of whose words are in moved it, or came over its side.
+  function layoutAgain() {
+    if (!view) return;
+    rescale();
+    relayout();
+  }
+
+  return { init, show, round, refresh, marked, band: setBand, markOf, layoutAgain };
 })();
