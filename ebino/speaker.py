@@ -13,11 +13,17 @@ only the endings, the turns of phrase, and the third person made the first
 nothing and leaves nothing out.
 
 Nothing the model writes is shown before code checks it, as everywhere:
-  - every number in it is in the original paragraph;
-  - every run of two or more kanji or katakana in it is in the original
-    paragraph, except the spoken words in texts/spoken_allowed.txt;
-  - it is at most MAX_GROWTH times the original's length;
-  - it holds no name (the gate's name list).
+  - it holds no name (the gate's name list);
+  - it holds no banned word (banned_words) that the original does not hold:
+    a 「〜といい」 the model adds would be the app advising the student in a
+    seat's voice; one the person said is theirs and stays (直し31続き-1);
+  - every number and every run of two or more kanji or katakana in it is in
+    this bubble's original words, not only somewhere in the paragraph,
+    except the spoken words in texts/spoken_allowed.txt (直し31続き-1);
+  - every number and every such run of the original is still in it: nothing
+    is left out, except the words in texts/spoken_drop_ok.txt, which may go
+    when the third person becomes the first (直し31続き-1);
+  - it is at most MAX_GROWTH times the original's length.
 A bubble that fails any of them is shown in its original words; so is every
 bubble when the model cannot be used or does not answer within
 TIMEOUT_SECONDS (no retry). The words are never shown first and changed
@@ -32,16 +38,20 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
+from .banned_words import BANNED_WORDS
 from .gate import Gate, GateError, ModelUnavailable, json_answer, json_request
-from .texts import SPOKEN_ALLOWED, load_lines
+from .ingest.scrub import normalize_for_match
+from .texts import SPOKEN_ALLOWED, SPOKEN_DROP_OK, load_lines
 
 ROLE = "speaker"
 TIMEOUT_SECONDS = 8.0
 MAX_GROWTH = 1.5
 SHOWN_SPOKEN = "spoken"
 SHOWN_ORIGINAL = "original"
-STOP_NUMBER = "number_not_in_paragraph"
-STOP_WORD = "word_not_in_paragraph"
+STOP_NUMBER = "number_not_in_original"
+STOP_WORD = "word_not_in_original"
+STOP_BANNED = "banned_word"
+STOP_DROPPED = "word_dropped"
 STOP_LONG = "too_long"
 STOP_NAME = "name"
 STOP_EMPTY = "empty"
@@ -108,25 +118,46 @@ def allowed_words() -> frozenset[str]:
     return frozenset(_plain(word) for word in load_lines(SPOKEN_ALLOWED))
 
 
-def stop_reason(spoken: str, original: str, paragraph: str, gate: Gate, allowed=None) -> str:
-    """"" when the spoken words may be shown; else why not."""
+def drop_ok_words() -> frozenset[str]:
+    return frozenset(_plain(word) for word in load_lines(SPOKEN_DROP_OK))
+
+
+_BANNED = tuple(normalize_for_match(word) for word in BANNED_WORDS)
+
+
+def banned_added(spoken: str, original: str) -> bool:
+    """A banned word in the spoken words that the original does not hold."""
+    said, was = normalize_for_match(spoken), normalize_for_match(original)
+    return any(word in said and word not in was for word in _BANNED)
+
+
+def _words(text: str, allowed: frozenset[str] = frozenset()) -> list[str]:
+    """The numbers and the runs of two or more kanji or katakana in text, a
+    whole run that is one of allowed left out."""
+    # A word of the list is let in only where it stands alone: a whole run of
+    # kanji or katakana that is the word, never a part of a longer one.
+    text = _RUN.sub(lambda m: "・" if m.group(0) in allowed else m.group(0), _plain(text))
+    return [word for pattern in (_DIGITS, _KANJI_NUMBER, _KANJI, _KATAKANA) for word in pattern.findall(text)]
+
+
+def stop_reason(spoken: str, original: str, paragraph: str, gate: Gate, allowed=None, drop_ok=None) -> str:
+    """"" when the spoken words may be shown; else why not. The paragraph is
+    not a source of words (直し31続き-1): only this bubble's original is."""
     allowed = allowed_words() if allowed is None else allowed
+    drop_ok = drop_ok_words() if drop_ok is None else drop_ok
     spoken = spoken.strip()
     if not spoken:
         return STOP_EMPTY
     if gate.names.hits(spoken):
         return STOP_NAME
-    source = _plain(paragraph + original)
-    plain = _plain(spoken)
-    # A spoken word of the list is let in only where it stands alone: a whole
-    # run of kanji or katakana that is the word, never a part of a longer one.
-    plain = _RUN.sub(lambda m: "・" if m.group(0) in allowed else m.group(0), plain)
-    for pattern in (_DIGITS, _KANJI_NUMBER):
-        if any(number not in source for number in pattern.findall(plain)):
-            return STOP_NUMBER
-    for pattern in (_KANJI, _KATAKANA):
-        if any(word not in source for word in pattern.findall(plain)):
-            return STOP_WORD
+    if banned_added(spoken, original):
+        return STOP_BANNED
+    source, plain = _plain(original), _plain(spoken)
+    for word in _words(spoken, allowed):
+        if word not in source:
+            return STOP_NUMBER if _DIGITS.fullmatch(word) or _KANJI_NUMBER.fullmatch(word) else STOP_WORD
+    if any(word not in plain for word in _words(original, drop_ok)):
+        return STOP_DROPPED
     if len(spoken) > len(original) * MAX_GROWTH:
         return STOP_LONG
     return ""
@@ -151,10 +182,10 @@ def speak(gate: Gate, quotes: list[dict]) -> list[Spoken]:
         return [Spoken(q["id"], q["text"], "", str(error)) for q in quotes]
     given = {line["id"]: line["text"] for line in lines
              if isinstance(line, dict) and isinstance(line.get("id"), str) and isinstance(line.get("text"), str)}
-    allowed = allowed_words()
+    allowed, drop_ok = allowed_words(), drop_ok_words()
     out = []
     for q in quotes:
         spoken = given.get(q["id"])
-        reason = STOP_MISSING if spoken is None else stop_reason(spoken, q["text"], q["paragraph"], gate, allowed)
+        reason = STOP_MISSING if spoken is None else stop_reason(spoken, q["text"], q["paragraph"], gate, allowed, drop_ok)
         out.append(Spoken(q["id"], q["text"], "" if reason else spoken.strip(), reason))
     return out

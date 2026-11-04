@@ -155,6 +155,9 @@ QUESTION_EXAMPLES_END = "question_examples_end"
 SPOKEN_NOTE = "spoken_note"
 SPOKEN_MARK = "spoken_mark"
 SPOKEN_ALLOWED = "spoken_allowed"
+# The words of an original that may be left out of its spoken words, when the
+# third person becomes the first (直し31続き-1). One a line; may be empty.
+SPOKEN_DROP_OK = "spoken_drop_ok"
 BACK_TO_START_CONFIRM = "back_to_start_confirm"
 BACK_TO_START_YES = "back_to_start_yes"
 BACK_TO_START_NO = "back_to_start_no"

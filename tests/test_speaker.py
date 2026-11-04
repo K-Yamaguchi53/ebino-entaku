@@ -142,3 +142,63 @@ def test_the_screen_shows_spoken_words_marked_and_the_note_with_the_original():
     assert ": null," not in render  # node.append would write a null out as "null".
     assert "quote.spoken && quote.source.note" in render  # The note goes with the paragraph.
     assert "state.texts.spoken_note" in APP and "state.spokenNoted" in APP
+
+
+# --- 直し31続き-1: three more checks ---
+
+POSTER = "勉強のやる気は、何で変わるのかを知る。"
+
+
+def test_a_banned_word_the_model_adds_keeps_the_original():
+    # The poster's aim made advice to the student, in the seat's voice.
+    assert speaker.stop_reason("勉強のやる気は、何で変わるのかを知るといいよ。", POSTER, POSTER, names_gate()) \
+        == speaker.STOP_BANNED
+    assert speaker.stop_reason("休みは決めて取るといいよ。", ORIGINAL, PARAGRAPH, names_gate()) == speaker.STOP_BANNED
+
+
+def test_a_banned_word_the_person_said_is_theirs_and_is_not_stopped():
+    original = "迷ったら、人に聞くといいと思います。"
+    assert speaker.stop_reason("迷ったら、人に聞くといいと思うよ。", original, original, names_gate()) == ""
+
+
+def test_a_word_left_out_keeps_the_original():
+    original = "地元で店を開くと決めたのは、母の髪を切りたかったからだと話す。"
+    assert speaker.stop_reason("地元で店を開こうと決めたのは、母の髪を切りたかったからなんだ。", original, original,
+                               names_gate()) == ""
+    assert speaker.stop_reason("店を開こうと決めたのは、母の髪を切りたかったからなんだ。", original, original,
+                               names_gate()) == speaker.STOP_DROPPED
+    # A number left out, too.
+    original = "県外の病院で五年働いてから、地元の病院に移ったという。"
+    assert speaker.stop_reason("県外の病院で働いてから、地元の病院に移ったんだよ。", original, original,
+                               names_gate()) == speaker.STOP_DROPPED
+
+
+def test_a_word_of_texts_spoken_drop_ok_may_be_left_out():
+    original = "同氏は、休みは決めて取ると話す。"
+    assert speaker.stop_reason("休みは決めて取るんだ。", original, original, names_gate(),
+                               drop_ok=frozenset()) == speaker.STOP_DROPPED
+    assert speaker.stop_reason("休みは決めて取るんだ。", original, original, names_gate(),
+                               drop_ok=frozenset({"同氏"})) == ""
+
+
+def test_a_word_from_another_sentence_of_the_paragraph_keeps_the_original():
+    paragraph = "休みの日は、子どもと川で魚を釣ることが多いという。家族と過ごす時間を大切にしている。"
+    original = "休みの日は、子どもと川で魚を釣ることが多いという。"
+    assert speaker.stop_reason("休みの日は、子どもと川で魚を釣ることが多いんだよね。", original, paragraph,
+                               names_gate()) == ""
+    assert speaker.stop_reason("休みの日は、家族と子どもと川で魚を釣ることが多いんだよね。", original, paragraph,
+                               names_gate()) == speaker.STOP_WORD
+
+
+def test_the_reason_is_kept_in_the_record(tmp_path):
+    bad = says(a1="休みは決めて取るといいよ。", a2="必ず店を閉めるんだよね。", b1="畑は天気しだいなので、休みは空いたら取るんだ。")
+    session, _ = sitting(ANSWERED + [bad], tmp_path)
+    session.ask(QUESTION)
+    record = json.loads((tmp_path / "sessions" / f"{session.session_id}.json").read_text(encoding="utf-8"))
+    kept = {item["utterance_id"]: item for item in record["spoken"]}
+    assert kept["a1"]["reason"] == "banned_word" and kept["a1"]["shown"] == "original"
+    assert kept["a2"]["reason"] == "word_dropped" and kept["b1"]["reason"] == ""
+
+
+def test_texts_spoken_drop_ok_is_read():
+    assert isinstance(speaker.drop_ok_words(), frozenset)
