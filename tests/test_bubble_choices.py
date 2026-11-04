@@ -68,7 +68,7 @@ def test_a_card_and_a_seat_left_out_take_a_press_that_opens_one_card_of_choices(
     assert 'event.key === "Escape"' in move and "ArrowDown: 1" in move and "ArrowUp: -1" in move
     assert "closeChoices(false);" in _inner("clearTable")
     # No browser balloon: the words are on the card.
-    assert "title" not in opened.replace("whoOf", "")
+    assert "title" not in opened.replace("whoOf", "").replace("seatOf(seatId).title", "")
 
 
 def test_each_choice_calls_what_the_round_below_already_does():

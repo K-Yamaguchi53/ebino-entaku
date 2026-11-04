@@ -614,12 +614,19 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .map-choices button[aria-pressed="true"] { border-color: var(--lamp); color: var(--lamp-bright); }
 .map-choices button[aria-pressed="true"]::before { content: ""; display: inline-block; width: 7px; height: 7px;
   margin-right: 8px; border-radius: 50%; background: var(--lamp); vertical-align: .1em; }
-.map-choices .paragraph { max-height: 7.6em; overflow: auto; margin: 0 0 2px; padding: 8px 10px; border-radius: 4px;
+.map-choices .paragraph { margin: 0 0 2px; padding: 8px 10px; border-radius: 4px;
   background: var(--paper); color: var(--paper-ink); font-family: var(--mincho); font-size: 14px; line-height: 1.7; }
-/* Or beside them, as tall as the two lines of choices, where that finds room. */
+/* Whose paragraph, at its head (直し27-3); the text scrolls only where
+   map.js finds no room for all of it. */
+.map-choices .paragraph .whose { font-family: var(--gothic); font-size: 12px; font-weight: bold; line-height: 1.5;
+  color: var(--paper-soft); margin-bottom: 2px; }
+.map-choices .paragraph .text { overflow: auto; }
+/* Apart from the choices, where the map has no room for it in them. */
+.map-choices .paragraph.apart { position: absolute; grid-column: auto; grid-row: auto; min-width: 0; margin: 0;
+  box-shadow: 0 0 0 1px var(--paper-line), 0 0 18px var(--lamp-soft), 0 10px 26px var(--shadow); }
+/* Or beside them, where that finds room. */
 .map-choices.beside { grid-template-columns: auto auto minmax(12em, 16em); }
-.map-choices.beside .paragraph { grid-column: 3; grid-row: 1 / span 2; order: 0; width: auto; min-width: 0;
-  max-height: 84px; margin: 0; }
+.map-choices.beside .paragraph { grid-column: 3; grid-row: 2 / span 2; order: 0; width: auto; min-width: 0; margin: 0; }
 .map-choices .done { align-self: center; padding: 4px 10px; font-size: 13px; color: var(--soft); }
 /* At their top, whose card it is and 「閉じる」 (直し27-1); never wider than the choices. */
 .map-choices .head { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; width: 0; min-width: 100%;

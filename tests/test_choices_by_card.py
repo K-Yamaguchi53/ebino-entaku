@@ -39,11 +39,12 @@ def test_the_choices_say_whose_they_are_and_close_with_the_teachers_word():
 def test_the_choices_get_a_tail_and_their_card_stays_in_sight():
     put = _inner("putChoices")
     assert "choicesPlan(frameWH, item, own, { w: width, h: height }, hard, crossed, others, spots, needTail)" in put
-    assert "for (const [crossed, needTail] of [[block, true], [[], true], [[], false]])" in put
+    assert "for (const [cardCrossed, crossed, needTail] of [[block, block, true], [block, [], true], [block, [], false]," in put
+    assert "spots = cardSpots(frameWH, item, own, hard, cardCrossed, reach);" in put  # The card's tail last of all.
     assert "if (plan.tail) drawTail(node, [...plan.spot, width, height], item);" in put
     assert "drawTail(card, [...plan.at, own[2], own[3]], item);" in put and "choices.moved = true;" in put
     # What they cover, and what the moved card covers, steps behind; never the card itself.
-    assert "for (const other of shown) if (overlaps(node, other) || overlaps(card, other))" in put
+    assert "if (overlaps(node, other) || overlaps(card, other) || (apart && overlaps(paragraph, other)))" in put
     assert ".map-choices .tail {" in CSS
 
 
@@ -95,3 +96,18 @@ def test_the_choices_go_against_their_card_never_over_it_the_table_or_the_seat()
     for name in ("cardSpots", "choicesPlan"):
         for outside in ("overlay", "document", "style", "classList", "dataset"):
             assert outside not in _inner(name)
+
+
+def test_the_paragraph_says_whose_it_is_and_shows_five_lines_where_there_is_room():
+    opened = _inner("openChoices")
+    assert 'paragraph.append(div("whose", seatOf(seatId).title), text);' in opened  # The name only.
+    assert "text.textContent = await app.paragraph(utteranceId);" in opened
+    put = _inner("putChoices")
+    # All of it first, then PARAGRAPH_LINES or more, only then fewer (it scrolls).
+    assert "PARAGRAPH_STEPS.flatMap(" in put and "const PARAGRAPH_STEPS = [0, 8, PARAGRAPH_LINES, 4, 3, 2];" in MAP
+    assert "putParagraphApart(paragraph, text, lineHeight, frameBox, [...hard, boxIn(card, frameBox)], others)" in put
+    assert "const PARAGRAPH_LINES = 5;" in MAP
+    assert "widths.map((w) => [\"\", false, lines, w])" in put  # Wider, where that finds room.
+    assert "text.style.maxHeight = lines ?" in put
+    assert ".map-choices .paragraph .text { overflow: auto; }" in CSS
+    assert "max-height: 7.6em" not in CSS and "max-height: 84px" not in CSS

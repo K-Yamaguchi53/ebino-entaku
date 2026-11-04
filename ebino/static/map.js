@@ -31,6 +31,9 @@ const EbinoMap = (() => {
   const TAIL_LENGTH = 16;  // px: a card's tail, at the least.
   const SEAT_PRESS = 44;  // px: the square a seat with no card up takes a press over.
   const TOUCH = 6;  // px between a lamp card and its choices, against its side.
+  const PARAGRAPH_LINES = 5;  // The paragraph's lines seen at the least, where there is room.
+  // The paragraph's lines tried, in order: all of it (0), then fewer; under PARAGRAPH_LINES only failing those.
+  const PARAGRAPH_STEPS = [0, 8, PARAGRAPH_LINES, 4, 3, 2];
   const DRAW_FOR = 1800;  // ms to draw the rim; the river follows.
   const RIPPLE_FOR = 1600;  // ms of the ring a seat sends out when its voice lights.
   const FADE_FOR = 300;  // ms a card takes to go, at the end of its BUBBLE_FOR.
@@ -1823,15 +1826,18 @@ const EbinoMap = (() => {
     };
     const paragraph = div("paragraph");
     paragraph.hidden = true;
+    // At its head, whose paragraph it is: the name only (直し27-3).
+    const text = div("text");
+    paragraph.append(div("whose", seatOf(seatId).title), text);
     // While a choice waits on the server it stays where it is (a disabled
     // button would drop the keyboard's focus): a second press then does nothing.
     let busy = false;
     const read = button("paragraph", async () => {
       if (busy) return;
-      if (!paragraph.textContent) {
+      if (!text.textContent) {
         busy = true;
         try {
-          paragraph.textContent = await app.paragraph(utteranceId);
+          text.textContent = await app.paragraph(utteranceId);
         } catch (error) {
           return;
         } finally {
@@ -1938,51 +1944,93 @@ const EbinoMap = (() => {
     for (const old of node.querySelectorAll(".tail")) old.remove();
     // Two choices to a line; or, where the map has room only so (直し27-1),
     // smaller and three to a line (low), or one to a line (narrow). The
-    // paragraph, when open: beside the choices (the card no taller), or
-    // under them, shorter (it scrolls) if that is what it takes to keep off
-    // the table. The first way that finds a clear spot; with none, the first.
-    const paragraph = node.querySelector(".paragraph");
-    const ways = paragraph.hidden ? [["", false, ""], ["low", false, ""], ["column", false, ""]]
-      : [["", true, ""], ["", false, ""], ["", false, "84px"], ["", false, "60px"], ["", false, "40px"]];
-    const lay = ([shape, beside, most]) => {
+    // paragraph, when open (直し27-3): all of it if that finds room, else
+    // PARAGRAPH_LINES lines or more, and only failing that fewer (it
+    // scrolls); beside the choices or under them, the card as it is or
+    // wider. The first way that covers nothing of soft; with none, the
+    // one that covers least.
+    const paragraph = node.querySelector(".paragraph"), text = paragraph.querySelector(".text");
+    const widths = [0, 420, 540].filter((w) => w < frameWH.w - 16);
+    const closed = [["", false, 0, 0], ["low", false, 0, 0], ["column", false, 0, 0]];
+    const ways = paragraph.hidden ? closed
+      : PARAGRAPH_STEPS.flatMap((lines) => [["", true, lines, 0],
+        ...widths.map((w) => ["", false, lines, w]), ["low", false, lines, 0]]);
+    const lineHeight = parseFloat(getComputedStyle(text).lineHeight) || 24;
+    const lay = ([shape, beside, lines, width]) => {
       node.classList.toggle("low", shape === "low");
       node.classList.toggle("column", shape === "column");
       node.classList.toggle("beside", beside);
-      paragraph.style.maxHeight = most;
+      text.style.maxHeight = lines ? `${Math.ceil(lines * lineHeight) + 1}px` : "";
+      node.style.width = width ? `${width}px` : "";
     };
     // By its own card, the first way that covers nothing of soft; with
     // none, the one that covers least.
-    // Failing all, their tails may cross the other seats; failing that,
-    // right by the seat they need none (the seat's ring says whose they are).
-    let planned = null;
-    for (const [crossed, needTail] of [[block, true], [[], true], [[], false]]) {
-      const spots = cardSpots(frameWH, item, own, hard, crossed, reach);
-      for (const way of ways) {
-        lay(way);
-        const { width, height } = node.getBoundingClientRect();
-        const plan = choicesPlan(frameWH, item, own, { w: width, h: height }, hard, crossed, others, spots, needTail);
-        if (plan && (!planned || plan.covered < planned.plan.covered)) planned = { way, plan };
-        if (plan && !plan.covered) break;
+    // Failing all, the choices' tail may cross the other seats; failing
+    // that, right by the seat they need none (the seat's ring says whose
+    // they are); and only failing that may the moved card's tail cross a
+    // seat: the choices are always against their card.
+    const search = (tried) => {
+      let planned = null;
+      for (const [cardCrossed, crossed, needTail] of [[block, block, true], [block, [], true], [block, [], false],
+        [[], [], true], [[], [], false]]) {
+        const spots = cardSpots(frameWH, item, own, hard, cardCrossed, reach);
+        for (const way of tried) {
+          lay(way);
+          const { width, height } = node.getBoundingClientRect();
+          const plan = choicesPlan(frameWH, item, own, { w: width, h: height }, hard, crossed, others, spots, needTail);
+          if (plan && (!planned || plan.covered < planned.plan.covered)) planned = { way, plan };
+          if (plan && !plan.covered) break;
+        }
+        if (planned) return planned;
       }
-      if (planned) break;
-    }
-    if (planned) {
-      const { way, plan } = planned;
+      return null;
+    };
+    const setApart = (on) => {
+      paragraph.classList.toggle("apart", on);
+      if (!on) Object.assign(paragraph.style, { left: "", top: "", width: "" });
+    };
+    const put = ({ way, plan }) => {
       lay(way);
-      if (plan.at[0] !== own[0] || plan.at[1] !== own[1]) {
-        card.style.left = `${plan.at[0]}px`;
-        card.style.top = `${plan.at[1]}px`;
-        drawTail(card, [...plan.at, own[2], own[3]], item);
-        choices.moved = true;
-      }
+      card.style.left = `${plan.at[0]}px`;
+      card.style.top = `${plan.at[1]}px`;
+      drawTail(card, [...plan.at, own[2], own[3]], item);
+      if (plan.at[0] !== own[0] || plan.at[1] !== own[1]) choices.moved = true;
+      for (const old of node.querySelectorAll(".tail")) old.remove();
       node.style.left = `${plan.spot[0]}px`;
       node.style.top = `${plan.spot[1]}px`;
       const { width, height } = node.getBoundingClientRect();
       if (plan.tail) drawTail(node, [...plan.spot, width, height], item);
-      // What they or the moved card cover steps behind while they are open.
-      for (const other of shown) if (overlaps(node, other) || overlaps(card, other)) other.classList.add("under-choices");
+    };
+    // How many of the paragraph's lines show (0: all of it), as a number to compare.
+    const seen = (lines) => (lines === 0 ? Infinity : lines);
+    setApart(false);
+    let planned = search(ways), apart = false;
+    // The paragraph in the card where that covers nothing and shows all of
+    // it or PARAGRAPH_LINES lines or more; else the choices as they are
+    // closed, and the paragraph apart (直し27-3), whichever shows more.
+    const inCard = planned && !planned.plan.covered ? seen(planned.way[2]) : -1;
+    if (!paragraph.hidden && inCard < PARAGRAPH_LINES) {
+      setApart(true);
+      const closedPlan = search(closed);
+      if (closedPlan) {
+        put(closedPlan);
+        const lines = putParagraphApart(paragraph, text, lineHeight, frameBox, [...hard, boxIn(card, frameBox)], others);
+        if (lines !== null && seen(lines) > inCard) {
+          planned = closedPlan;
+          apart = true;
+        }
+      }
+      if (!apart) setApart(false);
+    }
+    if (planned) {
+      if (!apart) put(planned);
+      // What they, their paragraph or the moved card cover steps behind while they are open.
+      for (const other of shown) {
+        if (overlaps(node, other) || overlaps(card, other) || (apart && overlaps(paragraph, other))) other.classList.add("under-choices");
+      }
       return;
     }
+    setApart(false);
     // No such spot: as before, by the card, over it rather than the table.
     let chosen = null;
     search: for (const overOwn of [false, true]) {
@@ -2000,6 +2048,38 @@ const EbinoMap = (() => {
     // What it covers steps behind it while it is open (its own card too,
     // when there was no room but over it).
     for (const other of [...shown, card]) if (overlaps(node, other)) other.classList.add("under-choices");
+  }
+
+  // The paragraph apart from its choices (直し27-3), where the map has no
+  // room for it in them: on paper of its own, its name at its head, the
+  // nearest spot to the choices that covers none of hard (the table, its
+  // seats and chairs, the lamp card) nor the choices, and none of soft if
+  // it can; all of it, or PARAGRAPH_LINES lines or more, and only failing
+  // that fewer (it scrolls), as wide as that takes. Returns the lines it
+  // shows (0: all of it), or null when it covers hard wherever it goes.
+  function putParagraphApart(paragraph, text, lineHeight, frameBox, hard, soft) {
+    const frameWH = { w: frameBox.width, h: frameBox.height }, from = boxIn(paragraph.parentElement, frameBox);
+    const covered = ([left, top], { w, h }) => soft.some((b) => boxesMeet([left, top, w, h], b));
+    let best = null;
+    for (const lines of PARAGRAPH_STEPS) {
+      for (const width of [560, 420, 300].filter((w) => w <= frameWH.w - 8)) {
+        paragraph.style.width = `${width}px`;
+        text.style.maxHeight = lines ? `${Math.ceil(lines * lineHeight) + 1}px` : "";
+        const { width: w, height: h } = paragraph.getBoundingClientRect();
+        const [spot, clear] = choiceSpot(frameWH, { w, h }, from, hard, soft);
+        const way = { lines, width, spot };
+        if (clear && !covered(spot, { w, h })) { best = way; break; }
+        if (clear && (!best || !best.clear)) best = { ...way, clear };
+      }
+      if (best && best.clear === undefined) break;
+    }
+    if (!best) return null;
+    paragraph.style.width = `${best.width}px`;
+    text.style.maxHeight = best.lines ? `${Math.ceil(best.lines * lineHeight) + 1}px` : "";
+    // Inside the choices' border: their box is where it is measured from.
+    paragraph.style.left = `${best.spot[0] - from[0] - 1}px`;
+    paragraph.style.top = `${best.spot[1] - from[1] - 1}px`;
+    return best.lines;
   }
 
   // Where a lamp card may go while its choices are open (直し27-1), a box
