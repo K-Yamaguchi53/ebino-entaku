@@ -136,13 +136,16 @@ def test_pressing_a_split_gives_its_heading_and_is_kept_apart_from_those_left():
         session.press_split(1, 1)
 
 
-def test_a_card_can_be_written_only_at_a_seat_shown_as_not_asked_yet():
+def test_a_card_can_be_written_at_a_seat_shown_as_not_asked_yet_or_one_that_spoke():
     session, client = sitting(ANSWERED + [editor_says(["S03"])])
     with pytest.raises(Refused):
         session.write_card("S03", "子どもと話すとき、何に気をつけますか")  # No round yet.
     session.ask("休みは？")
     with pytest.raises(Refused):
-        session.write_card("S01", "問い")  # S01 answered.
+        session.write_card("P01", "問い")  # Neither silent nor quoted in a round.
+    spoke = session.write_card("S01", "休みの日は、何時に起きますか")  # S01 answered (直し26-2).
+    assert spoke["seat_id"] == "S01" and len(session.cards) == 1
+    session.cards.clear()
     front = session.write_card("S03", "子どもと話すとき、何に気をつけますか")
     assert (front["origin"], front["seat_id"]) == ("student", "S03")
     assert "back" not in front and len(session.cards) == 1

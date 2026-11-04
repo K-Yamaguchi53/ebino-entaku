@@ -283,8 +283,6 @@ def test_nothing_found_says_not_answered_yet_and_makes_no_card(tmp_path):
 
 def test_under_not_answered_yet_the_student_writes_their_own_card_to_that_seat():
     session, _ = round_one([librarian_finds(), editor_says(["S02"])])
-    with pytest.raises(Refused, match="not_a_silent_seat"):
-        session.write_card("S02", "雨の日は何をしていますか？")  # S02 spoke: not yet.
     session.ask_the_seat(1)
     card = session.write_card("S02", "雨の日は何をしていますか？")
     assert card["seat_id"] == "S02" and card["origin"] == editor.ORIGIN_STUDENT
@@ -295,11 +293,14 @@ def test_under_not_answered_yet_the_student_writes_their_own_card_to_that_seat()
     assert "card_at_silent_seat" not in [f.code for f in harvest.found_moves(session, str)]
 
 
-def test_with_an_answer_found_no_card_can_be_written_to_that_seat():
+def test_with_an_answer_found_a_card_to_that_seat_is_one_to_a_seat_that_spoke():
+    # S02 spoke in the round: its lamp card at the table opens the same card
+    # (直し26-2), so it is taken; it is still not 「黙っていた席」's.
     session, _ = round_one([librarian_finds("b7"), says(B7)])
     session.ask_the_seat(1)
-    with pytest.raises(Refused, match="not_a_silent_seat"):
-        session.write_card("S02", "雨の日は何をしていますか？")
+    card = session.write_card("S02", "雨の日は何をしていますか？")
+    assert card["seat_id"] == "S02" and card["origin"] == editor.ORIGIN_STUDENT
+    assert "S02" in session.spoken_seats() and "S02" not in session.silent_seats()
 
 
 def test_a_failed_model_shows_the_fixed_sentence_and_keeps_the_reason():

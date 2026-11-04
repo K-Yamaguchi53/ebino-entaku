@@ -73,7 +73,11 @@ async function setup() {
   renderSeats();
   // The map over the seat list (map.js). No map, or one that fails to draw:
   // the seat list alone, as before.
-  if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, { state, cardEntry, renderSeats, shownQuotes, phrased }));
+  // What the map may use: the round's own ways to a quote's paragraph, its
+  // mark, a seat's question card and the quote's card (直し26-2).
+  const lent = { state, cardEntry, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
+    readBelow, shownQuotes, phrased };
+  if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
 
 // The Lab pressed lights up, the others step back, and the table opens a
@@ -160,7 +164,7 @@ function renderRound(round) {
   for (const id of round.met_seats) state.met.add(id);
   for (const id of round.silent_seats) state.silent.add(id);
 
-  const box = el("article", { class: "round" });
+  const box = el("article", { class: "round", "data-round": round.round });
   // A round that answers an AI's question shows that question over the answer.
   if (round.ai_question) {
     box.append(el("p", { class: "ai-asked" },
@@ -416,21 +420,10 @@ function renderQuote(roundNo, quote) {
   if (state.marks[quote.seat_id] === quote.utterance_id) node.classList.add("marked");
   const paragraph = el("p", { class: "paragraph", hidden: "" });
   const back = el("button", { type: "button", text: "元の段落", onclick: async () => {
-    if (paragraph.hidden && !paragraph.textContent) {
-      paragraph.textContent = (await call("/api/paragraph", { utterance_id: quote.utterance_id })).paragraph;
-    }
+    if (paragraph.hidden && !paragraph.textContent) paragraph.textContent = await paragraphOf(quote.utterance_id);
     paragraph.hidden = !paragraph.hidden;
   } });
-  const mark = el("button", { type: "button", text: "印をつける", onclick: async () => {
-    state.marks = (await call("/api/mark", { round: roundNo, utterance_id: quote.utterance_id })).marks;
-    for (const other of document.querySelectorAll(".quote")) {
-      const seatId = other.dataset.seat;
-      other.classList.toggle("marked", state.marks[seatId] === other.dataset.utterance);
-    }
-    // A mark can change the card of 「司会が○○に聞いてみる」 until it is pressed.
-    const askBox = state.askBoxes[roundNo];
-    if (askBox && !askBox.dataset.asked) loadAskCard(roundNo, askBox);
-  } });
+  const mark = el("button", { type: "button", text: "印をつける", onclick: () => markQuote(roundNo, quote.utterance_id) });
   node.dataset.seat = quote.seat_id;
   node.append(
     el("p", { class: "words", text: words }),
@@ -438,6 +431,38 @@ function renderQuote(roundNo, quote) {
     el("div", { class: "actions" }, back, mark),
     paragraph);
   return node;
+}
+
+// A quote's paragraph, as recorded (/api/paragraph).
+async function paragraphOf(utteranceId) {
+  return (await call("/api/paragraph", { utterance_id: utteranceId })).paragraph;
+}
+
+// 「印をつける」, from a quote's card or from its lamp card at the table
+// (直し26-2): the marks are kept in one place, state.marks, and every card
+// that shows them follows.
+async function markQuote(roundNo, utteranceId) {
+  state.marks = (await call("/api/mark", { round: roundNo, utterance_id: utteranceId })).marks;
+  for (const other of document.querySelectorAll(".quote")) {
+    const seatId = other.dataset.seat;
+    other.classList.toggle("marked", state.marks[seatId] === other.dataset.utterance);
+  }
+  // A mark can change the card of 「司会が○○に聞いてみる」 until it is pressed.
+  const askBox = state.askBoxes[roundNo];
+  if (askBox && !askBox.dataset.asked) loadAskCard(roundNo, askBox);
+  onMap((map) => map.marked());
+}
+
+// 「下のやりとりで読む」 (直し26-2): the page goes to that quote's card in its
+// round, and the keyboard's focus with it.
+function readBelow(roundNo, utteranceId) {
+  const quote = [...document.querySelectorAll(`#rounds .round[data-round="${roundNo}"] .quote`)]
+    .find((node) => node.dataset.utterance === utteranceId);
+  if (!quote) return;
+  quote.tabIndex = -1;
+  const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  quote.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
+  quote.focus({ preventScroll: true });
 }
 
 function renderPlanted(text) {
@@ -506,7 +531,7 @@ function renderSeats() {
 }
 
 function renderSeat(seat) {
-  const node = el("div", { class: `seat kind-${seat.kind}` });
+  const node = el("div", { class: `seat kind-${seat.kind}`, "data-seat": seat.seat_id });
   const order = state.lastOrder.indexOf(seat.seat_id);
   const title = el("div", { class: "title" });
   if (order >= 0) {
@@ -545,12 +570,33 @@ function putUnderLine(seat, form, open) {
   form.prepend(el("p", { class: "card-for", text: [seat.title, seat.detail].filter(Boolean).join("　") }));
   form.closeCard = () => {
     form.remove();
-    open.hidden = false;
+    if (open.dataset.quiet) open.remove();  // Opened from the map: no button of its own here.
+    else open.hidden = false;
     node.classList.remove("writing");
   };
   open.hidden = true;
   node.classList.add("writing");
   last.after(form);
+}
+
+// The seat list's question card for any seat, opened from its lamp card at
+// the table (直し26-2): the same card as 「聞きたいことを書く」, under its
+// seat's line, its box empty. A seat that spoke has no button for it in the
+// list: one is made for the card to go by, and goes with it.
+function openCardFor(seatId) {
+  const seat = state.seatById[seatId];
+  const node = [...$("seat-list").querySelectorAll(".seat")].find((item) => item.dataset.seat === seatId);
+  if (!seat || !node) return;
+  let open = node.querySelector(".not-asked > button");
+  if (!open) {
+    open = cardEntry(seatId, renderSeats, (form, button) => putUnderLine(seat, form, button));
+    open.dataset.quiet = "1";
+    open.hidden = true;
+    node.append(open);
+  }
+  open.click();
+  const form = node.parentElement.querySelector(".card-form");
+  if (form) form.scrollIntoView({ block: "center" });
 }
 
 // 「聞きたいことを書く」: opens an empty box; the card holds the student's

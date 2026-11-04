@@ -239,6 +239,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .quote .source, .closing-word .source { display: block; color: var(--paper-soft); font-family: var(--gothic); font-size: 14px; line-height: 1.5; }
 .quote .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--paper-line); }
 .quote .actions button { font-size: 14px; padding: 3px 14px; }
+/* Reached from a lamp card at the table (「下のやりとりで読む」). */
+.quote:focus { outline: 2px solid var(--lamp); outline-offset: 4px; }
 .quote .paragraph { color: var(--paper-soft); font-size: 16px; border-left: 3px solid var(--paper-line); padding-left: 10px; }
 .planted { color: var(--warn); font-size: 16px; }
 .planted s { color: var(--soft); }
@@ -592,6 +594,35 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .table-bubble .tail { position: absolute; height: 14px; margin-top: -7px; transform-origin: 0 50%;
   transform: rotate(var(--a)); background: var(--paper); clip-path: polygon(0 50%, 100% 0, 100% 100%);
   pointer-events: none; }
+/* A lamp card at the table takes a press (直し26-2): its ring of light where
+   the keyboard is, just outside the paper; marked, the lamp round it. */
+.table-bubble { pointer-events: auto; cursor: pointer; outline: none; }
+.table-bubble:focus-visible { outline: 2px solid var(--lamp); outline-offset: 3px; }
+.table-bubble.marked { box-shadow: 0 0 0 3px var(--lamp), 0 0 24px var(--lamp-soft), 0 8px 20px var(--shadow); }
+/* Its choices: a small card of the night by it, two choices to a line, in
+   Gothic; the paragraph on paper, in Mincho, under them. */
+.map-choices { position: absolute; z-index: 1; max-width: calc(100% - 16px); pointer-events: auto;
+  display: grid; grid-template-columns: auto auto; gap: 4px; padding: 6px; border-radius: 8px; background: var(--veil);
+  border: 1px solid var(--moon-soft); box-shadow: 0 10px 26px var(--shadow); font-family: var(--gothic); }
+/* The paragraph never makes the card wider than its choices. */
+.map-choices .paragraph { grid-column: 1 / -1; order: 1; width: 0; min-width: 100%; box-sizing: border-box; }
+.map-choices button { min-height: 40px; padding: 4px 10px; text-align: left; font-size: 13px; color: var(--ink);
+  background: var(--night-2); border: 1px solid var(--moon-faint); border-radius: 6px; }
+.map-choices button:hover { border-color: var(--moon-soft); }
+.map-choices button[aria-pressed="true"] { border-color: var(--lamp); color: var(--lamp-bright); }
+.map-choices button[aria-pressed="true"]::before { content: ""; display: inline-block; width: 7px; height: 7px;
+  margin-right: 8px; border-radius: 50%; background: var(--lamp); vertical-align: .1em; }
+.map-choices .paragraph { max-height: 7.6em; overflow: auto; margin: 0 0 2px; padding: 8px 10px; border-radius: 4px;
+  background: var(--paper); color: var(--paper-ink); font-family: var(--mincho); font-size: 14px; line-height: 1.7; }
+/* Or beside them, as tall as the two lines of choices, where that finds room. */
+.map-choices.beside { grid-template-columns: auto auto minmax(12em, 16em); }
+.map-choices.beside .paragraph { grid-column: 3; grid-row: 1 / span 2; order: 0; width: auto; min-width: 0;
+  max-height: 84px; margin: 0; }
+.map-choices .done { align-self: center; padding: 4px 10px; font-size: 13px; color: var(--soft); }
+.under-choices { visibility: hidden; }
+/* The line by the map's lower edge, until a lamp card is pressed. */
+.map-hint { position: absolute; white-space: nowrap; padding: 3px 12px; border-radius: 999px; background: var(--veil);
+  border: 1px solid var(--lamp-soft); color: var(--ink); font-family: var(--gothic); font-size: 13px; line-height: 1.5; }
 /* Under the card a seat shows when pressed. */
 .table-bubble.behind, .table-label.behind { visibility: hidden; }
 /* Over a seat at the table whose card has no room: pressed, it shows it. */

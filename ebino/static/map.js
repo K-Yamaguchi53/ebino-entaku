@@ -84,6 +84,9 @@ const EbinoMap = (() => {
   let soon = null;
   let hovered = null;  // The seat under the mouse (the nearest of the marks it is over).
   let opened = null;  // At the table, the seat whose card was left out and is shown, pressed.
+  let choices = null;  // The card of choices open at the table: { seatId, node, card }.
+  let pressedOnce = false;  // A card was pressed: the line that says so goes, for good.
+  let tableRoundNo = 0;  // The round the table is for.
 
   const reduced = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = (id) => document.getElementById(id);
@@ -355,6 +358,21 @@ const EbinoMap = (() => {
     put(compass, compassSpot(frameWH, { w: compass.offsetWidth, h: compass.offsetHeight }, avoid));
     for (const note of overlay.querySelectorAll(".map-around")) {
       put(note, aroundSpot(frameWH, { w: note.offsetWidth, h: note.offsetHeight }, ways[note.dataset.way], avoid));
+    }
+    // The line that says a lamp card can be pressed: by the lower edge, off
+    // the arrow, the edge names, the table and its seats (the dimmed map's
+    // points under it do not count).
+    const clear = [...fixedBoxes(frameBox, false, false),
+      ...[...overlay.querySelectorAll(".map-compass, .map-around")].map((node) => boxIn(node, frameBox))];
+    // With no room along the edge itself, a line higher up, then another.
+    for (const hint of overlay.querySelectorAll(".map-hint")) {
+      const box = { w: hint.offsetWidth, h: hint.offsetHeight };
+      let spot = null;
+      for (let up = 0; up < 3 && !(spot && coverOf(spot, box, clear) === 0); up++) {
+        const found = aroundSpot({ w: frameWH.w, h: frameWH.h - up * (box.h + 6) }, box, [0, 1], clear);
+        if (!spot || coverOf(found, box, clear) < coverOf(spot, box, clear)) spot = found;
+      }
+      put(hint, spot);
     }
   }
 
@@ -751,6 +769,12 @@ const EbinoMap = (() => {
       event.stopPropagation();
       event.preventDefault();
     }, true);
+    // A press on the map, not a drag: the choices close. Esc too, wherever
+    // the keyboard is.
+    svg.addEventListener("click", () => closeChoices(false));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && choices) closeChoices(true);
+    });
   }
 
   // When the frame's width changes, the sizes and every label follow.
@@ -936,7 +960,7 @@ const EbinoMap = (() => {
       return [left, top, right - left, bottom - top];
     });
     // The arrow and the four ways' names (直し25-3), once they are put.
-    const around = withAround ? [...overlay.querySelectorAll(".map-compass, .map-around")].map((node) => boxIn(node, frameBox)) : [];
+    const around = withAround ? [...overlay.querySelectorAll(".map-compass, .map-around, .map-hint")].map((node) => boxIn(node, frameBox)) : [];
     return [...nodes.map((node) => boxIn(node, frameBox)), ...seats, ...(cover ? topStrips(cover) : []),
       ...shelfBoxes, ...(withWords ? seenWords({ w: frameBox.width, h: frameBox.height }, words, cover) : []), ...around];
   }
@@ -1151,6 +1175,7 @@ const EbinoMap = (() => {
     put([...labels.filter((label) => !named.has(label.dataset.seat)), ...overlay.querySelectorAll(".map-tip")],
       (items) => planLabels(frameSize, items, [...fixed, ...taken]));
     placeSeatPresses(planned);
+    putChoices();
     placeAskMarks();
   }
 
@@ -1345,7 +1370,7 @@ const EbinoMap = (() => {
     sticky = null;
     roundSeats = [];
     hideTip();
-    for (const node of overlay.querySelectorAll(".map-bubble, .split-tag, .table-label, .table-bubble, .seat-press")) node.remove();
+    for (const node of overlay.querySelectorAll(".map-bubble, .split-tag, .table-label, .table-bubble, .seat-press, .map-hint")) node.remove();
     splitLayer.replaceChildren();
     clearTable();
     for (const { node } of Object.values(points)) node.classList.remove("lit");
@@ -1568,15 +1593,23 @@ const EbinoMap = (() => {
     // It wraps after its 「：」 or between its 「…」, never inside one (app.phrased).
     if (split && overlay.clientWidth >= TAG_ON_MAP) $("map-heading").replaceChildren(app.phrased(app.shownQuotes(split.heading)));
     for (const chairNode of tableLayer.querySelectorAll(".chair")) chairNode.classList.add("ready");
+    tableRoundNo = result.round;
+    if (!pressedOnce) overlay.append(div("map-hint", app.state.texts.bubble_hint));
     relayout();
+    marked();
   }
 
   // A seat's lamp card at the table: the same words as on the map, kept.
+  // Pressed (or Enter or Space on it), it opens its choices (直し26-2).
   function tableBubble(seatId, quote, at, k) {
     const node = div("table-bubble unplaced");
     node.append(div("voice", voiceOf(quote)), div("who", whoOf(seatOf(seatId))));
-    Object.assign(node.dataset, { seat: seatId, x: at[0], y: at[1] });
+    Object.assign(node.dataset, { seat: seatId, utterance: quote.utterance_id, x: at[0], y: at[1] });
     node.style.setProperty("--k", String(k));
+    node.tabIndex = 0;
+    node.setAttribute("role", "button");
+    node.setAttribute("aria-expanded", "false");
+    pressable(node, () => toggleChoices(seatId));
     return node;
   }
 
@@ -1591,6 +1624,7 @@ const EbinoMap = (() => {
     pressable(node, () => {
       opened = seatId;
       relayout();
+      toggleChoices(seatId);
     });
     return node;
   }
@@ -1695,6 +1729,221 @@ const EbinoMap = (() => {
     }
   }
 
+  // --- the choices a lamp card at the table opens (直し26-2) ---
+
+  // One card of choices at a time: pressing another lamp card closes the
+  // one open; pressing the same one again closes it.
+  function toggleChoices(seatId) {
+    if (choices && choices.seatId === seatId) return closeChoices(true);
+    openChoices(seatId);
+  }
+
+  // By the lamp card, what can be done next with its words: each the same
+  // as the round's own cards below the map do, in the teacher's words.
+  function openChoices(seatId) {
+    closeChoices(false);
+    const card = [...overlay.querySelectorAll(".table-bubble")].find((node) => node.dataset.seat === seatId);
+    if (!card || card.classList.contains("unplaced")) return;
+    dropHint();
+    const words = app.state.texts.bubble_choices, utteranceId = card.dataset.utterance;
+    const node = div("map-choices");
+    node.setAttribute("role", "group");
+    node.setAttribute("aria-label", whoOf(seatOf(seatId)));
+    const button = (key, action) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.textContent = words[key];
+      item.dataset.choice = key;
+      item.addEventListener("click", action);
+      return item;
+    };
+    const paragraph = div("paragraph");
+    paragraph.hidden = true;
+    // While a choice waits on the server it stays where it is (a disabled
+    // button would drop the keyboard's focus): a second press then does nothing.
+    let busy = false;
+    const read = button("paragraph", async () => {
+      if (busy) return;
+      if (!paragraph.textContent) {
+        busy = true;
+        try {
+          paragraph.textContent = await app.paragraph(utteranceId);
+        } catch (error) {
+          return;
+        } finally {
+          busy = false;
+        }
+      }
+      paragraph.hidden = !paragraph.hidden;
+      read.setAttribute("aria-expanded", String(!paragraph.hidden));
+      putChoices();
+    });
+    read.setAttribute("aria-expanded", "false");
+    const mark = button("mark", async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        await app.mark(tableRoundNo, utteranceId);
+      } catch (error) {
+        // As below the map: nothing changes.
+      } finally {
+        busy = false;
+      }
+    });
+    const write = app.state.carded.has(seatId) ? div("done", "質問カードにしました")
+      : button("card", () => { closeChoices(false); app.openCard(seatId); });
+    const below = button("read", () => { closeChoices(false); app.readBelow(tableRoundNo, utteranceId); });
+    node.append(read, paragraph, mark, write, below);
+    node.addEventListener("keydown", (event) => moveInChoices(event, node));
+    card.after(node);  // Tab goes on from the lamp card into its choices.
+    card.setAttribute("aria-expanded", "true");
+    choices = { seatId, node, card };
+    marked();
+    putChoices();
+    read.focus({ preventScroll: true });
+  }
+
+  // Esc closes the choices, back to their lamp card; the arrows go from
+  // one choice to the next (Tab too).
+  function moveInChoices(event, node) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      return closeChoices(true);
+    }
+    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
+    if (!step) return;
+    const items = [...node.querySelectorAll("button")];
+    const at = items.indexOf(document.activeElement);
+    if (at < 0) return;
+    event.preventDefault();
+    items[(at + step + items.length) % items.length].focus();
+  }
+
+  // A card the plan left out, shown by pressing its seat, goes again with
+  // its choices: the cards it covered come back, and the keyboard goes back
+  // to the seat. (laying: called while the map is being laid out.)
+  function closeChoices(back, laying = false) {
+    if (!choices) return;
+    const { node, card, seatId } = choices;
+    choices = null;
+    node.remove();
+    for (const other of overlay.querySelectorAll(".under-choices")) other.classList.remove("under-choices");
+    card.setAttribute("aria-expanded", "false");
+    if (seatId === opened) {
+      opened = null;
+      if (!laying) relayout();
+    }
+    if (!back) return;
+    if (card.isConnected && !card.classList.contains("unplaced")) return card.focus({ preventScroll: true });
+    const press = [...overlay.querySelectorAll(".seat-press")].find((other) => other.dataset.seat === seatId);
+    if (press && !press.classList.contains("unplaced")) press.focus({ preventScroll: true });
+  }
+
+  // The choices by their lamp card, inside the frame, clear of the table's
+  // top, its seats and chairs (choiceSpot). Closed when their card is no
+  // longer up.
+  function putChoices() {
+    if (!choices) return;
+    const { node, card } = choices;
+    if (!card.isConnected || card.classList.contains("unplaced")) return closeChoices(false, true);
+    for (const other of overlay.querySelectorAll(".under-choices")) other.classList.remove("under-choices");
+    const frameBox = overlay.getBoundingClientRect();
+    const frameWH = { w: frameBox.width, h: frameBox.height };
+    // It keeps off the table, its seats and chairs (hard); it would rather
+    // not cover the other cards, the labels, the arrow, the edge names and
+    // the line by the edge (soft), which step behind it if it must.
+    const shown = [...overlay.querySelectorAll(".table-bubble:not(.unplaced), .table-label:not(.unplaced), " +
+      ".map-compass, .map-around, .map-hint")].filter((other) => other !== card && getComputedStyle(other).visibility !== "hidden");
+    const others = shown.map((other) => boxIn(other, frameBox));
+    const own = boxIn(card, frameBox), hard = fixedBoxes(frameBox, false, false);
+    node.style.left = "0px";
+    node.style.top = "0px";
+    // The paragraph, when open: beside the choices (the card no taller), or
+    // under them, shorter (it scrolls) if that is what it takes to keep off
+    // the table. The first way that finds a clear spot; with none, the first.
+    const paragraph = node.querySelector(".paragraph");
+    const ways = paragraph.hidden ? [[false, ""]] : [[true, ""], [false, ""], [false, "84px"], [false, "60px"], [false, "40px"]];
+    const lay = ([beside, most]) => {
+      node.classList.toggle("beside", beside);
+      paragraph.style.maxHeight = most;
+    };
+    // Failing all, over its own card rather than the table.
+    let chosen = null;
+    search: for (const overOwn of [false, true]) {
+      for (const way of ways) {
+        lay(way);
+        const { width, height } = node.getBoundingClientRect();
+        const [found, clear] = choiceSpot(frameWH, { w: width, h: height }, own, hard, others, overOwn);
+        if (!chosen || clear) chosen = { way, found };
+        if (clear) break search;
+      }
+    }
+    lay(chosen.way);
+    node.style.left = `${chosen.found[0]}px`;
+    node.style.top = `${chosen.found[1]}px`;
+    // What it covers steps behind it while it is open (its own card too,
+    // when there was no room but over it).
+    for (const other of [...shown, card]) if (overlaps(node, other)) other.classList.add("under-choices");
+  }
+
+  // Where the choices ({ w, h }) go in a frame { w, h }: beside their lamp
+  // card (own, [left, top, width, height]) on the right, the left, below or
+  // above, the first that covers neither the card (unless overOwn) nor any
+  // of hard, and covers least of soft (the other cards and labels); failing that, the
+  // free spot nearest the card; with none, the side that covers least.
+  // Always inside the frame. Returns [[left, top], whether it covers
+  // nothing of the card and hard]. It reads nothing but what it is given.
+  function choiceSpot(frame, box, own, hard, soft, overOwn = false, margin = 4) {
+    const { w, h } = box, [l, t, ow, oh] = own, gap = 8;
+    const clampX = (left) => Math.max(margin, Math.min(left, frame.w - w - margin));
+    const clampY = (top) => Math.max(margin, Math.min(top, frame.h - h - margin));
+    const area = ([left, top], boxes) => boxes.reduce((sum, [bl, bt, bw, bh]) =>
+      sum + Math.max(0, Math.min(left + w, bl + bw) - Math.max(left, bl)) * Math.max(0, Math.min(top + h, bt + bh) - Math.max(top, bt)), 0);
+    const must = overOwn ? hard : [own, ...hard];
+    const sides = [[l + ow + gap, t], [l - w - gap, t], [l, t + oh + gap], [l, t - h - gap],
+      [l + ow + gap, t + oh - h], [l - w - gap, t + oh - h], [l + ow - w, t + oh + gap], [l + ow - w, t - h - gap]]
+      .map(([left, top]) => [clampX(left), clampY(top)]);
+    let best = sides[0], least = Infinity, clear = null, fewest = Infinity;
+    for (const side of sides) {
+      const hit = area(side, must), cost = hit * 1000 + area(side, soft);
+      if (cost < least) { best = side; least = cost; }
+      if (!hit && area(side, soft) < fewest) { clear = side; fewest = area(side, soft); }
+    }
+    if (clear) return [clear, true];
+    const away = ([left, top]) => Math.hypot(Math.max(l - left - w, 0, left - l - ow), Math.max(t - top - h, 0, top - t - oh));
+    let free = null, far = Infinity;
+    for (let top = margin; top <= frame.h - h - margin; top += 8) {
+      for (let left = margin; left <= frame.w - w - margin; left += 8) {
+        const spot = [left, top];
+        if (area(spot, must)) continue;
+        const d = away(spot) + area(spot, soft) / 100;
+        if (d < far) { free = spot; far = d; }
+      }
+    }
+    return free ? [free, true] : [best, false];
+  }
+
+  // Which lamp cards are marked (app.js keeps the marks), and the choice
+  // that says so. Called whenever a mark changes, from here or below.
+  function marked() {
+    if (!overlay) return;
+    const marks = app.state.marks;
+    for (const card of overlay.querySelectorAll(".table-bubble")) {
+      card.classList.toggle("marked", marks[card.dataset.seat] === card.dataset.utterance);
+    }
+    if (!choices) return;
+    const mark = choices.node.querySelector('[data-choice="mark"]');
+    if (mark) mark.setAttribute("aria-pressed", String(marks[choices.seatId] === choices.card.dataset.utterance));
+  }
+
+  // The line by the map's lower edge once the table is open, until a lamp
+  // card is first pressed (the teacher's words: texts/bubble_hint.txt).
+  function dropHint() {
+    pressedOnce = true;
+    for (const node of overlay.querySelectorAll(".map-hint")) node.remove();
+  }
+
   // An empty chair 「？」: a seat nobody asked yet. Pressing it (or Enter or
   // Space on it) opens the same 「聞きたいことを書く」 as the seat list.
   function chair(seatId, at) {
@@ -1716,6 +1965,7 @@ const EbinoMap = (() => {
     tokens = [];
     tableTop = null;
     opened = null;
+    closeChoices(false);
     if ($("map-heading")) $("map-heading").replaceChildren();
     if (tableLayer) tableLayer.replaceChildren();
     if (svg) svg.classList.remove("dim");
@@ -1729,7 +1979,7 @@ const EbinoMap = (() => {
     roundNo += 1;
     for (const flight of flights) flight.cancel();
     flights = [];
-    for (const node of overlay.querySelectorAll(".split-tag, .table-label, .map-bubble, .table-bubble, .seat-press")) node.remove();
+    for (const node of overlay.querySelectorAll(".split-tag, .table-label, .map-bubble, .table-bubble, .seat-press, .map-hint")) node.remove();
     clearTable();
     $("map-zoom-all").focus();
     moveTo({ x: 0, y: 0, w: view.W, h: view.H }, BACK_FOR);
@@ -1785,5 +2035,5 @@ const EbinoMap = (() => {
     card.scrollIntoView({ block: "nearest" });
   }
 
-  return { init, show, round, refresh };
+  return { init, show, round, refresh, marked };
 })();

@@ -107,6 +107,12 @@ MAP_BUTTON_IDS = ("back", "zoom_in", "zoom_out", "zoom_all")
 # Columns ID・方位・その方向にある所.
 MAP_AROUND = "map_around"
 MAP_AROUND_IDS = ("north", "west", "south", "east")
+# At the round table (map.js, 直し26-2): the line by the map's lower edge
+# once the table opens, and the choices a seat's lamp card opens, pressed.
+# Columns ID・文字.
+BUBBLE_HINT = "bubble_hint"
+BUBBLE_CHOICES = "bubble_choices"
+BUBBLE_CHOICE_IDS = ("paragraph", "mark", "card", "read")
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
@@ -114,6 +120,7 @@ SCREEN_TEXTS = (
     NOT_ASKED_YET, INPUT_EXAMPLE, PURPOSE_HEADING, WAITING_ASK, WAITING_REFLECTION,
     SEND_FAILED, MET_LIVES_EMPTY, HARVEST_HEADING, HARVEST_USE_QUESTION, MEET_QUESTION,
     HARVEST_MEET_PREFIX, MORE_END, MORE_CARD_DONE, SAMPLE_SUMMARIZED, HARVEST_SUBJECT_MORE,
+    BUBBLE_HINT,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 
@@ -161,6 +168,7 @@ def screen_texts() -> dict:
     texts.update({name: load_lines(name) for name in SCREEN_LISTS})
     texts[MAP_BUTTONS] = map_buttons()
     texts[MAP_AROUND] = map_around()
+    texts[BUBBLE_CHOICES] = bubble_choices()
     return texts
 
 
@@ -171,6 +179,14 @@ def map_buttons() -> dict[str, dict[str, str]]:
         raise ValueError(f"{MAP_BUTTONS}.tsv must have the rows {', '.join(MAP_BUTTON_IDS)}")
     return {key: {"text": rows[key]["文字"], "label": rows[key]["読み上げ"] or rows[key]["文字"]}
             for key in MAP_BUTTON_IDS}
+
+
+def bubble_choices() -> dict[str, str]:
+    """{ID: what the choice shows}, the four of them."""
+    rows = {row["ID"]: row["文字"] for row in load_table(BUBBLE_CHOICES, ("ID", "文字"))}
+    if set(rows) != set(BUBBLE_CHOICE_IDS):
+        raise ValueError(f"{BUBBLE_CHOICES}.tsv must have the rows {', '.join(BUBBLE_CHOICE_IDS)}")
+    return {key: rows[key] for key in BUBBLE_CHOICE_IDS}
 
 
 def map_around() -> dict[str, dict[str, str]]:

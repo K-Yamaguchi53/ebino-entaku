@@ -229,9 +229,11 @@ class Session:
 
     def write_card(self, seat_id: str, text: str) -> dict:
         """A card the student writes at a seat shown as 「まだ誰も聞いていない」,
-        or at a seat 「司会が○○に聞いてみる」 found no answer from (the box
-        opens empty: the card holds the student's words only)."""
-        if seat_id not in self.silent_seats() and seat_id not in self.not_answered_seats():
+        at a seat 「司会が○○に聞いてみる」 found no answer from, or at a seat
+        whose words a round showed, from its lamp card at the table (直し26-2;
+        the box opens empty: the card holds the student's words only)."""
+        if seat_id not in self.silent_seats() and seat_id not in self.not_answered_seats() \
+                and seat_id not in self.spoken_seats():
             raise Refused("not_a_silent_seat")
         if len((text or "").strip()) > MAX_CARD_CHARS:
             raise Refused("card_too_long")
@@ -622,6 +624,10 @@ class Session:
 
     def silent_seats(self) -> list[str]:
         return list(dict.fromkeys(s for r in self.rounds for s in r.silent_seats))
+
+    def spoken_seats(self) -> list[str]:
+        """The seats whose words a round showed."""
+        return list(dict.fromkeys(q.seat_id for r in self.rounds for q in r.quotes))
 
     def shown_ids(self) -> set[str]:
         return {q.utterance_id for r in self.rounds for q in r.quotes}
