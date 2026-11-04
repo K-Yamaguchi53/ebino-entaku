@@ -900,6 +900,44 @@ function renderSheet(sheet) {
   if (sheet.meet) row(meetLabel, sourceLine(sheet.meet), sheet.meet.reason);
   else if (sheet.meet_reason) row(meetLabel, sheet.meet_reason);
   box.hidden = false;
+  showBackToStart();
+}
+
+// --- back to the first screen (直し30-2) ---
+
+// Under the sheet (after the harvest card where ② is asked): 最初にもどる.
+function showBackToStart() {
+  $("back-start").textContent = state.texts.back_to_start;
+  $("back-confirm-line").textContent = state.texts.back_to_start_confirm;
+  $("back-yes").textContent = state.texts.back_to_start_yes;
+  $("back-no").textContent = state.texts.back_to_start_no;
+  $("back-confirm").hidden = true;
+  $("back-start").hidden = false;
+  $("back-to-start").hidden = false;
+}
+
+// Pressed: not yet; the line and もどる・やめる in its place.
+function askBackToStart() {
+  $("back-start").hidden = true;
+  $("back-confirm").hidden = false;
+  $("back-no").focus();
+}
+
+function stayHere() {
+  $("back-confirm").hidden = true;
+  $("back-start").hidden = false;
+  $("back-start").focus();
+}
+
+// The next student starts from the page read afresh, so nothing of this
+// one's words is left on screen or in the page. The sitting's record is on
+// the server already, kept after every step; the next Lab starts a new one.
+function backToStart() {
+  for (const node of document.querySelectorAll("input, textarea")) {
+    node.value = "";
+    node.checked = false;
+  }
+  window.location.replace(window.location.pathname);
 }
 
 $("ask-form").addEventListener("submit", ask);
@@ -909,6 +947,10 @@ $("reflect-answer").addEventListener("submit", (event) => { event.preventDefault
 $("decline").addEventListener("click", () => reflectAnswer(true));
 $("reflect-finish").addEventListener("submit", reflectFinish);
 $("harvest-subject-more").addEventListener("click", moreSubject);
+$("back-start").addEventListener("click", askBackToStart);
+$("back-yes").addEventListener("click", backToStart);
+$("back-no").addEventListener("click", stayHere);
+$("back-confirm").addEventListener("keydown", (event) => { if (event.key === "Escape") stayHere(); });
 $("more-purposes").addEventListener("click", async () => renderPurposes((await call("/api/purposes", {})).purposes));
 window.addEventListener("resize", () => {
   for (const form of document.querySelectorAll("#seat-list .card-form")) if (form.fit) form.fit();

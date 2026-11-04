@@ -342,6 +342,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 /* --- the reflection: one card at a time, in the middle, unhurried --- */
 .to-reflect { text-align: center; margin: 36px 0; }
+/* 最初にもどる under the sheet (直し30-2), and its line and two buttons. */
+.back-to-start { max-width: 720px; margin: 28px auto 48px; text-align: center; }
+.back-to-start > button, .back-confirm button { min-height: 48px; padding: 8px 24px; }
+.back-confirm { background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: 10px; padding: 16px 20px; }
+.back-confirm p { margin: 0 0 12px; color: var(--ink); }
+.back-confirm .choices { justify-content: center; }
 #to-reflect { padding: 12px 30px; min-height: 52px; border-color: var(--moon-soft); background: var(--night-2); letter-spacing: .12em; }
 #to-reflect:hover { border-color: var(--moon); background: var(--night-3); }
 #reflect { max-width: 760px; margin: 0 auto; }

@@ -137,6 +137,19 @@
     </section>
 
     <dl id="sheet" class="sheet" hidden></dl>
+
+    <!-- Once the sheet is out (直し30-2): back to the first screen for the
+         next student, asked once more here, not in the browser's own box. -->
+    <div id="back-to-start" class="back-to-start" hidden>
+      <button type="button" id="back-start" class="quiet"></button>
+      <div id="back-confirm" class="back-confirm" role="group" aria-labelledby="back-confirm-line" hidden>
+        <p id="back-confirm-line"></p>
+        <div class="choices">
+          <button type="button" id="back-yes"></button>
+          <button type="button" id="back-no"></button>
+        </div>
+      </div>
+    </div>
   </section>
 </main>
 
