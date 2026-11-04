@@ -31,6 +31,7 @@ const EbinoMap = (() => {
   const TAIL_LENGTH = 16;  // px: a card's tail, at the least.
   const SEAT_PRESS = 44;  // px: the square a seat with no card up takes a press over.
   const TOUCH = 6;  // px between a lamp card and its choices, against its side.
+  const SEAT_ROOM = 4;  // px the paragraph apart keeps from a seat's mark at the table.
   const PARAGRAPH_LINES = 5;  // The paragraph's lines seen at the least, where there is room.
   // The paragraph's lines tried, in order: all of it (0), then fewer; under PARAGRAPH_LINES only failing those.
   const PARAGRAPH_STEPS = [0, 8, PARAGRAPH_LINES, 4, 3, 2];
@@ -1746,6 +1747,15 @@ const EbinoMap = (() => {
     return { named, planned };
   }
 
+  // The room the paragraph apart keeps round the seats at the table
+  // (直し27-3): each seat's mark and SEAT_ROOM more, for its light.
+  function seatRoom(frameBox) {
+    return tokens.filter((t) => !t.chair).map(({ node }) => {
+      const [l, t, w, h] = boxIn(node.querySelector(".shape"), frameBox);
+      return [l - SEAT_ROOM, t - SEAT_ROOM, w + 2 * SEAT_ROOM, h + 2 * SEAT_ROOM];
+    });
+  }
+
   // Where a card's seat is at the table, in the frame (px, py), and how far
   // short of it a tail stops (r, clear of its mark).
   function seatAtTable(card) {
@@ -1940,11 +1950,14 @@ const EbinoMap = (() => {
     const shown = [...overlay.querySelectorAll(".table-bubble:not(.unplaced), .table-label:not(.unplaced), " +
       ".map-compass, .map-around, .map-hint")].filter((other) => other !== card && getComputedStyle(other).visibility !== "hidden");
     const others = shown.map((other) => boxIn(other, frameBox));
-    const own = boxIn(card, frameBox), hard = fixedBoxes(frameBox, false, false);
     const seat = seatAtTable(card);
+    const own = boxIn(card, frameBox), hard = fixedBoxes(frameBox, false, false);
     const block = [...tableLayer.querySelectorAll(".token .shape, .chair circle")].map((other) => boxIn(other, frameBox))
       .concat(tableTop ? topStrips(tableTop.map(([x, y]) => toFrame(x, y))) : []);
-    const item = { w: own[2], h: own[3], px: seat.px, py: seat.py, r: seat.r, gap: seat.r + TAIL_LENGTH };
+    // ring: how far the seat's ring of light reaches, which choices with no tail keep off.
+    const halo = seat.token && seat.token.node.querySelector(".halo").getBoundingClientRect();
+    const item = { w: own[2], h: own[3], px: seat.px, py: seat.py, r: seat.r, gap: seat.r + TAIL_LENGTH,
+      ring: halo ? halo.width / 2 + 2 : seat.r };
     const reach = 2 * Math.max(TABLE_REACH, frameWH.w * TABLE_REACH_PART);
     node.style.left = "0px";
     node.style.top = "0px";
@@ -1978,8 +1991,9 @@ const EbinoMap = (() => {
     // seat: the choices are always against their card.
     const search = (tried) => {
       let planned = null;
+      // needTail: true, or false (none, off the seat's ring), or "near" (none, by the ring).
       for (const [cardCrossed, crossed, needTail] of [[block, block, true], [block, [], true], [block, [], false],
-        [[], [], true], [[], [], false]]) {
+        [[], [], true], [[], [], false], [block, [], "near"], [[], [], "near"]]) {
         const spots = cardSpots(frameWH, item, own, hard, cardCrossed, reach);
         for (const way of tried) {
           lay(way);
@@ -2021,7 +2035,7 @@ const EbinoMap = (() => {
       const closedPlan = search(closed);
       if (closedPlan) {
         put(closedPlan);
-        const lines = putParagraphApart(paragraph, text, lineHeight, frameBox, [...hard, boxIn(card, frameBox)], others);
+        const lines = putParagraphApart(paragraph, text, lineHeight, frameBox, [...hard, ...seatRoom(frameBox), boxIn(card, frameBox)], others);
         if (lines !== null && seen(lines) > inCard) {
           planned = closedPlan;
           apart = true;
@@ -2136,7 +2150,9 @@ const EbinoMap = (() => {
         // is false: then right by the seat will do, with no tail).
         const tail = tailEnds(spot, card.px, card.py, card.r);
         const seen = tail && Math.hypot(tail[1][0] - tail[0][0], tail[1][1] - tail[0][1]) >= TAIL_LENGTH * 0.6;
-        if (needTail && !seen) continue;
+        if (needTail === true && !seen) continue;
+        // With no tail, against the seat's ring but not over it (unless "near").
+        if (!seen && needTail !== "near" && Math.hypot(Math.max(left - card.px, 0, card.px - left - w), Math.max(top - card.py, 0, card.py - top - h)) < (card.ring || card.r)) continue;
         if (seen && (crosses(tail[0], tail[1], c) || block.some((other) => crosses(tail[0], tail[1], other)))) continue;
         if (cardTail && crosses(cardTail[0], cardTail[1], spot)) continue;
         const covered = area(spot) + area(c), cost = covered + Math.hypot(l - own[0], t - own[1]) * 10;

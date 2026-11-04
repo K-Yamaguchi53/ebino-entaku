@@ -105,9 +105,20 @@ def test_the_paragraph_says_whose_it_is_and_shows_five_lines_where_there_is_room
     put = _inner("putChoices")
     # All of it first, then PARAGRAPH_LINES or more, only then fewer (it scrolls).
     assert "PARAGRAPH_STEPS.flatMap(" in put and "const PARAGRAPH_STEPS = [0, 8, PARAGRAPH_LINES, 4, 3, 2];" in MAP
-    assert "putParagraphApart(paragraph, text, lineHeight, frameBox, [...hard, boxIn(card, frameBox)], others)" in put
+    assert "putParagraphApart(paragraph, text, lineHeight, frameBox, [...hard, ...seatRoom(frameBox), boxIn(card, frameBox)], others)" in put
     assert "const PARAGRAPH_LINES = 5;" in MAP
     assert "widths.map((w) => [\"\", false, lines, w])" in put  # Wider, where that finds room.
     assert "text.style.maxHeight = lines ?" in put
     assert ".map-choices .paragraph .text { overflow: auto; }" in CSS
     assert "max-height: 7.6em" not in CSS and "max-height: 84px" not in CSS
+
+
+def test_choices_with_no_tail_keep_off_the_pressed_seats_ring_and_the_paragraph_off_the_seats():
+    put = _inner("putChoices")
+    assert 'ring: halo ? halo.width / 2 + 2 : seat.r' in put
+    plan = _inner("choicesPlan")
+    assert 'if (!seen && needTail !== "near" && Math.hypot(' in plan and "< (card.ring || card.r)) continue;" in plan
+    # Only as the last resorts may they touch the ring.
+    assert '[block, [], "near"], [[], [], "near"]' in put
+    room = _inner("seatRoom")
+    assert "SEAT_ROOM" in room and ".shape" in room
