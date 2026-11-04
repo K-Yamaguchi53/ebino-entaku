@@ -74,10 +74,11 @@ def test_their_seats_are_flames_their_cards_moonlit_and_first_to_find_room():
 def test_pressed_they_offer_to_answer_in_the_same_box_as_below_and_to_close():
     assert "if (ai) return openAnswer(seatId, card, ai.ai);" in _inner("openChoices")
     answer = _inner("openAnswer")
-    assert "app.answerForm(roundNo, ai.role)" in answer and "closeChoices(true)" in answer
+    # The one box at the foot answers it (直し32-2).
+    assert "app.answerTo(roundNo, ai.role)" in answer and "closeChoices(true)" in answer
     assert "app.state.texts.bubble_close" in answer
-    assert "answerForm };" in APP
-    form = _top("answerForm")
+    assert "askSeat, answerTo };" in APP  # The one box at the foot (直し32-2).
+    form = _top("sendAnswer")
     assert '"/api/coach_answer"' in form and "bandAnswered(roundNo, role);" in form and "renderRound(round);" in form
     # One answer per band: the other's 「答える」 goes, wherever it was written.
     done = _top("bandAnswered")

@@ -2065,7 +2065,7 @@ const EbinoMap = (() => {
       }
     });
     const write = app.state.carded.has(seatId) ? div("done", "質問カードにしました")
-      : button("card", () => { closeChoices(false); app.openCard(seatId, { from: card }); });
+      : button("card", () => { closeChoices(false); app.askSeat(seatId); });
     const below = button("read", () => { closeChoices(false); app.readBelow(tableRoundNo, utteranceId, card); });
     node.append(head, read, paragraph, mark, write, below);
     node.addEventListener("keydown", (event) => moveInChoices(event, node));
@@ -2099,11 +2099,10 @@ const EbinoMap = (() => {
     answer.textContent = app.state.texts.bubble_answer;
     answer.dataset.choice = "answer";
     const roundNo = tableRoundNo;
+    // The one box at the foot answers it (直し32-2).
     answer.addEventListener("click", () => {
-      const form = app.answerForm(roundNo, ai.role);
-      answer.replaceWith(form);
-      putChoices();
-      form.querySelector("input").focus({ preventScroll: true });
+      closeChoices(false);
+      app.answerTo(roundNo, ai.role);
     });
     // No paragraph here; putChoices lays out one, kept hidden.
     const paragraph = div("paragraph");
@@ -2554,6 +2553,7 @@ const EbinoMap = (() => {
     for (const [id, { node }] of Object.entries(points)) {
       node.classList.toggle("met", app.state.met.has(id));
       node.classList.toggle("silent", isSilent(id));
+      node.classList.toggle("carded", app.state.carded.has(id));
       const seat = seatOf(id);
       const words = [seat.title, seat.detail, isSilent(id) ? app.state.texts.not_asked_yet : ""];
       node.setAttribute("aria-label", words.filter(Boolean).join("　"));
@@ -2571,30 +2571,8 @@ const EbinoMap = (() => {
       return;
     }
     returnFocus = from;
-    const seat = seatOf(seatId);
-    card.replaceChildren(div("title", seat.title), div("not-asked", app.state.texts.not_asked_yet));
-    const close = document.createElement("button");
-    close.type = "button";
-    close.className = "quiet close";
-    close.textContent = "閉じる";
-    close.addEventListener("click", () => {
-      card.hidden = true;
-      if (returnFocus && returnFocus.isConnected) returnFocus.focus();
-    });
-    if (app.state.carded.has(seatId)) {
-      card.append(app.cardDone(seatId));
-    } else {
-      const open = app.cardEntry(seatId, (form) => {
-        form.replaceWith(app.cardDone(seatId));
-        app.renderSeats();
-      });
-      card.append(open);
-      card.hidden = false;
-      open.click();  // Opens the box at once, as the list's button does.
-    }
-    card.append(close);
-    card.hidden = false;
-    card.scrollIntoView({ block: "nearest" });
+    // The one box at the foot writes to it (直し32-2), the keyboard in it.
+    app.askSeat(seatId);
   }
 
   // A seat kind's mark as on the map, small, for the counts over the

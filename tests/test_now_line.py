@@ -92,6 +92,7 @@ const hidden = %(hidden)s;
 const $ = (id) => ({ hidden: hidden[id] !== undefined ? hidden[id] : true });
 const state = %(state)s;
 const cardOpen = () => Boolean(state.cardOpen);
+state.to = state.to || { kind: "all" };
 %(source)s
 process.stdout.write(JSON.stringify(nowState()));
 """
@@ -126,6 +127,8 @@ def test_one_state_at_a_time_in_order():
     assert now({"cardOpen": True, "now": {"choices": True, "pressed": True, "table": True, "band": True}}) == "card"
     assert now({"cardOpen": True, "now": {"band": True}}) == "card"
     assert now({"cardOpen": True, "now": {"reading": True}}) == "reading"
+    # The box at the foot answering an AI's question (直し32-2).
+    assert now({"to": {"kind": "ai"}, "now": {"choices": True, "pressed": True, "table": True}}) == "answer_ai"
 
 
 def test_the_screen_changes_the_state_where_it_happens():
@@ -170,7 +173,8 @@ def test_a_card_box_open_has_its_own_line():
     assert 'if (cardOpen()) return "card";' in app
     # Before the pressed bubble's line: the box is what is in front of the student.
     assert app.index('if (cardOpen()) return "card";') < app.index('if (now.choices) return "pressed";')
-    assert "new MutationObserver" in app
+    # The box at the foot writes to one seat (直し32-2).
+    assert 'return state.to.kind === "seat";' in app
 
 
 def test_the_quote_cards_button_says_what_the_bubbles_button_says():

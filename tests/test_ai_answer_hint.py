@@ -61,7 +61,7 @@ def test_cards_to_answer_ask_for_the_line_at_the_top_and_not_over_the_cards():
 def test_once_answered_it_is_not_asked_for():
     assert run(CARDS % '"coach"')["asked"] == []
     # The state that shows it holds only until one AI question is answered.
-    form = _top("answerForm")
+    form = _top("sendAnswer")  # The one box at the foot answers it (直し32-2).
     assert form.index("state.aiAnswered = true;") < form.index("renderRound(round);")
     assert '!state.aiAnswered && now.band' in _top("nowState")
 

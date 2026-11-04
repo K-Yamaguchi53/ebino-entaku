@@ -17,6 +17,10 @@ const state = {
   // pressed this round; the round's table open with its cards; AI
   // questions to answer below.
   now: { asking: false, reading: false, choices: false, pressed: false, table: false, band: false },
+  // Whom the one box at the foot writes to (直し32-2): everyone (a question
+  // to the town's adults), one seat (a question card), or an AI's question
+  // (the answer starts the next round). Each keeps its own unsent words.
+  to: { kind: "all" }, drafts: {},
 };
 
 const $ = (id) => document.getElementById(id);
@@ -83,7 +87,7 @@ async function setup() {
   }
   $("heavy-talk").textContent = data.texts.heavy_talk_notice;
   setupDrawer();
-  $("question").placeholder = "例：" + data.texts.input_example;
+  setTo({ kind: "all" }, { focus: false });
   $("purpose-heading").textContent = data.texts.purpose_heading;
   for (const text of data.texts.work_questions) {
     $("work-questions").append(el("button", { type: "button", text, onclick: () => fill(text) }));
@@ -94,7 +98,7 @@ async function setup() {
   // What the map may use: the round's own ways to a quote's paragraph, its
   // mark, a seat's question card and the quote's card (直し26-2).
   const lent = { state, cardEntry, cardDone, setNow, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
-    readBelow, shownQuotes, phrased, answerForm };
+    readBelow, shownQuotes, phrased, askSeat, answerTo };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
 
@@ -512,25 +516,17 @@ function nowState() {
   if (!state.firstQuestion) return "write";
   if (now.reading) return "reading";
   if (cardOpen()) return "card";
+  if (state.to.kind === "ai") return "answer_ai";
   if (now.choices) return "pressed";
   if (now.table && !now.pressed) return "table";
   if (!state.aiAnswered && now.band) return "answer_ai";
   return "after";
 }
 
-// A box to write a card in is open, wherever it is (直し31続き-3).
+// The box writes to one seat (直し31続き-3; the one box, 直し32-2).
 function cardOpen() {
-  return Boolean(document.querySelector("form.card-form"));
+  return state.to.kind === "seat";
 }
-
-// The line follows a card's box as it opens and goes, from any place.
-let cardWasOpen = false;
-new MutationObserver(() => {
-  if (cardOpen() !== cardWasOpen) {
-    cardWasOpen = !cardWasOpen;
-    setNow();
-  }
-}).observe(document.body, { childList: true, subtree: true });
 
 // The band's step for this state lit (by its words and a mark, not its
 // colour alone), and the one line under it. changes: flags to set first.
@@ -671,10 +667,145 @@ function renderPurposes(purposes) {
   $("purposes").hidden = purposes.length === 0;
 }
 
+// --- the one box at the foot (直し32-2) ---
+
+// Whom it writes to, in words: the label on its left, its button's word,
+// how long it may be, and the example only when it is everyone.
+function seatName(seatId) {
+  const seat = state.seatById[seatId];
+  return seat ? [seat.title, seat.detail].filter(Boolean).join("　") : "";
+}
+
+function draftKey(to) {
+  return to.kind === "seat" ? `seat:${to.seatId}` : to.kind === "ai" ? `ai:${to.roundNo}:${to.role}` : "all";
+}
+
+function setTo(next, { focus = true } = {}) {
+  const box = $("question");
+  if (state.to) state.drafts[draftKey(state.to)] = box.value;
+  state.to = next;
+  const words = state.texts.input_to;
+  const label = next.kind === "seat" ? words.seat.replace("{seat}", seatName(next.seatId)) : words[next.kind];
+  $("input-to-label").textContent = label;
+  $("question-label").textContent = label;
+  const clear = $("input-to-clear");
+  clear.hidden = next.kind === "all";
+  clear.setAttribute("aria-label", words.clear);
+  clear.title = words.clear;
+  $("ask-button").textContent = state.texts.input_send[next.kind];
+  $("ask-form").dataset.to = next.kind;
+  box.maxLength = next.kind === "ai" ? 120 : 200;
+  box.placeholder = next.kind === "all" ? "例：" + state.texts.input_example : "";
+  box.value = state.drafts[draftKey(next)] || "";
+  setNow();
+  if (focus) box.focus({ preventScroll: true });
+}
+
+// 「この人に聞きたいことを書く」, a 「？」, the seat list: the box writes to
+// that seat, the keyboard in it at once.
+// While a send is out the box keeps whom it writes to: what comes back
+// clears the words that went, never another's.
+function sending() {
+  return $("ask-button").disabled;
+}
+
+function askSeat(seatId) {
+  if (sending()) return;
+  hideDone();
+  setTo({ kind: "seat", seatId });
+}
+
+// 「答える」 on an AI's question: the box answers it.
+function answerTo(roundNo, role) {
+  if (sending()) return;
+  hideDone();
+  setTo({ kind: "ai", roundNo, role });
+}
+
+function backToEveryone() {
+  if (!sending() && state.to.kind !== "all") setTo({ kind: "all" });
+}
+
+function showDone(text) { $("input-done").textContent = text; $("input-done").hidden = false; }
+function hideDone() { $("input-done").hidden = true; }
+
+// One press sends once: the button waits while it is sent (直し31-2).
+async function send(event) {
+  event.preventDefault();
+  const button = $("ask-button");
+  if (button.disabled || !$("question").value.trim()) return;
+  hideDone();
+  if (state.to.kind === "seat") return sendCard(state.to.seatId);
+  if (state.to.kind === "ai") return sendAnswer(state.to.roundNo, state.to.role);
+  return ask();
+}
+
+// To one seat: a question card (/api/card), the student's words only. The
+// same words to the same seat again: the card there is (直し31-2).
+async function sendCard(seatId) {
+  const button = $("ask-button");
+  const text = $("question").value.trim();
+  button.disabled = true;
+  hideMessage();
+  let card;
+  try {
+    card = await call("/api/card", { seat_id: seatId, text });
+  } catch (error) {
+    showMessage(sendFailed(error));
+    return;
+  } finally {
+    button.disabled = false;
+  }
+  state.carded.add(seatId);
+  if (card.again) state.cardAgain[seatId] = card.text;
+  $("question").value = "";
+  delete state.drafts[`seat:${seatId}`];
+  // Every 「聞きたいことを書く」 of that seat says its card is made.
+  for (const open of document.querySelectorAll("button[data-card-seat]")) {
+    if (open.dataset.cardSeat === seatId) open.replaceWith(cardDone(seatId, open.dataset.doneTag || "div"));
+  }
+  setTo({ kind: "all" });
+  showDone(card.again ? state.texts.card_already.replace("{card}", card.text)
+    : state.texts.input_done.seat.replace("{seat}", seatName(seatId)));
+  renderSeats();  // The seat marked on the map too (map.refresh).
+}
+
+// To an AI's question: the answer starts the next round (直し29-1).
+async function sendAnswer(roundNo, role) {
+  const button = $("ask-button");
+  const answer = $("question").value.trim();
+  button.disabled = true;
+  hideMessage();
+  setNow({ asking: true });
+  try {
+    const round = await call("/api/coach_answer", { round: roundNo, role, answer, after_notice: state.needsShown });
+    setNow({ asking: false });
+    if (round.status === "unavailable") state.aiUnavailable = true;
+    if (round.status === "ask_again" || round.status === "unavailable") {
+      showMessage(round.message);  // The answer stays in the box to be changed.
+      return;
+    }
+    hideMessage();
+    state.aiAnswered = true;
+    $("reflect-needs-answer").hidden = true;
+    for (const node of document.querySelectorAll(".ai-card.needs-answer")) node.classList.remove("needs-answer");
+    bandAnswered(roundNo, role);
+    $("question").value = "";
+    delete state.drafts[`ai:${roundNo}:${role}`];
+    setTo({ kind: "all" });
+    showDone(state.texts.input_done.ai);
+    renderRound(round);
+  } catch (error) {
+    setNow({ asking: false });
+    showMessage(sendFailed(error));
+  } finally {
+    button.disabled = false;
+  }
+}
+
 // --- asking ---
 
-async function ask(event) {
-  event.preventDefault();
+async function ask() {
   const question = $("question").value.trim();
   if (!question) return;
   const button = $("ask-button");
@@ -692,6 +823,7 @@ async function ask(event) {
       return;
     }
     $("question").value = "";
+    delete state.drafts.all;
     renderRound(round);
   } catch (error) {
     showMessage(sendFailed(error));
@@ -810,50 +942,8 @@ async function loadBand(roundNo, box) {
 }
 
 function answerEntry(roundNo, role) {
-  const open = el("button", { type: "button", class: "quiet", text: state.texts.bubble_answer });
-  open.addEventListener("click", () => {
-    const form = answerForm(roundNo, role);
-    open.replaceWith(form);
-    form.querySelector("input").focus();
-  });
-  return open;
-}
-
-// The one-line box an answer to コーチ or オブザーバー goes in, empty: below
-// the map and in the round table's choices alike (直し29-1). Sent, the next
-// round starts.
-function answerForm(roundNo, role) {
-  const input = el("input", { type: "text", maxlength: "120", autocomplete: "off" });
-  const form = el("form", { class: "ai-answer" }, input, el("button", { type: "submit", text: "送る" }));
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const answer = input.value.trim();
-    if (!answer) return;
-    for (const node of form.querySelectorAll("input, button")) node.disabled = true;
-    hideMessage();
-    setNow({ asking: true });
-    try {
-      const round = await call("/api/coach_answer", { round: roundNo, role, answer, after_notice: state.needsShown });
-      setNow({ asking: false });
-      if (round.status === "unavailable") state.aiUnavailable = true;
-      if (round.status === "ask_again" || round.status === "unavailable") {
-        showMessage(round.message);
-        for (const node of form.querySelectorAll("input, button")) node.disabled = false;
-        return;
-      }
-      hideMessage();
-      state.aiAnswered = true;
-      $("reflect-needs-answer").hidden = true;
-      for (const node of document.querySelectorAll(".ai-card.needs-answer")) node.classList.remove("needs-answer");
-      bandAnswered(roundNo, role);
-      renderRound(round);
-    } catch (error) {
-      setNow({ asking: false });
-      showMessage(sendFailed(error));
-      for (const node of form.querySelectorAll("input, button")) node.disabled = false;
-    }
-  });
-  return form;
+  return el("button", { type: "button", class: "quiet", text: state.texts.bubble_answer,
+    onclick: () => answerTo(roundNo, role) });
 }
 
 // One answer per band: the other card's 「答える」 goes away and the card
@@ -912,9 +1002,8 @@ function renderAsked(roundNo, box, asked) {
     // Shown only, never a button: the question is the app's sentence, not
     // the student's. Under it, the seat's 「聞きたいことを書く」, box empty.
     node.append(el("p", { class: "not-answered", text: asked.not_answered }));
-    const done = () => cardDone(asked.seat_id, "p");
-    if (asked.carded || state.carded.has(asked.seat_id)) node.append(done());
-    else node.append(cardEntry(asked.seat_id, (form) => form.replaceWith(done())));
+    if (asked.carded || state.carded.has(asked.seat_id)) node.append(cardDone(asked.seat_id, "p"));
+    else node.append(cardEntry(asked.seat_id, "p"));
   } else if (asked.message) {
     node.append(el("p", { class: "message", text: asked.message }));
   }
@@ -1120,9 +1209,6 @@ function renderSplit(roundNo, split, byId, [quotesA, quotesB]) {
 
 function renderSeats() {
   const list = $("seat-list");
-  // A card being written in stays open, its words as they were, when the
-  // list is drawn again (直し26-3).
-  const draft = keptDraft(list);
   list.replaceChildren();
   for (const [kind, label] of Object.entries(state.kinds)) {
     const seats = state.seats.filter((seat) => seat.kind === kind);
@@ -1132,33 +1218,7 @@ function renderSeats() {
     list.append(el("section", { class: `kind-group kind-${kind}` }, el("h3", { text: label }), row));
   }
   $("met-count").textContent = String(state.met.size);
-  putBackDraft(draft);
   onMap((map) => map.refresh());  // The same count and marks on the map.
-}
-
-// The seat list's open card, if any: whose seat, the student's words in it
-// so far, and whether the keyboard was in it (and where).
-function keptDraft(list) {
-  const form = list.querySelector(".card-form");
-  if (!form || !form.dataset.seat) return null;
-  const box = form.querySelector("textarea");
-  return { seatId: form.dataset.seat, text: box.value, focused: document.activeElement === box,
-    start: box.selectionStart, end: box.selectionEnd };
-}
-
-// The card open again under its seat's line, with the student's own words
-// put back (the box is never filled with anything else); the page does not
-// move, and the keyboard stays where it is unless it was in the card.
-// A card already sent is not opened again.
-function putBackDraft(draft) {
-  if (!draft || state.carded.has(draft.seatId)) return;
-  const form = openCardFor(draft.seatId, { quiet: true });
-  if (!form) return;
-  const box = form.querySelector("textarea");
-  box.value = draft.text;
-  if (!draft.focused) return;
-  box.focus({ preventScroll: true });
-  box.setSelectionRange(draft.start, draft.end);
 }
 
 function renderSeat(seat) {
@@ -1183,69 +1243,14 @@ function renderNotAsked(seat) {
     box.append(cardDone(seat.seat_id));
     return box;
   }
-  box.append(cardEntry(seat.seat_id, renderSeats, (form, open) => putUnderLine(seat, form, open)));
+  box.append(cardEntry(seat.seat_id));
   return box;
 }
 
-// In the seat list an open card goes right under its seat's line of seats,
-// the list's full width, so the seat keeps its size (直し25-4). It says
-// whose seat it is for, in the seat list's own words. One open at a time:
-// another one closes, its button back.
-function putUnderLine(seat, form, open) {
-  for (const other of document.querySelectorAll("#seat-list .card-form")) other.closeCard();
-  const node = open.closest(".seat");
-  let last = node;
-  for (const next of node.parentElement.children) {
-    if (next.classList.contains("seat") && next.offsetTop === node.offsetTop) last = next;
-  }
-  form.prepend(el("p", { class: "card-for", text: [seat.title, seat.detail].filter(Boolean).join("　") }));
-  form.closeCard = () => {
-    form.remove();
-    if (open.dataset.quiet) open.remove();  // Opened from the map: no button of its own here.
-    else open.hidden = false;
-    node.classList.remove("writing");
-  };
-  open.hidden = true;
-  node.classList.add("writing");
-  last.after(form);
-  // As wide as the seats' columns, not the whole list (直し26-4), again
-  // when the window's width changes.
-  form.fit = () => fitToSeats(node, form);
-  form.fit();
-}
-
-// The width the seats of a row take: from the left of the leftmost to the
-// right of the rightmost, whichever line they are on.
-function fitToSeats(node, form) {
-  const seats = [...node.parentElement.children].filter((next) => next.classList.contains("seat"));
-  const left = Math.min(...seats.map((seat) => seat.offsetLeft));
-  const right = Math.max(...seats.map((seat) => seat.offsetLeft + seat.offsetWidth));
-  form.style.setProperty("--line", `${right - left}px`);
-}
-
-// The seat list's question card for any seat, opened from its lamp card at
-// the table (直し26-2): the same card as 「聞きたいことを書く」, under its
-// seat's line, its box empty. A seat that spoke has no button for it in the
-// list: one is made for the card to go by, and goes with it.
-function openCardFor(seatId, { quiet = false, from } = {}) {
-  const seat = state.seatById[seatId];
-  const node = [...$("seat-list").querySelectorAll(".seat")].find((item) => item.dataset.seat === seatId);
-  if (!seat || !node) return null;
-  if (!quiet) openDrawer("seats", from, { focus: false });
-  let open = node.querySelector(".not-asked > button");
-  if (!open) {
-    open = cardEntry(seatId, renderSeats, (form, button) => putUnderLine(seat, form, button));
-    open.dataset.quiet = "1";
-    open.hidden = true;
-    node.append(open);
-  }
-  // Quiet (put back after the list is drawn again): no focus, no scroll.
-  open.dataset.still = quiet ? "1" : "";
-  open.click();
-  delete open.dataset.still;
-  const form = node.parentElement.querySelector(".card-form");
-  if (form && !quiet) form.scrollIntoView({ block: "center" });
-  return form;
+// A seat's question card, from its lamp card at the table (直し26-2): the
+// one box at the foot writes to that seat (直し32-2).
+function openCardFor(seatId) {
+  askSeat(seatId);
 }
 
 // Where a seat's card was made: 「質問カードにしました」, or when the same
@@ -1255,35 +1260,14 @@ function cardDone(seatId, tag = "div") {
   return el(tag, { class: "card-done", text: again ? state.texts.card_already.replace("{card}", again) : "質問カードにしました" });
 }
 
-// 「聞きたいことを書く」: opens an empty box; the card holds the student's
-// words only (SPEC 2-2). put: where the open card goes (in the button's place).
-function cardEntry(seatId, done, put = (form, open) => open.replaceWith(form)) {
-  const open = el("button", { type: "button", class: "quiet", text: "聞きたいことを書く" });
-  open.addEventListener("click", () => {
-    const form = $("card-form-template").content.firstElementChild.cloneNode(true);
-    form.dataset.seat = seatId;  // Whose card it is, so it can be opened again (直し26-3).
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const text = form.querySelector("textarea").value.trim();
-      if (!text) return;
-      // One press makes one card: the button waits while it is sent (直し31-2).
-      const send = form.querySelector("button[type=submit]");
-      if (send.disabled) return;
-      send.disabled = true;
-      let card;
-      try {
-        card = await call("/api/card", { seat_id: seatId, text });
-      } catch (error) {
-        send.disabled = false;
-        return;
-      }
-      state.carded.add(seatId);
-      if (card.again) state.cardAgain[seatId] = card.text;
-      done(form);
-    });
-    put(form, open);
-    if (!open.dataset.still) form.querySelector("textarea").focus();
-  });
+// 「聞きたいことを書く」: the one box at the foot writes to that seat, empty
+// for it (SPEC 2-2: the card holds the student's words only). Once its card
+// is made, the button says so (sendCard). tag: what the line it becomes is.
+function cardEntry(seatId, tag = "div") {
+  const open = el("button", { type: "button", class: "quiet", text: "聞きたいことを書く",
+    onclick: () => askSeat(seatId) });
+  open.dataset.cardSeat = seatId;
+  open.dataset.doneTag = tag;
   return open;
 }
 
@@ -1614,7 +1598,14 @@ function backToStart() {
   window.location.replace(window.location.pathname);
 }
 
-$("ask-form").addEventListener("submit", ask);
+$("ask-form").addEventListener("submit", send);
+$("input-to-clear").addEventListener("click", backToEveryone);
+$("question").addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.to.kind !== "all") {
+    event.preventDefault();
+    backToEveryone();
+  }
+});
 $("to-reflect").addEventListener("click", toReflection);
 $("reflect-first").addEventListener("submit", reflectFirst);
 $("reflect-answer").addEventListener("submit", (event) => { event.preventDefault(); reflectAnswer(false); });
@@ -1628,7 +1619,4 @@ $("back-no").addEventListener("click", stayHere);
 $("back-confirm").addEventListener("keydown", (event) => { if (event.key === "Escape") stayHere(); });
 $("more-purposes").addEventListener("click", async () => renderPurposes((await call("/api/purposes", {})).purposes));
 window.addEventListener("resize", keepUnderNow);
-window.addEventListener("resize", () => {
-  for (const form of document.querySelectorAll("#seat-list .card-form")) if (form.fit) form.fit();
-});
 setup();

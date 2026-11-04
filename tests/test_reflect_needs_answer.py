@@ -86,7 +86,7 @@ def test_after_the_model_was_out_once_it_goes_on():
 
 
 def test_only_an_answer_that_started_the_next_round_counts():
-    form = _top("answerForm")
+    form = _top("sendAnswer")  # The one box at the foot answers it (直し32-2).
     assert 'if (round.status === "unavailable") state.aiUnavailable = true;' in form
     sent = form.index("after_notice: state.needsShown")
     turned = form.index('if (round.status === "ask_again" || round.status === "unavailable") {')

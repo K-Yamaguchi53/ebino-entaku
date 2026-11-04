@@ -113,6 +113,14 @@ MAP_BUTTONS = "map_buttons"
 # The drawer's parts (直し32-1): each one's name, on its button and over it.
 DRAWER_PARTS = "drawer_parts"
 DRAWER_PART_IDS = ("paragraph", "rounds", "seats", "purposes")
+# The one box at the foot (直し32-2): to whom it goes (and the × back to
+# everyone), its button's word for each, and the line after a send.
+INPUT_TO = "input_to"
+INPUT_TO_IDS = ("all", "seat", "ai", "clear")
+INPUT_SEND = "input_send"
+INPUT_SEND_IDS = ("all", "seat", "ai")
+INPUT_DONE = "input_done"
+INPUT_DONE_IDS = ("seat", "ai")
 MAP_BUTTON_IDS = ("back", "zoom_in", "zoom_out", "zoom_all")
 # Round the map (map.js): the word on the mark that points north (the north
 # row's 方位), and by each of the map's four sides what lies that way.
@@ -229,6 +237,9 @@ def screen_texts() -> dict:
     texts[MAP_AROUND] = map_around()
     texts[BUBBLE_CHOICES] = bubble_choices()
     texts[DRAWER_PARTS] = id_table(DRAWER_PARTS, DRAWER_PART_IDS)
+    texts[INPUT_TO] = id_table(INPUT_TO, INPUT_TO_IDS)
+    texts[INPUT_SEND] = id_table(INPUT_SEND, INPUT_SEND_IDS)
+    texts[INPUT_DONE] = id_table(INPUT_DONE, INPUT_DONE_IDS)
     texts[SEAT_ICONS] = seat_icons()
     texts[NOW_STEPS] = now_steps()
     texts[NOW_LINE] = now_lines()

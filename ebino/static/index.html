@@ -152,9 +152,15 @@
       <p id="ask-message" class="message" hidden></p>
       <!-- Before the reflection, one answer to コーチ or オブザーバー (直し30-1). -->
       <p id="reflect-needs-answer" class="reflect-needs" role="status" hidden></p>
+      <!-- What came of the last send: a card made, an AI's question answered. -->
+      <p id="input-done" class="input-done" role="status" hidden></p>
       <div class="input-row">
-        <form id="ask-form" class="ask">
-          <label for="question" class="visually-hidden">問い</label>
+        <!-- The one box (直し32-2): on its left, to whom it goes (町の大人みんな,
+             one seat, or an AI's question), × back to everyone (Esc too). -->
+        <form id="ask-form" class="ask" data-to="all">
+          <p class="input-to"><span id="input-to-label" class="input-to-label"></span><button type="button"
+            id="input-to-clear" class="input-to-clear" hidden>×</button></p>
+          <label for="question" id="question-label" class="visually-hidden">問い</label>
           <textarea id="question" rows="2" maxlength="200"></textarea>
           <button type="submit" id="ask-button">聞く</button>
         </form>
@@ -246,15 +252,6 @@
     </div>
   </section>
 </main>
-
-<template id="card-form-template">
-  <form class="card-form">
-    <label>この人に聞きたいこと
-      <textarea rows="2" maxlength="200"></textarea>
-    </label>
-    <button type="submit">質問カードにする</button>
-  </form>
-</template>
 
 <script src="/rough.js"></script>
 <script src="/map.js"></script>

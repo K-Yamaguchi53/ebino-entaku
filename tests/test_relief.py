@@ -771,7 +771,7 @@ def test_a_heading_and_a_labs_name_wrap_only_between_their_pieces():
     assert json.loads(done.stdout.decode("utf-8")) == [
         ["ここで割れた：", "休みを「決めて取る」か", "「空いたら取る」か"], ["Creation", "（生活文化科）"],
         ["ここで割れた：", "「空いたら取る」と", "「決めて取る」"], ["割れ目のない言葉"]]
-    assert 'phrased(label)' in script and "shownQuotes, phrased, answerForm }" in script
+    assert 'phrased(label)' in script and "shownQuotes, phrased, askSeat, answerTo }" in script
     css = _css()
     assert ".phrase { display: inline-block; max-width: 100%; }" in css
 
@@ -823,7 +823,8 @@ def test_the_student_writes_on_paper_in_gothic_and_only_the_ask_button_is_honey(
     assert "min-height: 44px" in _rule(css, "button")
     html = (app_module.STATIC_DIR / "index.html").read_text(encoding="utf-8")
     form = html[html.index('<form id="ask-form"'):html.index("</form>", html.index('<form id="ask-form"'))]
-    assert form.count("<button") == 1 and "placeholder" not in form  # No new example or wording on the screen.
+    # Its send button, and × back to everyone (直し32-2); no new example or wording on the screen.
+    assert form.count("<button") == 2 and 'id="input-to-clear"' in form and "placeholder" not in form
 
 
 def test_the_rounds_voices_are_lamp_cards_the_moderators_words_moonlight_and_the_newest_stands_out():

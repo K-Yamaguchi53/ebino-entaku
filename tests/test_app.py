@@ -196,10 +196,11 @@ def test_the_coach_and_observer_band_over_http(server, monkeypatch):
     assert script.index("closeRound(round.round, closingBox)") < script.index("loadBand(round.round, bandBox)")
     entry = script[script.index("function answerEntry"):]
     entry = entry[:entry.index("\n}\n")]
-    assert "answerForm(roundNo, role)" in entry
-    form = script[script.index("function answerForm"):]
-    form = form[:form.index("\n}\n")]
-    assert 'el("input", { type: "text"' in form and ".value =" not in form
+    assert "answerTo(roundNo, role)" in entry
+    # The one box at the foot (直し32-2): it holds only what the student wrote for this question.
+    to = script[script.index("function setTo"):]
+    to = to[:to.index("\n}\n")]
+    assert 'box.value = state.drafts[draftKey(next)] || "";' in to
 
 
 def test_not_answered_yet_is_shown_only_with_the_seats_empty_card_box_under_it():
@@ -210,8 +211,8 @@ def test_not_answered_yet_is_shown_only_with_the_seats_empty_card_box_under_it()
     assert "cardEntry(asked.seat_id," in asked and "asked.question" not in asked[asked.index("cardEntry"):]
     entry = script[script.index("function cardEntry"):]
     entry = entry[:entry.index("\n}\n")]
-    # The box is the template's, empty; nothing is put in it.
-    assert "card-form-template" in entry and ".value =" not in entry
+    # The one box at the foot writes to that seat (直し32-2); nothing is put in it.
+    assert "askSeat(seatId)" in entry and ".value =" not in entry
     # 「ここから先は、まだ聞いていない」 under 「もっと聞く」 still makes a card.
     assert 'call("/api/more_card"' in script
 

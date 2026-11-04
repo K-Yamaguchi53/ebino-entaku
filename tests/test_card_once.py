@@ -44,9 +44,10 @@ def test_the_same_question_unanswered_twice_keeps_one_card():
 
 
 def test_the_screen_sends_a_card_once_and_shows_the_one_there_is():
-    entry = APP[APP.index("function cardEntry("):]
+    # The one box at the foot (直し32-2): its button waits while the card is out.
+    entry = APP[APP.index("async function sendCard("):]
     entry = entry[:entry.index("\n}\n")]
-    assert entry.index("send.disabled = true;") < entry.index('await call("/api/card"')
-    assert "if (send.disabled) return;" in entry
+    assert entry.index("button.disabled = true;") < entry.index('await call("/api/card"')
+    assert "if (button.disabled || " in APP[APP.index("async function send("):]
     assert "if (card.again) state.cardAgain[seatId] = card.text;" in entry
     assert 'state.texts.card_already.replace("{card}", again)' in APP

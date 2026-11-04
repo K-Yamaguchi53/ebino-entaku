@@ -74,7 +74,7 @@ def test_a_card_and_a_seat_left_out_take_a_press_that_opens_one_card_of_choices(
 def test_each_choice_calls_what_the_round_below_already_does():
     opened = _inner("openChoices")
     assert "app.paragraph(utteranceId)" in opened and "app.mark(tableRoundNo, utteranceId)" in opened
-    assert "app.openCard(seatId, { from: card })" in opened and "app.readBelow(tableRoundNo, utteranceId, card)" in opened
+    assert "app.askSeat(seatId)" in opened and "app.readBelow(tableRoundNo, utteranceId, card)" in opened
     assert "fetch(" not in MAP and "call(" not in MAP  # The map asks the server nothing itself.
     lent = APP[APP.index("const lent = {"):APP.index("};", APP.index("const lent = {"))]
     for part in ("paragraph: paragraphOf", "mark: markQuote", "openCard: openCardFor", "readBelow"):
@@ -95,11 +95,10 @@ def test_one_mark_in_one_place_and_the_map_follows_it():
 
 
 def test_the_card_is_the_seat_lists_own_with_its_box_empty():
+    # The one box at the foot writes to that seat (直し32-2), empty for it.
     open_for = _top("openCardFor")
-    assert "cardEntry(seatId, renderSeats, (form, button) => putUnderLine(seat, form, button))" in open_for
+    assert "askSeat(seatId);" in open_for
     assert ".value" not in open_for and "placeholder" not in open_for
-    assert 'open.dataset.quiet = "1"' in open_for and "open.click();" in open_for
-    assert "if (open.dataset.quiet) open.remove();" in _top("putUnderLine")
     assert '"data-seat": seat.seat_id' in _top("renderSeat")
 
 
