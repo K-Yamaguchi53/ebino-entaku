@@ -1,0 +1,104 @@
+"""The opening after a Lab is picked (直し30-3): over the dark map, a paper
+plane in lines flies a loose S from the school's mark (or the lower left)
+to where the round table opens, lands, the lamp's light spreads once and the
+title comes and goes. Under 3 seconds; 「とばす」, Enter or Esc ends it.
+/api/start is waited for all the while: the question box never comes
+before it, and a failure brings the Lab buttons back. With motion reduced,
+or no map, none: the table at once, as before."""
+
+import json
+import re
+import shutil
+import subprocess
+
+import pytest
+
+from ebino import app as app_module
+from ebino import texts
+
+APP = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
+MAP = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+HTML = (app_module.STATIC_DIR / "index.html").read_text(encoding="utf-8")
+CSS = (app_module.STATIC_DIR / "style.css").read_text(encoding="utf-8")
+node = pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+
+
+def _top(name):
+    start = APP.index(f"function {name}(")
+    return APP[start:APP.index("\n}\n", start) + 3]
+
+
+def test_the_skip_button_is_the_teachers_word():
+    assert texts.screen_texts()["opening_skip"] == "とばす"
+    assert '"とばす"' not in APP and ">とばす<" not in HTML
+    assert '$("opening-skip").textContent = state.texts.opening_skip;' in _top("playOpening")
+
+
+def test_it_plays_while_start_is_waited_for_and_never_shows_the_box_before_it():
+    start = _top("start")
+    assert "const opening = still ? null : playOpening();" in start
+    assert 'Promise.all([call("/api/start", { lab }),\n      opening ||' in start
+    # A failure: the opening away and the Lab buttons back, as before.
+    failed = start[start.index("} catch (error) {"):start.index("throw error;")]
+    assert failed.index("if (opening) endOpening(true);") < failed.index("button.disabled = false;")
+    assert "$(\"table\").hidden = true;" in _top("endOpening") and "$(\"start\").hidden = false;" in _top("endOpening")
+    # Only once /api/start is in: the opening away, the purposes, the box focused.
+    after = start[start.index("throw error;"):]
+    assert after.index("if (opening) endOpening(false);") < after.index("renderPurposes(data.purposes);") \
+        < after.index('$("question").focus();')
+
+
+def test_no_map_or_motion_reduced_means_no_opening():
+    play = _top("playOpening")
+    assert play.index('if (typeof EbinoMap === "undefined" || $("map").hidden) return null;') \
+        < play.index('$("table").classList.add("opening-on");')
+    assert "if (!box.width || !box.height" in play
+    # It uses the map's own drawing of the rim and the river.
+    assert "onMap((map) => map.show());" in play
+    assert "opening" not in MAP
+
+
+def test_it_is_under_three_seconds_and_skipped_at_once():
+    times = re.search(r"const OPENING = \{ fly: (\d+), land: (\d+), title: (\d+) \};", APP)
+    assert sum(int(n) for n in times.groups()) <= 3000
+    play = _top("playOpening")
+    assert 'event.key === "Enter" || event.key === "Escape"' in play
+    assert '$("opening-skip").onclick = () => finishOpening(run);' in play and '$("opening-skip").focus();' in play
+    finish = _top("finishOpening")
+    assert "cancelAnimationFrame(run.frame);" in finish and 'document.removeEventListener("keydown", run.keys);' in finish
+    assert "run.done();" in finish
+    # The keyboard goes to 「とばす」 (the map behind kept out), its ring shown.
+    assert '$("map-frame").inert = true;' in play and '$("map-frame").inert = false;' in _top("endOpening")
+    assert ".opening-bar button:focus { outline: 2px solid var(--lamp);" in CSS
+
+
+def test_the_plane_is_lines_in_the_code_in_the_lamps_colour_and_nothing_flashes():
+    plane = re.search(r'<path id="opening-plane" class="opening-plane" d="([^"]+)">', HTML).group(1)
+    assert plane == "M22,0 L-16,-13 L-7,0 L-16,13 Z M22,0 L-7,0"  # A dart and its one fold.
+    assert ".opening-plane { fill: var(--night-2); stroke: var(--lamp);" in CSS
+    rules = CSS[CSS.index("/* The opening (直し30-3)"):CSS.index("/* 最初にもどる under the sheet")]
+    assert "animation" not in rules and "#" not in rules.replace("#table", "").replace("#map", "")
+    assert "http" not in rules and "url(" not in rules
+    # The aeroplane of 県外・海外 at the table is another shape.
+    assert "cross: \"M0,-6 C0.9,-6" in MAP and plane not in MAP
+
+
+_PLANE = """
+%(source)s
+const run = { from: [40, 560], end: [500, 300] };
+const at = (u) => planeAt(run, u);
+const side = (p) => Math.sign((500 - 40) * (p.y - 560) - (300 - 560) * (p.x - 40));
+process.stdout.write(JSON.stringify({ start: at(0), end: at(1), sides: [side(at(0.25)), side(at(0.75))] }));
+"""
+
+
+@node
+def test_the_plane_flies_a_loose_s_from_its_start_to_the_tables_spot():
+    program = _PLANE % {"source": _top("planeAt")}
+    out = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=30)
+    assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
+    got = json.loads(out.stdout.decode("utf-8"))
+    assert (round(got["start"]["x"]), round(got["start"]["y"])) == (40, 560)
+    assert (round(got["end"]["x"]), round(got["end"]["y"])) == (500, 300)
+    # One side of the straight way, then the other: an S.
+    assert got["sides"][0] == -got["sides"][1] != 0

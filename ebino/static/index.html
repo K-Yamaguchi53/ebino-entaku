@@ -38,6 +38,20 @@
       <div id="map-frame" class="map-frame">
         <svg id="map-svg" role="group" aria-label="えびのの地図と席の点" xmlns="http://www.w3.org/2000/svg"></svg>
         <div id="map-overlay" class="map-overlay"></div>
+        <!-- The opening (直し30-3): over the map once a Lab is picked, a few
+             seconds; 「とばす」, Enter or Esc ends it. -->
+        <div id="opening" class="opening" hidden>
+          <svg id="opening-svg" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+            <circle id="opening-ring" class="opening-ring" r="0"></circle>
+            <polyline id="opening-trail" class="opening-trail" points=""></polyline>
+            <path id="opening-plane" class="opening-plane" d="M22,0 L-16,-13 L-7,0 L-16,13 Z M22,0 L-7,0"></path>
+          </svg>
+          <p id="opening-title" class="opening-title" aria-hidden="true"></p>
+        </div>
+      </div>
+      <!-- Under the map while the opening plays, where its buttons are after. -->
+      <div id="opening-bar" class="opening-bar" hidden>
+        <button type="button" id="opening-skip" class="quiet"></button>
       </div>
       <!-- Under the map, never over it: 地図にもどす, the table's heading and
            the zoom buttons; the buttons' words come from texts/map_buttons.tsv. -->

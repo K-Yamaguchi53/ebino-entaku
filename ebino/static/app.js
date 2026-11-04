@@ -93,21 +93,189 @@ async function start(lab, chosen) {
     button.disabled = true;
   }
   const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // The opening over the map while /api/start is waited for (直し30-3);
+  // none with motion reduced or no map: the table at once, as before.
+  const opening = still ? null : playOpening();
   let data;
   try {
-    [data] = await Promise.all([call("/api/start", { lab }), new Promise((done) => setTimeout(done, still ? 0 : 320))]);
+    [data] = await Promise.all([call("/api/start", { lab }),
+      opening || new Promise((done) => setTimeout(done, still ? 0 : 320))]);
   } catch (error) {
+    if (opening) endOpening(true);
     for (const button of buttons) {
       button.setAttribute("aria-pressed", "false");
       button.disabled = false;
     }
     throw error;
   }
+  if (opening) endOpening(false);
   $("start").hidden = true;
   $("table").hidden = false;
   onMap((map) => map.show());  // Draws the rim and the river once the map is on screen.
   renderPurposes(data.purposes);
   $("question").focus();
+}
+
+// --- the opening (直し30-3) ---
+
+// Once a Lab is picked: over the dark map a paper plane drawn in lines takes
+// off from the school's mark (or the lower left), flies a loose S, nose to
+// its way and leaning into its turns with a thin trail that fades at once,
+// slows and lands where the round table opens; the lamp's light spreads
+// once in a ring, the seats' points lighting nearest first, and the title
+// comes and goes up toward the question box. Under 3 seconds; 「とばす」,
+// Enter or Esc ends it at once. No flashing, the screen never shakes.
+const OPENING = { fly: 1400, land: 600, title: 800 };
+let openingRun = null;
+
+// Starts it and returns a promise kept when it has ended (or at once, with
+// no map on screen to fly over: then null).
+function playOpening() {
+  if (typeof EbinoMap === "undefined" || $("map").hidden) return null;
+  $("start").hidden = true;
+  $("table").hidden = false;
+  $("table").classList.add("opening-on");
+  onMap((map) => map.show());
+  const frame = $("map-frame");
+  const box = frame.getBoundingClientRect();
+  if (!box.width || !box.height || $("map").hidden) {
+    $("table").classList.remove("opening-on");
+    return null;
+  }
+  $("map").scrollIntoView({ block: "nearest" });
+  const w = box.width, h = box.height;
+  const end = [w / 2, h / 2];
+  // From the school's mark when it is on the map in sight; else the lower left.
+  let from = [Math.min(48, w * 0.08), h - Math.min(48, h * 0.08)];
+  const school = document.querySelector("#map-svg .school > :not(text)");
+  if (school) {
+    const s = school.getBoundingClientRect();
+    const at = [s.left + s.width / 2 - box.left, s.top + s.height / 2 - box.top];
+    if (s.width && at[0] > 0 && at[0] < w && at[1] > 0 && at[1] < h) from = at;
+  }
+  const points = [...document.querySelectorAll("#map-svg .pt")].map((node) => {
+    const p = node.getBoundingClientRect();
+    return { node, d: Math.hypot(p.left + p.width / 2 - box.left - end[0], p.top + p.height / 2 - box.top - end[1]) };
+  });
+  const far = Math.max(1, ...points.map((p) => p.d));
+  for (const p of points) p.node.style.opacity = ".2";
+  $("opening-title").textContent = document.querySelector(".masthead h1").textContent;
+  $("opening-skip").textContent = state.texts.opening_skip;
+  $("opening").hidden = false;
+  $("opening-bar").hidden = false;
+  $("map-frame").inert = true;  // The keyboard goes to 「とばす」, not the points behind.
+  const run = { from, end, w, h, points, far, ring: Math.hypot(w, h) * 0.42, trail: [], last: null, lean: 0, frame: 0 };
+  openingRun = run;
+  return new Promise((done) => {
+    run.done = done;
+    const began = performance.now();
+    const step = (now) => {
+      if (openingRun !== run) return;
+      const t = now - began;
+      drawOpening(run, t);
+      if (t >= OPENING.fly + OPENING.land + OPENING.title) return finishOpening(run);
+      run.frame = requestAnimationFrame(step);
+    };
+    run.keys = (event) => {
+      if (event.key === "Enter" || event.key === "Escape") {
+        event.preventDefault();
+        finishOpening(run);
+      }
+    };
+    document.addEventListener("keydown", run.keys);
+    $("opening-skip").onclick = () => finishOpening(run);
+    $("opening-skip").focus();
+    run.frame = requestAnimationFrame(step);
+  });
+}
+
+// Where the plane is at u (0 to 1) of its flight: a cubic curve bent one
+// way then the other, a loose S from (from) to (end).
+function planeAt(run, u) {
+  const [x0, y0] = run.from, [x3, y3] = run.end;
+  const dx = x3 - x0, dy = y3 - y0, len = Math.hypot(dx, dy) || 1;
+  // The swing is wide even when the school is near the middle; the bends
+  // stay in the frame (the curve keeps inside its four points).
+  const swing = Math.max(len * 0.28, Math.min(run.w || 0, run.h || 0) * 0.22);
+  const nx = -dy / len * swing, ny = dx / len * swing;
+  const keep = (x, y) => (run.w ? [Math.max(24, Math.min(run.w - 24, x)), Math.max(24, Math.min(run.h - 24, y))] : [x, y]);
+  const c1 = keep(x0 + dx / 3 + nx, y0 + dy / 3 + ny), c2 = keep(x0 + dx * 2 / 3 - nx, y0 + dy * 2 / 3 - ny);
+  const v = 1 - u;
+  const at = (a, b, c, d) => v * v * v * a + 3 * v * v * u * b + 3 * v * u * u * c + u * u * u * d;
+  const slope = (a, b, c, d) => 3 * v * v * (b - a) + 6 * v * u * (c - b) + 3 * u * u * (d - c);
+  return { x: at(x0, c1[0], c2[0], x3), y: at(y0, c1[1], c2[1], y3),
+    a: Math.atan2(slope(y0, c1[1], c2[1], y3), slope(x0, c1[0], c2[0], x3)) };
+}
+
+// The opening as it is t ms in.
+function drawOpening(run, t) {
+  const plane = $("opening-plane"), trail = $("opening-trail"), ring = $("opening-ring"), title = $("opening-title");
+  const fly = Math.min(1, t / OPENING.fly);
+  // Slowing down to land: fast at first, the last stretch gently.
+  const u = 1 - Math.pow(1 - fly, 2.2);
+  const p = planeAt(run, u);
+  if (run.last !== null) {
+    let turn = p.a - run.last;
+    turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+    run.lean += (Math.min(0.45, Math.abs(turn) * 14) - run.lean) * 0.25;
+  }
+  run.last = p.a;
+  const deg = p.a * 180 / Math.PI;
+  plane.setAttribute("transform", `translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) rotate(${deg.toFixed(1)}) scale(1 ${(1 - run.lean).toFixed(3)})`);
+  plane.style.opacity = t < OPENING.fly + OPENING.land ? "1"
+    : String(Math.max(0, 1 - (t - OPENING.fly - OPENING.land) / (OPENING.title * 0.5)));
+  // The trail: the last quarter second of the way only, so it fades at once.
+  run.trail.push([t, p.x, p.y]);
+  while (run.trail.length && t - run.trail[0][0] > 240) run.trail.shift();
+  trail.setAttribute("points", fly < 1 ? run.trail.map(([, x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ") : "");
+  // Landed: the lamp's light spreads once in a ring; the points light from the nearest.
+  const lit = (t - OPENING.fly) / OPENING.land;
+  if (lit > 0) {
+    const k = Math.min(1, lit);
+    ring.setAttribute("cx", run.end[0].toFixed(1));
+    ring.setAttribute("cy", run.end[1].toFixed(1));
+    ring.setAttribute("r", (8 + (run.ring - 8) * (1 - Math.pow(1 - k, 2))).toFixed(1));
+    ring.style.opacity = String(0.85 * (1 - k));
+    for (const point of run.points) if (point.d / run.far <= k) point.node.style.opacity = "";
+  }
+  // The title: comes, stays a moment, and goes up toward the question box.
+  const shown = (t - OPENING.fly - OPENING.land) / OPENING.title;
+  if (shown > 0) {
+    const come = Math.min(1, shown / 0.3), go = Math.max(0, (shown - 0.6) / 0.4);
+    title.style.opacity = String(Math.min(come, 1 - go));
+    title.style.transform = `translate(-50%, calc(-50% - ${(go * 48).toFixed(1)}px))`;
+  }
+}
+
+function finishOpening(run) {
+  if (openingRun !== run || run.ended) return;
+  run.ended = true;
+  cancelAnimationFrame(run.frame);
+  document.removeEventListener("keydown", run.keys);
+  // Its last form: the map as the table screen shows it, until /api/start is in.
+  for (const point of run.points) point.node.style.opacity = "";
+  for (const id of ["opening-svg", "opening-title"]) $(id).style.visibility = "hidden";
+  $("opening-bar").hidden = true;
+  run.done();
+}
+
+// Taken away once /api/start is in (back: it failed, the Lab buttons again).
+function endOpening(back) {
+  const run = openingRun;
+  if (run) finishOpening(run);
+  openingRun = null;
+  $("opening").hidden = true;
+  for (const id of ["opening-svg", "opening-title"]) $(id).style.visibility = "";
+  $("opening-bar").hidden = true;
+  $("opening-trail").setAttribute("points", "");
+  $("opening-ring").setAttribute("r", "0");
+  $("opening-title").style.opacity = "0";
+  $("table").classList.remove("opening-on");
+  $("map-frame").inert = false;
+  if (back) {
+    $("table").hidden = true;
+    $("start").hidden = false;
+  }
 }
 
 // Buttons only put words in the box; the student sends them (SPEC 14-11).
