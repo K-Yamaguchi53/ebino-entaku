@@ -146,12 +146,12 @@ def test_the_tables_front_is_the_side_nearest_the_camera_now_the_south():
         f"const map = {json.dumps({'boundary': [list(p) for p in data.boundary], 'viewbox': [0, 0, data.width, data.height]})};",
         f"const relief = {json.dumps(relief)};",
         _inner_function(SCRIPT, "centroid"), _inner_function(SCRIPT, "reliefView"),
-        _inner_function(SCRIPT, "onTable"), _inner_function(SCRIPT, "frontAngle"), _inner_function(SCRIPT, "aiAngles"),
+        _inner_function(SCRIPT, "onTable"), _inner_function(SCRIPT, "frontAngle"),
         "const view = reliefView(relief); const [x, y] = centroid(map.boundary);",
         "const front = frontAngle({ x, y, level: view.zAt(x, y) });",
-        "process.stdout.write(JSON.stringify({ front, ai: aiAngles([], true, 2, front), free: aiAngles([], false, 2, front) }));",
+        "process.stdout.write(JSON.stringify({ front }));",
     ])
     got = _run(program)
     assert got["front"] == 90  # The map's south: nearest the camera, lowest on the picture.
-    assert got["ai"] == [90, 270]  # With a split: the dashed line's two ends.
-    assert got["free"] == [45, 135]  # Else the front's two diagonals first.
+    # コーチ and オブザーバー no longer sit at the table (直し32-3): no angles for them.
+    assert "aiAngles" not in SCRIPT

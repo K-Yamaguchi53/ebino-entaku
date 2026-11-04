@@ -31,10 +31,6 @@ const EbinoMap = (() => {
   const TAIL_LENGTH = 16;  // px: a card's tail, at the least.
   const SEAT_PRESS = 44;  // px: the square a seat with no card up takes a press over.
   const TOUCH = 6;  // px between a lamp card and its choices, against its side.
-  const AI_APART = 24;  // Degrees コーチ and オブザーバー keep from every seat at the table (直し29-1).
-  // A small flame in its holder: コーチ's and オブザーバー's seat, no seat's mark.
-  const AI_FLAME = "M0,-11 C3.6,-6.5 5.2,-3.4 5.2,-0.8 A5.2,5.2 0 0 1 -5.2,-0.8 C-5.2,-3.4 -3.6,-6.5 0,-11 Z " +
-    "M-7,5.5 H7 L5,10 H-5 Z";
   // The pictures at the table's seats (直し29-3): lines on a 12px square
   // round 0,0, one thin line in the lamp's light, no words. Drawn here,
   // nothing read from outside.
@@ -134,7 +130,6 @@ const EbinoMap = (() => {
   let choices = null;  // The card of choices open at the table: { seatId, node, card }.
   let pressedOnce = false;  // A card was pressed: the line that says so goes, for good.
   let tableRoundNo = 0;  // The round the table is for.
-  let band = null;  // コーチ and オブザーバー of a round (直し29-1): { round, cards }.
   let tableAt = null;  // The table open: { center, angles, split }, for the band's seats.
 
   const reduced = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1003,7 +998,7 @@ const EbinoMap = (() => {
     // The chairs' backs and the table's leg and foot too (直し29-2): cards and names keep off them.
     // コーチ and オブザーバー's seats with their light round them (直し31-4: at
     // 768 a card came over the coach's flame's foot).
-    const nodes = [...tableLayer.querySelectorAll(".token .shape, .token.ai-seat .halo, .chair circle, .chair .hit" +
+    const nodes = [...tableLayer.querySelectorAll(".token .shape, .chair circle, .chair .hit" +
       (withBacks ? ", .token .chair-back, .chair .back, .table-foot .leg, .table-foot .base" : ""))];
     // A seat of the round at the size it has once lit (not met yet, it is drawn smaller).
     const reach = 9.5 * pointScale() * frameBox.width / vb.w;
@@ -1018,8 +1013,11 @@ const EbinoMap = (() => {
     });
     // The arrow and the four ways' names (直し25-3), once they are put.
     const around = withAround ? [...overlay.querySelectorAll(".map-compass, .map-around, .map-hint")].map((node) => boxIn(node, frameBox)) : [];
-    // What the one screen lays over the map's side (直し32-1): the card of whose words are in.
-    for (const node of document.querySelectorAll("#inside:not([hidden])")) around.push(boxIn(node, frameBox));
+    // What the one screen lays over the map's side (直し32-1): the card of
+    // whose words are in, and the AI's seat (直し32-3).
+    for (const node of document.querySelectorAll("#inside:not([hidden]), #ai-seat:not([hidden])")) {
+      around.push(boxIn(node, frameBox));
+    }
     return [...nodes.map((node) => boxIn(node, frameBox)), ...seats, ...(cover ? topStrips(cover) : []),
       ...shelfBoxes, ...(withWords ? seenWords({ w: frameBox.width, h: frameBox.height }, words, cover) : []), ...around];
   }
@@ -1753,7 +1751,6 @@ const EbinoMap = (() => {
     if (split && overlay.clientWidth >= TAG_ON_MAP) $("map-heading").replaceChildren(app.phrased(app.shownQuotes(split.heading)));
     for (const chairNode of tableLayer.querySelectorAll(".chair")) chairNode.classList.add("ready");
     tableRoundNo = result.round;
-    if (band && band.round === result.round) seatBand();
     if (!pressedOnce) overlay.append(div("map-hint", app.state.texts.bubble_hint));
     relayout();
     marked();
@@ -1781,78 +1778,10 @@ const EbinoMap = (() => {
     return node;
   }
 
-  // コーチ and オブザーバー (直し29-1), from the band app.js got with its one
-  // call to /api/coach: kept for the round's table, seated at once if it is
-  // open. A band with no cards, or answered, is not sent.
-  function setBand(roundNo, cards) {
-    band = { round: roundNo, cards };
-    if (tableTop && tableAt && tableRoundNo === roundNo && !tokens.some((token) => token.ai)) {
-      seatBand();
-      relayout();
-    }
-  }
-
-  // Their two seats: off the seats and chairs (aiAngles), a small flame in
-  // moonlight each, no seat's mark; their names as on the cards below; their
-  // questions in moonlit cards that find room before the seats' (rank).
-  function seatBand() {
-    const { center, angles, split, front } = tableAt;
-    const spots = aiAngles(angles, split, band.cards.length, front);
-    band.cards.forEach((card, k) => {
-      const id = `ai-${card.role}`, at = onTable(center, spots[k], SEAT_OUT);
-      const node = svgEl("g", { class: "token ai-seat lit", "aria-hidden": "true" });
-      node.append(svgEl("circle", { class: "halo", r: 20 }), svgEl("path", { class: "shape", d: AI_FLAME }));
-      tableLayer.append(node);
-      tokens.push({ node, at, scale: TOKEN, id, ai: card });
-      const label = div("table-label ai", card.label);
-      Object.assign(label.dataset, { seat: id, x: at[0], y: at[1], gap: 16, full: card.label, short: card.label });
-      const bubble = aiBubble(id, card, at);
-      bubble.dataset.rank = String(k - band.cards.length);
-      overlay.append(label, bubble, seatPress(id, at));
-    });
-    rescale();
-  }
-
-  // Where コーチ and オブザーバー sit (直し29-1), in degrees round the table:
-  // with a split, at the ends of its dashed line (the front and the back:
-  // on neither side) where no seat is near; else between the groups,
-  // the front's two first; the first tried
-  // that is AI_APART from every seat (taken) and from each other, or failing
-  // that the furthest. It reads nothing but what it is given.
-  function aiAngles(taken, split, count = 2, front = 270) {
-    const turn = (a) => ((a % 360) + 360) % 360;
-    const tried = [...(split ? [front, turn(front + 180)] : []), ...[-45, 45, -135, 135].map((d) => turn(front + d)),
-      ...Array.from({ length: 72 }, (_, k) => k * 5)];
-    const apart = (a, b) => { const d = (((a - b) % 360) + 360) % 360; return Math.min(d, 360 - d); };
-    const out = [];
-    for (let k = 0; k < count; k++) {
-      const near = (angle) => Math.min(360, ...[...taken, ...out].map((other) => apart(angle, other)));
-      const free = tried.find((angle) => near(angle) >= AI_APART);
-      out.push(free !== undefined ? free : tried.reduce((best, angle) => (near(angle) > near(best) ? angle : best)));
-    }
-    return out;
-  }
-
-  // An AI question's card at the table: in moonlight, not the seats' paper,
-  // so a recorded voice and an AI's question are told apart at a glance.
-  // Pressed, its choices: 「答える」 and 「閉じる」.
-  function aiBubble(id, card, at) {
-    const node = div("table-bubble ai unplaced");
-    node.append(div("badge", card.badge), div("voice", card.question), div("who", card.label));
-    Object.assign(node.dataset, { seat: id, utterance: "", x: at[0], y: at[1] });
-    node.style.setProperty("--k", "0");
-    node.tabIndex = 0;
-    node.setAttribute("role", "button");
-    node.setAttribute("aria-expanded", "false");
-    pressable(node, () => toggleChoices(id));
-    return node;
-  }
-
-  // Whose a seat at the table is, in words: a seat's title and detail, or
-  // コーチ's or オブザーバー's label.
+  // Whose a seat at the table is, in words: its title and detail. (コーチ
+  // and オブザーバー sit at the AI's seat, off the table: 直し32-3.)
   function nameAt(seatId) {
-    const token = tokens.find((t) => t.id === seatId && t.ai);
-    return token ? token.ai.label : whoOf(seatOf(seatId));
+    return whoOf(seatOf(seatId));
   }
 
   // Over a seat at the table whose card has no room: pressing it (or Enter
@@ -2004,8 +1933,6 @@ const EbinoMap = (() => {
     const card = [...overlay.querySelectorAll(".table-bubble")].find((node) => node.dataset.seat === seatId);
     if (!card || card.classList.contains("unplaced")) return;
     dropHint();
-    const ai = tokens.find((t) => t.id === seatId && t.ai);
-    if (ai) return openAnswer(seatId, card, ai.ai);
     app.setNow({ choices: true, pressed: true });
     const words = app.state.texts.bubble_choices, utteranceId = card.dataset.utterance;
     const node = div("map-choices");
@@ -2078,45 +2005,6 @@ const EbinoMap = (() => {
     marked();
     putChoices();
     read.focus({ preventScroll: true });
-  }
-
-  // The choices of コーチ's or オブザーバー's card (直し29-1): 「答える」, the
-  // same one-line box as below the map (app.answerForm; sent, the next round
-  // starts), and 「閉じる」. Not answering is fine: nothing waits on it.
-  function openAnswer(seatId, card, ai) {
-    const node = div("map-choices ai");
-    node.setAttribute("role", "group");
-    node.setAttribute("aria-label", ai.label);
-    const head = div("head");
-    const close = document.createElement("button");
-    close.type = "button";
-    close.className = "close";
-    close.textContent = app.state.texts.bubble_close;
-    close.addEventListener("click", () => closeChoices(true));
-    head.append(div("who", ai.label), close);
-    const answer = document.createElement("button");
-    answer.type = "button";
-    answer.textContent = app.state.texts.bubble_answer;
-    answer.dataset.choice = "answer";
-    const roundNo = tableRoundNo;
-    // The one box at the foot answers it (直し32-2).
-    answer.addEventListener("click", () => {
-      closeChoices(false);
-      app.answerTo(roundNo, ai.role);
-    });
-    // No paragraph here; putChoices lays out one, kept hidden.
-    const paragraph = div("paragraph");
-    paragraph.hidden = true;
-    paragraph.append(div("text"));
-    node.append(head, answer, paragraph);
-    node.addEventListener("keydown", (event) => moveInChoices(event, node));
-    card.after(node);
-    card.setAttribute("aria-expanded", "true");
-    const { token } = seatAtTable(card);
-    if (token) token.node.classList.add("chosen");
-    choices = { seatId, node, card, moved: false };
-    putChoices();
-    answer.focus({ preventScroll: true });
   }
 
   // Esc closes the choices, back to their lamp card; the arrows go from
@@ -2595,5 +2483,5 @@ const EbinoMap = (() => {
     relayout();
   }
 
-  return { init, show, round, refresh, marked, band: setBand, markOf, layoutAgain };
+  return { init, show, round, refresh, marked, markOf, layoutAgain };
 })();

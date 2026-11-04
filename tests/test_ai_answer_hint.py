@@ -28,6 +28,7 @@ function el(tag, attrs, ...kids) { return { tag, cls: attrs.class, text: attrs.t
   append(...more) { this.kids.push(...more); }, classList: { add() {} } }; }
 function answerEntry() { return el("button", { class: "quiet" }); }
 const onMap = () => {};
+function renderAiSeat() {}  // The AI's seat (直し32-3).
 const asked = [];
 function setNow(changes) { asked.push(changes); }
 const state = { texts: { ai_answer_hint: "HINT" }, bands: {}, aiAnswered: %(answered)s, lastRound: 1 };

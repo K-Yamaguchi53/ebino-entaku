@@ -160,7 +160,7 @@ def test_every_way_to_write_goes_to_the_one_box():
     assert "askSeat(seatId);" in _top("openCardFor")
     assert "answerTo(roundNo, role)" in _top("answerEntry")
     assert 'button("card", () => { closeChoices(false); app.askSeat(seatId); })' in MAP
-    assert "app.answerTo(roundNo, ai.role);" in MAP
+    assert "answerTo(roundNo, card.role);" in _top("renderAiSeat")  # The AI's seat (直し32-3).
     assert "app.askSeat(seatId);" in MAP[MAP.index("function press("):]
     assert "function answerForm" not in APP and "putUnderLine" not in APP and "keptDraft" not in APP
 

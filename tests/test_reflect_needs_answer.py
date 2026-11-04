@@ -33,10 +33,10 @@ def _top(name):
 _RUN = """
 %(source)s
 const line = { hidden: true, textContent: "" };
-const $ = (id) => (id === "reflect-needs-answer" ? line : null);
+const $ = (id) => (id === "reflect-needs-answer" ? line : id === "ai-seat" ? { hidden: true } : null);
 let opened = 0, focused = 0, scrolled = [];
 function openReflection() { opened += 1; }
-const card = { classList: { add() {}, remove() {} }, scrollIntoView(o) { scrolled.push(o.behavior); } };
+const card = { classList: { add() {}, remove() {}, contains: () => false }, scrollIntoView(o) { scrolled.push(o.behavior); } };
 const entry = { closest: () => card, focus() { focused += 1; } };
 const band = (open) => ({ querySelector: () => (open ? entry : null) });
 globalThis.document = { querySelectorAll: () => [] };

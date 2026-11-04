@@ -91,7 +91,7 @@ def test_one_mark_in_one_place_and_the_map_follows_it():
     assert "onMap((map) => map.marked())" in mark
     marked = _inner("marked")
     assert "app.state.marks" in marked and 'setAttribute("aria-pressed"' in marked
-    assert "return { init, show, round, refresh, marked, band: setBand, markOf, layoutAgain };" in MAP
+    assert "return { init, show, round, refresh, marked, markOf, layoutAgain };" in MAP
 
 
 def test_the_card_is_the_seat_lists_own_with_its_box_empty():

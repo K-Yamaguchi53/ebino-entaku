@@ -697,6 +697,7 @@ function setTo(next, { focus = true } = {}) {
   box.maxLength = next.kind === "ai" ? 120 : 200;
   box.placeholder = next.kind === "all" ? "例：" + state.texts.input_example : "";
   box.value = state.drafts[draftKey(next)] || "";
+  if (next.kind !== "ai") for (const button of document.querySelectorAll(".ai-question.chosen")) button.classList.remove("chosen");
   setNow();
   if (focus) box.focus({ preventScroll: true });
 }
@@ -788,7 +789,7 @@ async function sendAnswer(roundNo, role) {
     hideMessage();
     state.aiAnswered = true;
     $("reflect-needs-answer").hidden = true;
-    for (const node of document.querySelectorAll(".ai-card.needs-answer")) node.classList.remove("needs-answer");
+    for (const node of document.querySelectorAll(".needs-answer")) node.classList.remove("needs-answer");
     bandAnswered(roundNo, role);
     $("question").value = "";
     delete state.drafts[`ai:${roundNo}:${role}`];
@@ -847,6 +848,8 @@ function renderRound(round) {
   for (const id of round.silent_seats) state.silent.add(id);
 
   state.lastRound = round.round;
+  // The AI's seat keeps the questions it has (the one answered marked) until
+  // this round's come (renderAiSeat): it never goes blank meanwhile.
   // The first round with spoken words says once what they are (直し31-7).
   const spokenNote = $("spoken-note");
   if (round.quotes.some((quote) => quote.spoken) && !state.spokenNoted) {
@@ -937,8 +940,51 @@ async function loadBand(roundNo, box) {
   }
   box.append(part);
   state.bands[roundNo] = part;
-  // The same two sit at the round table (直し29-1), from this one call.
-  if (!band.answered) onMap((map) => map.band(roundNo, band.cards));
+  // The newest round's questions at the AI's seat (直し32-3), not at the table.
+  if (roundNo === state.lastRound) renderAiSeat(roundNo, band);
+}
+
+// --- the AI's seat (直し32-3) ---
+
+// コーチ and オブザーバー, out of the round table's ring: a rounded square in
+// the AI's blue with 「AI」 on it, its name, and the newest round's two
+// questions. Pressed, the box at the foot answers that one. The first time
+// there are questions, one line says they are the AI's, not the map's
+// people's; after that the name only.
+function renderAiSeat(roundNo, band) {
+  const seat = $("ai-seat");
+  $("ai-seat-mark").textContent = state.texts.ai_seat_mark;
+  $("ai-seat-label").textContent = state.texts.ai_seat_label;
+  const note = $("ai-seat-note");
+  if (!state.aiNoted) {
+    state.aiNoted = roundNo;
+    note.textContent = state.texts.ai_seat_note;
+  }
+  note.hidden = state.aiNoted !== roundNo;
+  const cards = $("ai-seat-cards");
+  cards.replaceChildren();
+  for (const card of band.cards) {
+    const button = el("button", { type: "button", class: "ai-question", "data-role": card.role, "data-round": roundNo },
+      el("span", { class: "who", text: card.label }), el("span", { class: "words", text: card.question }));
+    button.addEventListener("click", () => {
+      answerTo(roundNo, card.role);
+      markAiChosen(card.role);
+    });
+    if (band.answered) {
+      button.disabled = true;
+      if (band.answered === card.role) button.classList.add("answered");
+    }
+    cards.append(button);
+  }
+  seat.hidden = false;
+  mapMoved();  // The map's cards keep off it.
+}
+
+// The question the box at the foot answers, lit; the box back to everyone, none.
+function markAiChosen(role) {
+  for (const button of $("ai-seat-cards").children) {
+    button.classList.toggle("chosen", state.to.kind === "ai" && button.dataset.role === role);
+  }
 }
 
 function answerEntry(roundNo, role) {
@@ -949,6 +995,10 @@ function answerEntry(roundNo, role) {
 // One answer per band: the other card's 「答える」 goes away and the card
 // answered is marked, wherever the answer was written.
 function bandAnswered(roundNo, role) {
+  for (const button of document.querySelectorAll(`#ai-seat-cards .ai-question[data-round="${roundNo}"]`)) {
+    button.disabled = true;
+    button.classList.toggle("answered", button.dataset.role === role);
+  }
   const part = state.bands[roundNo];
   if (!part) return;
   for (const card of part.querySelectorAll(".ai-card")) {
@@ -1303,9 +1353,9 @@ function toReflection() {
   line.hidden = false;
   state.needsShown = true;
   const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const card = entry.closest(".ai-card");
-  openDrawer("rounds", document.activeElement, { focus: false });
-  for (const node of document.querySelectorAll(".ai-card.needs-answer")) node.classList.remove("needs-answer");
+  const card = entry.closest(".ai-card, .ai-question");
+  if (!card.classList.contains("ai-question")) openDrawer("rounds", document.activeElement, { focus: false });
+  for (const node of document.querySelectorAll(".needs-answer")) node.classList.remove("needs-answer");
   card.classList.add("needs-answer");
   card.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "center" });
   entry.focus({ preventScroll: true });
@@ -1314,6 +1364,9 @@ function toReflection() {
 // The newest round's card that can still be answered: its 「答える」, or the
 // box already open under it. None: null.
 function answerable() {
+  const seat = $("ai-seat");
+  const there = seat.hidden ? null : seat.querySelector(".ai-question:not(:disabled)");
+  if (there) return there;
   const rounds = Object.keys(state.bands).map(Number).sort((a, b) => b - a);
   for (const roundNo of rounds) {
     const entry = state.bands[roundNo].querySelector(".ai-card > button, .ai-card > form input:not(:disabled)");

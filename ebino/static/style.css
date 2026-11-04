@@ -42,9 +42,6 @@
   --wood-deep: #22170e;
   --wood-side: #170f09;
   --wood-lit: #7a5634;
-  --moon-paper: #d8e3f3;  /* Moonlit paper: an AI's question at the round table (直し29-1). */
-  --moon-paper-line: #9fb3d3;
-  --moon-paper-soft: #4c5a72;
   --river: #86b3dd;
   --ink: #ece6d8;  /* Words on the night. */
   --soft: #a9bdd9;  /* Quieter words on the night. */
@@ -738,20 +735,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .table-bubble { pointer-events: auto; cursor: pointer; outline: none; }
 .table-bubble:focus-visible { outline: 2px solid var(--lamp); outline-offset: 3px; }
 .table-bubble.marked { box-shadow: 0 0 0 3px var(--lamp), 0 0 24px var(--lamp-soft), 0 8px 20px var(--shadow); }
-/* コーチ's and オブザーバー's questions (直し29-1): moonlit paper, not the
-   seats' cream, so an AI's question is told from a recorded voice at a glance. */
-.table-bubble.ai { background: var(--moon-paper); box-shadow: 0 0 0 1px var(--moon-paper-line), 0 0 18px var(--moon-soft), 0 8px 20px var(--shadow); }
-.table-bubble.ai .tail { background: var(--moon-paper); }
-.table-bubble.ai .badge { font-family: var(--gothic); font-size: 11px; line-height: 1.5; color: var(--moon-paper-soft); }
-.table-bubble.ai .who { color: var(--moon-paper-soft); }
-.table-label.ai { background: var(--moon-paper); color: var(--paper-ink); }
-.token.ai-seat .halo { fill: var(--moon-faint); stroke: none; opacity: .7; }
-.token.ai-seat .shape { fill: var(--moon-paper); stroke: var(--moon); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
-/* Their choices: 「答える」 and 「閉じる」 in a row; the box, once open, a line of its own. */
-.map-choices.ai { display: flex; flex-wrap: wrap; align-items: center; }
-.map-choices.ai .head { flex: 1 1 100%; }
-.map-choices.ai .ai-answer { flex: 1 1 100%; display: flex; gap: 4px; }
-.map-choices.ai .ai-answer input { flex: 1 1 auto; min-width: 10em; width: 12em; }
 /* Its choices: a small card of the night by it, two choices to a line, in
    Gothic; the paragraph on paper, in Mincho, under them. */
 .map-choices { position: absolute; z-index: 1; max-width: calc(100% - 16px); pointer-events: auto;
@@ -985,14 +968,17 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .map-card { position: abs
   body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { display: flex; flex-direction: column; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) #map { height: auto; flex: none; flex-direction: column; gap: 0; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-room { flex: none; container-type: inline-size; }
-  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-frame { width: 100cqw; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-frame { width: min(100cqw, (100cqh - 300px) * var(--ratio, 1.3)); margin: 0 auto; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar { flex: none; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 6px 0 0; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-heading { flex: 1 1 100%; order: 9; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-buttons { flex-direction: row; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom { margin-left: auto; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom button { flex: none; }
-  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { container-type: normal; }
-  body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: static; width: auto; max-height: none; flex: 1 1 auto; min-height: 0; margin-top: 8px; }
+  /* The map a little smaller than the width where the height asks for it,
+     so its buttons, the counts card and the AI's seat fit under it. */
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { container-type: size; display: flex; flex-direction: column; overflow: hidden; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: static; width: auto; max-height: none; flex: 1 1 auto; min-height: 0; margin-top: 8px;
+    overflow: auto; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) #inside:not(:has(details[open])) { flex: none; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer { grid-column: 1; grid-row: 1; align-self: end; width: auto; max-height: 46%; z-index: 30; }
 }
@@ -1012,3 +998,43 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .ask { grid-template-colu
 /* A seat its card was made for: a small ring of the lamp's light on the map. */
 .pt.carded .halo { opacity: 1; stroke: var(--lamp); stroke-width: 2.4; stroke-dasharray: 3 3; fill-opacity: .25; }
 #to-reflect { white-space: nowrap; }
+
+/* --- the AI's seat (直し32-3): out of the round table's ring, in the AI's
+   blue, rounded squares with 「AI」 on them: never the seats' round paper
+   nor the lamp's honey, so its questions are not taken for the map's people. --- */
+.ai-seat { margin: 12px 0; padding: 10px 12px 12px; border: 2px solid var(--ai); border-radius: 14px;
+  background: var(--ai-deep); color: var(--ai-ink); }
+.ai-seat-head { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-weight: bold; font-size: 15px;
+  line-height: 1.4; }
+.ai-mark { display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 9px;
+  background: var(--ai); color: var(--ai-deep); font: 800 15px/1 var(--gothic); letter-spacing: .04em; }
+.ai-seat-note { margin: 0 0 8px; font-size: 14px; line-height: 1.6; color: var(--ai-ink); }
+.ai-seat-cards { display: grid; gap: 8px; }
+.ai-question { display: grid; gap: 2px; width: 100%; text-align: left; padding: 8px 12px; min-height: 44px;
+  border: 1px solid var(--ai); border-radius: 10px; background: color-mix(in srgb, var(--ai-deep) 70%, var(--night));
+  color: var(--ai-ink); font-family: var(--gothic); }
+.ai-question .who { font-size: 13px; font-weight: bold; color: var(--ai); }
+.ai-question .words { font-size: 15px; line-height: 1.6; }
+.ai-question:hover { border-color: var(--ai-ink); }
+.ai-question.chosen { box-shadow: 0 0 0 2px var(--ai); }
+.ai-question.answered { border-style: solid; border-width: 2px; }
+.ai-question:disabled { cursor: default; opacity: .7; }
+.ai-question.answered:disabled { opacity: 1; }
+.ai-question.needs-answer { box-shadow: 0 0 0 2px var(--lamp-soft), 0 0 18px var(--lamp-faint); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { --ai-w: clamp(240px, calc((100cqw - 212px - min(100cqw - 212px, 100cqh * var(--map-ratio, 1.3))) / 2 - 8px), 340px); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { position: absolute; z-index: 6; left: 0; bottom: 0; margin: 0; width: var(--ai-w);
+  max-height: calc(100% - 64px); overflow: auto; scrollbar-width: thin; scrollbar-color: var(--ai) transparent;
+  box-shadow: 0 10px 28px var(--shadow); }
+/* Beside the map where there is room; where there is not (1180), the map
+   steps right for it, as for the card of whose words are in, so it covers
+   no seat at the table. */
+@media (orientation: landscape) {
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage:has(#ai-seat:not([hidden])) .map-room { padding-left: calc(var(--ai-w) + 12px); }
+}
+@media (orientation: portrait) {
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { position: static; width: auto; max-height: none; flex: 0 1 auto; min-height: 0; margin: 8px 0 0;
+    padding: 8px 10px; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-head { margin-bottom: 4px; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-cards { grid-template-columns: 1fr 1fr; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-question { padding: 6px 10px; }
+}

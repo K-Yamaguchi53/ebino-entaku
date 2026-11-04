@@ -163,6 +163,10 @@ INSIDE_OPEN = "inside_open"
 QUESTION_EXAMPLES = "question_examples"
 QUESTION_EXAMPLES_LEAD = "question_examples_lead"
 QUESTION_EXAMPLES_END = "question_examples_end"
+# The AI's seat (直し32-3): its name, the line said the first time, its mark.
+AI_SEAT_LABEL = "ai_seat_label"
+AI_SEAT_NOTE = "ai_seat_note"
+AI_SEAT_MARK = "ai_seat_mark"
 # The bubbles as spoken words (直し31-7): the line said once, the small mark
 # on each such bubble, and the spoken words code lets in without the paragraph.
 SPOKEN_NOTE = "spoken_note"
@@ -187,7 +191,7 @@ SCREEN_TEXTS = (
     OPENING_SKIP, AI_ANSWER_HINT, CARD_ALREADY,
     HARVEST_SUBJECT_QUESTION, HARVEST_SUBJECT_PICK, HARVEST_SUBJECT_NONE,
     START_PURPOSE, INSIDE_HEADING, INSIDE_END, INSIDE_OPEN, QUESTION_EXAMPLES_LEAD, QUESTION_EXAMPLES_END,
-    SPOKEN_NOTE, SPOKEN_MARK,
+    SPOKEN_NOTE, SPOKEN_MARK, AI_SEAT_LABEL, AI_SEAT_NOTE, AI_SEAT_MARK,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS, QUESTION_EXAMPLES)
 

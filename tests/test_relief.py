@@ -639,7 +639,7 @@ def test_the_maps_words_are_among_what_a_label_or_bubble_keeps_off():
     fixed = _inner_function(script, "fixedBoxes")
     assert ".place-names text, .shelf-names text, .school text" in fixed and "seenWords(" in fixed
     # On the map, every seat the round lights, from the start; at the table, its seats and chairs.
-    assert "roundSeats.map(" in fixed and ".token .shape, .token.ai-seat .halo, .chair circle" in fixed
+    assert "roundSeats.map(" in fixed and ".token .shape, .chair circle" in fixed
     place = _inner_function(script, "place")
     assert "planBubble(" in place and "fixedBoxes(frameBox)" in place
     assert "fixedBoxes(frameBox)" in _inner_function(script, "relayout")
