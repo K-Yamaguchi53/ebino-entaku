@@ -95,7 +95,13 @@ const EbinoMap = (() => {
   const CHAIR_GAP = HIT_PX + 6;  // CSS px between an empty chair and its label, clear of that square.
   const DRAG_FROM = 5;  // px moved before a press becomes a drag.
   // Words drawn on the picture, in CSS px (they keep their size as it zooms).
-  const TEXT_PX = { place: 11, school: 12, shelf: 11 };
+  const TEXT_PX = { place: 11, school: 12, home: 12 };
+  // The seats' homes (直し33-3): 地域で働く大人 at their places on the map;
+  // 県外・海外に出た人 by a way out at the map's upper right corner, GATE_COLUMNS
+  // to a row, at most GATE_ROWS rows; 探究をした先輩 at the school's windows;
+  // 外から来た大人・先生, and whoever the map and the school have no room for,
+  // on the ground, one to a square. HOME_STEP CSS px between two side by side.
+  const HOME_STEP = 16, GATE_COLUMNS = 5, GATE_ROWS = 4;
   // The school (直し25-1). Its 3D picture: at the whole map a share of the
   // drawing's width (about 86px on a PC's full screen, the size 19d drew it for),
   // nearer in as the ground grows, but never under SCHOOL_MIN_PX nor over
@@ -133,7 +139,6 @@ const EbinoMap = (() => {
   let vb = null;  // The part of the drawing on screen.
   let splitLayer, tableLayer, schoolGroup = null;
   const points = {};  // Seat ID -> { node, seat, at() }.
-  let shelves = [];  // The picture's shelves: { shelf, rect, name, seats }.
   let tokens = [];  // Seats and empty chairs at the table: { node, at, scale }.
   let timers = [], flights = [];
   let sticky = null;  // The seat whose label stays (the last to light up).
@@ -326,7 +331,6 @@ const EbinoMap = (() => {
     svg.replaceChildren();
     overlay.replaceChildren();
     for (const id of Object.keys(points)) delete points[id];
-    shelves = [];
     tokens = [];
     schoolGroup = null;
     const base = withRelief ? reliefView(map.relief) : flatView();
@@ -334,6 +338,7 @@ const EbinoMap = (() => {
     const laid = compose(roomSize(), base.W, base.H, model);
     const [ox, oy] = laid.map;
     view = { ...base, W: laid.W, H: laid.H, upright: laid.upright, yard: { ...laid.yard, model }, column: laid.column,
+      unit: laid.W / roomSize().w,
       mapBox: [ox, oy, base.W, base.H],
       proj: (...at) => {
         const [x, y] = base.proj(...at);
@@ -372,26 +377,6 @@ const EbinoMap = (() => {
     const rim = layer("rim draw-first");
     rim.append(rc.polygon(rimLine, { ...ink, strokeWidth: 2.2 * S, roughness: 1.3, bowing: 0.8 }));
 
-    const mapShelves = map.shelves || [];
-
-    // Each kind's shelf: its name, faint, the same words as the seat list's
-    // heading for that kind. On the picture, the shelves sit in its corners.
-    const shelfBoxes = layer("shelf-boxes");
-    const shelfNames = layer("shelf-names");
-    for (const shelf of mapShelves) {
-      const words = app.state.kinds[shelf.kind];
-      if (!words) continue;
-      const [nx, ny] = view.relief ? shelf.label : P(...shelf.label);
-      const text = svgEl("text", { x: nx, y: ny });
-      text.textContent = words;
-      shelfNames.append(text);
-      if (!view.relief) continue;
-      const rect = svgEl("rect", { rx: 6 * S });
-      shelfBoxes.append(rect);
-      const onIt = seats.filter((s) => s.outer && s.kind === shelf.kind && s.x !== undefined);
-      shelves.push({ shelf, rect, name: text, seats: onIt.map((s) => s.seat_id) });
-    }
-
     if (map.crossing) {
       const line = layer("crossing");
       const [from, to] = [map.crossing.from, map.crossing.to].map(([x, y]) => P(x, y, 1));
@@ -402,13 +387,29 @@ const EbinoMap = (() => {
     splitLayer = layer("split-lines");
     // The school's picture, when it comes, under the points: no seat is hidden under it.
     const pictureLayer = layer("school-picture");
+    // Each seat at its home (直し33-3), worked out from the seat table each
+    // time it is drawn: 地域で働く大人 at their places, the others by the way
+    // out, at the school's windows and on its ground (homesOf).
+    const placed = seats.filter((seat) => seat.x !== undefined);
+    const homes = homesOf(placed.map((seat) => ({ id: seat.seat_id, kind: seat.kind,
+      at: seat.outer ? null : view.relief ? P(seat.x, seat.y, 1.5) : P(seat.x, seat.y) })), homePlace());
+    drawGate(layer("home-gate"), homes.gate);
     const seatLayer = layer("points");
-    for (const seat of seats) {
-      if (seat.x === undefined) continue;
+    for (const seat of placed) {
       const node = drawPoint(seat);
-      const spot = !view.relief ? P(seat.x, seat.y) : seat.outer ? null : P(seat.x, seat.y, 1.5);
-      points[seat.seat_id] = { node, seat, at: spot ? () => spot : () => shelfSpot(seat.seat_id) };
+      const spot = homes.spots[seat.seat_id];
+      points[seat.seat_id] = { node, seat, at: () => spot };
       seatLayer.append(node);
+    }
+    // Each home's name where it is, in the words of the seat list's headings
+    // (in place of the map's four corners' boxes).
+    const homeNames = layer("home-names");
+    for (const { kind, at, anchor } of homes.names) {
+      const words = app.state.kinds[kind];
+      if (!words) continue;
+      const text = svgEl("text", { class: `kind-${kind}`, x: at[0], y: at[1], "text-anchor": anchor, "data-px": TEXT_PX.home });
+      text.textContent = words;
+      homeNames.append(text);
     }
     // Over the points, outlined, so a point never hides a place name.
     const names = layer("place-names");
@@ -418,7 +419,6 @@ const EbinoMap = (() => {
       text.textContent = place.name;
       names.append(text);
     }
-    for (const text of shelfNames.children) text.dataset.px = TEXT_PX.shelf;
     // Over the points so its label reads; it takes no presses (not a seat).
     if (map.school) drawSchool(layer("school"), map.school, pictureLayer);
     tableLayer = layer("table");
@@ -460,6 +460,97 @@ const EbinoMap = (() => {
       building.append(svgEl("rect", { class: "yard-window", x: wx - 9, y: wy - 14, width: 18, height: 28, rx: 2 }));
     }
     group.append(building);
+  }
+
+  // What homesOf needs of the drawing as it is: the map's box, the yard's
+  // place and model, and the drawing's units to a CSS px.
+  function homePlace() {
+    // A point's radius at the whole drawing (pointScale and shape()).
+    return { mapBox: view.mapBox, yard: view.yard, unit: view.unit, r: Math.max(MIN_POINT_PX * view.unit, POINT_R * view.S) };
+  }
+
+  // Where each seat lives (直し33-3), in the drawing's units, from the seats
+  // as given ({ id, kind, at: its spot on the map or null }) in their order:
+  // 地域で働く大人 with a spot there; 県外・海外に出た人 in rows by the way out
+  // (GATE_COLUMNS × GATE_ROWS); 探究をした先輩 at the school's windows, one to
+  // a window (a window nearer than a point's width to one taken stays empty);
+  // then 外から来た大人・先生 first and everyone else left on the
+  // ground, one to a square. Returns { spots: id -> [x, y], gate, names:
+  // [{ kind, at, anchor }], counts }. The same seats give the same homes. It
+  // reads nothing but what it is given.
+  function homesOf(seats, place) {
+    const { mapBox: [mx, my, mw], yard: { x: yx, y: yy, k, model }, unit, r } = place;
+    const step = Math.max(HOME_STEP * unit, 2.4 * r);
+    const inYard = ([px, py]) => [yx + px * k, yy + py * k];
+    const windows = [], field = model.field.map(inYard);
+    for (const spot of model.windows.map(inYard)) {
+      if (windows.every(([x, y]) => Math.hypot(x - spot[0], y - spot[1]) >= 2.2 * r)) windows.push(spot);
+    }
+    const gate = [mx + mw - step * 1.4, my + step * 2.4];
+    const spots = {}, counts = { map: 0, gate: 0, windows: 0, ground: 0 }, ground = [];
+    for (const seat of seats) {
+      if (seat.kind === "adult" && seat.at) {
+        spots[seat.id] = seat.at;
+        counts.map += 1;
+      } else if (seat.kind === "cross" && counts.gate < GATE_COLUMNS * GATE_ROWS) {
+        const column = counts.gate % GATE_COLUMNS, row = Math.floor(counts.gate / GATE_COLUMNS);
+        spots[seat.id] = [gate[0] - (column + 1.6) * step, gate[1] + (row + 0.2) * step];
+        counts.gate += 1;
+      } else if (seat.kind === "poster" && counts.windows < windows.length) {
+        spots[seat.id] = windows[counts.windows];
+        counts.windows += 1;
+      } else ground.push(seat);
+    }
+    const first = ground.filter((seat) => seat.kind === "outsider_teacher");
+    const squares = groundSquares(field, ground.length, step);
+    [...first, ...ground.filter((seat) => seat.kind !== "outsider_teacher")].forEach((seat, n) => {
+      spots[seat.id] = squares[n];
+    });
+    counts.ground = ground.length;
+    const kinds = new Set(seats.map((seat) => seat.kind));
+    const xs = windows.map((p) => p[0]), top = Math.min(...windows.map((p) => p[1]));
+    const names = [];
+    if (counts.map) names.push({ kind: "adult", at: [mx + step * 0.6, my + step * 1.3], anchor: "start" });
+    if (counts.gate) names.push({ kind: "cross", at: [gate[0] + step * 0.6, gate[1] - step * 0.9], anchor: "end" });
+    if (kinds.has("poster")) {
+      names.push({ kind: "poster", at: [(Math.min(...xs) + Math.max(...xs)) / 2, Math.max(step, top - step * 2)], anchor: "middle" });
+    }
+    if (first.length || ground.length) {
+      const [nw, ne] = field;
+      names.push({ kind: "outsider_teacher", at: [(nw[0] + ne[0]) / 2, Math.max(step, Math.min(nw[1], ne[1]) - step * 0.5)],
+        anchor: "middle" });
+    }
+    return { spots, gate, names, counts };
+  }
+
+  // n squares on a ground (its four corners: north-west, north-east,
+  // south-east, south-west), step apart where it is large enough (closer
+  // where it is not), the block in its middle, row by row from the north.
+  // It reads nothing but what it is given.
+  function groundSquares([nw, ne, se, sw], n, step) {
+    if (!n) return [];
+    const wide = Math.hypot(ne[0] - nw[0], ne[1] - nw[1]), deep = Math.hypot(sw[0] - nw[0], sw[1] - nw[1]);
+    const most = Math.max(1, Math.floor(wide / step) - 1);
+    const columns = Math.min(most, n, Math.max(1, Math.ceil(Math.sqrt(n * wide / deep))));
+    const rows = Math.ceil(n / columns);
+    const across = Math.min(step, wide / (columns + 1)), down = Math.min(step, deep / (rows + 1));
+    const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    return Array.from({ length: n }, (_, m) => {
+      const c = m % columns, r = Math.floor(m / columns);
+      const u = 0.5 + (c - (columns - 1) / 2) * across / wide, v = 0.5 + (r - (rows - 1) / 2) * down / deep;
+      return mix(mix(nw, ne, u), mix(sw, se, u), v);
+    });
+  }
+
+  // The way out (直し33-3): a doorway at the map's upper right corner, open
+  // outward, in 県外・海外に出た人's colour; no words (its name is by it).
+  function drawGate(group, [x, y]) {
+    const s = view.unit;
+    group.setAttribute("aria-hidden", "true");
+    group.classList.add("kind-cross");
+    group.append(svgEl("path", { class: "door", d: `M ${x - 5 * s} ${y + 9 * s} V ${y - 8 * s} H ${x + 5 * s} V ${y + 9 * s}` }),
+      svgEl("path", { class: "out", d: `M ${x - 2 * s} ${y + 3 * s} L ${x + 9 * s} ${y - 8 * s} M ${x + 3 * s} ${y - 8 * s} H ${x + 9 * s} V ${y - 2 * s}` }));
+    for (const path of group.querySelectorAll("path")) path.style.strokeWidth = `${1.6 * s}px`;
   }
 
   // Drawn again for the room's shape as it is now, when that is not the
@@ -770,37 +861,9 @@ const EbinoMap = (() => {
     return Math.max(view.S, MIN_POINT_PX * (vb.w / across) / POINT_R);
   }
 
-  // The picture's shelves, one per corner (nothing is over the corners: the
-  // buttons are under the map), spaced so their points never touch at any width.
-  function layoutShelves(f) {
-    const margin = 14 * f;
-    const corners = [[0, 0], [1, 0], [0, 1], [1, 1]];
-    const [mx, my, mw, mh] = view.mapBox;
-    shelves.forEach((entry, k) => {
-      const [x0, y0, x1, y1] = entry.shelf.box;
-      const w = (x1 - x0) * f, h = (y1 - y0) * f;
-      const [cx, cy] = corners[k % corners.length];
-      const left = mx + (cx ? mw - w - margin : margin), top = my + (cy ? mh - h - margin : margin);
-      entry.origin = [left, top];
-      entry.scale = f;
-      Object.entries({ x: left, y: top, width: w, height: h }).forEach(([key, value]) => entry.rect.setAttribute(key, value));
-      entry.name.setAttribute("x", left + (entry.shelf.label[0] - x0) * f);
-      entry.name.setAttribute("y", top + (entry.shelf.label[1] - y0) * f);
-    });
-  }
-
-  function shelfSpot(seatId) {
-    const seat = points[seatId].seat;
-    const entry = shelves.find((s) => s.seats.includes(seatId));
-    if (!entry || !entry.origin) return [view.mapBox[0] + seat.x * view.S, view.mapBox[1] + seat.y * view.S];
-    const [x0, y0] = entry.shelf.box;
-    return [entry.origin[0] + (seat.x - x0) * entry.scale, entry.origin[1] + (seat.y - y0) * entry.scale];
-  }
-
   function rescale() {
     const f = pointScale();
     const perPx = vb.w / (frame.clientWidth || 1);
-    if (view.relief) layoutShelves(f);
     for (const { node, at } of Object.values(points)) {
       const [x, y] = at();
       node.setAttribute("transform", `translate(${x} ${y}) scale(${f})`);
@@ -1160,13 +1223,9 @@ const EbinoMap = (() => {
     const reach = 9.5 * pointScale() * frameBox.width / vb.w;
     const seats = tableTop ? [] : roundSeats.map((id) => toFrame(...spotOf(id)))
       .map(([px, py]) => [px - reach, py - reach, 2 * reach, 2 * reach]);
-    const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text, .school > :not(text), " +
+    const words = [...svg.querySelectorAll(".place-names text, .home-names text, .school text, .school > :not(text), " +
       ".school-picture image")].map((node) => boxIn(node, frameBox));
     const cover = tableTop && tableTop.map(([x, y]) => toFrame(x, y));
-    const shelfBoxes = shelfAreas().map(([x0, y0, x1, y1]) => {
-      const [left, top] = toFrame(x0, y0), [right, bottom] = toFrame(x1, y1);
-      return [left, top, right - left, bottom - top];
-    });
     // The arrow and the four ways' names (直し25-3), once they are put.
     const around = withAround ? [...overlay.querySelectorAll(".map-compass, .map-around, .map-hint")].map((node) => boxIn(node, frameBox)) : [];
     // What the one screen lays over the map's side (直し32-1): the card of
@@ -1175,20 +1234,7 @@ const EbinoMap = (() => {
       around.push(boxIn(node, frameBox));
     }
     return [...nodes.map((node) => boxIn(node, frameBox)), ...seats, ...(cover ? topStrips(cover) : []),
-      ...shelfBoxes, ...(withWords ? seenWords({ w: frameBox.width, h: frameBox.height }, words, cover) : []), ...around];
-  }
-
-  // The shelves, each a box of the drawing [x0, y0, x1, y1] with its name and
-  // its row of points: on the picture where layoutShelves put it (a corner),
-  // on the flat map where the map has it.
-  function shelfAreas() {
-    if (view.relief) {
-      return shelves.filter((entry) => entry.origin).map(({ shelf: { box: [x0, y0, x1, y1] }, origin: [left, top], scale }) =>
-        [left, top, left + (x1 - x0) * scale, top + (y1 - y0) * scale]);
-    }
-    const [ox, oy] = view.mapBox;
-    return (map.shelves || []).filter((shelf) => app.state.kinds[shelf.kind])
-      .map(({ box: [x0, y0, x1, y1] }) => [x0 + ox, y0 + oy, x1 + ox, y1 + oy]);
+      ...(withWords ? seenWords({ w: frameBox.width, h: frameBox.height }, words, cover) : []), ...around];
   }
 
   // The round table's top (a ring of spots in a frame) as a few boxes, band
@@ -1407,12 +1453,12 @@ const EbinoMap = (() => {
   }
 
   // A 「？」 by its seat, at the first of its four corners that covers no word
-  // drawn on the map (a place name, a shelf's name, the school's); with none
+  // drawn on the map (a place name, a home's name, the school's); with none
   // free, the one that covers least. Measured on screen, as the zoom is now.
   function placeAskMarks() {
     const marks = [...svg.querySelectorAll(".pt.silent .ask-mark")];
     if (!marks.length) return;
-    const words = [...svg.querySelectorAll(".place-names text, .shelf-names text, .school text, .school-picture image")]
+    const words = [...svg.querySelectorAll(".place-names text, .home-names text, .school text, .school-picture image")]
       .map((node) => node.getBoundingClientRect()).filter((r) => r.width)
       .map((r) => [r.left - WORD_PAD, r.top - WORD_PAD, r.width + 2 * WORD_PAD, r.height + 2 * WORD_PAD]);
     for (const mark of marks) {

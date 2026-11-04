@@ -578,13 +578,13 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .river path { stroke: var(--river); fill: none; }
 .drawing path { transition-property: stroke-dashoffset; transition-timing-function: ease-in-out; }
 /* While the round table is open, the map steps back under it. */
-.relief-image, .basin-fill, .river, .rim, .points, .place-names, .school, .school-picture, .shelf-boxes,
-.shelf-names, .crossing {
+.relief-image, .basin-fill, .river, .rim, .points, .place-names, .school, .school-picture, .home-names,
+.home-gate, .yard, .crossing {
   transition: opacity .9s ease;
 }
 .dim .relief-image { opacity: .42; }
 .dim .basin-fill, .dim .river, .dim .rim, .dim .points, .dim .place-names, .dim .school, .dim .school-picture,
-.dim .shelf-boxes, .dim .shelf-names, .dim .crossing { opacity: .26; }
+.dim .home-names, .dim .home-gate, .dim .yard, .dim .crossing { opacity: .26; }
 /* While the round table is open, the map's points behind take no mouse,
    press or touch (直し27-4); the table's own seats and chairs do. */
 .dim .points { pointer-events: none; }
@@ -592,8 +592,11 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .place-names { pointer-events: none; }
 .place-names text { fill: var(--soft); font-family: var(--gothic); font-size: 22px; letter-spacing: .18em;
   paint-order: stroke; stroke: var(--veil-thin); stroke-width: 2px; stroke-linejoin: round; }
-.shelf-names text { fill: var(--soft); font-family: var(--gothic); font-size: 17px; letter-spacing: .06em; }
-.shelf-boxes rect { fill: var(--veil); stroke: var(--moon-faint); }
+/* Each home's name where it is (直し33-3), in its kind's colour, outlined
+   like the place names so it reads over the picture. */
+.home-names text { fill: var(--kind); font-family: var(--gothic); font-size: 17px; font-weight: bold; letter-spacing: .06em;
+  paint-order: stroke; stroke: var(--night); stroke-linejoin: round; }
+.home-gate path { fill: none; stroke: var(--kind); stroke-linecap: round; stroke-linejoin: round; }
 /* The school: its wings and round roof in thin moonlight on the night, the
    glass at the top in the lamp's honey with the faintest light round it. */
 .school .wing, .school .dome { fill: var(--night); stroke: var(--moon); stroke-width: 1.1px;
@@ -843,7 +846,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* Motion reduced: nothing moves; everything is at once as it ends. */
 @media (prefers-reduced-motion: reduce) {
   .pt .halo, .pt .shape, .drawing path, .chair, .relief-image, .basin-fill, .river, .rim, .points, .place-names,
-  .school, .school-picture, .map-compass, .map-around, .shelf-boxes, .shelf-names, .crossing, button, .lab-choice::before, .map-bubble, .seat,
+  .school, .school-picture, .map-compass, .map-around, .home-names, .home-gate, .crossing, button, .lab-choice::before, .map-bubble, .seat,
   .choice, .choice::before { transition: none !important; }
   .map-bubble, .map-bubble .thread { animation: none !important; }
   .table-bubble { animation: none !important; }

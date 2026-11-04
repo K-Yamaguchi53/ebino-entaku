@@ -221,7 +221,8 @@ def test_the_shelf_names_are_the_seat_lists_headings_from_the_same_place(data):
     assert set(shelves[0]) == {"kind", "box", "label"}  # The words are not here twice ...
     assert shelves[0]["kind"] in setup["kinds"]  # ... the screen takes them from setup's kinds.
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
-    assert "app.state.kinds[shelf.kind]" in script
+    # Each home's name (直し33-3), in setup's kinds' words.
+    assert "const words = app.state.kinds[kind];" in script
 
 
 def test_the_place_names_are_drawn_over_the_points_and_outlined():

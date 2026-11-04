@@ -436,19 +436,22 @@ _ROUND = {
 
 _SCENE_RUN = r"""
 %(consts)s
-let view, vb, frame = { clientWidth: 0 }, shelves = [], points = {};
+let view, vb, frame = { clientWidth: 0 }, points = {}, homes = null, yardPicture = null;
 %(source)s
 const setup = %(setup)s, round = %(round)s, screens = %(screens)s;
 const map = setup.map;
 const app = { state: { kinds: setup.kinds } };
 view = reliefView(map.relief);
-// The map alone, as before the yard beside it (直し33-2): its box the whole drawing.
+// The map alone, as before the yard beside it (直し33-2): its box the whole
+// drawing; the plain yard in its lower right quarter, for the homes there (直し33-3).
 view.mapBox = [0, 0, view.W, view.H];
+const yardModelHere = yardModel();
+view.yard = { x: view.W * 0.62, y: view.H * 0.66, k: view.W * 0.36 / yardModelHere.width, model: yardModelHere };
 const P = view.proj;
 const stub = () => { const node = {}; node.setAttribute = (key, value) => { node[key] = value; }; return node; };
 for (const seat of setup.seats) points[seat.seat_id] = { seat };
 const isSilent = (id) => round.silent_seats.includes(id);
-const spotOf = (id) => points[id].seat.outer ? shelfSpot(id) : P(points[id].seat.x, points[id].seat.y, 1.5);
+const spotOf = (id) => homes.spots[id];
 const chars = (text) => [...text].length;
 const area = (a, b) => Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0])) *
   Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]));
@@ -470,12 +473,12 @@ function scene(width) {
   const fr = { w: width, h: width * view.H / view.W };
   const toFrame = (x, y) => [(x - vb.x) / vb.w * fr.w, (y - vb.y) / vb.h * fr.h];
   const perPx = () => vb.w / fr.w;
-  shelves = map.shelves.filter((shelf) => setup.kinds[shelf.kind]).map((shelf) => ({ shelf, rect: stub(),
-    name: stub(), words: setup.kinds[shelf.kind],
-    seats: setup.seats.filter((s) => s.outer && s.kind === shelf.kind).map((s) => s.seat_id) }));
+  view.unit = view.W / width;
+  homes = homesOf(setup.seats.map((s) => ({ id: s.seat_id, kind: s.kind, at: s.outer ? null : P(s.x, s.y, 1.5) })),
+    { mapBox: view.mapBox, yard: view.yard, unit: view.unit, r: Math.max(MIN_POINT_PX * view.unit, POINT_R * view.S) });
   // The words on the map in the frame, as the screen draws them: each its
   // size in CSS px whatever the zoom, place names a little spaced out.
-  // Place names first, then the shelves' names, then the school's.
+  // Place names first, then the homes' names, then the school's.
   const words = () => {
     const out = [];
     const word = (x, y, text, size, spacing, middle) => {
@@ -483,7 +486,10 @@ function scene(width) {
       out.push([middle ? x - w / 2 : x, y - size * 1.05, w, size * 1.3]);
     };
     for (const place of map.places) word(...toFrame(...P(place.x, place.y, 2)), place.name, TEXT_PX.place, 1.18, true);
-    for (const entry of shelves) word(...toFrame(entry.name.x, entry.name.y), entry.words, TEXT_PX.shelf, 1, false);
+    for (const name of homes.names) {
+      const [x, y] = toFrame(...name.at), text = setup.kinds[name.kind], w = chars(text) * TEXT_PX.home;
+      word(name.anchor === "end" ? x - w : name.anchor === "middle" ? x - w / 2 : x, y, text, TEXT_PX.home, 1, false);
+    }
     if (map.school) {
       const [x, y] = P(map.school.x, map.school.y, 1), k = Math.max(view.S, TEXT_PX.school * perPx() / 20);
       word(...toFrame(x, y + 25 * k), map.school.label, 20 * k / perPx(), 1, true);
@@ -491,36 +497,29 @@ function scene(width) {
     return out;
   };
   // The buttons are under the map, not over it: nothing of them is in the frame.
-  const out = { bubbles: [], labels: [], unplaced: 0, wordsLeftOut: 0, shelfNames: 0, shelfNamesSeen: 0, farByFixed: 0 };
+  const out = { bubbles: [], labels: [], unplaced: 0, wordsLeftOut: 0, homeNames: 0, homeNamesSeen: 0, farByFixed: 0 };
 
   // The seats light up one by one on the whole map, each with its bubble;
   // the bubbles of the seats just before are still up. Every seat of the
   // round is kept clear from the start (one lit later is not under a bubble).
   vb = { x: 0, y: 0, w: view.W, h: view.H };
-  layoutShelves(pointScale());
-  out.shelfNames = shelves.length;
+  out.homeNames = homes.names.length;
   const up = [];
   const still = Math.ceil(BUBBLE_FOR / LIGHT_EVERY) - 1;
   const lit = round.seat_order.map((id) => {
     const [px, py] = toFrame(...spotOf(id)), r = 9.5 * pointScale() / perPx();
     return [px - r, py - r, 2 * r, 2 * r];
   });
-  // The shelves with their rows of points, as fixedBoxes takes them.
-  const shelfBoxes = () => shelfAreas().map(([x0, y0, x1, y1]) => {
-    const [left, top] = toFrame(x0, y0), [right, bottom] = toFrame(x1, y1);
-    return [left, top, right - left, bottom - top];
-  });
-  out.shelfBoxes = shelfBoxes().length;
   round.seat_order.forEach((id, k) => {
     const [px, py] = toFrame(...spotOf(id));
     const quote = round.quotes.find((q) => q.seat_id === id);
     const text = `「${[...quote.text].slice(0, BUBBLE_CHARS).join("")}…」`;
     const box = { ...cardBox(fr, text), px, py, gap: 18 };
     const all = words();
-    const shelfNames = all.slice(map.places.length, map.places.length + shelves.length).filter((w) => inFrame(fr, w));
-    out.shelfNamesSeen = Math.max(out.shelfNamesSeen, shelfNames.length);
+    const homeNames = all.slice(map.places.length, map.places.length + homes.names.length).filter((w) => inFrame(fr, w));
+    out.homeNamesSeen = Math.max(out.homeNamesSeen, homeNames.length);
     const seen = seenWords(fr, all, null);
-    const fixed = [...seen, ...lit, ...shelfBoxes()];
+    const fixed = [...seen, ...lit];
     const alive = up.filter((b) => b.k >= k - still && !b.gone);
     const [spot, least, drop] = planBubble(fr, box, fixed, [], alive.map((b) => b.box));
     const placed = [spot[0], spot[1], box.w, box.h];
@@ -536,8 +535,8 @@ function scene(width) {
     // short frame), as near as they let it be.
     const canBe = awayOf(chooseSpot(fr, box, fixed)[0]);
     if (canBe > Math.max(BUBBLE_NEAR, fr.w * BUBBLE_NEAR_PART)) out.farByFixed += 1;
-    out.bubbles.push({ least, near: away <= Math.max(BUBBLE_NEAR, fr.w * BUBBLE_NEAR_PART, canBe), onFixed: covers(placed, fixed),
-      onShelfNames: covers(placed, shelfNames), onShelves: covers(placed, shelfBoxes()),
+    out.bubbles.push({ least, near: away <= Math.max(BUBBLE_NEAR, fr.w * BUBBLE_NEAR_PART, canBe) + 1, onFixed: covers(placed, fixed),
+      onHomeNames: covers(placed, homeNames),
       onBubbles: covers(placed, alive.filter((b) => !b.gone).map((b) => b.box)),
       inside: placed[0] >= 0 && placed[1] >= 0 && placed[0] + placed[2] <= fr.w && placed[1] + placed[3] <= fr.h });
   });
@@ -550,10 +549,9 @@ function scene(width) {
   const center = { x: cx, y: cy, level: view.zAt(cx, cy) };
   vb = tableView(center);
   const f = pointScale();
-  layoutShelves(f);
   const { seats } = seating(round, round.seat_order, frontAngle(center));
   const cover = ring(center, 0, TABLE_LIFT).map((p) => toFrame(...p));
-  const fixed = [...topStrips(cover), ...shelfBoxes()], labels = [];
+  const fixed = [...topStrips(cover)], labels = [];
   for (const sitting of seats) {
     const at = onTable(center, sitting.angle, SEAT_OUT), chair = sitting.group === "front";
     const k = chair ? Math.max(f * 1.2, MIN_CHAIR_PX * perPx() / CHAIR_R) : f * TOKEN;
@@ -590,8 +588,8 @@ process.stdout.write(JSON.stringify(result));
 def _scenes():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     consts = script[script.index("  const NS ="):script.index("  let map = null;")]
-    names = ["centroid", "reliefView", "onTable", "ring", "tableView", "frontAngle", "seating", "pointScale", "layoutShelves",
-             "shelfSpot", "chooseSpot", "planLabels", "within", "seenWords", "planBubble", "topStrips", "shelfAreas"]
+    names = ["centroid", "reliefView", "onTable", "ring", "tableView", "frontAngle", "seating", "pointScale", "yardModel",
+             "homesOf", "groundSquares", "chooseSpot", "planLabels", "within", "seenWords", "planBubble", "topStrips"]
     source = "".join(_inner_function(script, name) for name in names)
     seats = [make_seat(seat_id=seat, kind=kind, title=f"架空の席{seat}", company="", display_name="",
                        district=district) for seat, kind, district in _ROUND_SEATS]
@@ -611,15 +609,14 @@ def test_bubbles_labels_and_the_heading_keep_off_the_maps_words_seats_and_button
     assert set(scenes) == set(SCREENS)
     left_out = far_by_fixed = 0
     for name, scene in scenes.items():
-        # The four shelves' names are on screen while the seats light up.
-        assert scene["shelfNames"] == 4 and scene["shelfNamesSeen"] == 4 and scene["shelfBoxes"] == 4, name
-        # Each bubble clear of the place names, the shelves' names, the
-        # school's name, the seats of the round, the shelves with their rows
-        # of points, and the bubbles still up, inside the frame, and near its
-        # own seat.
+        # The homes' names (直し33-3) are on screen while the seats light up.
+        assert scene["homeNames"] == 4 and scene["homeNamesSeen"] == 4, name
+        # Each bubble clear of the place names, the homes' names, the
+        # school's name, the seats of the round, and the bubbles still up,
+        # inside the frame, and near its own seat.
         assert len(scene["bubbles"]) == len(_ROUND["seat_order"]), name
         for bubble in scene["bubbles"]:
-            assert bubble == {"least": 0, "near": True, "onFixed": 0, "onShelfNames": 0, "onShelves": 0,
+            assert bubble == {"least": 0, "near": True, "onFixed": 0, "onHomeNames": 0,
                               "onBubbles": 0, "inside": True}, name
         # At the table every label is put, clear of those words (but the
         # ones the table's top hides), the table's top, the seats, the
@@ -639,7 +636,7 @@ def test_bubbles_labels_and_the_heading_keep_off_the_maps_words_seats_and_button
 def test_the_maps_words_are_among_what_a_label_or_bubble_keeps_off():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     fixed = _inner_function(script, "fixedBoxes")
-    assert ".place-names text, .shelf-names text, .school text" in fixed and "seenWords(" in fixed
+    assert ".place-names text, .home-names text, .school text" in fixed and "seenWords(" in fixed
     # On the map, every seat the round lights, from the start; at the table, its seats and chairs.
     assert "roundSeats.map(" in fixed and ".token .shape, .chair circle" in fixed
     place = _inner_function(script, "place")
@@ -778,12 +775,12 @@ def test_a_heading_and_a_labs_name_wrap_only_between_their_pieces():
     assert ".phrase { display: inline-block; max-width: 100%; }" in css
 
 
-def test_cards_keep_off_the_shelves_and_a_seats_mark_off_the_maps_words():
+def test_cards_keep_off_the_homes_names_and_a_seats_mark_off_the_maps_words():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     fixed = _inner_function(script, "fixedBoxes")
-    assert "shelfAreas()" in fixed and "...shelfBoxes," in fixed
+    assert ".home-names text" in fixed and "shelf" not in fixed  # No boxes in the map's corners (直し33-3).
     marks = _inner_function(script, "placeAskMarks")
-    assert ".place-names text, .shelf-names text, .school text" in marks and "leastCovered(" in marks
+    assert ".place-names text, .home-names text, .school text" in marks and "leastCovered(" in marks
     assert "placeAskMarks();" in _inner_function(script, "relayout") and "placeAskMarks();" in _inner_function(script, "refresh")
     plan = _inner_function(script, "leastCovered")
     for outside in ("overlay", "dataset", "document", "vb", "style", "classList", "svg"):
