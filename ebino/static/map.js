@@ -1952,8 +1952,9 @@ const EbinoMap = (() => {
     const others = shown.map((other) => boxIn(other, frameBox));
     const seat = seatAtTable(card);
     const own = boxIn(card, frameBox), hard = fixedBoxes(frameBox, false, false);
-    const block = [...tableLayer.querySelectorAll(".token .shape, .chair circle")].map((other) => boxIn(other, frameBox))
-      .concat(tableTop ? topStrips(tableTop.map(([x, y]) => toFrame(x, y))) : []);
+    // A tail never crosses the table's top (top); it crosses no seat or chair either (block) but as a last resort.
+    const top = tableTop ? topStrips(tableTop.map(([x, y]) => toFrame(x, y))) : [];
+    const block = [...tableLayer.querySelectorAll(".token .shape, .chair circle")].map((other) => boxIn(other, frameBox)).concat(top);
     // ring: how far the seat's ring of light reaches, which choices with no tail keep off.
     const halo = seat.token && seat.token.node.querySelector(".halo").getBoundingClientRect();
     const item = { w: own[2], h: own[3], px: seat.px, py: seat.py, r: seat.r, gap: seat.r + TAIL_LENGTH,
@@ -1985,15 +1986,16 @@ const EbinoMap = (() => {
     };
     // By its own card, the first way that covers nothing of soft; with
     // none, the one that covers least.
-    // Failing all, the choices' tail may cross the other seats; failing
-    // that, right by the seat they need none (the seat's ring says whose
-    // they are); and only failing that may the moved card's tail cross a
-    // seat: the choices are always against their card.
+    // Failing all, the choices' tail may cross the other seats (never the
+    // table's top); failing that, right by the seat they need none (the
+    // seat's ring says whose they are), off its ring, then by it; and only
+    // failing that may the moved card's tail cross a seat: the choices are
+    // always against their card.
     const search = (tried) => {
       let planned = null;
       // needTail: true, or false (none, off the seat's ring), or "near" (none, by the ring).
-      for (const [cardCrossed, crossed, needTail] of [[block, block, true], [block, [], true], [block, [], false],
-        [[], [], true], [[], [], false], [block, [], "near"], [[], [], "near"]]) {
+      for (const [cardCrossed, crossed, needTail] of [[block, block, true], [block, top, true], [block, top, false],
+        [block, top, "near"], [top, top, true], [top, top, false], [top, top, "near"]]) {
         const spots = cardSpots(frameWH, item, own, hard, cardCrossed, reach);
         for (const way of tried) {
           lay(way);

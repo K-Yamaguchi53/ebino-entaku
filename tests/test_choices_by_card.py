@@ -39,7 +39,8 @@ def test_the_choices_say_whose_they_are_and_close_with_the_teachers_word():
 def test_the_choices_get_a_tail_and_their_card_stays_in_sight():
     put = _inner("putChoices")
     assert "choicesPlan(frameWH, item, own, { w: width, h: height }, hard, crossed, others, spots, needTail)" in put
-    assert "for (const [cardCrossed, crossed, needTail] of [[block, block, true], [block, [], true], [block, [], false]," in put
+    assert "for (const [cardCrossed, crossed, needTail] of [[block, block, true], [block, top, true], [block, top, false]," in put
+    assert '[block, top, "near"], [top, top, true], [top, top, false], [top, top, "near"]]' in put  # Never over the top.
     assert "spots = cardSpots(frameWH, item, own, hard, cardCrossed, reach);" in put  # The card's tail last of all.
     assert "if (plan.tail) drawTail(node, [...plan.spot, width, height], item);" in put
     assert "drawTail(card, [...plan.at, own[2], own[3]], item);" in put and "choices.moved = true;" in put
@@ -119,6 +120,6 @@ def test_choices_with_no_tail_keep_off_the_pressed_seats_ring_and_the_paragraph_
     plan = _inner("choicesPlan")
     assert 'if (!seen && needTail !== "near" && Math.hypot(' in plan and "< (card.ring || card.r)) continue;" in plan
     # Only as the last resorts may they touch the ring.
-    assert '[block, [], "near"], [[], [], "near"]' in put
+    assert '[block, top, "near"]' in put
     room = _inner("seatRoom")
     assert "SEAT_ROOM" in room and ".shape" in room
