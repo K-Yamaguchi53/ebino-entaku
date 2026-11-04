@@ -188,3 +188,24 @@ def test_no_name_of_the_schools_booklet_is_in_the_repository():
                  *(root / "ebino").rglob("*.py"), *(root / "ebino" / "static").glob("*.*")]:
         if path.suffix in (".py", ".md", ".txt", ".tsv", ".js", ".css", ".html"):
             assert name not in path.read_text(encoding="utf-8"), path.name
+
+
+# --- 直し31続き-5: the band off the map, and Japanese broken between words ---
+
+def test_the_map_fits_under_the_band():
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    rule = css[css.index(".map {"):]
+    rule = rule[:rule.index("}")]
+    assert "var(--now-h, 0px)" in rule  # The band's height is kept out of the map's.
+    assert 'setProperty("--now-h"' in (STATIC / "app.js").read_text(encoding="utf-8")
+
+
+def test_the_boxes_a_student_reads_break_between_words():
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    at = css.index("word-break: auto-phrase;")
+    head = css[css.rindex("*/", 0, at) + 2:css.index("{", css.rindex("*/", 0, at))]
+    boxes = {name.strip() for name in head.replace("\n", " ").split(",")}
+    for box in (".now-line", ".inside", ".harvest", ".sheet", ".quote", ".table-bubble", ".map-bubble", ".map-choices",
+                ".round", ".ai-card", ".closing", ".map-hint", ".heavy-talk", ".seats", "#reflect"):
+        assert box in boxes, box
+    assert '<html lang="ja">' in (STATIC / "index.html").read_text(encoding="utf-8")  # auto-phrase needs the language.
