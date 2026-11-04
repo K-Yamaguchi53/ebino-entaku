@@ -580,6 +580,24 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 }
 @keyframes thread { from { transform: rotate(var(--a)) scaleX(0); } }
 @media (min-width: 1600px) { .map-bubble .voice { font-size: 18px; } }
+/* At the round table (直し26-1): each seat that spoke keeps its lamp card, a
+   little smaller than on the whole map so more find room, its paper tail
+   pointing at its chair. They come one after another; they stay. */
+.table-bubble { position: absolute; padding: 8px 12px 7px; border-radius: 4px; background: var(--paper);
+  color: var(--paper-ink); box-shadow: 0 0 0 1px var(--paper-line), 0 0 18px var(--lamp-soft), 0 8px 20px var(--shadow);
+  animation: kindle .45s ease-out both; animation-delay: calc(var(--k, 0) * 140ms); }
+.table-bubble .voice { font-family: var(--mincho); font-size: 15px; line-height: 1.7; max-width: 13em; }
+.table-bubble .who { width: 0; min-width: 100%; margin-top: 2px; font-family: var(--gothic); font-size: 12px;
+  line-height: 1.5; color: var(--paper-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.table-bubble .tail { position: absolute; height: 14px; margin-top: -7px; transform-origin: 0 50%;
+  transform: rotate(var(--a)); background: var(--paper); clip-path: polygon(0 50%, 100% 0, 100% 100%);
+  pointer-events: none; }
+/* Under the card a seat shows when pressed. */
+.table-bubble.behind, .table-label.behind { visibility: hidden; }
+/* Over a seat at the table whose card has no room: pressed, it shows it. */
+.seat-press { position: absolute; width: 44px; height: 44px; border-radius: 50%; pointer-events: auto;
+  cursor: pointer; outline: none; }
+.seat-press:focus-visible { box-shadow: 0 0 0 2px var(--lamp); }
 .split-tag { background: var(--veil); color: var(--lamp); border: 1px dashed var(--lamp-soft);
   font-family: var(--mincho); font-weight: 600; font-size: .9rem; }
 /* At the table, a seat's name is a small card set by its chair. */
@@ -630,4 +648,5 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   .school, .school-picture, .map-compass, .map-around, .shelf-boxes, .shelf-names, .crossing, button, .lab-choice::before, .map-bubble, .seat,
   .choice, .choice::before { transition: none !important; }
   .map-bubble, .map-bubble .thread { animation: none !important; }
+  .table-bubble { animation: none !important; }
 }

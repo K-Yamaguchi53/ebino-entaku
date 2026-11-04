@@ -21,6 +21,15 @@ const EbinoMap = (() => {
   // CSS px: a card further from its seat reads as another seat's (on a wide
   // frame, this part of its width, if more: a thread of light ties the two).
   const BUBBLE_NEAR = 100, BUBBLE_NEAR_PART = 0.12;
+  // At the round table (直し26-1) each seat that spoke keeps its lamp card,
+  // its tail pointing at its chair, the card within TABLE_REACH px of it (or
+  // this part of the frame's width, if more); a card with no room that near
+  // is left out, and its seat shows it when pressed.
+  const TABLE_REACH = 120, TABLE_REACH_PART = 0.13;
+  const TABLE_STEP = 6;  // px between two spots tried for a card at the table.
+  const TAIL_CORNER = 12;  // px a tail keeps from its card's corners.
+  const TAIL_LENGTH = 16;  // px: a card's tail, at the least.
+  const SEAT_PRESS = 44;  // px: the square a seat with no card up takes a press over.
   const DRAW_FOR = 1800;  // ms to draw the rim; the river follows.
   const RIPPLE_FOR = 1600;  // ms of the ring a seat sends out when its voice lights.
   const FADE_FOR = 300;  // ms a card takes to go, at the end of its BUBBLE_FOR.
@@ -74,6 +83,7 @@ const EbinoMap = (() => {
   let roundSeats = [];  // The seats this round lights, in order.
   let soon = null;
   let hovered = null;  // The seat under the mouse (the nearest of the marks it is over).
+  let opened = null;  // At the table, the seat whose card was left out and is shown, pressed.
 
   const reduced = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = (id) => document.getElementById(id);
@@ -868,7 +878,8 @@ const EbinoMap = (() => {
     node.style.width = "";
     // A voice's card: its lines about twenty characters (style.css), never
     // more than half the frame across.
-    const most = node.classList.contains("map-bubble") ? frameBox.width * 0.5 : Math.min(frameBox.width * 0.7, 18 * 16);
+    const voice = node.classList.contains("map-bubble") || node.classList.contains("table-bubble");
+    const most = voice ? frameBox.width * 0.5 : Math.min(frameBox.width * 0.7, 18 * 16);
     node.style.maxWidth = `${Math.floor(Math.min(most, frameBox.width - 8))}px`;
     node.style.width = `${Math.ceil(node.getBoundingClientRect().width)}px`;
     const { width, height } = node.getBoundingClientRect();
@@ -911,7 +922,7 @@ const EbinoMap = (() => {
   // takes a press; the shelves with their rows of points; and what is drawn
   // on the map in words: the place names, the shelves' names, the school's
   // name and its mark.
-  function fixedBoxes(frameBox, withAround = true) {
+  function fixedBoxes(frameBox, withAround = true, withWords = true) {
     const nodes = [...tableLayer.querySelectorAll(".token .shape, .chair circle, .chair .hit")];
     // A seat of the round at the size it has once lit (not met yet, it is drawn smaller).
     const reach = 9.5 * pointScale() * frameBox.width / vb.w;
@@ -927,7 +938,7 @@ const EbinoMap = (() => {
     // The arrow and the four ways' names (直し25-3), once they are put.
     const around = withAround ? [...overlay.querySelectorAll(".map-compass, .map-around")].map((node) => boxIn(node, frameBox)) : [];
     return [...nodes.map((node) => boxIn(node, frameBox)), ...seats, ...(cover ? topStrips(cover) : []),
-      ...shelfBoxes, ...seenWords({ w: frameBox.width, h: frameBox.height }, words, cover), ...around];
+      ...shelfBoxes, ...(withWords ? seenWords({ w: frameBox.width, h: frameBox.height }, words, cover) : []), ...around];
   }
 
   // The shelves, each a box of the drawing [x0, y0, x1, y1] with its name and
@@ -975,6 +986,101 @@ const EbinoMap = (() => {
     return [best, least, false];
   }
 
+  function boxesMeet(a, b) {
+    return a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
+  }
+
+  // Whether the line from a to b passes through a box [left, top, width,
+  // height]. It reads nothing but what it is given.
+  function crosses([ax, ay], [bx, by], [left, top, w, h]) {
+    let t0 = 0, t1 = 1;
+    const dx = bx - ax, dy = by - ay;
+    for (const [p, q] of [[-dx, ax - left], [dx, left + w - ax], [-dy, ay - top], [dy, top + h - ay]]) {
+      if (p === 0) {
+        if (q < 0) return false;
+        continue;
+      }
+      const t = q / p;
+      if (p < 0) {
+        if (t > t1) return false;
+        t0 = Math.max(t0, t);
+      } else {
+        if (t < t0) return false;
+        t1 = Math.min(t1, t);
+      }
+    }
+    return t0 < t1;
+  }
+
+  // A card's tail ([left, top, width, height] in the frame): from r short of
+  // its seat's spot (px, py) to the side of the card that faces it, TAIL_CORNER
+  // from its corners where the side is long enough. [[from], [to]], or null
+  // when the card is that close. It reads nothing but what it is given.
+  function tailEnds([left, top, w, h], px, py, r) {
+    const along = (v, lo, hi) => (hi - lo > 2 * TAIL_CORNER ? Math.min(Math.max(v, lo + TAIL_CORNER), hi - TAIL_CORNER) : (lo + hi) / 2);
+    const outX = Math.max(left - px, 0, px - left - w), outY = Math.max(top - py, 0, py - top - h);
+    if (!outX && !outY) return null;
+    const [qx, qy] = outX >= outY
+      ? [px < left ? left : left + w, along(py, top, top + h)]
+      : [along(px, left, left + w), py < top ? top : top + h];
+    const length = Math.hypot(qx - px, qy - py);
+    if (length <= r + 4) return null;
+    return [[px + (qx - px) * r / length, py + (qy - py) * r / length], [qx, qy]];
+  }
+
+  // Where each card at the table goes (直し26-1), in the order given (the
+  // round's seat_order), each a box { w, h, px, py, gap, r, inView } in a
+  // frame { w, h }: inside the frame, within reach of its seat, covering none
+  // of the fixed boxes nor a card put before it, no tail crossing a card, and
+  // its own tail crossing none of block (the seats, the chairs, the table's
+  // top). null leaves a card out: off screen, or no such spot. The same frame
+  // gives the same places. It reads nothing but what it is given.
+  function planTableBubbles(frame, items, fixed, block, reach) {
+    const taken = [...fixed], cards = [], tails = [];
+    return items.map((item) => {
+      if (!item.inView) return null;
+      const found = tableBubbleSpot(frame, item, taken, [...block, ...cards], tails, reach);
+      if (!found) return null;
+      const [spot, tail] = found;
+      const box = [spot[0], spot[1], item.w, item.h];
+      taken.push(box);
+      cards.push(box);
+      if (tail) tails.push(tail);
+      return spot;
+    });
+  }
+
+  // One card's spot: first the eight round its seat (above first), then the
+  // nearest free one within reach. [spot, its tail] or null.
+  function tableBubbleSpot(frame, item, taken, block, tails, reach) {
+    const { w, h, px, py, gap, r } = item, m = 4;
+    if (w > frame.w - 2 * m || h > frame.h - 2 * m) return null;
+    const clamp = ([left, top]) => [Math.max(m, Math.min(left, frame.w - w - m)), Math.max(m, Math.min(top, frame.h - h - m))];
+    const away = ([left, top]) => Math.hypot(Math.max(left - px, 0, px - left - w), Math.max(top - py, 0, py - top - h));
+    const d = gap * 0.7;
+    const round = [[px - w / 2, py - h - gap], [px - w / 2, py + gap], [px + gap, py - h / 2], [px - w - gap, py - h / 2],
+      [px + d, py - h - d], [px - w - d, py - h - d], [px + d, py + d], [px - w - d, py + d]].map(clamp);
+    const grid = [];
+    for (let top = py - reach - h; top <= py + reach; top += TABLE_STEP) {
+      for (let left = px - reach - w; left <= px + reach; left += TABLE_STEP) {
+        const spot = clamp([left, top]);
+        grid.push([away(spot), spot]);
+      }
+    }
+    grid.sort((a, b) => a[0] - b[0]);
+    for (const spot of [...round, ...grid.map(([, spot]) => spot)]) {
+      const far = away(spot);
+      if (far > reach || far < gap * 0.9) continue;  // Near its seat, its tail long enough to see.
+      const box = [spot[0], spot[1], w, h];
+      if (taken.some((other) => boxesMeet(box, other))) continue;
+      if (tails.some(([a, b]) => crosses(a, b, box))) continue;
+      const tail = tailEnds(box, px, py, r);
+      if (tail && block.some((other) => crosses(tail[0], tail[1], other))) continue;
+      return [spot, tail];
+    }
+    return null;
+  }
+
   // Puts one label, bubble or heading by a spot of the drawing, clear of the
   // fixed boxes and of every other box on the map (planBubble). Returns
   // false when there is no free spot even with the bubbles gone (it then
@@ -1006,11 +1112,10 @@ const EbinoMap = (() => {
     clearSchoolName();
     for (const node of overlay.querySelectorAll(".map-bubble")) node.remove();
     placeAround();
-    const nodes = [...overlay.querySelectorAll(".split-tag"), ...overlay.querySelectorAll(".table-label.empty"),
-      ...overlay.querySelectorAll(".table-label:not(.empty)"), ...overlay.querySelectorAll(".map-tip")];
     const frameBox = overlay.getBoundingClientRect();
+    const frameSize = { w: frameBox.width, h: frameBox.height };
     const narrow = frameBox.width < NARROW;
-    const items = nodes.map((node) => {
+    const itemOf = (node) => {
       const x = Number(node.dataset.x), y = Number(node.dataset.y);
       if (node.classList.contains("table-label")) node.textContent = narrow ? node.dataset.short : node.dataset.full;
       node.classList.toggle("narrow", narrow);
@@ -1018,16 +1123,34 @@ const EbinoMap = (() => {
       return { ...measure(node, frameBox), px, py, gap: Number(node.dataset.gap), inView: inView(x, y),
         heading: node.classList.contains("split-tag"),
         atTable: node.classList.contains("table-label") || node.classList.contains("on-table") };
-    });
-    const spots = planLabels({ w: frameBox.width, h: frameBox.height }, items, fixedBoxes(frameBox));
-    nodes.forEach((node, k) => {
-      if (!spots[k]) {
-        node.classList.add("unplaced");
-        return;
-      }
-      node.style.left = `${spots[k][0]}px`;
-      node.style.top = `${spots[k][1]}px`;
-    });
+    };
+    const fixed = fixedBoxes(frameBox);
+    const taken = [];  // What is put, in order: the next ones keep off it.
+    const put = (nodes, plan) => {
+      const items = nodes.map(itemOf);
+      const spots = plan(items);
+      nodes.forEach((node, k) => {
+        if (!spots[k]) {
+          node.classList.add("unplaced");
+          return;
+        }
+        node.style.left = `${spots[k][0]}px`;
+        node.style.top = `${spots[k][1]}px`;
+        taken.push([spots[k][0], spots[k][1], items[k].w, items[k].h]);
+      });
+    };
+    // The headings, then the empty chairs' labels.
+    put([...overlay.querySelectorAll(".split-tag"), ...overlay.querySelectorAll(".table-label.empty")],
+      (items) => planLabels(frameSize, items, fixed));
+    // At the table, the cards of the seats that spoke, in seat_order (直し26-1).
+    const { named, planned } = placeTableBubbles(frameBox, frameSize, taken);
+    // The names of the other seats there (a seat whose card is up has none:
+    // the card says who), then a seat's name card.
+    const labels = [...overlay.querySelectorAll(".table-label:not(.empty)")];
+    for (const label of labels) if (named.has(label.dataset.seat)) label.classList.add("unplaced");
+    put([...labels.filter((label) => !named.has(label.dataset.seat)), ...overlay.querySelectorAll(".map-tip")],
+      (items) => planLabels(frameSize, items, [...fixed, ...taken]));
+    placeSeatPresses(planned);
     placeAskMarks();
   }
 
@@ -1162,17 +1285,24 @@ const EbinoMap = (() => {
     if (!seat || !quote) return;
     const [x, y] = spotOf(seatId);
     if (!inView(x, y)) return;
-    const chars = [...quote.text];
-    const cut = chars.length > BUBBLE_CHARS ? chars.slice(0, BUBBLE_CHARS).join("") + "…" : quote.text;
     const node = div("map-bubble");
-    node.append(div("voice", quote.said ? `「${cut}」` : cut));
-    node.append(div("who", [seat.title, seat.detail].filter(Boolean).join("　")));
+    node.append(div("voice", voiceOf(quote)), div("who", whoOf(seat)));
     overlay.append(node);
     place(node, x, y, 18);
     thread(node, ...toFrame(x, y));
     timers.push(setTimeout(() => node.classList.add("fading"), BUBBLE_FOR - FADE_FOR));
     timers.push(setTimeout(() => node.remove(), BUBBLE_FOR));
   }
+
+  // A lamp card's words: the quote cut at BUBBLE_CHARS with 「…」, and which
+  // seat, in the words the seat's label already shows.
+  function voiceOf(quote) {
+    const chars = [...quote.text];
+    const cut = chars.length > BUBBLE_CHARS ? chars.slice(0, BUBBLE_CHARS).join("") + "…" : quote.text;
+    return quote.said ? `「${cut}」` : cut;
+  }
+
+  function whoOf(seat) { return [seat.title, seat.detail].filter(Boolean).join("　"); }
 
   // The thread of light from a seat's spot (px, py in the frame) to the
   // nearest edge of its card. Inside the card, so it goes with it.
@@ -1215,7 +1345,7 @@ const EbinoMap = (() => {
     sticky = null;
     roundSeats = [];
     hideTip();
-    for (const node of overlay.querySelectorAll(".map-bubble, .split-tag, .table-label")) node.remove();
+    for (const node of overlay.querySelectorAll(".map-bubble, .split-tag, .table-label, .table-bubble, .seat-press")) node.remove();
     splitLayer.replaceChildren();
     clearTable();
     for (const { node } of Object.values(points)) node.classList.remove("lit");
@@ -1422,15 +1552,147 @@ const EbinoMap = (() => {
       const label = div("table-label", title);
       if (item.chair) label.classList.add("empty");
       overlay.append(label);
-      Object.assign(label.dataset, { x: item.at[0], y: item.at[1], gap: item.chair ? CHAIR_GAP : 16, full: title,
-        short: chars.length > LABEL_CHARS ? chars.slice(0, LABEL_CHARS).join("") + "…" : title });
+      Object.assign(label.dataset, { seat: item.id, x: item.at[0], y: item.at[1], gap: item.chair ? CHAIR_GAP : 16,
+        full: title, short: chars.length > LABEL_CHARS ? chars.slice(0, LABEL_CHARS).join("") + "…" : title });
     }
+    // Each seat that spoke: its lamp card by its chair, in seat_order, and
+    // the part that takes a press when the card has no room (直し26-1).
+    const first = {};
+    for (const quote of result.quotes) if (!(quote.seat_id in first)) first[quote.seat_id] = quote;
+    order.forEach((id, k) => {
+      const token = tokens.find((t) => t.id === id && !t.chair);
+      if (token && first[id]) overlay.append(tableBubble(id, first[id], token.at, k), seatPress(id, token.at));
+    });
     // The split's heading: under the map, over neither the table's top nor
     // its chairs; on a map narrower than TAG_ON_MAP, in the split block only.
     // It wraps after its 「：」 or between its 「…」, never inside one (app.phrased).
     if (split && overlay.clientWidth >= TAG_ON_MAP) $("map-heading").replaceChildren(app.phrased(app.shownQuotes(split.heading)));
     for (const chairNode of tableLayer.querySelectorAll(".chair")) chairNode.classList.add("ready");
     relayout();
+  }
+
+  // A seat's lamp card at the table: the same words as on the map, kept.
+  function tableBubble(seatId, quote, at, k) {
+    const node = div("table-bubble unplaced");
+    node.append(div("voice", voiceOf(quote)), div("who", whoOf(seatOf(seatId))));
+    Object.assign(node.dataset, { seat: seatId, x: at[0], y: at[1] });
+    node.style.setProperty("--k", String(k));
+    return node;
+  }
+
+  // Over a seat at the table whose card has no room: pressing it (or Enter
+  // or Space on it) shows that card.
+  function seatPress(seatId, at) {
+    const node = div("seat-press unplaced");
+    Object.assign(node.dataset, { seat: seatId, x: at[0], y: at[1] });
+    node.tabIndex = 0;
+    node.setAttribute("role", "button");
+    node.setAttribute("aria-label", whoOf(seatOf(seatId)));
+    pressable(node, () => {
+      opened = seatId;
+      relayout();
+    });
+    return node;
+  }
+
+  // The cards at the table (直し26-1), each by its seat in seat_order (the
+  // order they were added in), clear of what a label keeps off but the map's
+  // words (the map is dimmed under the table), of the labels put before
+  // (taken) and of one another, near its seat, its tail crossing no seat,
+  // chair or the table's top (planTableBubbles). A card with no room is left
+  // out; the one pressed (opened) is then shown all the same, by its seat
+  // clear of the fixed boxes and its tail clear of the other seats, the
+  // cards and chairs' labels it covers stepping behind. Returns
+  // the seats whose card is up (named) and those put by the plan (planned);
+  // taken gets their boxes.
+  function placeTableBubbles(frameBox, frameSize, taken) {
+    const named = new Set(), planned = new Set();
+    for (const node of overlay.querySelectorAll(".behind")) node.classList.remove("behind");
+    const cards = [...overlay.querySelectorAll(".table-bubble")];
+    if (!cards.length) return { named, planned };
+    const before = [...taken];
+    const fixed = fixedBoxes(frameBox, true, false);
+    // A tail crosses no seat, chair, the table's top, nor a label put before.
+    const block = [...tableLayer.querySelectorAll(".token .shape, .chair circle")].map((node) => boxIn(node, frameBox))
+      .concat(tableTop ? topStrips(tableTop.map(([x, y]) => toFrame(x, y))) : [], before);
+    const items = cards.map((card) => {
+      const x = Number(card.dataset.x), y = Number(card.dataset.y);
+      const [px, py] = toFrame(x, y);
+      const token = tokens.find((t) => t.id === card.dataset.seat && !t.chair);
+      const shape = token && token.node.querySelector(".shape").getBoundingClientRect();
+      const r = shape ? Math.hypot(shape.width, shape.height) / 2 + 3 : 12;
+      // Its tail TAIL_LENGTH long at least, so it shows which seat it is.
+      return { ...measure(card, frameBox), px, py, gap: r + TAIL_LENGTH, r, inView: inView(x, y) };
+    });
+    const reach = Math.max(TABLE_REACH, frameSize.w * TABLE_REACH_PART);
+    const spots = planTableBubbles(frameSize, items, [...fixed, ...before], block, reach);
+    const show = (card, item, spot) => {
+      card.style.left = `${spot[0]}px`;
+      card.style.top = `${spot[1]}px`;
+      const box = [spot[0], spot[1], item.w, item.h];
+      const ends = drawTail(card, box, item);
+      // The labels put after keep off the card and its tail.
+      taken.push(box, ...(ends ? alongTail(ends) : []));
+      named.add(card.dataset.seat);
+    };
+    cards.forEach((card, k) => {
+      if (!spots[k]) return card.classList.add("unplaced");
+      show(card, items[k], spots[k]);
+      planned.add(card.dataset.seat);
+    });
+    const k = cards.findIndex((card) => card.dataset.seat === opened);
+    if (k >= 0 && !spots[k] && items[k].inView) {
+      cards[k].classList.remove("unplaced");
+      // Its tail crossing no other seat if it can be: a little further off,
+      // or over the chairs' labels, if it must.
+      const found = tableBubbleSpot(frameSize, items[k], [...fixed, ...before], block, [], 2 * reach) ||
+        tableBubbleSpot(frameSize, items[k], fixed, block, [], 2 * reach);
+      show(cards[k], items[k], found ? found[0] : chooseSpot(frameSize, items[k], [...fixed, ...before])[0]);
+      for (const other of [...cards, ...overlay.querySelectorAll(".table-label.empty:not(.unplaced)")]) {
+        if (other !== cards[k] && !other.classList.contains("unplaced") && overlaps(cards[k], other)) other.classList.add("behind");
+      }
+    }
+    return { named, planned };
+  }
+
+  // A card's tail: paper, from its side to just short of its seat, inside
+  // the card so it goes with it.
+  function drawTail(card, box, { px, py, r }) {
+    for (const old of card.querySelectorAll(".tail")) old.remove();
+    const ends = tailEnds(box, px, py, r);
+    if (!ends) return null;
+    const [[fx, fy], [qx, qy]] = ends;
+    const tail = document.createElement("span");
+    tail.className = "tail";
+    // A little into the card, so the two are one piece of paper.
+    Object.assign(tail.style, { left: `${fx - box[0]}px`, top: `${fy - box[1]}px`, width: `${Math.hypot(qx - fx, qy - fy) + 6}px` });
+    tail.style.setProperty("--a", `${Math.atan2(qy - fy, qx - fx)}rad`);
+    card.append(tail);
+    return ends;
+  }
+
+  // A tail as a row of small boxes along it, for the labels to keep off. It
+  // reads nothing but what it is given.
+  function alongTail([[fx, fy], [qx, qy]], size = 10) {
+    const steps = Math.max(1, Math.ceil(Math.hypot(qx - fx, qy - fy) / (size / 2)));
+    return Array.from({ length: steps + 1 }, (_, k) => {
+      const x = fx + (qx - fx) * k / steps, y = fy + (qy - fy) * k / steps;
+      return [x - size / 2, y - size / 2, size, size];
+    });
+  }
+
+  // The part that takes a press, over each seat at the table whose card the
+  // plan left out.
+  function placeSeatPresses(planned) {
+    for (const node of overlay.querySelectorAll(".seat-press")) {
+      const x = Number(node.dataset.x), y = Number(node.dataset.y);
+      const out = planned.has(node.dataset.seat) || !inView(x, y);
+      node.classList.toggle("unplaced", out);
+      if (out) continue;
+      const [px, py] = toFrame(x, y);
+      node.style.left = `${px - SEAT_PRESS / 2}px`;
+      node.style.top = `${py - SEAT_PRESS / 2}px`;
+    }
   }
 
   // An empty chair 「？」: a seat nobody asked yet. Pressing it (or Enter or
@@ -1453,6 +1715,7 @@ const EbinoMap = (() => {
   function clearTable() {
     tokens = [];
     tableTop = null;
+    opened = null;
     if ($("map-heading")) $("map-heading").replaceChildren();
     if (tableLayer) tableLayer.replaceChildren();
     if (svg) svg.classList.remove("dim");
@@ -1466,7 +1729,7 @@ const EbinoMap = (() => {
     roundNo += 1;
     for (const flight of flights) flight.cancel();
     flights = [];
-    for (const node of overlay.querySelectorAll(".split-tag, .table-label, .map-bubble")) node.remove();
+    for (const node of overlay.querySelectorAll(".split-tag, .table-label, .map-bubble, .table-bubble, .seat-press")) node.remove();
     clearTable();
     $("map-zoom-all").focus();
     moveTo({ x: 0, y: 0, w: view.W, h: view.H }, BACK_FOR);
