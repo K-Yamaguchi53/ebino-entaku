@@ -621,6 +621,28 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .map-choices.beside .paragraph { grid-column: 3; grid-row: 1 / span 2; order: 0; width: auto; min-width: 0;
   max-height: 84px; margin: 0; }
 .map-choices .done { align-self: center; padding: 4px 10px; font-size: 13px; color: var(--soft); }
+/* At their top, whose card it is and 「閉じる」 (直し27-1); never wider than the choices. */
+.map-choices .head { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; width: 0; min-width: 100%;
+  box-sizing: border-box; padding-left: 6px; }
+.map-choices .head .who { flex: 1; min-width: 0; font-size: 13px; font-weight: bold; color: var(--lamp-bright);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-choices .head .close { flex: none; text-align: center; }
+/* Where the map has room only so: smaller, the name a line over three
+   choices to a line, 「閉じる」 last; or one to a line. */
+.map-choices.low { grid-template-columns: repeat(3, auto); gap: 3px; padding: 4px; }
+.map-choices.low .head { display: contents; }
+.map-choices.low .head .who { grid-column: 1 / -1; order: -1; width: 0; min-width: 100%; box-sizing: border-box; padding: 0 4px; font-size: 12px; line-height: 18px; }
+.map-choices.low .head .close { order: 1; }
+.map-choices.low button { min-height: 34px; padding: 2px 8px; font-size: 12px; }
+.map-choices.column { grid-template-columns: minmax(0, 96px); }
+.map-choices.column .head { flex-wrap: wrap; }
+.map-choices.column .head .who { flex-basis: 100%; white-space: normal; }
+/* Their tail, in the lamp's light, to the seat; the seat a ring brighter. */
+.map-choices .tail { position: absolute; height: 12px; margin-top: -6px; transform-origin: 0 50%;
+  transform: rotate(var(--a)); background: var(--lamp); clip-path: polygon(0 50%, 100% 0, 100% 100%);
+  pointer-events: none; }
+.token.chosen .halo { stroke: var(--lamp-bright); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.token.chosen .shape { stroke: var(--ink); stroke-width: 2.6; }
 .under-choices { visibility: hidden; }
 /* The line by the map's lower edge, until a lamp card is pressed. */
 .map-hint { position: absolute; white-space: nowrap; padding: 3px 12px; border-radius: 999px; background: var(--veil);

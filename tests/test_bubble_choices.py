@@ -121,7 +121,8 @@ def test_the_hint_goes_once_a_card_is_pressed_and_keeps_by_the_lower_edge():
 
 def test_a_card_shown_by_its_seat_goes_again_with_its_choices_and_the_keyboard_goes_back():
     close = _inner("closeChoices")
-    assert "if (seatId === opened) {" in close and "opened = null;" in close and "if (!laying) relayout();" in close
+    assert "const shownByPress = seatId === opened;" in close and "if (shownByPress) opened = null;" in close
+    assert "if ((shownByPress || moved) && !laying) relayout();" in close  # Moved for them (直し27-1): back too.
     assert 'querySelectorAll(".under-choices")) other.classList.remove("under-choices")' in close
     assert "press.focus({ preventScroll: true })" in close
     assert "closeChoices(false, true)" in _inner("putChoices")  # Not laid out again from inside the layout.

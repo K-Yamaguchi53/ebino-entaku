@@ -108,9 +108,10 @@ MAP_BUTTON_IDS = ("back", "zoom_in", "zoom_out", "zoom_all")
 MAP_AROUND = "map_around"
 MAP_AROUND_IDS = ("north", "west", "south", "east")
 # At the round table (map.js, 直し26-2): the line by the map's lower edge
-# once the table opens, and the choices a seat's lamp card opens, pressed.
-# Columns ID・文字.
+# once the table opens, and the choices a seat's lamp card opens, pressed
+# (columns ID・文字), with the button that closes them (直し27-1).
 BUBBLE_HINT = "bubble_hint"
+BUBBLE_CLOSE = "bubble_close"
 BUBBLE_CHOICES = "bubble_choices"
 BUBBLE_CHOICE_IDS = ("paragraph", "mark", "card", "read")
 
@@ -120,7 +121,7 @@ SCREEN_TEXTS = (
     NOT_ASKED_YET, INPUT_EXAMPLE, PURPOSE_HEADING, WAITING_ASK, WAITING_REFLECTION,
     SEND_FAILED, MET_LIVES_EMPTY, HARVEST_HEADING, HARVEST_USE_QUESTION, MEET_QUESTION,
     HARVEST_MEET_PREFIX, MORE_END, MORE_CARD_DONE, SAMPLE_SUMMARIZED, HARVEST_SUBJECT_MORE,
-    BUBBLE_HINT,
+    BUBBLE_HINT, BUBBLE_CLOSE,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 

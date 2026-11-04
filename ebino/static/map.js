@@ -30,6 +30,7 @@ const EbinoMap = (() => {
   const TAIL_CORNER = 12;  // px a tail keeps from its card's corners.
   const TAIL_LENGTH = 16;  // px: a card's tail, at the least.
   const SEAT_PRESS = 44;  // px: the square a seat with no card up takes a press over.
+  const TOUCH = 6;  // px between a lamp card and its choices, against its side.
   const DRAW_FOR = 1800;  // ms to draw the rim; the river follows.
   const RIPPLE_FOR = 1600;  // ms of the ring a seat sends out when its voice lights.
   const FADE_FOR = 300;  // ms a card takes to go, at the end of its BUBBLE_FOR.
@@ -1675,13 +1676,10 @@ const EbinoMap = (() => {
     const block = [...tableLayer.querySelectorAll(".token .shape, .chair circle")].map((node) => boxIn(node, frameBox))
       .concat(tableTop ? topStrips(tableTop.map(([x, y]) => toFrame(x, y))) : [], before);
     const items = cards.map((card) => {
-      const x = Number(card.dataset.x), y = Number(card.dataset.y);
-      const [px, py] = toFrame(x, y);
-      const token = tokens.find((t) => t.id === card.dataset.seat && !t.chair);
-      const shape = token && token.node.querySelector(".shape").getBoundingClientRect();
-      const r = shape ? Math.hypot(shape.width, shape.height) / 2 + 3 : 12;
+      const { px, py, r } = seatAtTable(card);
       // Its tail TAIL_LENGTH long at least, so it shows which seat it is.
-      return { ...measure(card, frameBox), px, py, gap: r + TAIL_LENGTH, r, inView: inView(x, y) };
+      return { ...measure(card, frameBox), px, py, gap: r + TAIL_LENGTH, r,
+        inView: inView(Number(card.dataset.x), Number(card.dataset.y)) };
     });
     const reach = Math.max(TABLE_REACH, frameSize.w * TABLE_REACH_PART);
     const spots = planTableBubbles(frameSize, items, [...fixed, ...before], block, reach);
@@ -1702,6 +1700,7 @@ const EbinoMap = (() => {
     const k = cards.findIndex((card) => card.dataset.seat === opened);
     if (k >= 0 && !spots[k] && items[k].inView) {
       cards[k].classList.remove("unplaced");
+      cards[k].style.setProperty("--k", "0");  // Pressed: it comes at once (直し27-1).
       // Its tail crossing no other seat if it can be: a little further off,
       // or over the chairs' labels, if it must.
       const found = tableBubbleSpot(frameSize, items[k], [...fixed, ...before], block, [], 2 * reach) ||
@@ -1712,6 +1711,15 @@ const EbinoMap = (() => {
       }
     }
     return { named, planned };
+  }
+
+  // Where a card's seat is at the table, in the frame (px, py), and how far
+  // short of it a tail stops (r, clear of its mark).
+  function seatAtTable(card) {
+    const [px, py] = toFrame(Number(card.dataset.x), Number(card.dataset.y));
+    const token = tokens.find((t) => t.id === card.dataset.seat && !t.chair);
+    const shape = token && token.node.querySelector(".shape").getBoundingClientRect();
+    return { px, py, r: shape ? Math.hypot(shape.width, shape.height) / 2 + 3 : 12, token };
   }
 
   // A card's tail: paper, from its side to just short of its seat, inside
@@ -1774,6 +1782,14 @@ const EbinoMap = (() => {
     const node = div("map-choices");
     node.setAttribute("role", "group");
     node.setAttribute("aria-label", whoOf(seatOf(seatId)));
+    // At the top, whose card it is (as on the lamp card), and 「閉じる」 (直し27-1).
+    const head = div("head");
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "close";
+    close.textContent = app.state.texts.bubble_close;
+    close.addEventListener("click", () => closeChoices(true));
+    head.append(div("who", whoOf(seatOf(seatId))), close);
     const button = (key, action) => {
       const item = document.createElement("button");
       item.type = "button";
@@ -1818,11 +1834,14 @@ const EbinoMap = (() => {
     const write = app.state.carded.has(seatId) ? div("done", "質問カードにしました")
       : button("card", () => { closeChoices(false); app.openCard(seatId); });
     const below = button("read", () => { closeChoices(false); app.readBelow(tableRoundNo, utteranceId); });
-    node.append(read, paragraph, mark, write, below);
+    node.append(head, read, paragraph, mark, write, below);
     node.addEventListener("keydown", (event) => moveInChoices(event, node));
     card.after(node);  // Tab goes on from the lamp card into its choices.
     card.setAttribute("aria-expanded", "true");
-    choices = { seatId, node, card };
+    // Its seat at the table, a ring brighter, while they are open.
+    const { token } = seatAtTable(card);
+    if (token) token.node.classList.add("chosen");
+    choices = { seatId, node, card, moved: false };
     marked();
     putChoices();
     read.focus({ preventScroll: true });
@@ -1850,29 +1869,33 @@ const EbinoMap = (() => {
   // to the seat. (laying: called while the map is being laid out.)
   function closeChoices(back, laying = false) {
     if (!choices) return;
-    const { node, card, seatId } = choices;
+    const { node, card, seatId, moved } = choices;
     choices = null;
     node.remove();
     for (const other of overlay.querySelectorAll(".under-choices")) other.classList.remove("under-choices");
+    for (const token of tableLayer.querySelectorAll(".token.chosen")) token.classList.remove("chosen");
     card.setAttribute("aria-expanded", "false");
-    if (seatId === opened) {
-      opened = null;
-      if (!laying) relayout();
-    }
+    // Its card goes back to its own spot (a card moved for them), or goes
+    // (one shown only by pressing its seat).
+    const shownByPress = seatId === opened;
+    if (shownByPress) opened = null;
+    if ((shownByPress || moved) && !laying) relayout();
     if (!back) return;
     if (card.isConnected && !card.classList.contains("unplaced")) return card.focus({ preventScroll: true });
     const press = [...overlay.querySelectorAll(".seat-press")].find((other) => other.dataset.seat === seatId);
     if (press && !press.classList.contains("unplaced")) press.focus({ preventScroll: true });
   }
 
-  // The choices by their lamp card, inside the frame, clear of the table's
-  // top, its seats and chairs (choiceSpot). Closed when their card is no
-  // longer up.
+  // The choices by their lamp card (直し27-1): against its side, below,
+  // above, right or left, its own card in sight, their tail to its seat;
+  // inside the frame, clear of the table's top, its seats and chairs
+  // (choicesPlan). Its card moves, while they are open, if that is what
+  // keeps the others in sight. Closed when their card is no longer up.
   function putChoices() {
     if (!choices) return;
     const { node, card } = choices;
     if (!card.isConnected || card.classList.contains("unplaced")) return closeChoices(false, true);
-    for (const other of overlay.querySelectorAll(".under-choices")) other.classList.remove("under-choices");
+    for (const other of overlay.querySelectorAll(".under-choices, .behind")) other.classList.remove("under-choices", "behind");
     const frameBox = overlay.getBoundingClientRect();
     const frameWH = { w: frameBox.width, h: frameBox.height };
     // It keeps off the table, its seats and chairs (hard); it would rather
@@ -1882,18 +1905,62 @@ const EbinoMap = (() => {
       ".map-compass, .map-around, .map-hint")].filter((other) => other !== card && getComputedStyle(other).visibility !== "hidden");
     const others = shown.map((other) => boxIn(other, frameBox));
     const own = boxIn(card, frameBox), hard = fixedBoxes(frameBox, false, false);
+    const seat = seatAtTable(card);
+    const block = [...tableLayer.querySelectorAll(".token .shape, .chair circle")].map((other) => boxIn(other, frameBox))
+      .concat(tableTop ? topStrips(tableTop.map(([x, y]) => toFrame(x, y))) : []);
+    const item = { w: own[2], h: own[3], px: seat.px, py: seat.py, r: seat.r, gap: seat.r + TAIL_LENGTH };
+    const reach = 2 * Math.max(TABLE_REACH, frameWH.w * TABLE_REACH_PART);
     node.style.left = "0px";
     node.style.top = "0px";
-    // The paragraph, when open: beside the choices (the card no taller), or
+    for (const old of node.querySelectorAll(".tail")) old.remove();
+    // Two choices to a line; or, where the map has room only so (直し27-1),
+    // smaller and three to a line (low), or one to a line (narrow). The
+    // paragraph, when open: beside the choices (the card no taller), or
     // under them, shorter (it scrolls) if that is what it takes to keep off
     // the table. The first way that finds a clear spot; with none, the first.
     const paragraph = node.querySelector(".paragraph");
-    const ways = paragraph.hidden ? [[false, ""]] : [[true, ""], [false, ""], [false, "84px"], [false, "60px"], [false, "40px"]];
-    const lay = ([beside, most]) => {
+    const ways = paragraph.hidden ? [["", false, ""], ["low", false, ""], ["column", false, ""]]
+      : [["", true, ""], ["", false, ""], ["", false, "84px"], ["", false, "60px"], ["", false, "40px"]];
+    const lay = ([shape, beside, most]) => {
+      node.classList.toggle("low", shape === "low");
+      node.classList.toggle("column", shape === "column");
       node.classList.toggle("beside", beside);
       paragraph.style.maxHeight = most;
     };
-    // Failing all, over its own card rather than the table.
+    // By its own card, the first way that covers nothing of soft; with
+    // none, the one that covers least.
+    // Failing all, their tails may cross the other seats; failing that,
+    // right by the seat they need none (the seat's ring says whose they are).
+    let planned = null;
+    for (const [crossed, needTail] of [[block, true], [[], true], [[], false]]) {
+      const spots = cardSpots(frameWH, item, own, hard, crossed, reach);
+      for (const way of ways) {
+        lay(way);
+        const { width, height } = node.getBoundingClientRect();
+        const plan = choicesPlan(frameWH, item, own, { w: width, h: height }, hard, crossed, others, spots, needTail);
+        if (plan && (!planned || plan.covered < planned.plan.covered)) planned = { way, plan };
+        if (plan && !plan.covered) break;
+      }
+      if (planned) break;
+    }
+    if (planned) {
+      const { way, plan } = planned;
+      lay(way);
+      if (plan.at[0] !== own[0] || plan.at[1] !== own[1]) {
+        card.style.left = `${plan.at[0]}px`;
+        card.style.top = `${plan.at[1]}px`;
+        drawTail(card, [...plan.at, own[2], own[3]], item);
+        choices.moved = true;
+      }
+      node.style.left = `${plan.spot[0]}px`;
+      node.style.top = `${plan.spot[1]}px`;
+      const { width, height } = node.getBoundingClientRect();
+      if (plan.tail) drawTail(node, [...plan.spot, width, height], item);
+      // What they or the moved card cover steps behind while they are open.
+      for (const other of shown) if (overlaps(node, other) || overlaps(card, other)) other.classList.add("under-choices");
+      return;
+    }
+    // No such spot: as before, by the card, over it rather than the table.
     let chosen = null;
     search: for (const overOwn of [false, true]) {
       for (const way of ways) {
@@ -1910,6 +1977,73 @@ const EbinoMap = (() => {
     // What it covers steps behind it while it is open (its own card too,
     // when there was no room but over it).
     for (const other of [...shown, card]) if (overlaps(node, other)) other.classList.add("under-choices");
+  }
+
+  // Where a lamp card may go while its choices are open (直し27-1), a box
+  // { w, h, px, py, gap, r } (its seat's spot px, py) in a frame { w, h }:
+  // inside the frame, within reach of its seat and gap from it at the least,
+  // covering none of hard, its tail crossing none of block. The spots
+  // [left, top, w, h], nearest its own spot (own) first. It reads nothing
+  // but what it is given.
+  function cardSpots(frame, item, own, hard, block, reach) {
+    const { w, h, px, py, gap, r } = item, m = 4, spots = [];
+    const away = ([left, top]) => Math.hypot(Math.max(left - px, 0, px - left - w), Math.max(top - py, 0, py - top - h));
+    for (let top = py - reach - h; top <= py + reach; top += TABLE_STEP) {
+      for (let left = px - reach - w; left <= px + reach; left += TABLE_STEP) {
+        const box = [left, top, w, h], far = away(box);
+        if (left < m || top < m || left + w > frame.w - m || top + h > frame.h - m) continue;
+        if (far > reach || far < gap * 0.9 || hard.some((other) => boxesMeet(box, other))) continue;
+        const tail = tailEnds(box, px, py, r);
+        if (tail && block.some((other) => crosses(tail[0], tail[1], other))) continue;
+        spots.push([Math.hypot(left - own[0], top - own[1]), box]);
+      }
+    }
+    return spots.sort((a, b) => a[0] - b[0]).map(([, box]) => box);
+  }
+
+  // Where the choices ({ w, h }) go by their lamp card (直し27-1): against
+  // its side (below, above, right or left, TOUCH apart), inside the frame
+  // { w, h }, covering none of hard, their tail to the seat (card's px, py,
+  // r) crossing neither the card nor block, and the card's own tail not
+  // crossing them. The card stays where it is (own) if that covers nothing
+  // of soft; else it goes to the nearest of spots (cardSpots) that does;
+  // failing that, the one that covers least (a little more for each px it
+  // moves). Returns { at, spot, tail, covered, cost } or null when there is none.
+  // It reads nothing but what it is given.
+  function choicesPlan(frame, card, own, box, hard, block, soft, spots, needTail = true) {
+    const { w, h } = box, m = 4;
+    const area = (b) => soft.reduce((sum, o) => sum + Math.max(0, Math.min(b[0] + b[2], o[0] + o[2]) - Math.max(b[0], o[0])) *
+      Math.max(0, Math.min(b[1] + b[3], o[1] + o[3]) - Math.max(b[1], o[1])), 0);
+    const by = (c) => {
+      const [l, t, cw, ch] = c, cardTail = tailEnds(c, card.px, card.py, card.r);
+      let pick = null;
+      for (const [left, top] of [[l, t + ch + TOUCH], [l + cw - w, t + ch + TOUCH], [l, t - h - TOUCH], [l + cw - w, t - h - TOUCH],
+        [l + cw + TOUCH, t], [l + cw + TOUCH, t + ch - h], [l - w - TOUCH, t], [l - w - TOUCH, t + ch - h]]) {
+        const spot = [left, top, w, h];
+        if (left < m || top < m || left + w > frame.w - m || top + h > frame.h - m) continue;
+        if (hard.some((other) => boxesMeet(spot, other))) continue;
+        // Their tail long enough to see which seat it is (unless needTail
+        // is false: then right by the seat will do, with no tail).
+        const tail = tailEnds(spot, card.px, card.py, card.r);
+        const seen = tail && Math.hypot(tail[1][0] - tail[0][0], tail[1][1] - tail[0][1]) >= TAIL_LENGTH * 0.6;
+        if (needTail && !seen) continue;
+        if (seen && (crosses(tail[0], tail[1], c) || block.some((other) => crosses(tail[0], tail[1], other)))) continue;
+        if (cardTail && crosses(cardTail[0], cardTail[1], spot)) continue;
+        const covered = area(spot) + area(c), cost = covered + Math.hypot(l - own[0], t - own[1]) * 10;
+        if (!pick || cost < pick.cost) pick = { at: [l, t], spot: [left, top], tail: seen ? tail : null, covered, cost };
+      }
+      return pick;
+    };
+    const stay = by(own);
+    if (stay && !stay.covered) return stay;
+    let least = stay;
+    for (const c of spots) {
+      const pick = by(c);
+      if (!pick) continue;
+      if (!pick.covered) return pick;
+      if (!least || pick.cost < least.cost) least = pick;
+    }
+    return least;
   }
 
   // Where the choices ({ w, h }) go in a frame { w, h }: beside their lamp
