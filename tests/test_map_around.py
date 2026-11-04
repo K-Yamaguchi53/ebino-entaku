@@ -64,7 +64,7 @@ def test_the_screen_reads_the_words_and_writes_none_of_its_own():
 
 
 @node
-def test_north_is_towards_the_front_on_the_picture_and_up_on_the_flat_map():
+def test_north_is_up_on_the_picture_and_on_the_flat_map():
     data = seat_map.load_map()
     relief = load_relief((data.width, data.height))
     if relief is None:
@@ -80,8 +80,11 @@ def test_north_is_towards_the_front_on_the_picture_and_up_on_the_flat_map():
     ])
     ways = _run(program)
     north, east = ways["onRelief"]["north"], ways["onRelief"]["east"]
-    assert north[1] > 0.95  # Down the screen: the front.
-    assert east[0] < -0.95  # The picture's left is east.
+    # The picture looks north from the south (直し31-4): north up, east right,
+    # as on an ordinary map, so 人吉方面 is put at the top, 霧島山 at the
+    # bottom, 小林市 on the right and 伊佐方面 on the left.
+    assert north[1] < -0.95
+    assert east[0] > 0.95
     assert ways["onFlat"]["north"] == [0, -1] and ways["onFlat"]["east"] == [1, 0]
     assert ways["onFlat"]["south"] == [0, 1] and ways["onFlat"]["west"] == [-1, 0]
 
@@ -129,3 +132,26 @@ def test_with_less_motion_the_arrow_and_the_names_do_not_fade():
     reduced = CSS[CSS.index("@media (prefers-reduced-motion: reduce)"):]
     reduced = reduced[:reduced.index("transition: none !important")]
     assert ".map-compass" in reduced and ".map-around" in reduced
+
+
+@node
+def test_the_tables_front_is_the_side_nearest_the_camera_now_the_south():
+    data = seat_map.load_map()
+    relief = load_relief((data.width, data.height))
+    if relief is None:
+        pytest.skip("the relief files are not here")
+    consts = SCRIPT[SCRIPT.index("  const NS ="):SCRIPT.index("  let map = null;")]
+    program = "\n".join([
+        consts,
+        f"const map = {json.dumps({'boundary': [list(p) for p in data.boundary], 'viewbox': [0, 0, data.width, data.height]})};",
+        f"const relief = {json.dumps(relief)};",
+        _inner_function(SCRIPT, "centroid"), _inner_function(SCRIPT, "reliefView"),
+        _inner_function(SCRIPT, "onTable"), _inner_function(SCRIPT, "frontAngle"), _inner_function(SCRIPT, "aiAngles"),
+        "const view = reliefView(relief); const [x, y] = centroid(map.boundary);",
+        "const front = frontAngle({ x, y, level: view.zAt(x, y) });",
+        "process.stdout.write(JSON.stringify({ front, ai: aiAngles([], true, 2, front), free: aiAngles([], false, 2, front) }));",
+    ])
+    got = _run(program)
+    assert got["front"] == 90  # The map's south: nearest the camera, lowest on the picture.
+    assert got["ai"] == [90, 270]  # With a split: the dashed line's two ends.
+    assert got["free"] == [45, 135]  # Else the front's two diagonals first.

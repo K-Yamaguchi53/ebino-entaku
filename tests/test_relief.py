@@ -60,7 +60,7 @@ def setup_of(lib):
 def test_the_three_files_in_the_repo_read_fit_the_map_and_are_small():
     data = load_relief(VIEWBOX)
     assert data is not None
-    assert data["image"] == "/relief.webp" and data["res"] == [2400, 1840]
+    assert data["image"] == "/relief.webp" and data["res"] == [2400, 1823]
     assert len(data["px"]) == 4 and len(data["py"]) == 4 and data["z"]["m_per_unit"] > 0
     assert data["step"] == 10 and len(data["rows"]) >= 90 and len(data["rows"][0]) == 101
     # Small enough for the repo: the picture under 1 MB, the grid and the projection a few dozen KB.
@@ -176,8 +176,8 @@ def test_a_webp_header_gives_its_size_and_anything_else_is_refused():
 def test_a_picture_too_large_is_refused():
     projection = json.loads((relief.RELIEF_DIR / relief.PROJECTION).read_text(encoding="utf-8"))
     heights = json.loads((relief.RELIEF_DIR / relief.HEIGHTS).read_text(encoding="utf-8"))
-    image = vp8x(2400, 1840)
-    assert parse_relief(image, projection, heights, VIEWBOX)["res"] == [2400, 1840]
+    image = vp8x(2400, 1823)
+    assert parse_relief(image, projection, heights, VIEWBOX)["res"] == [2400, 1823]
     with pytest.raises(ValueError):
         parse_relief(image + b"\x00" * relief.MAX_IMAGE_BYTES, projection, heights, VIEWBOX)
 
@@ -549,7 +549,7 @@ function scene(width) {
   vb = tableView(center);
   const f = pointScale();
   layoutShelves(f);
-  const { seats } = seating(round, round.seat_order);
+  const { seats } = seating(round, round.seat_order, frontAngle(center));
   const cover = ring(center, 0, TABLE_LIFT).map((p) => toFrame(...p));
   const fixed = [...topStrips(cover), ...shelfBoxes()], labels = [];
   for (const sitting of seats) {
@@ -588,7 +588,7 @@ process.stdout.write(JSON.stringify(result));
 def _scenes():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     consts = script[script.index("  const NS ="):script.index("  let map = null;")]
-    names = ["centroid", "reliefView", "onTable", "ring", "tableView", "seating", "pointScale", "layoutShelves",
+    names = ["centroid", "reliefView", "onTable", "ring", "tableView", "frontAngle", "seating", "pointScale", "layoutShelves",
              "shelfSpot", "chooseSpot", "planLabels", "within", "seenWords", "planBubble", "topStrips", "shelfAreas"]
     source = "".join(_inner_function(script, name) for name in names)
     seats = [make_seat(seat_id=seat, kind=kind, title=f"架空の席{seat}", company="", display_name="",
@@ -639,7 +639,7 @@ def test_the_maps_words_are_among_what_a_label_or_bubble_keeps_off():
     fixed = _inner_function(script, "fixedBoxes")
     assert ".place-names text, .shelf-names text, .school text" in fixed and "seenWords(" in fixed
     # On the map, every seat the round lights, from the start; at the table, its seats and chairs.
-    assert "roundSeats.map(" in fixed and ".token .shape, .chair circle" in fixed
+    assert "roundSeats.map(" in fixed and ".token .shape, .token.ai-seat .halo, .chair circle" in fixed
     place = _inner_function(script, "place")
     assert "planBubble(" in place and "fixedBoxes(frameBox)" in place
     assert "fixedBoxes(frameBox)" in _inner_function(script, "relayout")

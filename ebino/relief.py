@@ -1,4 +1,5 @@
-"""The basin drawn as a model, seen from the north, under the map (SPEC 14-66).
+"""The basin drawn as a model, seen from the south with north up as on an
+ordinary map (直し31-4), under the map (SPEC 14-66).
 
 Three files in the repo, made once by tools/fetch_copernicus_dem.py and
 tools/render_relief.py; nothing is fetched while the app runs:

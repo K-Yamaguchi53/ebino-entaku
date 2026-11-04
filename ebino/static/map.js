@@ -2,7 +2,7 @@
 // list stays as it is: the map adds to it.
 //
 // With the picture (relief.py: the basin drawn as a model, seen from the
-// north), the map is laid over it: every (x, y) of seat_map.py is moved onto
+// south with north up, 直し31-4), the map is laid over it: every (x, y) of seat_map.py is moved onto
 // the picture here, on the screen only. A round lights the seats that
 // answered, the camera comes closer, a round table opens over the basin and
 // the lit seats fly to it. Without the picture (none, or it does not load),
@@ -342,8 +342,8 @@ const EbinoMap = (() => {
 
   // Which way north, east, south and west go on the drawing, as unit steps
   // on the screen, worked out from the map's own projection at its middle
-  // (the map's y grows southward), so it holds for either map: on the
-  // picture north is towards the front, on the flat map it is up.
+  // (the map's y grows southward), so it holds for either map and for any
+  // way the picture was drawn: on both, north is up (直し31-4).
   function compassWays() {
     const [x, y] = centroid(map.boundary);
     const level = view.relief ? view.zAt(x, y) : null;
@@ -998,7 +998,9 @@ const EbinoMap = (() => {
   // name and its mark.
   function fixedBoxes(frameBox, withAround = true, withWords = true, withBacks = true) {
     // The chairs' backs and the table's leg and foot too (直し29-2): cards and names keep off them.
-    const nodes = [...tableLayer.querySelectorAll(".token .shape, .chair circle, .chair .hit" +
+    // コーチ and オブザーバー's seats with their light round them (直し31-4: at
+    // 768 a card came over the coach's flame's foot).
+    const nodes = [...tableLayer.querySelectorAll(".token .shape, .token.ai-seat .halo, .chair circle, .chair .hit" +
       (withBacks ? ", .token .chair-back, .chair .back, .table-foot .leg, .table-foot .base" : ""))];
     // A seat of the round at the size it has once lit (not met yet, it is drawn smaller).
     const reach = 9.5 * pointScale() * frameBox.width / vb.w;
@@ -1521,11 +1523,24 @@ const EbinoMap = (() => {
     return Array.from({ length: 72 }, (_, k) => onTable(center, k * 5, out, lift));
   }
 
-  // Who sits where. Seen from the north, the map's east (0°) is on the
-  // picture's left and its north (270°) in front: the two sides of the first
-  // split face each other across the dashed line, the other seats sit at the
-  // back, and the empty chairs in front.
-  function seating(result, order) {
+  // The side of the table towards the camera, in degrees round it (0° the
+  // map's east, 90° its south): where its rim is lowest on the picture,
+  // worked out from the projection, so it holds whichever way the picture
+  // looks (直し31-4: now south, 90°).
+  function frontAngle(center) {
+    let best = 0, low = -Infinity;
+    for (let k = 0; k < 72; k++) {
+      const y = onTable(center, k * 5, 0)[1];
+      if (y > low) [best, low] = [k * 5, y];
+    }
+    return best;
+  }
+
+  // Who sits where, round from the side in front (front, in degrees): the
+  // two sides of the first split face each other across the dashed line
+  // (left and right), the other seats sit at the back, and the empty chairs
+  // in front.
+  function seating(result, order, front = 270) {
     const seatOfQuote = {};
     for (const quote of result.quotes) seatOfQuote[quote.utterance_id] = quote.seat_id;
     const sideOf = (ids) => new Set(ids.map((id) => seatOfQuote[id]).filter((id) => order.includes(id)));
@@ -1538,7 +1553,9 @@ const EbinoMap = (() => {
       else groups.back.push(id);
     }
     groups.front = result.silent_seats.filter((id) => points[id] && isSilent(id));
-    const arcs = { a: [0, 80], b: [180, 80], back: [90, split ? 70 : 170], front: [270, 90] };
+    const turn = (a) => ((a % 360) + 360) % 360;
+    const arcs = { a: [turn(front + 90), 80], b: [turn(front - 90), 80], back: [turn(front + 180), split ? 70 : 170],
+      front: [front, 90] };
     const seats = [];
     for (const [name, ids] of Object.entries(groups)) {
       const [middle, arc] = arcs[name];
@@ -1599,8 +1616,9 @@ const EbinoMap = (() => {
 
   async function openTable(result, order, center, still) {
     const motion = !reduced();
-    const { split, sides, seats } = seating(result, order);
-    tableAt = { center, angles: seats.map((sitting) => sitting.angle), split: Boolean(split) };
+    const front = frontAngle(center);
+    const { split, sides, seats } = seating(result, order, front);
+    tableAt = { center, angles: seats.map((sitting) => sitting.angle), split: Boolean(split), front };
     svg.classList.add("dim");
     // While the table is open the map's points behind take no mouse, press
     // or touch (style.css; 直し27-4): the name card the mouse showed goes.
@@ -1627,8 +1645,9 @@ const EbinoMap = (() => {
     // foot, a little seen under the front. Its size and the seats' spots
     // are as before.
     const under = ring(center, 0, TABLE_LIFT - TABLE_THICK);
-    const front = tableTop.filter((_, k) => k >= 38 && k <= 70);  // 190° to 350°: the side towards the camera.
-    const rimLight = svgEl("polyline", { class: "table-rim-light", points: front.map((p) => p.join(",")).join(" ") });
+    // The side towards the camera: 80° each way from the front.
+    const near = tableTop.filter((_, k) => Math.min(Math.abs(k * 5 - front), 360 - Math.abs(k * 5 - front)) <= 80);
+    const rimLight = svgEl("polyline", { class: "table-rim-light", points: near.map((p) => p.join(",")).join(" ") });
     top.append(polygon("table-edge", under), polygon("table-top", tableTop),
       polygon("table-grain", ring(center, -46, TABLE_LIFT)), polygon("table-grain", ring(center, -86, TABLE_LIFT)),
       polygon("table-inner", ring(center, -16, TABLE_LIFT)), polygon("table-rim-glow", tableTop), rimLight, lamp);
@@ -1751,8 +1770,8 @@ const EbinoMap = (() => {
   // moonlight each, no seat's mark; their names as on the cards below; their
   // questions in moonlit cards that find room before the seats' (rank).
   function seatBand() {
-    const { center, angles, split } = tableAt;
-    const spots = aiAngles(angles, split, band.cards.length);
+    const { center, angles, split, front } = tableAt;
+    const spots = aiAngles(angles, split, band.cards.length, front);
     band.cards.forEach((card, k) => {
       const id = `ai-${card.role}`, at = onTable(center, spots[k], SEAT_OUT);
       const node = svgEl("g", { class: "token ai-seat lit", "aria-hidden": "true" });
@@ -1769,12 +1788,15 @@ const EbinoMap = (() => {
   }
 
   // Where コーチ and オブザーバー sit (直し29-1), in degrees round the table:
-  // with a split, at the ends of its dashed line (270°, 90°: on neither
-  // side) where no seat is near; else between the groups; the first tried
+  // with a split, at the ends of its dashed line (the front and the back:
+  // on neither side) where no seat is near; else between the groups,
+  // the front's two first; the first tried
   // that is AI_APART from every seat (taken) and from each other, or failing
   // that the furthest. It reads nothing but what it is given.
-  function aiAngles(taken, split, count = 2) {
-    const tried = [...(split ? [270, 90] : []), 225, 315, 135, 45, ...Array.from({ length: 72 }, (_, k) => k * 5)];
+  function aiAngles(taken, split, count = 2, front = 270) {
+    const turn = (a) => ((a % 360) + 360) % 360;
+    const tried = [...(split ? [front, turn(front + 180)] : []), ...[-45, 45, -135, 135].map((d) => turn(front + d)),
+      ...Array.from({ length: 72 }, (_, k) => k * 5)];
     const apart = (a, b) => { const d = (((a - b) % 360) + 360) % 360; return Math.min(d, 360 - d); };
     const out = [];
     for (let k = 0; k < count; k++) {

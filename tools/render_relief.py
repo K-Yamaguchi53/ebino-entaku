@@ -1,4 +1,4 @@
-"""Draw the basin as a model in the night, seen from the north (SPEC 14-66).
+"""Draw the basin as a model in the night, seen from the south, north up (SPEC 14-66, 直し31-4).
 Run in Blender, after tools/fetch_copernicus_dem.py:
 
     blender -b --python tools/render_relief.py -- WORK_DIR [WIDTH_PX] [SAMPLES]
@@ -10,8 +10,11 @@ picture is drawn there too (relief.png). Written to the repo:
 
 The map's coordinates (x right, y down, 1 unit about 33.4 m) are put at
 Blender's X = x, Y = -y; a height is (metres - BASE_M) / M_PER_UNIT, EXAG times.
-The camera is orthographic and looks south from the north, ELEV_DEG down:
-the basin is in front, Kirishima at the back, the map's east on the left.
+The camera is orthographic and looks north from the south, ELEV_DEG down,
+as an ordinary map is read: north at the top, east on the right, Kirishima
+in front at the bottom and Hitoyoshi's side at the back. The moon lights it
+from the screen's upper left (the north-west), so the hills stand out and
+are not read as hollows.
 Cycles on the CPU; nothing here needs more than the numpy Blender carries.
 """
 
@@ -124,9 +127,11 @@ def night_material():
 
 
 def lights(scene):
-    """The moon, high in the west and bluish; a warm rim; a faint night sky."""
+    """The moon from the north-west (the screen's upper left) and bluish; a
+    weaker warm rim from the north-east (the upper right), never from the
+    front, so no slope is lit from below; a faint night sky."""
     for name, energy, colour, angles in (("moon", 1.15, (0.72, 0.80, 1.0), (62, 0, -118)),
-                                         ("rim", 0.6, (1.0, 0.86, 0.6), (70, 0, 30))):
+                                         ("rim", 0.35, (1.0, 0.86, 0.6), (70, 0, 135))):
         light = bpy.data.lights.new(name, "SUN")
         light.energy, light.color = energy, colour
         light.angle = math.radians(1.5)
@@ -148,7 +153,8 @@ def camera(scene, verts, width_px):
     cam = bpy.data.objects.new("camera", data)
     scene.collection.objects.link(cam)
     scene.camera = cam
-    cam.rotation_euler = Euler((math.radians(90 - ELEV_DEG), 0, math.radians(180)))
+    # Looking north (Blender's +Y is the map's north): north at the picture's top.
+    cam.rotation_euler = Euler((math.radians(90 - ELEV_DEG), 0, 0))
     bpy.context.view_layer.update()
     rotation = cam.matrix_world.to_3x3()
     right, up, back = Vector(rotation.col[0]), Vector(rotation.col[1]), Vector(rotation.col[2])

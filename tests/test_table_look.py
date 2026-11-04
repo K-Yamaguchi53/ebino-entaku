@@ -55,7 +55,7 @@ def test_each_seat_sits_on_a_chair_its_back_to_the_outside():
 
 def test_cards_and_names_keep_off_the_chairs_backs_and_the_tables_leg():
     fixed = _inner("fixedBoxes")
-    assert '".token .shape, .chair circle, .chair .hit"' in fixed
+    assert '".token .shape, .token.ai-seat .halo, .chair circle, .chair .hit"' in fixed
     assert '", .token .chair-back, .chair .back, .table-foot .leg, .table-foot .base"' in fixed
 
 
