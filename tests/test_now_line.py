@@ -156,7 +156,7 @@ def test_the_band_says_the_step_in_words_not_by_colour_alone():
 def test_the_purpose_is_over_the_seven_promises_and_the_counts_over_the_question_box():
     assert HTML.index('id="start-purpose"') < HTML.index('id="start-notice"')
     assert HTML.index('id="inside"') < HTML.index('id="ask-form"')
-    assert '<details id="inside-fold" open>' in HTML
+    assert '<details id="inside-fold">' in HTML  # Shut until asked for (直し33-1).
     # Examples are shown only: never put in the box.
     render = _top("renderInside")
     assert "fill(" not in render and "onclick" not in render and "#question" not in render

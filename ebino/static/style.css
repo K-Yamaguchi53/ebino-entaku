@@ -900,24 +900,38 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom { margin: 0; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom button { flex: 1; }
 /* Whose words are in the app: a card over the map's left side, in the
    room beside the map where there is room (直し32-1). */
-body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: absolute; z-index: 6; top: 0; left: 0; margin: 0; width: var(--inside-w, 320px);
+/* 直し33-1: its button at the head of the map's buttons, over no part of
+   the map; opened, the card over the map's right side, by the button. */
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: absolute; z-index: 7; top: 0; right: 0; width: 200px; margin: 0; padding: 0;
+  border: 0; background: none; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .inside-body { position: absolute; z-index: 6; top: 0; right: 212px; width: var(--inside-w, 320px);
+  padding: 12px 18px; border: 1px solid var(--moon-faint); border-radius: 8px;
   overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--moon-soft) transparent;
-  max-height: 100%; overflow: auto; background: color-mix(in srgb, var(--night-2) 94%, transparent);
+  max-height: 100cqh; overflow: auto; background: color-mix(in srgb, var(--night-2) 96%, transparent);
   box-shadow: 0 10px 28px var(--shadow); }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .inside-body { grid-template-columns: 1fr; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .inside-examples { border-left: 0; padding-left: 0; border-top: 1px solid var(--moon-faint); padding-top: 8px; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .inside-counts { grid-template-columns: 1fr; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .inside-counts .number { font-size: 26px; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .hints { margin: 8px 0 0; }
-/* Folded once a question is sent: only its line, as narrow as its words. */
-body:has(#table:not([hidden])):has(#map:not([hidden])) #inside:not(:has(details[open])) { width: auto; }
-/* Open (before the first question): the map steps right to leave it its
-   room, and comes back to its full size when it folds. */
-@media (orientation: landscape) {
-  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { --inside-w: min(320px, 30cqw); }
-  /* Only as far as it must: none where the room beside the map is enough. */
-  body:has(#table:not([hidden])):has(#map:not([hidden])) .stage:has(#inside:not([hidden]) details[open]) .map-room {
-    padding-left: min(var(--inside-w) + 12px, max(0px, 2 * (var(--inside-w) + 12px) - (100cqw - 212px - min(100cqw - 212px, 100cqh * var(--map-ratio, 1.3))))); }
+/* Shut (直し33-1): only its button, as narrow as its words, small, over the
+   map's corner; open, the card over the map (the map does not move). */
+body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { --inside-w: min(340px, 42cqw); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside summary { margin: 0; padding: 4px 12px; text-align: center;
+  border: 1px solid var(--moon-soft); border-radius: 999px; background: color-mix(in srgb, var(--night-2) 92%, transparent);
+  font-size: 14px; min-height: 0; line-height: 1.6; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside summary::marker { content: ""; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside details[open] summary { border-color: var(--lamp); }
+/* Before the first question the eye goes to it once: lit in the lamp's
+   colour; one soft ring goes out from it, once (no blinking); with motion
+   reduced, lit and still. */
+#inside.beckon:not(:has(details[open])) summary { border-color: var(--lamp); color: var(--lamp-bright); }
+@media (prefers-reduced-motion: no-preference) {
+  #inside.beckon:not(:has(details[open])) summary { animation: beckon 1.6s ease-out .6s 1 both; }
+}
+@keyframes beckon {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--lamp) 70%, transparent); }
+  to { box-shadow: 0 0 0 14px color-mix(in srgb, var(--lamp) 0%, transparent); }
 }
 /* The drawer: closed, nothing; open, one part, scrolling inside itself. */
 /* Over the right of the stage (its buttons' column first), so the map never
@@ -976,15 +990,16 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .map-card { position: abs
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-frame { width: min(100cqw, (100cqh - 300px) * var(--ratio, 1.3)); margin: 0 auto; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar { flex: none; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 6px 0 0; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-heading { flex: 1 1 100%; order: 9; }
+  /* Upright: its button under the map's buttons; the card over the map. */
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: static; width: auto; margin: 6px 0 0; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #inside summary { display: inline-block; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .inside-body { top: 0; right: 0; width: min(420px, 100%); max-height: calc(100cqh - 56px); }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-buttons { flex-direction: row; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom { margin-left: auto; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom button { flex: none; }
   /* The map a little smaller than the width where the height asks for it,
      so its buttons, the counts card and the AI's seat fit under it. */
   body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { container-type: size; display: flex; flex-direction: column; overflow: hidden; }
-  body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: static; width: auto; max-height: none; flex: 1 1 auto; min-height: 0; margin-top: 8px;
-    overflow: auto; }
-  body:has(#table:not([hidden])):has(#map:not([hidden])) #inside:not(:has(details[open])) { flex: none; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer { grid-column: 1; grid-row: 1; align-self: end; justify-self: stretch; width: auto; max-height: 46%; z-index: 30; }
 }
 

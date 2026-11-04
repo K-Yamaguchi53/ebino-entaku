@@ -611,6 +611,28 @@ function renderInside(rows) {
   $("examples-end").textContent = state.texts.question_examples_end;
 }
 
+// Whose words are in (直し33-1): shut, its button alone over the map; open
+// over the map at once when pressed (the map does not move for it). Pressed
+// again, Esc, or a press outside it shuts it, the keyboard back on its
+// button. Before the first question the button is lit once (style.css:
+// .beckon; with motion reduced, lit and still).
+function setupInside() {
+  const fold = $("inside-fold"), button = $("inside-open");
+  // Lit once: the first time it opens, the light goes for good.
+  fold.addEventListener("toggle", () => { if (fold.open) $("inside").classList.remove("beckon"); });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !fold.open) return;
+    event.preventDefault();
+    event.stopPropagation();
+    fold.open = false;
+    button.focus({ preventScroll: true });
+  });
+  document.addEventListener("click", (event) => {
+    if (fold.open && !$("inside").contains(event.target)) fold.open = false;
+  });
+  $("inside").classList.add("beckon");
+}
+
 // --- the drawer (直し32-1) ---
 
 // On the right of the one screen, only when opened: one part at a time (the
@@ -628,8 +650,7 @@ function setupDrawer() {
       onclick: (event) => toggleDrawer(part, event.currentTarget) }));
   }
   $("drawer-close").addEventListener("click", () => closeDrawer());
-  // The card of whose words are in, opened or folded, moves the map too.
-  $("inside-fold").addEventListener("toggle", mapMoved);
+  setupInside();
   $("drawer").addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || !drawerOpen()) return;
     event.preventDefault();
@@ -858,8 +879,9 @@ async function ask() {
   try {
     const round = await call("/api/ask", { question });
     setNow({ asking: false });
-    // The counts and examples fold once a question is sent; they open again.
+    // The counts and examples shut once a question is sent; they open again.
     $("inside-fold").open = false;
+    $("inside").classList.remove("beckon");
     if (round.status === "ask_again" || round.status === "unavailable") {
       showMessage(round.message);  // The question stays in the box to be changed.
       return;
