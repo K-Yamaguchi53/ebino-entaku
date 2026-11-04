@@ -87,6 +87,13 @@ HARVEST_SUBJECT_WHEN = "harvest_subject_when"
 HARVEST_SUBJECT_LINE = "harvest_subject_line"
 HARVEST_SUBJECT_LINE_PLAIN = "harvest_subject_line_plain"
 HARVEST_SUBJECT_MORE = "harvest_subject_more"
+# ③ as a card tied to the student's question (直し31-3): the line over it, the
+# label over the question, and the words when the student picks one of two.
+HARVEST_SUBJECT_LINK = "harvest_subject_link"
+HARVEST_SUBJECT_QUESTION = "harvest_subject_question"
+HARVEST_SUBJECT_CHOOSE = "harvest_subject_choose"
+HARVEST_SUBJECT_PICK = "harvest_subject_pick"
+HARVEST_SUBJECT_NONE = "harvest_subject_none"
 # コーチとオブザーバー (SPEC 5-1, coach.py): each card's line (the role's name
 # and what it asks from), the mark that it is an AI's question, and the
 # observer's view, which is told to the model and never shown.
@@ -142,6 +149,7 @@ SCREEN_TEXTS = (
     BUBBLE_HINT, BUBBLE_CLOSE, BUBBLE_ANSWER,
     BACK_TO_START, BACK_TO_START_CONFIRM, BACK_TO_START_YES, BACK_TO_START_NO, REFLECT_NEEDS_ANSWER,
     OPENING_SKIP, AI_ANSWER_HINT, CARD_ALREADY,
+    HARVEST_SUBJECT_QUESTION, HARVEST_SUBJECT_PICK, HARVEST_SUBJECT_NONE,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS)
 

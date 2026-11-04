@@ -428,8 +428,38 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .harvest h3::after { content: ""; display: block; width: 48px; height: 1px; margin: 14px auto 0; background: var(--lamp); }
 .harvest p { margin: 6px 0; font-size: 17px; line-height: 1.9; }
 #harvest-subject { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--paper-line); }
-#harvest-subject-note { color: var(--paper-soft); font-size: 16px; }
-#harvest-subject-more { margin-top: 10px; font-family: var(--gothic); font-size: 15px; }
+#harvest-subject-more, #harvest-subject-none { margin-top: 12px; font-family: var(--gothic); font-size: 15px; }
+#harvest-subject-none { margin-right: 10px; }
+/* ③ as a card tied to the question (直し31-3): question | line | card(s). */
+.harvest .subject-link { margin: 0 0 12px; font-weight: 600; }
+.subject-tie { display: grid; grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1.25fr); align-items: center; }
+.subject-question { padding: 12px 14px; border: 1px dashed var(--paper-soft); border-radius: 4px; }
+.harvest .subject-question .label { margin: 0; font-family: var(--gothic); font-size: 13px; color: var(--paper-soft); letter-spacing: .08em; }
+.harvest .subject-question .words { margin: 2px 0 0; font-size: 17px; line-height: 1.7; }
+.subject-tie-line { position: relative; height: 2px; background: var(--lamp); }
+.subject-tie-line::before, .subject-tie-line::after { content: ""; position: absolute; top: -3px; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--lamp); }
+.subject-tie-line::before { left: -4px; }
+.subject-tie-line::after { right: -4px; }
+.subject-tie.two .subject-tie-line::after { display: none; }
+.subject-cards { display: grid; gap: 10px; }
+.subject-tie.two .subject-cards { position: relative; padding-left: 16px; border-left: 2px solid var(--lamp); }
+.subject-tie.two .subject-card { position: relative; }
+.subject-tie.two .subject-card::before { content: ""; position: absolute; left: -17px; top: 50%; width: 16px; height: 2px; background: var(--lamp); }
+.subject-card { padding: 12px 16px; border: 1px solid var(--paper-line); border-left: 4px solid var(--lamp); border-radius: 4px;
+  background: var(--paper-light); }
+.harvest .subject-card p { margin: 0; }
+.harvest .subject-card .when { font-family: var(--gothic); font-size: 13px; color: var(--paper-soft); letter-spacing: .06em; }
+.harvest .subject-card .subject { font-size: 21px; font-weight: 600; line-height: 1.5; }
+.harvest .subject-card .heading { font-size: 16px; }
+.harvest .subject-card .note { margin-top: 4px; font-size: 16px; color: var(--paper-soft); line-height: 1.75; }
+.subject-card button { margin-top: 8px; font-family: var(--gothic); font-size: 15px; }
+@media (max-width: 600px) {
+  .subject-tie { grid-template-columns: minmax(0, 1fr); }
+  .subject-tie-line { justify-self: center; width: 2px; height: 28px; }
+  .subject-tie-line::before { left: -3px; top: -4px; }
+  .subject-tie-line::after { left: -3px; right: auto; top: auto; bottom: -4px; }
+}
 .sheet { display: grid; grid-template-columns: 10em 1fr; gap: 0 22px; border-radius: 4px;
   padding: clamp(18px, 3vw, 30px) clamp(22px, 5vw, 56px) clamp(24px, 4vw, 40px); }
 /* The harvest and the sheet are one sheet of paper when both are there. */
@@ -451,7 +481,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* Printed once the sheet is there: the one sheet alone, ink on the page's white. */
 @media print {
   html:has(#sheet:not([hidden])), html:has(#sheet:not([hidden])) body { background: none; color: var(--paper-ink); }
-  body:has(#sheet:not([hidden])) :is(.masthead, #start, #table, #reflect > :not(.harvest):not(.sheet), #harvest-subject-more) {
+  body:has(#sheet:not([hidden])) :is(.masthead, #start, #table, #reflect > :not(.harvest):not(.sheet), #harvest-subject-more, #harvest-subject-none, .subject-card button) {
     display: none !important;
   }
   #reflect { max-width: none; }

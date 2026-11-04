@@ -581,27 +581,44 @@ class Session:
         if current.subject is None:
             current.subject = subjects.choose(self.gate, self.library.subject_catalog, self.lab,
                                               subjects.record_words(current), self._shown_subjects())
-            self._count_shown_subject(current.subject)
+            for shown in current.subject.on_screen():
+                self._count_shown_subject(shown)
             self.save()
-        return {"subject": subjects.view(self.library.subject_catalog, current.subject)}
+        return {"subject": self._subject_view(current)}
+
+    def _subject_view(self, current: Reflection) -> dict | None:
+        # Tied to the question as the student holds it now (直し31-3).
+        return subjects.view(self.library.subject_catalog, current.subject, current.rewrite or current.now_question)
+
+    def subject_choose(self, choice) -> dict:
+        """Of the two ③ shows when nothing else fit: 0 or 1, or "none"."""
+        current = self._reflection()
+        pick = current.subject
+        if pick is None or pick.status != subjects.STATUS_CHOOSE or pick.chosen:
+            raise Refused("not_choosing")
+        if choice != subjects.CHOSE_NONE and (not isinstance(choice, int) or isinstance(choice, bool)
+                                              or not 0 <= choice < len(pick.order[:2])):
+            raise Refused("unknown_subject")
+        subjects.pick_one(self.library.subject_catalog, self.lab, pick, choice, self._shown_subjects())
+        self.save()
+        return {"subject": self._subject_view(current)}
 
     def subject_more(self) -> dict:
         """「ほかの教科も見る」: the next candidate, round and round."""
         current = self._reflection()
         pick = current.subject
-        if pick is None or len(pick.order) < 2:
+        if pick is None or len(pick.order) < 2 or pick.two_shown:
             raise Refused("no_other_subject")
         pick.index = (pick.index + 1) % len(pick.order)
         pick.presses += 1
-        self._count_shown_subject(pick)
+        self._count_shown_subject(pick.shown())
         self.save()
-        return {"subject": subjects.view(self.library.subject_catalog, pick)}
+        return {"subject": self._subject_view(current)}
 
     def _shown_subjects(self) -> Counter:
         return self.records.subject_counts() if self.records is not None else Counter(self._subject_counts)
 
-    def _count_shown_subject(self, pick) -> None:
-        shown = pick.shown()
+    def _count_shown_subject(self, shown) -> None:
         if shown is None:
             return
         if self.records is not None:

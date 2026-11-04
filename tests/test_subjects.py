@@ -96,10 +96,12 @@ def test_a_student_who_did_not_say_gets_no_mi1_only_row_and_no_choice():
     assert "家庭エ" in shown and "社会ウ" in shown  # 学科不明, and み1 with 生1.
 
 
-def test_not_said_and_a_fuda_whose_rows_are_each_for_one_course_shows_no_third_line():
+def test_not_said_and_a_fuda_whose_rows_are_each_for_one_course_lets_the_clue_words_pick():
     assert names("not_said", "札2") == []
     pick = choose(gate(says("札2", 1)), catalog(), "not_said", WORDS, Counter())
-    assert pick.status == subjects.STATUS_NO_CANDIDATE and subjects.view(catalog(), pick) is None
+    # Never an empty ③ (直し31-3): the clue words pick among this student's.
+    assert pick.status == subjects.SHOWN and pick.source == subjects.SOURCE_CODE and pick.model_said == "札2"
+    assert subjects.view(catalog(), pick) is not None
 
 
 # --- the line ---
@@ -140,9 +142,10 @@ def test_a_fuda_not_in_the_table_is_not_used():
     assert pick.source == subjects.SOURCE_CODE and pick.model_error == subjects.BAD_FUDA
 
 
-def test_nashi_shows_no_third_line():
+def test_nashi_lets_the_clue_words_pick_and_the_card_is_never_empty():
     pick = choose(gate(says("なし")), catalog(), "quest", WORDS, Counter())
-    assert pick.status == subjects.STATUS_NONE and subjects.view(catalog(), pick) is None
+    assert pick.status == subjects.SHOWN and pick.source == subjects.SOURCE_CODE and pick.model_said == "なし"
+    assert subjects.view(catalog(), pick)["cards"]
 
 
 def test_with_no_model_the_clue_words_choose_and_none_held_means_no_third_line():
@@ -153,7 +156,8 @@ def test_with_no_model_the_clue_words_choose_and_none_held_means_no_third_line()
     assert pick.fuda == "札1"
     nothing = choose(gate(RuntimeError("down")), catalog(), "quest",
                      {"question": "休みの日は何をする？", "answer": "", "move": ""}, Counter())
-    assert nothing.status == subjects.STATUS_NO_CLUE and subjects.view(catalog(), nothing) is None
+    # No clue word held: two to pick from, never nothing (直し31-3).
+    assert nothing.status == subjects.STATUS_CHOOSE and len(subjects.view(catalog(), nothing)["cards"]) == 2
 
 
 def test_with_no_model_the_second_comes_from_the_first_ones_fuda_only():
@@ -219,7 +223,8 @@ def test_seeing_other_subjects_goes_round_and_the_last_one_shown_is_recorded(tmp
     assert all(s["more"] for s in seen)
     record = json.loads((tmp_path / "sessions" / f"{session.session_id}.json").read_text(encoding="utf-8"))
     assert record["reflection"]["harvest_subject"] == {
-        "status": "shown", "fuda": "札3", "source": "model", "model_error": "", "shown": ROWS[12].key, "presses": 3}
+        "status": "shown", "fuda": "札3", "source": "model", "model_error": "", "model_said": "",
+        "shown": ROWS[12].key, "presses": 3, "offered": [], "chosen": ""}
     counts = Records(tmp_path).subject_counts()
     assert counts == Counter({ROWS[12].key: 2, ROWS[13].key: 1, ROWS[14].key: 1})  # Pressed ones count too.
 

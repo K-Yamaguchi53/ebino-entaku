@@ -24,12 +24,17 @@ not shown at all.
    a Lab or a company.
 3. Code checks the answer: a 札 not in the table, or a number not among that
    札's narrowed candidates, is not used; numbers missing are filled by
-   code's way below. なし, or a 札 with no candidate left, shows no ③.
-4. When the model cannot be used or does not answer: of all the narrowed
+   code's way below.
+4. When the model says なし, names a 札 with no candidate left for this
+   student, or cannot be used or does not answer: of all the narrowed
    candidates, the one whose clue words (手がかりの言葉) the record holds
    most (ties in table order) gives the 札, and the second is the next by
    clue words within that 札 only, so the 札 recorded and the subjects shown
-   agree; none held, no ③.
+   agree.
+   No clue word held either (直し31-3): ③ is never left empty. Two of the
+   narrowed candidates, of two 札 when there are, fewest shown first, are
+   shown side by side and the student picks the one they think nearer, or
+   neither; which is kept. No model gives a reason: each shows its ひとこと.
 5. Of the two, the one shown fewer times so far is shown (a tie: the one
    first). 「ほかの教科も見る」 shows the other, then the rest of that 札's
    narrowed candidates, fewest shown first, then starts again. Every one shown
@@ -37,9 +42,10 @@ not shown at all.
    (records.py: no name, number or time with them) and go when the records
    go (SPEC 2-1).
 
+③ is shown as a card tied by a line to the student's question as they hold
+it now (their own words, as on the sheet): いつ・科目・見出し・ひとこと.
 The screen never gets the item number (項目番号), the text quoted from the
-course of study, the words 「学習指導要領」 or a Lab's name; and ③ never
-quotes the question.
+course of study, the words 「学習指導要領」 or a Lab's name.
 """
 
 import json
@@ -51,7 +57,7 @@ from .gate import Gate, GateError, ModelUnavailable, json_answer, json_request
 from .ingest.scrub import normalize_for_match
 from .prompts import SUBJECT_FUDA
 from .reflection import CHOSE_OWN, DIRECTION_LABELS
-from .texts import (HARVEST_FUDA, HARVEST_SUBJECT_LINE, HARVEST_SUBJECT_LINE_PLAIN, HARVEST_SUBJECT_WHEN,
+from .texts import (HARVEST_SUBJECT_CHOOSE, HARVEST_SUBJECT_LINK, HARVEST_FUDA, HARVEST_SUBJECT_LINE, HARVEST_SUBJECT_LINE_PLAIN, HARVEST_SUBJECT_WHEN,
                     HARVEST_SUBJECTS, load_table, load_text, read_table)
 
 ROLE = "subjects"
@@ -85,9 +91,11 @@ SOURCE_CODE = "code"  # The clue words, when the model was not used.
 SHOWN = "shown"
 STATUS_OFF = "off"  # No table loaded (tests that build no catalog).
 STATUS_NO_MANABU = "no_manabu_file"
-STATUS_NONE = "fuda_none"  # The model said なし.
-STATUS_NO_CANDIDATE = "no_candidate"  # The 札 has no candidate for this student.
-STATUS_NO_CLUE = "no_clue_word"  # No model; the record holds no clue word.
+STATUS_NO_CANDIDATE = "no_candidate"  # Nothing at all for this student: no ③.
+# Neither the model nor the clue words gave one: two shown, the student picks (直し31-3).
+STATUS_CHOOSE = "student_chooses"
+SOURCE_STUDENT = "student"
+CHOSE_NONE = "none"  # 「どれも選ばない」
 BAD_FUDA = "unknown_fuda"
 # The wait for the model, with no retry (直し31-1): past it the clue words pick.
 TIMEOUT_SECONDS = 20.0
@@ -220,9 +228,20 @@ class Pick:
     order: list[Candidate] = field(default_factory=list)
     index: int = 0
     presses: int = 0  # 「ほかの教科も見る」
+    model_said: str = ""  # The model's 札 (or なし) when code picked instead.
+    chosen: str = ""  # STATUS_CHOOSE: the key the student picked, or CHOSE_NONE.
+    offered: list[str] = field(default_factory=list)  # STATUS_CHOOSE: the two keys shown.
 
     def shown(self) -> Candidate | None:
         return self.order[self.index] if self.order else None
+
+    @property
+    def two_shown(self) -> bool:
+        """Both of the two are on the screen: still to pick, or neither picked."""
+        return self.status == STATUS_CHOOSE and self.chosen in ("", CHOSE_NONE)
+
+    def on_screen(self) -> list[Candidate]:
+        return self.order[:2] if self.two_shown else [c for c in [self.shown()] if c]
 
 
 def record_words(reflection) -> dict[str, str]:
@@ -299,12 +318,8 @@ def choose(gate: Gate, catalog: Catalog | None, lab: str, words: dict[str, str],
     if not candidates:  # Nothing could be shown: the model is not asked.
         return Pick(STATUS_NO_CANDIDATE)
     fuda, numbers, error = _ask(gate, catalog, candidates, words)
-    if fuda == NONE:
-        return Pick(STATUS_NONE, fuda=NONE, source=SOURCE_MODEL)
-    if fuda:
-        pool = [c for c in candidates if c.row.fuda == fuda]
-        if not pool:
-            return Pick(STATUS_NO_CANDIDATE, fuda=fuda, source=SOURCE_MODEL)
+    pool = [c for c in candidates if c.row.fuda == fuda] if fuda and fuda != NONE else []
+    if pool:
         picked: list[Candidate] = []
         for number in numbers:
             if 1 <= number <= len(candidates) and candidates[number - 1] in pool \
@@ -317,15 +332,41 @@ def choose(gate: Gate, catalog: Catalog | None, lab: str, words: dict[str, str],
                 picked.append(candidate)
         picked = picked[:PICKS]
         return Pick(SHOWN, fuda=fuda, source=SOURCE_MODEL, order=_ordered(picked, pool, counts))
+    # なし, a 札 with nothing for this student, or no model: the clue words.
+    said = fuda
     ranked = by_clues(candidates, words)
     if not clue_hits(ranked[0].row, words):
-        return Pick(STATUS_NO_CLUE, source=SOURCE_CODE, model_error=error)
+        # None held either: two to pick from, never an empty ③ (直し31-3).
+        two = two_to_choose(candidates, counts)
+        return Pick(STATUS_CHOOSE, source=SOURCE_STUDENT, model_error=error, model_said=said, order=two,
+                    offered=[c.row.key for c in two])
     # The first one's 札 is the 札; the second comes from the same 札 only,
     # so the 札 recorded and the subjects on screen always agree.
     fuda = ranked[0].row.fuda
     pool = [c for c in candidates if c.row.fuda == fuda]
     picked = by_clues(pool, words)[:PICKS]
-    return Pick(SHOWN, fuda=fuda, source=SOURCE_CODE, model_error=error, order=_ordered(picked, pool, counts))
+    return Pick(SHOWN, fuda=fuda, source=SOURCE_CODE, model_error=error, model_said=said,
+                order=_ordered(picked, pool, counts))
+
+
+def two_to_choose(candidates: list[Candidate], counts: Counter) -> list[Candidate]:
+    """The one shown fewest times so far (ties in table order), and the next
+    such of another 札 (of the same when there is no other)."""
+    ranked = sorted(candidates, key=lambda c: counts[c.row.key])
+    other = [c for c in ranked[1:] if c.row.fuda != ranked[0].row.fuda] or ranked[1:]
+    return ranked[:1] + other[:1]
+
+
+def pick_one(catalog: Catalog, lab: str, pick: Pick, choice, counts: Counter) -> None:
+    """The student picked one of the two (0 or 1) or neither (CHOSE_NONE).
+    Picked: it is shown alone, then 「ほかの教科も見る」 goes through its 札."""
+    if choice == CHOSE_NONE:
+        pick.chosen = CHOSE_NONE
+        return
+    chosen = pick.order[choice]
+    pool = [c for c in catalog.candidates(lab) if c.row.fuda == chosen.row.fuda]
+    pick.chosen, pick.fuda = chosen.row.key, chosen.row.fuda
+    pick.order, pick.index = _ordered([chosen], pool, counts), 0
 
 
 # --- what the screen and the records get ---
@@ -336,12 +377,18 @@ def line(catalog: Catalog, candidate: Candidate) -> str:
     return template.format(**{"いつ": catalog.when_words[candidate.when], "科目": row.subject, "見出し": row.heading})
 
 
-def view(catalog: Catalog | None, pick: Pick | None) -> dict | None:
-    """None when no ③ is shown."""
+def view(catalog: Catalog | None, pick: Pick | None, question: str = "") -> dict | None:
+    """None when no ③ is shown (nothing at all for this student). The
+    question is the student's own, tied to the card by a line on screen."""
     shown = pick.shown() if pick else None
     if catalog is None or shown is None:
         return None
-    return {"line": line(catalog, shown), "note": shown.row.note, "more": len(pick.order) > 1}
+    two = pick.two_shown
+    cards = [{"when": catalog.when_words[c.when], "subject": c.row.subject, "heading": c.row.heading,
+              "note": c.row.note, "line": line(catalog, c)} for c in pick.on_screen()]
+    return {"line": line(catalog, shown), "note": shown.row.note, "more": len(pick.order) > 1 and not two,
+            "question": question, "link": load_text(HARVEST_SUBJECT_CHOOSE if two and not pick.chosen else HARVEST_SUBJECT_LINK),
+            "choose": two and not pick.chosen, "cards": cards}
 
 
 def record(pick: Pick | None) -> dict | None:
@@ -351,4 +398,7 @@ def record(pick: Pick | None) -> dict | None:
         return None
     shown = pick.shown()
     return {"status": pick.status, "fuda": pick.fuda, "source": pick.source, "model_error": pick.model_error,
-            "shown": shown.row.key if shown else "", "presses": pick.presses}
+            "model_said": pick.model_said, "shown": shown.row.key if shown else "", "presses": pick.presses,
+            # The two offered and the one the student picked (or none) (直し31-3).
+            "offered": list(pick.offered),
+            "chosen": pick.chosen}

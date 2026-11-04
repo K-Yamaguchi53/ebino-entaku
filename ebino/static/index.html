@@ -162,9 +162,12 @@
       <p id="harvest-moves" hidden></p>
       <p id="harvest-meet" hidden></p>
       <!-- ③ (SPEC 5-3): asked for after ① and ② are shown. -->
+      <!-- 直し31-3: the student's question on the left, the subject's card on
+           the right (or two to pick from), a line between them. -->
       <div id="harvest-subject" hidden>
-        <p id="harvest-subject-line"></p>
-        <p id="harvest-subject-note"></p>
+        <p id="harvest-subject-link" class="subject-link"></p>
+        <div id="harvest-subject-tie" class="subject-tie"></div>
+        <button type="button" id="harvest-subject-none" class="quiet" hidden></button>
         <button type="button" id="harvest-subject-more" hidden></button>
       </div>
     </section>

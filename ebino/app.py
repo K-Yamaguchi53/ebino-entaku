@@ -158,6 +158,8 @@ class App:
             return session.subject()
         if path == "/api/subject_more":
             return session.subject_more()
+        if path == "/api/subject_choose":
+            return session.subject_choose(body.get("choice"))
         raise Refused("unknown_path")
 
 

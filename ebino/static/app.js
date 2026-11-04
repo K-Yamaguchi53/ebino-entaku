@@ -1281,17 +1281,55 @@ async function loadSubject() {
   }
 }
 
+// ③ as a card (直し31-3): the student's question as they hold it now on the
+// left, the subject's card on the right (いつ・科目・見出し・ひとこと), a line
+// between, so the tie is seen at a glance. Nothing else fit: two cards, and
+// the student picks the one they think nearer, or neither.
 function showSubject(subject) {
   if (!subject) return;
   $("harvest-heading").textContent = state.texts.harvest_heading;
-  $("harvest-subject-line").textContent = subject.line;
-  $("harvest-subject-note").textContent = subject.note;
+  $("harvest-subject-link").textContent = subject.link;
+  const cards = el("div", { class: "subject-cards" });
+  subject.cards.forEach((card, index) => {
+    const node = el("div", { class: "subject-card" },
+      el("p", { class: "when", text: card.when }),
+      el("p", { class: "subject", text: card.subject }),
+      card.heading ? el("p", { class: "heading", text: `「${card.heading}」` }) : null,
+      el("p", { class: "note", text: card.note }));
+    if (subject.choose) {
+      node.append(el("button", { type: "button", class: "quiet", text: state.texts.harvest_subject_pick,
+        onclick: () => chooseSubject(index) }));
+    }
+    cards.append(node);
+  });
+  const tie = $("harvest-subject-tie");
+  tie.classList.toggle("two", subject.cards.length > 1);
+  tie.replaceChildren(
+    el("div", { class: "subject-question" },
+      el("p", { class: "label", text: state.texts.harvest_subject_question }),
+      el("p", { class: "words", text: subject.question })),
+    el("div", { class: "subject-tie-line", "aria-hidden": "true" }),
+    cards);
+  const none = $("harvest-subject-none");
+  none.textContent = state.texts.harvest_subject_none;
+  none.hidden = !subject.choose;
+  none.disabled = false;
   const more = $("harvest-subject-more");
   more.textContent = state.texts.harvest_subject_more;
   more.hidden = !subject.more;
   more.disabled = false;
   $("harvest-subject").hidden = false;
   $("harvest").hidden = false;
+}
+
+async function chooseSubject(choice) {
+  const buttons = [$("harvest-subject-none"), ...$("harvest-subject-tie").querySelectorAll("button")];
+  for (const button of buttons) button.disabled = true;
+  try {
+    showSubject((await call("/api/subject_choose", { choice })).subject);
+  } catch (error) {
+    for (const button of buttons) button.disabled = false;
+  }
 }
 
 async function moreSubject() {
@@ -1382,6 +1420,7 @@ $("reflect-answer").addEventListener("submit", (event) => { event.preventDefault
 $("decline").addEventListener("click", () => reflectAnswer(true));
 $("reflect-finish").addEventListener("submit", reflectFinish);
 $("harvest-subject-more").addEventListener("click", moreSubject);
+$("harvest-subject-none").addEventListener("click", () => chooseSubject("none"));
 $("back-start").addEventListener("click", askBackToStart);
 $("back-yes").addEventListener("click", backToStart);
 $("back-no").addEventListener("click", stayHere);

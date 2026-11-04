@@ -146,7 +146,10 @@ def test_the_third_line_is_asked_for_only_after_the_first_two_are_on_screen():
     assert finish.index("renderSheet(sheet);") < finish.index("loadSubject();")
     pick = script[script.index("async function pickUse"):script.index("async function loadSubject")]
     assert pick.index("showHarvest(card);") < pick.index("loadSubject();")
-    assert "textContent = subject.line" in script and "textContent = subject.note" in script
+    # ③ as a card tied to the question (直し31-3), every word set as text.
+    show = script[script.index("function showSubject"):script.index("async function chooseSubject")]
+    assert 'text: subject.question' in show and 'text: card.subject' in show and 'text: card.note' in show
+    assert "innerHTML" not in show
 
 
 def test_the_rounds_last_word_over_http(server):
