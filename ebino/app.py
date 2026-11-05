@@ -192,6 +192,11 @@ class App:
             "parts": session.hitokoto_parts,
             "choose": lambda: session.hitokoto_choose(body.get("person"), body.get("part", ""),
                                                       omakase=body.get("omakase") is True),
+            "answer": lambda: session.hitokoto_answer(body.get("text", ""), dont_know=body.get("dont_know") is True),
+            "ladder": lambda: session.hitokoto_ladder(body.get("choice")),
+            "fill": lambda: session.hitokoto_fill(body.get("text", ""), skip=skip),
+            "scale": lambda: session.hitokoto_scale(body.get("value")),
+            "forward": lambda: session.hitokoto_forward(body.get("text", ""), skip=skip),
         }
         if step not in steps:
             raise Refused("unknown_path")

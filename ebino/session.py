@@ -870,6 +870,13 @@ class Session:
             raise Refused("not_now")
         return talk
 
+    def _named(self, text: str) -> dict | None:
+        """With a name in it: the line asking for it again (as for an answer
+        to an AI's question); the words are neither kept nor sent."""
+        if text and self.gate.names.hits(text):
+            return {"status": roundtable.ASK_AGAIN, "message": load_text(NAME_IN_QUESTION)}
+        return None
+
     def hitokoto_begin(self, opened) -> dict:
         """Today's map: the people on it, the split between two of them, the
         counts. opened: the bubbles the student opened, in that order."""
@@ -909,8 +916,154 @@ class Session:
                 raise Refused("unknown_part")
         talk.chosen, talk.chosen_part, talk.omakase = person, part, bool(omakase)
         talk.stage = hitokoto.TALK
+        asked = hitokoto.ask_listener(self.gate, self, talk, hitokoto.REACTION)
         self.save()
-        return {"next": "chosen", "omakase": bool(omakase), "person": person, "part": part}
+        return {"next": "ask", "question": asked.text, "omakase": bool(omakase), "person": person, "part": part}
+
+    def _ladder_or_scale(self, talk: hitokoto.Hitokoto) -> dict:
+        """Two 「わからない」 in a row: the ladder (once a sitting), else the scale."""
+        talk.blank_run = 0
+        if talk.ladder_shown:
+            return self._to_scale(talk)
+        if talk.split:
+            return self._ladder_step(talk, hitokoto.LADDER_TWO)
+        if len(talk.people) >= 2:
+            return self._ladder_step(talk, hitokoto.LADDER_THREE)
+        return self._ladder_step(talk, hitokoto.FILL)
+
+    def _ladder_step(self, talk: hitokoto.Hitokoto, step: str) -> dict:
+        texts = hitokoto.words()
+        talk.stage = step
+        talk.ladder_shown += 1
+        question = texts[{hitokoto.LADDER_TWO: "ladder_two", hitokoto.LADDER_THREE: "ladder_three",
+                          hitokoto.FILL: "ladder_fill"}[step]]
+        talk.asked.append(hitokoto.Asked(step, question, "teacher"))
+        view = {"next": step, "question": question}
+        if step == hitokoto.LADDER_TWO:  # The split's two people's own words.
+            view["options"] = [dict(talk.people[i].view(), index=i) for i in (talk.split["a"], talk.split["b"])]
+        elif step == hitokoto.LADDER_THREE:  # The people on the map.
+            view["options"] = [dict(p.view(), index=i) for i, p in enumerate(talk.people)]
+        else:
+            index = next(i for i in (talk.ladder_three, talk.ladder_two, 0) if i is not None)
+            line = hitokoto.fill(texts["ladder_fill_line"], who=talk.people[index].title)
+            before, _, after = line.partition(hitokoto.FILL_BLANK)
+            view.update(before=before, after=after)
+        return view
+
+    def _to_scale(self, talk: hitokoto.Hitokoto) -> dict:
+        talk.stage = hitokoto.SCALE
+        question = hitokoto.words()["scale_q"]
+        talk.asked.append(hitokoto.Asked("scale", question, "teacher"))
+        return {"next": "scale", "question": question}
+
+    def _next_listener(self, talk: hitokoto.Hitokoto, answer: str) -> dict:
+        """The direction not asked yet, or the scale."""
+        if talk.listener_asked >= hitokoto.MAX_LISTENER:
+            return self._to_scale(talk)
+        talk.stage = hitokoto.TALK
+        asked = hitokoto.ask_listener(self.gate, self, talk, hitokoto.DIRECTIONS[talk.listener_asked], answer)
+        return {"next": "ask", "question": asked.text}
+
+    def hitokoto_answer(self, text, dont_know: bool = False) -> dict:
+        """An answer to the listener's question, or 「わからない」. Once: the
+        same question again; twice in a row: the ladder."""
+        talk = self._talk(hitokoto.TALK)
+        text = "" if dont_know else _line(text, hitokoto.MAX_LINE, "empty_answer")
+        named = self._named(text)
+        if named:
+            return named
+        direction = next(a.step for a in reversed(talk.asked) if a.step in hitokoto.DIRECTIONS)
+        if dont_know or hitokoto.is_blank(text):
+            talk.answers.append({"step": direction, "dont_know": True})
+            talk.blank_run += 1
+            if talk.blank_run == 1:
+                self.save()
+                return {"next": "again", "note": hitokoto.words()["again"], "question": talk.asked[-1].text}
+            view = self._ladder_or_scale(talk)
+            self.save()
+            return view
+        talk.blank_run = 0
+        talk.answers.append({"step": direction, "text": text})
+        talk.written.append({"step": direction, "text": text})
+        view = self._next_listener(talk, text)
+        self.save()
+        return view
+
+    def hitokoto_ladder(self, choice) -> dict:
+        """2択 (one of the split's two) or 3択 (one on the map)."""
+        talk = self._talk(hitokoto.LADDER_TWO, hitokoto.LADDER_THREE)
+        allowed = ((talk.split["a"], talk.split["b"]) if talk.stage == hitokoto.LADDER_TWO
+                   else tuple(range(len(talk.people))))
+        if not isinstance(choice, int) or isinstance(choice, bool) or choice not in allowed:
+            raise Refused("unknown_choice")
+        talk.answers.append({"step": talk.stage, "seat_id": talk.people[choice].seat_id})
+        if talk.stage == hitokoto.LADDER_TWO:
+            talk.ladder_two = choice
+            view = self._ladder_step(talk, hitokoto.LADDER_THREE)
+        else:
+            talk.ladder_three = choice
+            view = self._ladder_step(talk, hitokoto.FILL)
+        self.save()
+        return view
+
+    def hitokoto_fill(self, text, skip: bool = False) -> dict:
+        """The blank of 「○○の話の、［　　］のところが近いと思った。」, or left
+        empty. Written: back to the direction not asked yet."""
+        talk = self._talk(hitokoto.FILL)
+        text = "" if skip else _line(text, hitokoto.MAX_LINE, "", required=False)
+        named = self._named(text)
+        if named:
+            return named
+        if not text or hitokoto.is_blank(text):
+            talk.answers.append({"step": hitokoto.FILL, "dont_know": True})
+            view = self._to_scale(talk)
+        else:
+            talk.fill_text = text
+            talk.answers.append({"step": hitokoto.FILL, "text": text})
+            talk.written.append({"step": hitokoto.FILL, "text": text})
+            view = self._next_listener(talk, text)
+        self.save()
+        return view
+
+    def hitokoto_scale(self, value) -> dict:
+        """The doubt now, 0 to 15 (the first question's as 10): the next
+        question by it (the teacher's three)."""
+        talk = self._talk(hitokoto.SCALE)
+        if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= hitokoto.SCALE_TOP:
+            raise Refused("unknown_scale")
+        talk.scale = value
+        texts = hitokoto.words()
+        if value < hitokoto.SCALE_FIRST:
+            key = "scale_down"
+        elif value == hitokoto.SCALE_FIRST:
+            key = "scale_same"
+        else:
+            key = "scale_up"
+        talk.asked.append(hitokoto.Asked("forward", texts[key], "teacher"))
+        talk.stage = hitokoto.FORWARD
+        self.save()
+        return {"next": "forward", "question": texts[key]}
+
+    def _kept_line(self, talk: hitokoto.Hitokoto, step: str, text, skip: bool):
+        """One optional line: (its words, or ""), or (None, the ask-again view)."""
+        text = "" if skip else _line(text, hitokoto.MAX_LINE, "", required=False)
+        named = self._named(text)
+        if named:
+            return None, named
+        if text and not hitokoto.is_blank(text):
+            talk.written.append({"step": step, "text": text})
+            return text, None
+        return "", None
+
+    def hitokoto_forward(self, text, skip: bool = False) -> dict:
+        """The answer to the scale's next question (optional; no ladder)."""
+        talk = self._talk(hitokoto.FORWARD)
+        text, named = self._kept_line(talk, "forward", text, skip)
+        if named:
+            return named
+        talk.forward, talk.stage = text, hitokoto.WAY
+        self.save()
+        return {"next": "way"}
 
     # --- what the sitting has gathered ---
 

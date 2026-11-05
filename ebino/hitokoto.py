@@ -314,6 +314,50 @@ def begin(session, opened: list[str], sheet_heading) -> Hitokoto:
     return talk
 
 
+# --- the checks ---
+
+class Words:
+    """What 「」 may hold: the record's words (reflection.Record), the people's
+    cards and lit parts, and what the student wrote here."""
+
+    def __init__(self, session, talk: Hitokoto):
+        self.record = Record(session)
+        self.record.quote_texts += [p.text for p in talk.people]
+        self.record.own_words += [talk.first_question, *talk.parts.values(), talk.chosen_part]
+        self.record.own_words += [w["text"] for w in talk.written]
+        self.record.own_words = [w for w in self.record.own_words if w]
+
+
+def _outside(text: str) -> str:
+    return normalize_for_match(_QUOTED.sub("", text))
+
+
+def _starts_you_are(text: str) -> bool:
+    plain = _QUOTED.sub("", text)
+    return any(sentence.strip().startswith("あなたは") for sentence in re.split(r"[。．！!？?\n]", plain))
+
+
+def question_stop(text: str, words_: Words, gate: Gate) -> str:
+    """"" when the listener's question may be shown, else a reason code."""
+    reason = checked(text, words_.record, gate, MAX_QUESTION)
+    if reason:
+        return reason
+    text = text.strip()
+    body = _outside(text)
+    if any(normalize_for_match(lure) in body for lure in LURE_FORMS):
+        return STOP_LURE
+    if _starts_you_are(text):
+        return STOP_YOU_ARE
+    plain = _QUOTED.sub("", text)
+    if not text.endswith(("？", "?")) or plain.count("？") + plain.count("?") != 1:
+        return STOP_NOT_ONE_QUESTION
+    if sum(body.count(word) for word in QUESTION_WORDS) > 1:
+        return STOP_QUESTION_WORDS
+    if has_avoid(text):
+        return STOP_AVOID
+    return ""
+
+
 # --- the listener ---
 
 def _send(gate: Gate, role: str, system: str, data: dict, schema: dict, seconds: float, max_tokens: int):
@@ -340,6 +384,10 @@ PARTS_SCHEMA = {
         "required": ["id", "part"], "additionalProperties": False}}},
     "required": ["parts"], "additionalProperties": False,
 }
+QUESTION_SCHEMA = {
+    "type": "object", "properties": {"question": {"type": "string"}},
+    "required": ["question"], "additionalProperties": False,
+}
 
 
 def ask_parts(gate: Gate, talk: Hitokoto) -> None:
@@ -363,3 +411,46 @@ def ask_parts(gate: Gate, talk: Hitokoto) -> None:
             talk.parts[index] = part
     if answer is not None and not talk.parts:
         talk.parts_reason = "no_part_found"
+
+
+def first_sentence(text: str) -> str:
+    match = re.match(r"[^。．！!？?]+", text.strip())
+    return match.group(0) if match else text.strip()
+
+
+def chosen_words(talk: Hitokoto) -> str:
+    """What the student picked: the lit part, else the card's first sentence."""
+    if talk.chosen is None:
+        return ""
+    return talk.chosen_part or first_sentence(talk.people[talk.chosen].text)
+
+
+def fixed_question(direction: str, talk: Hitokoto) -> str:
+    texts = words()
+    if direction == REACTION:
+        return fill(texts["ask_reaction"], word=chosen_words(talk))
+    return texts["ask_self"]
+
+
+def ask_listener(gate: Gate, session, talk: Hitokoto, direction: str, answer: str = "") -> Asked:
+    """The question of this direction: the listener's where it passes the
+    checks, else the fixed one. answer: what the student wrote just before,
+    left out when it is of home, money or health (not dug into)."""
+    talk.listener_asked += 1
+    if answer and has_avoid(answer):
+        asked = Asked(direction, fixed_question(direction, talk), "fixed", STUDENT_AVOID)
+        talk.asked.append(asked)
+        return asked
+    person = talk.people[talk.chosen] if talk.chosen is not None else None
+    data = {"task": "question", "direction": direction, "first_question": talk.first_question,
+            "chosen": chosen_words(talk), "card": person.text if person else "", "answer": answer}
+    reply, reason, seconds = _send(gate, LISTENER, listener_system(), data, QUESTION_SCHEMA, LISTENER_SECONDS, 500)
+    text = reply.get("question") if isinstance(reply, dict) else None
+    if reply is not None:
+        reason = question_stop(text, Words(session, talk), gate) if isinstance(text, str) else STOP_MISSING
+    if reason:
+        asked = Asked(direction, fixed_question(direction, talk), "fixed", reason, seconds)
+    else:
+        asked = Asked(direction, text.strip(), LISTENER, "", seconds)
+    talk.asked.append(asked)
+    return asked

@@ -80,6 +80,13 @@ def sitting(model=None, tmp_path=None, mark="b1", opened=("a1",)):
     return session, model, client, view
 
 
+def to_scale(session):
+    session.hitokoto_parts()
+    session.hitokoto_choose(0, "休みは空いたら取ります")
+    session.hitokoto_answer("空いたら取るのがいいと思った")
+    return session.hitokoto_answer("部活がない日は空いたら休む")
+
+
 # --- 段1: today's map ---
 
 def test_the_map_shows_the_marked_person_first_then_the_bubble_opened_with_their_own_words():
@@ -137,7 +144,7 @@ def test_parts_not_back_in_time_leave_the_whole_cards_to_press():
     session, _, _, _ = sitting(Model(parts=TimeoutError()))
     assert session.hitokoto_parts() == {"parts": {}}
     assert session.talk.parts_reason == "api_error:TimeoutError"
-    assert session.hitokoto_choose(1, "")["next"] == "chosen"  # The whole card.
+    assert session.hitokoto_choose(1, "")["next"] == "ask"  # The whole card.
 
 
 def test_omakase_is_picked_by_code_the_first_lit_part():
@@ -145,7 +152,7 @@ def test_omakase_is_picked_by_code_the_first_lit_part():
     session.hitokoto_parts()
     view = session.hitokoto_choose(None, "", omakase=True)
     assert view["omakase"] and view["person"] == 0 and view["part"] == "休みは空いたら取ります"
-    assert model.kinds() == ["parts"]  # No request to pick.
+    assert model.kinds() == ["parts", "reaction"]  # No request to pick.
 
 
 def test_only_the_lit_part_can_be_pressed():
@@ -155,8 +162,174 @@ def test_only_the_lit_part_can_be_pressed():
         session.hitokoto_choose(0, "天気しだい")
 
 
+# --- 段2: the listener's two directions ---
+
+def test_the_two_directions_come_in_order_and_neither_is_asked_twice():
+    session, model, _, _ = sitting()
+    session.hitokoto_parts()
+    assert session.hitokoto_choose(0, "休みは空いたら取ります")["question"] == REACTION_Q
+    assert session.hitokoto_answer("空いたら取るのがいいと思った")["question"] == SELF_Q
+    view = session.hitokoto_answer("部活がない日は空いたら休む")
+    assert view == {"next": "scale", "question": WORDS["scale_q"]}
+    assert model.kinds() == ["parts", "reaction", "self"]
+    assert [a.step for a in session.talk.asked] == ["reaction", "self", "scale"]
+    # The self question is sent the answer just written.
+    assert model.sent[2][1]["answer"] == "空いたら取るのがいいと思った"
 
 
+def test_dont_know_once_asks_the_same_question_again_without_the_model():
+    session, model, _, _ = sitting()
+    session.hitokoto_parts()
+    session.hitokoto_choose(0, "休みは空いたら取ります")
+    view = session.hitokoto_answer("", dont_know=True)
+    assert view == {"next": "again", "note": "だいじょうぶ。ひとことでいいよ。", "question": REACTION_Q}
+    assert model.kinds() == ["parts", "reaction"]
+    assert session.hitokoto_answer("わからない。")["next"] == "ladder_two"  # Typed counts too.
+
+
+def test_dont_know_twice_turns_to_the_ladder_and_a_blank_written_goes_back_to_the_next_direction():
+    session, model, _, _ = sitting()
+    session.hitokoto_parts()
+    session.hitokoto_choose(0, "休みは空いたら取ります")
+    session.hitokoto_answer("", dont_know=True)
+    two = session.hitokoto_answer("ない")
+    assert two["question"] == "2人の言葉。自分に近いのは、どっち？"
+    three = session.hitokoto_ladder(two["options"][0]["index"])
+    assert three["question"] == WORDS["ladder_three"] and len(three["options"]) == 2
+    fill = session.hitokoto_ladder(1)
+    assert fill["question"] == WORDS["ladder_fill"]
+    assert fill["before"] == "理容師の話の、" and fill["after"] == "のところが近いと思った。"
+    back = session.hitokoto_fill("決めて取る")
+    assert back == {"next": "ask", "question": SELF_Q}
+    assert session.hitokoto_answer("店を閉める日を決めたい")["next"] == "scale"
+    talk = session.talk
+    assert talk.listener_asked == 2 and talk.ladder_shown == 3
+    assert talk.question_count() == hitokoto.MAX_QUESTIONS
+    assert model.kinds() == ["parts", "reaction", "self"]
+
+
+def test_the_ladder_is_made_from_the_record_and_texts_only():
+    session, model, _, _ = sitting()
+    session.hitokoto_parts()
+    session.hitokoto_choose(0, "休みは空いたら取ります")
+    session.hitokoto_answer("", dont_know=True)
+    sent = len(model.sent)
+    two = session.hitokoto_answer("", dont_know=True)
+    assert {o["text"] for o in two["options"]} == {"休みは決めて取ります。", "畑は天気しだいなので、休みは空いたら取ります。"}
+    three = session.hitokoto_ladder(two["options"][1]["index"])
+    assert {o["title"] for o in three["options"]} == {"理容師", "農家"}
+    session.hitokoto_ladder(0)
+    assert len(model.sent) == sent  # No model for any of the ladder.
+
+
+def test_with_no_split_the_ladder_skips_the_two():
+    session, _, _, _ = sitting(Model(split=False))
+    session.hitokoto_parts()
+    session.hitokoto_choose(0, "")
+    session.hitokoto_answer("", dont_know=True)
+    assert session.hitokoto_answer("", dont_know=True)["next"] == "ladder_three"
+
+
+def test_with_one_person_on_the_map_the_ladder_goes_to_the_blank_line():
+    session, _, _, view = sitting(opened=())
+    assert len(view["people"]) == 1
+    session.hitokoto_parts()
+    session.hitokoto_choose(0, "")
+    session.hitokoto_answer("", dont_know=True)
+    fill = session.hitokoto_answer("", dont_know=True)
+    assert fill["next"] == "fill" and fill["before"] == "農家の話の、"
+    assert session.hitokoto_fill("", skip=True)["next"] == "scale"  # Left empty: on to the scale.
+
+
+def test_the_ladder_is_shown_once_a_sitting():
+    session, _, _, _ = sitting()
+    session.hitokoto_parts()
+    session.hitokoto_choose(0, "")
+    session.hitokoto_answer("", dont_know=True)
+    session.hitokoto_answer("", dont_know=True)
+    session.hitokoto_ladder(0)
+    session.hitokoto_ladder(0)
+    session.hitokoto_fill("天気しだい")
+    session.hitokoto_answer("", dont_know=True)
+    assert session.hitokoto_answer("", dont_know=True)["next"] == "scale"
+    assert session.talk.ladder_shown == 3
+
+
+QUESTION_STOPS = [
+    ("「休みは自由に取る」を読んで、最初に思ったことは？", "quote_not_in_record"),
+    ("谷口さんの言葉を読んで、最初に思ったことは？", "name"),
+    ("休みを決めて取るべきだと思った？", "banned_word"),
+    ("休みは空いたら取るほうが楽だと思わない？", "lure_form"),
+    ("休みを決めるのと空いたら取るのと、それとも別の形？", "lure_form"),
+    ("あなたは決めて取るタイプ？", "banned_word"),
+    ("あなたは決めて取る人？", "you_are"),
+    ("家族と休みの日に何をしている？", "avoid_word"),
+    ("お金がかかる休みと、かからない休みは？", "avoid_word"),
+    ("「休みは空いたら取ります」を読んで、" + "最初に心に浮かんだことや思い出したことや気づいたことは" * 2 + "？", "too_long"),
+    ("「休みは空いたら取ります」を読んで、最初に思ったこと。", "not_one_question"),
+    ("最初に思ったことは？ 次に思ったことは？", "not_one_question"),
+    ("なぜそう思ったのか、どう感じた？", "question_words"),
+]
+
+
+@pytest.mark.parametrize("text, reason", QUESTION_STOPS)
+def test_a_listener_question_that_fails_a_check_becomes_the_fixed_one(text, reason):
+    session, _, _, _ = sitting(Model(reaction=text))
+    session.hitokoto_parts()
+    view = session.hitokoto_choose(0, "休みは空いたら取ります")
+    assert view["question"] == "「休みは空いたら取ります」を読んで、最初に思ったことは？"
+    assert session.talk.asked[0].by == "fixed" and session.talk.asked[0].fallback == reason
+
+
+def test_a_listener_question_past_eight_seconds_becomes_the_fixed_one():
+    session, _, client, _ = sitting(Model(reaction=TimeoutError()))
+    session.hitokoto_parts()
+    session.hitokoto_choose(0, "")
+    asked = session.talk.asked[0]
+    assert asked.by == "fixed" and asked.fallback == "api_error:TimeoutError"
+    assert asked.text == "「畑は天気しだいなので、休みは空いたら取ります」を読んで、最初に思ったことは？"
+    assert client.options[-1] == {"timeout": hitokoto.LISTENER_SECONDS, "max_retries": 0}
+
+
+def test_the_self_question_is_fixed_and_not_sent_the_answer_when_it_is_of_home_or_money():
+    session, model, _, _ = sitting()
+    session.hitokoto_parts()
+    session.hitokoto_choose(0, "")
+    view = session.hitokoto_answer("家族が休みの日に働いている")
+    assert view["question"] == WORDS["ask_self"]
+    assert session.talk.asked[-1].fallback == hitokoto.STUDENT_AVOID
+    assert model.kinds() == ["parts", "reaction"]  # Not sent.
+
+
+def test_a_name_in_the_students_words_is_neither_sent_nor_kept(tmp_path):
+    session, model, client, _ = sitting(tmp_path=tmp_path)
+    session.hitokoto_parts()
+    session.hitokoto_choose(0, "")
+    sent = len(client.requests)
+    view = session.hitokoto_answer("谷口さんの話がよかった")
+    assert view == {"status": "ask_again", "message": load_text(NAME_IN_QUESTION)}
+    assert len(client.requests) == sent and session.talk.written == []
+    kept = (tmp_path / "sessions" / f"{session.session_id}.json").read_text(encoding="utf-8")
+    assert "谷口" not in kept
+    for step in (lambda: session.hitokoto_answer("森川さんみたいに"),):
+        assert step()["status"] == "ask_again"
+
+
+# --- 段3: the scale ---
+
+@pytest.mark.parametrize("value, key", [(8, "scale_down"), (10, "scale_same"), (13, "scale_up")])
+def test_the_scale_answer_picks_the_teachers_next_question(value, key):
+    session, _, _, _ = sitting()
+    to_scale(session)
+    assert session.hitokoto_scale(value)["question"] == WORDS[key]
+
+
+def test_the_scale_is_zero_to_fifteen():
+    session, _, _, _ = sitting()
+    to_scale(session)
+    for value in (-1, 16, "8", True):
+        with pytest.raises(Refused):
+            session.hitokoto_scale(value)
 
 
 
@@ -189,3 +362,8 @@ def test_every_fixed_sentence_added_to_texts_passes_the_banned_words_and_the_lur
 
 
 
+def test_dont_know_words_and_the_listeners_avoid_words_are_in_texts():
+    assert "わからない" in load_lines("hitokoto_blank") and hitokoto.is_blank("特にない。")
+    assert not hitokoto.is_blank("わからないけど、決めて取りたい")
+    assert load_lines("listener_avoid") == ["家庭", "家族", "親", "お金", "家計", "病気", "体調"]
+    assert (TEXTS_DIR / "hitokoto.tsv").exists()

@@ -90,6 +90,7 @@ const EbinoHitokoto = (() => {
       $("hk-map-box").hidden = true;
       $("hk-talk").hidden = false;
       markStep("talk");
+      askScale(view.question);
       return;
     }
     renderCards({});
@@ -217,6 +218,10 @@ const EbinoHitokoto = (() => {
     }
     waiting.remove();
     busy = false;
+    if (omakase) {
+      for (const pt of document.querySelectorAll("#hk-map-box .hk-pt")) pt.classList.toggle("on", pt.id === `hk-pt-${result.person}`);
+    }
+    next(result);
   }
 
   // --- 段2・段3: the listener's questions, the ladder, the scale ---
@@ -247,6 +252,223 @@ const EbinoHitokoto = (() => {
     $("hk-input").prepend(line);
   }
 
+  // The server says what comes next.
+  function next(result) {
+    if (result.status === "ask_again") return message(result.message);
+    clearInput();
+    if (result.next === "ask") {
+      say("ai", result.question);
+      return answerBox();
+    }
+    if (result.next === "again") {  // 「だいじょうぶ。…」 and the same question, in one card.
+      say("ai", result.note).append(el("p", "hk-q", result.question));
+      return answerBox();
+    }
+    if (result.next === "ladder_two") return ladderTwo(result);
+    if (result.next === "ladder_three") return ladderThree(result);
+    if (result.next === "fill") return ladderFill(result);
+    if (result.next === "scale") return askScale(result.question);
+  }
+
+  // A line to write (and 「わからない」): the answer to the listener's question.
+  function answerBox() {
+    const form = el("form", "hk-answer");
+    const input = el("input");
+    Object.assign(input, { type: "text", maxLength: 120, placeholder: W.placeholder, autocomplete: "off" });
+    input.setAttribute("aria-label", W.who_me);
+    const send = el("button", "hk-primary", W.send);
+    send.type = "submit";
+    const unsure = button("hk-pick", W.dont_know);
+    form.append(input, send, unsure);
+    $("hk-input").append(form);
+    input.focus({ preventScroll: true });
+    const go = async (body, shown) => {
+      if (busy) return;
+      busy = true;
+      for (const node of form.querySelectorAll("input, button")) node.disabled = true;
+      const waiting = body.dont_know ? null : say("ai", W.thinking, null, "waiting");
+      let result;
+      try {
+        result = await post("answer", body);
+      } catch (error) {
+        if (waiting) waiting.remove();
+        message(app.sendFailed(error));
+        for (const node of form.querySelectorAll("input, button")) node.disabled = false;
+        busy = false;
+        return;
+      }
+      if (waiting) waiting.remove();
+      busy = false;
+      if (result.status === "ask_again") {
+        for (const node of form.querySelectorAll("input, button")) node.disabled = false;
+        input.focus();
+        return message(result.message);
+      }
+      say("me", shown);
+      next(result);
+    };
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const text = input.value.trim();
+      if (text) go({ text }, text);
+    });
+    unsure.addEventListener("click", () => go({ dont_know: true }, W.dont_know));
+  }
+
+  async function ladderStep(step, body, shown) {
+    if (busy) return;
+    busy = true;
+    let result;
+    try {
+      result = await post(step, body);
+    } catch (error) {
+      busy = false;
+      return message(app.sendFailed(error));
+    }
+    busy = false;
+    if (result.status === "ask_again") return message(result.message);
+    if (shown) say("me", shown);
+    next(result);
+  }
+
+  function lock(box) {
+    for (const node of box.querySelectorAll("input, button, select, textarea")) node.disabled = true;
+  }
+
+  // 2択: the split's two people's own words; no 「どっちでもない」.
+  function ladderTwo(result) {
+    const box = el("div", "hk-options");
+    for (const option of result.options) {
+      const quote = button("hk-quote", option.said ? `「${option.text}」` : option.text, () => {
+        lock(box);
+        ladderStep("ladder", { choice: option.index }, fill(W.ladder_two_me, { who: option.title }));
+      });
+      quote.append(el("small", "", `${option.title}（${option.kind_label}）`));
+      box.append(quote);
+    }
+    say("teacher", result.question, box);
+    box.querySelector("button").focus({ preventScroll: true });
+  }
+
+  // 3択: the people on the map.
+  function ladderThree(result) {
+    const box = el("div", "hk-picks");
+    for (const option of result.options) {
+      box.append(button("hk-pick", option.title, () => {
+        lock(box);
+        ladderStep("ladder", { choice: option.index }, option.title);
+      }));
+    }
+    say("teacher", result.question, box);
+    box.querySelector("button").focus({ preventScroll: true });
+  }
+
+  // The line with a blank: only the blank is written, or left empty.
+  function ladderFill(result) {
+    const form = el("form", "hk-fill");
+    const input = el("input");
+    Object.assign(input, { type: "text", maxLength: 120, autocomplete: "off" });
+    input.setAttribute("aria-label", `${result.before}…${result.after}`);
+    const line = el("p", "hk-fill-line");
+    line.append(result.before, input, result.after);
+    const ok = el("button", "hk-primary", W.fill_ok);
+    ok.type = "submit";
+    const empty = button("quiet", W.fill_skip);
+    const row = el("div", "hk-row");
+    row.append(ok, empty);
+    form.append(line, row);
+    say("teacher", result.question, form);
+    input.focus({ preventScroll: true });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const text = input.value.trim();
+      lock(form);
+      if (text) ladderStep("fill", { text }, `${result.before}${text}${result.after}`);
+      else ladderStep("fill", { skip: true }, "");
+    });
+    empty.addEventListener("click", () => {
+      lock(form);
+      ladderStep("fill", { skip: true }, "");
+    });
+  }
+
+  // The teacher's scale: 0 to 15, starting at 10.
+  function askScale(question) {
+    clearInput();
+    const box = el("div", "hk-scale");
+    const now = el("p", "hk-scale-now", "10");
+    now.setAttribute("aria-hidden", "true");
+    const range = el("input");
+    Object.assign(range, { type: "range", min: "0", max: "15", value: "10", step: "1" });
+    range.setAttribute("aria-label", question);
+    const ticks = el("p", "hk-ticks");
+    ticks.append(el("span", "", W.scale_low), el("span", "", W.scale_first), el("span", "", "15"));
+    range.addEventListener("input", () => { now.textContent = range.value; });
+    const ok = button("hk-primary", W.scale_ok, async () => {
+      if (busy) return;
+      busy = true;
+      lock(box);
+      let result;
+      try {
+        result = await post("scale", { value: Number(range.value) });
+      } catch (error) {
+        busy = false;
+        box.querySelectorAll("input, button").forEach((node) => { node.disabled = false; });
+        return message(app.sendFailed(error));
+      }
+      busy = false;
+      say("me", fill(W.scale_me, { n: range.value }));
+      say("teacher", result.question);
+      lineBox("forward", { send: W.send, skip: W.skip }, () => {});
+    });
+    box.append(now, range, ticks, ok);
+    say("teacher", question, box);
+    range.focus({ preventScroll: true });
+  }
+
+  // One optional line, then on: the scale's next question, the way to keep, which lesson.
+  function lineBox(step, { send, skip, placeholder = W.placeholder, label = W.who_me }, after, card = null) {
+    clearInput();
+    const form = el("form", "hk-answer");
+    const input = el("input");
+    Object.assign(input, { type: "text", maxLength: 120, placeholder, autocomplete: "off" });
+    input.setAttribute("aria-label", label);
+    const ok = el("button", "hk-primary", send);
+    ok.type = "submit";
+    const pass = button("quiet", skip);
+    form.append(input, ok, pass);
+    (card || $("hk-input")).append(form);
+    input.focus({ preventScroll: true });
+    const go = async (body) => {
+      if (busy) return;
+      busy = true;
+      lock(form);
+      let result;
+      try {
+        result = await post(step, body);
+      } catch (error) {
+        busy = false;
+        form.querySelectorAll("input, button").forEach((node) => { node.disabled = false; });
+        return message(app.sendFailed(error));
+      }
+      busy = false;
+      if (result.status === "ask_again") {
+        form.querySelectorAll("input, button").forEach((node) => { node.disabled = false; });
+        input.focus();
+        return message(result.message);
+      }
+      if (body.text) say("me", body.text);
+      if (!card) form.remove();
+      after(result);
+    };
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const text = input.value.trim();
+      go(text ? { text } : { skip: true });
+    });
+    pass.addEventListener("click", () => go({ skip: true }));
+    return form;
+  }
 
 
 
