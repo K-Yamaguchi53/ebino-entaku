@@ -1,5 +1,6 @@
 """直し35-2: each seat has its home, worked out from the seat table each time,
-on the map that fills the room with the school on it at its real size:
+on the map that fills the room with the school on it, put larger (直し37-1:
+SCHOOL_SCALE times its real size):
 地域で働く大人 at their places (with none, together where the map is free,
 their points dotted); 県外・海外に出た人 at a way out on the map's edge (to
 海外 by the south, else to 県外 by the north), beside the arrow going out;
@@ -11,6 +12,7 @@ five screens at the whole map (the seniors folded into their count), and
 once the seniors come out at their windows, no two of them overlap there."""
 
 import json
+import math
 import random
 import re
 import shutil
@@ -121,7 +123,7 @@ def _homes(seats, picture=None):
              "schoolSquares", "clearOf", "freeBlock", "trackOn"]
     program = PLACES % {"setup": json.dumps(setup, ensure_ascii=False), "rooms": json.dumps(ROOMS),
                         "picture": json.dumps(picture),
-                        "consts": _consts("UPRIGHT_UNDER", "AI_BAND_UP", "M_PER_UNIT", "PLAIN_YARD", "TRACK", "HOME_STEP",
+                        "consts": _consts("UPRIGHT_UNDER", "AI_BAND_UP", "SCHOOL_SCALE", "M_PER_UNIT", "PLAIN_YARD", "TRACK", "HOME_STEP",
                                           "POINT_R", "MIN_POINT_PX") + "\n" +
                                   "const PLAIN_PX_PER_M = 520 / 96.2, PLAIN_RING = [1020, 290];\n"
                                   "const SCHOOL_R_PX = 5, MAX_POINT_PX = 10;",
@@ -176,9 +178,15 @@ def test_more_than_the_windows_go_inside_the_track_then_round_it():
 
 
 @node
-def test_the_seniors_come_out_where_the_windows_are_a_point_apart_and_never_both_or_neither():
-    for name, one in _homes(_invented(), PICTURE).items():
-        assert 40 <= one["zoom"] <= 200, (name, one["zoom"])  # The zoom where they come out.
+def test_the_seniors_come_out_within_ten_times_and_three_to_six_presses_and_never_both_or_neither():
+    # 直し37-1: with the school put larger, the zoom where they come out is
+    # at most 10 (the relief keeps its shape) and 3 to 6 presses of ＋ (1.4
+    # each) from the whole map, picture or plain, at the five sizes.
+    for picture in (PICTURE, None):
+        for name, one in _homes(_invented(), picture).items():
+            zoom = one["zoom"]
+            presses = math.ceil(math.log(zoom) / math.log(1.4) - 1e-9)
+            assert zoom <= 10 and 3 <= presses <= 6, (name, picture is None, zoom, presses)
     fold = _inner("foldSchool")
     assert "const out = seniorsOut(perPx);" in fold and "label.hidden = out;" in fold
     assert 'frame.classList.toggle("seniors-out", out);' in fold

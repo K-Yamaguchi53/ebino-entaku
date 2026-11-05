@@ -174,9 +174,11 @@ def test_one_school_on_the_map_under_the_points_and_it_takes_no_presses():
         assert ".yard-building" in _inner_function(SCRIPT, name)
 
 
-def test_the_school_is_its_real_size_on_the_map_and_its_name_has_a_most():
+def test_the_school_is_put_larger_on_the_map_by_one_scale_and_its_name_has_a_most():
+    # 直し37-1: SCHOOL_SCALE times its real size (直し35-2 had it at its real size).
     on_map = _inner_function(SCRIPT, "schoolOnMap")
-    assert "const k = unitsPerM / model.pxPerM;" in on_map
+    assert "const k = SCHOOL_SCALE * unitsPerM / model.pxPerM;" in on_map
+    assert "const SCHOOL_SCALE = 22;" in SCRIPT
     assert "x: px - model.ring[0] * k, y: py - model.ring[1] * k, k" in on_map
     draw = SCRIPT[SCRIPT.index("function draw(seats"):]
     assert "schoolOnMap(schoolAt, model, base.S / mPerUnit)" in draw

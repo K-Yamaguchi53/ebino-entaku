@@ -13,7 +13,8 @@ Only these three files are read there, nothing else:
                         ("school_point_px"); for the large one, where seats
                         go on it: the ring's windows ("windows_px") and the
                         ground's four corners ("field_px"); and, to put it
-                        on the map at its real size (直し35-2), its pixels to
+                        on the map put larger (直し37-1: SCHOOL_SCALE times
+                        its real size in static/map.js), its pixels to
                         a metre across ("px_per_m") and the ring's middle
                         on the ground ("ring_centre_px"), the school's
                         point on the map

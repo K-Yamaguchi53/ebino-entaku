@@ -127,12 +127,21 @@ const EbinoMap = (() => {
   // The school's name never over SCHOOL_TEXT_MAX_PX on screen.
   const SCHOOL_TEXT_MAX_PX = 24;
   // The one drawing (直し35-2): the map alone, as large as the room lets it
-  // be, in its middle (the school is on it, at its real size).
+  // be, in its middle (the school is on it, put larger: SCHOOL_SCALE).
   const AI_BAND_UP = 0.3;  // Upright: the AI's seat this part of the room's height, under the map.
   const UPRIGHT_UNDER = 1.4;  // A room narrower than this (width to height) is upright.
-  // The school at its real size (直し35-2): the map's metres to a unit (the
-  // relief's own, else this), the plain school's units to a metre (its ground
-  // is the model's 96.2 m across) and the ring's middle on it.
+  // The school put larger on the map (直し37-1: 大きめに置いた校舎, SCHOOL_SCALE
+  // times its real size; at its real size, 直し35-2, it was a few pixels
+  // across at the whole map, and its seniors came out only 110 to 220 times
+  // nearer, where the relief is a grey blur). The one scale for the picture,
+  // its windows, its ground and track and their squares, the school rising
+  // at the meeting and one to one at its windows. 22: at the whole map the
+  // picture is about 0.18 of the map's shorter side (at most 0.2), and its
+  // seniors come out within 4 to 8 times (at most 10), 4 to 6 presses of ＋
+  // (3 to 6 asked), at the five sizes. The map's metres to a unit (the relief's
+  // own, else this), the plain school's units to a metre (its ground is the
+  // model's 96.2 m across) and the ring's middle on it.
+  const SCHOOL_SCALE = 22;
   const M_PER_UNIT = 33.4225;
   const PLAIN_PX_PER_M = 520 / 96.2, PLAIN_RING = [1020, 290];
   // A seat at the school (a window, the track) never more than SCHOOL_R_PX
@@ -317,12 +326,13 @@ const EbinoMap = (() => {
     return { W, H, upright, map: [(W - mapW) / 2, upright ? 0 : (H - mapH) / 2] };
   }
 
-  // The school at its real size on the map (直し35-2): its picture's (or the
-  // plain one's) ring's middle on the school's point, its metres as the
-  // map's (unitsPerM: the drawing's units to a metre across). Returns the
-  // picture's corner and its scale. It reads nothing but what it is given.
+  // The school put larger on the map (直し37-1, 大きめに置いた校舎、倍率
+  // SCHOOL_SCALE): its picture's (or the plain one's) ring's middle on the
+  // school's point, its metres SCHOOL_SCALE times the map's (unitsPerM: the
+  // drawing's units to a metre across). Returns the picture's corner and its
+  // scale. It reads nothing but what it is given.
   function schoolOnMap([px, py], model, unitsPerM) {
-    const k = unitsPerM / model.pxPerM;
+    const k = SCHOOL_SCALE * unitsPerM / model.pxPerM;
     return { x: px - model.ring[0] * k, y: py - model.ring[1] * k, k };
   }
 
@@ -366,7 +376,7 @@ const EbinoMap = (() => {
       const [x, y] = base.proj(...at);
       return [x + ox, y + oy];
     };
-    // The school at its real size where it is on the map (直し35-2).
+    // The school put larger where it is on the map (直し37-1, SCHOOL_SCALE).
     const mPerUnit = (map.relief && map.relief.z && map.relief.z.m_per_unit) || M_PER_UNIT;
     const schoolAt = map.school ? proj(map.school.x, map.school.y, 0) : [ox + base.W / 2, oy + base.H / 2];
     const yard = { ...schoolOnMap(schoolAt, model, base.S / mPerUnit), model };
@@ -416,7 +426,8 @@ const EbinoMap = (() => {
       line.append(svgEl("circle", { cx: from[0], cy: from[1], r: 5 * S }));
     }
 
-    // The school and its ground on the map, at their real size (直し35-2).
+    // The school and its ground on the map, put larger (直し37-1, SCHOOL_SCALE),
+    // under the seats' points and the place names.
     drawYard(layer("yard"));
     splitLayer = layer("split-lines");
     // Each seat at its home (直し33-3), worked out from the seat table each
@@ -900,8 +911,8 @@ const EbinoMap = (() => {
   // move). The southern wing, the corridors, the gate and the grounds are
   // left out: a mark this small would blur them.
   // The school's name (texts/school_label.txt) under the school, which is
-  // drawn at its real size on the map (直し35-2: one school, no mark beside
-  // it). It takes no presses.
+  // drawn on the map put larger (直し37-1, SCHOOL_SCALE; 直し35-2: one
+  // school, no mark beside it). It takes no presses.
   function drawSchool(group, school) {
     const { x, y, k, model } = view.yard;
     schoolGroup = { node: group, x: x + model.ring[0] * k, y: y + model.height * k };

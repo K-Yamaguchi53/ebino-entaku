@@ -97,8 +97,9 @@ def test_the_person_whole_in_the_frame_and_the_ai_seat_steps_back():
     assert "getBBox()" in placed
 
 
-def test_a_senior_is_met_at_the_real_size_schools_window_no_nearer_than_the_nearest_zoom():
+def test_a_senior_is_met_at_the_larger_schools_window_no_nearer_than_the_nearest_zoom():
     # 直し35-4: to its home (a window, the track), as near as the nearest zoom; the others as before.
+    # 直し37-1: the school put larger, that zoom is shallower (1.6 times where the seniors come out).
     opened = MAP[MAP.index("async function openOne("):]
     opened = opened[:opened.index("\n  }\n")]
     assert "const w = view.W / (view.homes.school.has(seatId) ? view.closest : ONE_ZOOM)" in opened

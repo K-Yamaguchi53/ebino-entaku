@@ -1,6 +1,6 @@
 """直し35-2: the map alone, as large as the room lets it be (an upright
 screen: at the top, the room's foot left for the AI's seat), the school on
-it at its real size where it is. The school's large picture comes from
+it where it is, put larger (直し37-1: SCHOOL_SCALE times its real size). The school's large picture comes from
 outside the repo; with none, a plain building and a ground with no name,
 the same seats put on it. The AI's seat over a corner of the map."""
 
@@ -73,17 +73,20 @@ def test_the_map_fills_the_room_and_upright_leaves_its_foot_for_the_ais_seat():
 
 
 @node
-def test_the_school_is_at_its_real_size_where_it_is():
-    program = "\n".join([_inner("schoolOnMap"),
+def test_the_school_is_put_larger_where_it_is_by_one_scale():
+    program = "\n".join([_consts("SCHOOL_SCALE"), _inner("schoolOnMap"),
                          "const model = { pxPerM: 6.79, ring: [1081, 368] };",
                          "const unitsPerM = 2.33 / 33.4225;",  # The relief's units to a metre.
                          "process.stdout.write(JSON.stringify(schoolOnMap([1000, 500], model, unitsPerM)));"])
     done = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=30)
     assert done.returncode == 0, done.stderr.decode("utf-8", "replace")
     got = json.loads(done.stdout.decode("utf-8"))
-    # The ring's middle on the school's point; 96.2 m of ground (653 px) about 6.7 units of the map.
+    # The ring's middle on the school's point; 96.2 m of ground (653 px), at
+    # its real size about 6.7 units of the map, SCHOOL_SCALE (22) times that.
+    scale = float(re.search(r"const SCHOOL_SCALE = ([\d.]+);", MAP).group(1))
+    assert scale == 22
     assert abs(got["x"] + 1081 * got["k"] - 1000) < 1e-6 and abs(got["y"] + 368 * got["k"] - 500) < 1e-6
-    assert abs(653 * got["k"] - 96.2 * 2.33 / 33.4225) < 0.05
+    assert abs(653 * got["k"] - scale * 96.2 * 2.33 / 33.4225) < 0.05 * scale
 
 
 def test_the_plain_yard_has_its_windows_and_ground_and_no_name():

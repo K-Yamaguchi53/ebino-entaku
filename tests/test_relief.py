@@ -444,7 +444,7 @@ const map = setup.map;
 const app = { state: { kinds: setup.kinds } };
 view = reliefView(map.relief);
 // The map alone (直し35-2): its box the whole drawing; the plain school on
-// it at its real size, where the school is.
+// it put larger (直し37-1, SCHOOL_SCALE), where the school is.
 view.mapBox = [0, 0, view.W, view.H];
 const yardModelHere = yardModel();
 view.yard = { ...schoolOnMap(view.proj(map.school.x, map.school.y, 0), yardModelHere, view.S / M_PER_UNIT), model: yardModelHere };
@@ -723,9 +723,9 @@ def test_an_empty_chair_takes_a_press_over_44px_and_shows_the_keyboard_there():
     assert re.search(r"\.chair:focus-visible \.hit \{[^}]*stroke: var\(--lamp\)", css)
 
 
-def test_the_school_is_drawn_once_at_its_real_size_and_its_name_under_it():
+def test_the_school_is_drawn_once_put_larger_and_its_name_under_it():
     # 直し35-2: no mark or small picture any more: the school (its picture or
-    # the plain one) at its real size on the map, its name under it.
+    # the plain one) on the map, its name under it; put larger (直し37-1).
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     school = _inner_function(script, "drawSchool")
     assert "flag" not in school and "pole" not in school and "polygon" not in school and "wing" not in school
