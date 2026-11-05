@@ -102,10 +102,14 @@ for (const [name, [w, h]] of Object.entries(rooms)) {
   for (let i = 0; i < school.length; i++) for (let j = i + 1; j < school.length; j++) {
     if (Math.hypot(school[i][0] - school[j][0], school[i][1] - school[j][1]) < 2 * SCHOOL_R_PX - 0.01) schoolOverlaps += 1;
   }
+  // 直し37-1: no senior on an adult's place where the school lies under it.
+  const places = seats.filter((s) => s.kind === "adult" && s.at).map((s) => s.at);
+  const onAdults = [...homes.school].filter((id) => places.some((a) =>
+    Math.hypot(a[0] - homes.spots[id][0], a[1] - homes.spots[id][1]) < homes.seniorStep * SCHOOL_CLEAR)).length;
   const inMap = (p) => p[0] >= ox && p[0] <= ox + base.W && p[1] >= oy && p[1] <= oy + base.H;
   const kindsAt = (test) => seats.filter((s) => !(s.kind === "adult" && s.at) && test(homes.spots[s.id]));
   const nearGate = (gate) => (p) => Math.hypot(p[0] - gate[0], p[1] - gate[1]) < 8 * HOME_STEP * unit;
-  out[name] = { counts: homes.counts, overlaps, outside, least: least / r, schoolOverlaps, zoom,
+  out[name] = { counts: homes.counts, overlaps, outside, least: least / r, schoolOverlaps, zoom, onAdults,
     names: homes.names.map((n) => n.kind).sort(), trackRoom: homes.trackRoom,
     allInMap: seats.every((s) => inMap(homes.spots[s.id])),
     north: kindsAt(nearGate(homes.gates.out)).map((s) => s.kind + (s.abroad ? "!" : "")).sort(),
@@ -123,7 +127,7 @@ def _homes(seats, picture=None):
              "schoolSquares", "clearOf", "freeBlock", "trackOn"]
     program = PLACES % {"setup": json.dumps(setup, ensure_ascii=False), "rooms": json.dumps(ROOMS),
                         "picture": json.dumps(picture),
-                        "consts": _consts("UPRIGHT_UNDER", "AI_BAND_UP", "SCHOOL_SCALE", "M_PER_UNIT", "PLAIN_YARD", "TRACK", "HOME_STEP",
+                        "consts": _consts("UPRIGHT_UNDER", "AI_BAND_UP", "SCHOOL_SCALE", "SCHOOL_CLEAR", "M_PER_UNIT", "PLAIN_YARD", "TRACK", "HOME_STEP",
                                           "POINT_R", "MIN_POINT_PX") + "\n" +
                                   "const PLAIN_PX_PER_M = 520 / 96.2, PLAIN_RING = [1020, 290];\n"
                                   "const SCHOOL_R_PX = 5, MAX_POINT_PX = 10;",
@@ -154,10 +158,13 @@ def test_every_invented_seat_has_a_home_and_none_overlap_on_the_five_screens(pic
         # Two with no district, and any whose district the map does not have.
         assert counts["map"] + counts["noPlace"] == 103 and counts["noPlace"] >= 2, name
         assert counts["out"] == 7 and counts["abroad"] == 3 and counts["in"] == 1, name
-        # 45 seniors, 40 windows: 5 inside the track.
-        assert counts["windows"] == 40 and counts["track"] == 5 and counts["field"] == 0, name
+        # 45 seniors, 40 windows less those under an adult's place (直し37-1:
+        # the school put larger lies under some; 2 here), the rest inside the track.
+        assert counts["windows"] + counts["track"] == 45 and counts["field"] == 0, name
+        assert 36 <= counts["windows"] <= 40, name
         assert one["overlaps"] == 0 and one["outside"] == 0, (name, one["least"])
         assert one["schoolOverlaps"] == 0, name
+        assert one["onAdults"] == 0, name  # 直し37-1: a window or square under an adult's place passed over.
         assert one["allInMap"], name
         assert one["north"] == ["cross"] * 7 + ["outsider_teacher"], name  # Out to 県外, and in from outside.
         assert one["south"] == ["cross!"] * 3, name  # Out to 海外.

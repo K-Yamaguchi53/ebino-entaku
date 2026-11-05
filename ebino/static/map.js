@@ -149,6 +149,9 @@ const EbinoMap = (() => {
   // windows are that far apart on screen (twice it), and the nearest zoom is
   // CLOSEST_MORE times nearer than that. Points never over MAX_POINT_PX.
   const SCHOOL_R_PX = 5, CLOSEST_MORE = 1.6, MAX_POINT_PX = 10;
+  // A window or square this many window steps from an adult's point is passed
+  // over (直し37-1): a senior (5px) and a point (10px at most) side by side.
+  const SCHOOL_CLEAR = 1.6;
   // The AI's seat in a corner of the map (直し35-2), tried in this order.
   const AI_CORNERS = ["bottom-right", "bottom-left", "top-left"];
   const RECOMPOSE = 0.03;  // The room's shape this much off the drawing's: it is drawn again.
@@ -614,13 +617,21 @@ const EbinoMap = (() => {
     row(gates.abroad, lines.abroad, 1, -1, "abroad");
     // The seniors: the windows, then the track's inside, then the ground round it.
     const squares = schoolSquares(trackOn(field), field, seniorStep);
+    // The school put larger (直し37-1) can lie under an adult's place: that
+    // point stays where it is, and a window or square under it is passed
+    // over, so no senior sits on it once they come out.
+    const places = seats.filter((seat) => seat.kind === "adult" && seat.at).map((seat) => seat.at);
+    const free = (p) => places.every(([ax, ay]) => Math.hypot(ax - p[0], ay - p[1]) >= seniorStep * SCHOOL_CLEAR);
+    const openWindows = windows.filter(free);
+    const open = squares.all.map((p, n) => ({ p, inside: n < squares.inside })).filter(({ p }) => free(p));
     const school = new Set();
     seniors.forEach((seat, n) => {
-      const spot = n < windows.length ? windows[n] : squares.all[n - windows.length];
+      const square = n < openWindows.length ? null : open[n - openWindows.length];
+      const spot = square ? square.p : openWindows[n];
       if (!spot) return;
       spots[seat.id] = spot;
       school.add(seat.id);
-      counts[n < windows.length ? "windows" : n - windows.length < squares.inside ? "track" : "field"] += 1;
+      counts[!square ? "windows" : square.inside ? "track" : "field"] += 1;
     });
     // Those with no place, where the map is free.
     if (noPlace.length) {
@@ -643,7 +654,8 @@ const EbinoMap = (() => {
       names.push({ kind: "poster", at: [(Math.min(...xs) + Math.max(...xs)) / 2, top - seniorStep * 1.5], anchor: "middle", school: true });
     }
     return { spots, gates, used: { out: counts.out > 0, in: counts.in > 0, abroad: counts.abroad > 0 }, names, counts,
-      school, noPlace: new Set(noPlace.map((seat) => seat.id)), seniorStep, trackRoom: squares.inside };
+      school, noPlace: new Set(noPlace.map((seat) => seat.id)), seniorStep,
+      trackRoom: open.filter(({ inside }) => inside).length };
   }
 
   // Spots for seats at the school past its windows, step apart on a grid
@@ -1680,9 +1692,7 @@ const EbinoMap = (() => {
     const key = `${Math.round(f.width)}x${Math.round(f.height)}`;
     if (view.aiCorner === undefined || view.aiFor !== key) {
       // What it keeps off, as drawn now at the whole map (the words whole, not their first letter).
-      const boxes = [...svg.querySelectorAll(".pt .shape, .home-gate path, .home-names text, .place-names text, .school text, .yard-building"),
-        ...frame.querySelectorAll(".school-count")]
-        .filter((node) => node.getClientRects().length).map((node) => boxIn(node, f));
+      const boxes = seatKeepsOff(f);
       const pad = 6;
       const boxOf = (corner) => [corner.endsWith("left") ? 8 : f.width - w - 8, corner.startsWith("top") ? 8 : f.height - tall - 8];
       const covered = (corner) => {
@@ -1709,6 +1719,38 @@ const EbinoMap = (() => {
     stage.style.setProperty("--ai-right", `${Math.round(s.right - f.right + 8)}px`);
     stage.style.setProperty("--ai-h", `${h}px`);
     stage.dataset.aiCorner = view.aiCorner;
+    placeFoldedSeat();
+  }
+
+  // What the AI's seat keeps off on the map, as drawn now: the seats'
+  // points, the ways out, the homes' and places' names, the school and its
+  // count (boxes in the frame's own px).
+  function seatKeepsOff(f) {
+    return [...svg.querySelectorAll(".pt .shape, .home-gate path, .home-names text, .place-names text, .school text, .yard-building"),
+      ...frame.querySelectorAll(".school-count")]
+      .filter((node) => node.getClientRects().length).map((node) => boxIn(node, f));
+  }
+
+  // Folded (直し37-2), the AI's seat is its heading only. Within the room its
+  // opened seat takes at its corner, it sits where it covers least of what
+  // the map shows (the corner's edge first, then a step at a time inward):
+  // 直し37-3, at 1180 the corner's edge covered a way out's name.
+  function placeFoldedSeat() {
+    const stage = frame.closest(".stage"), seat = $("ai-seat");
+    if (!stage || !seat || seat.hidden || !seat.classList.contains("folded") || !view.aiCorner) return;
+    stage.style.setProperty("--ai-fold-shift", "0px");
+    const f = frame.getBoundingClientRect(), s = seat.getBoundingClientRect();
+    const boxes = seatKeepsOff(f);
+    const room = parseFloat(stage.style.getPropertyValue("--ai-h")) || s.height;
+    const left = s.left - f.left, bottom = view.aiCorner.startsWith("bottom");
+    let best = 0, least = Infinity;
+    for (let shift = 0; shift <= Math.max(0, room - s.height); shift += 8) {
+      const top = (s.top - f.top) + (bottom ? -shift : shift);
+      const n = boxes.filter(([x, y, bw, bh]) => x < left + s.width + 6 && x + bw > left - 6 && y < top + s.height + 6 && y + bh > top - 6).length;
+      if (n < least) [best, least] = [shift, n];
+      if (!n) break;
+    }
+    stage.style.setProperty("--ai-fold-shift", `${best}px`);
   }
 
   // A 「？」 by its seat, at the first of its four corners that covers no word
@@ -3056,6 +3098,7 @@ const EbinoMap = (() => {
     }
     clearTable();
     app.foldAiSeat(true);  // Back at the map: the AI's seat folded (直し37-2).
+    requestAnimationFrame(placeFoldedSeat);
   }
 
   // --- marks that stay: met seats, and 「？」 on seats nobody asked yet ---

@@ -1049,6 +1049,10 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-head { margin-bo
 body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat.folded { height: auto; width: auto;
   max-width: var(--ai-w, 320px); overflow: visible; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat.folded .ai-seat-head { margin: 0; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .stage[data-ai-corner^="bottom"] #ai-seat.folded {
+  bottom: calc(var(--ai-bottom, 8px) + var(--ai-fold-shift, 0px)); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .stage[data-ai-corner^="top"] #ai-seat.folded {
+  top: calc(var(--ai-top, 8px) + var(--ai-fold-shift, 0px)); }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .stage[data-ai-corner$="right"] #ai-seat.folded { left: auto;
   right: var(--ai-right, 8px); }
 .ai-seat-open { display: inline-grid; place-items: center; width: 44px; height: 44px; flex: none; margin-left: auto;

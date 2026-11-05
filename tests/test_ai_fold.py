@@ -57,3 +57,14 @@ def test_its_corner_and_the_upright_band_are_as_before_only_its_inside_folds():
     assert re.search(r"#ai-seat\.folded \{ height: auto; width: auto;\s+max-width: var\(--ai-w, 320px\);", CSS)
     assert '.stage[data-ai-corner$="right"] #ai-seat.folded { left: auto;' in CSS
     assert 'stage.style.setProperty("--ai-right",' in place
+
+
+def test_folded_it_sits_where_it_covers_least_within_its_open_seats_room():
+    # 直し37-3 (the screen check at 1180: the corner's edge covered a way out's name).
+    folded = _inner("placeFoldedSeat")
+    assert "const boxes = seatKeepsOff(f);" in folded
+    assert "for (let shift = 0; shift <= Math.max(0, room - s.height); shift += 8) {" in folded
+    assert 'stage.style.setProperty("--ai-fold-shift", `${best}px`);' in folded
+    assert "placeFoldedSeat();" in _inner("placeAiCorner") and "requestAnimationFrame(placeFoldedSeat);" in _inner("closeTable")
+    assert "bottom: calc(var(--ai-bottom, 8px) + var(--ai-fold-shift, 0px));" in CSS
+    assert "top: calc(var(--ai-top, 8px) + var(--ai-fold-shift, 0px));" in CSS
