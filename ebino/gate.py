@@ -64,6 +64,7 @@ MODELS = {
     # 帰る前に、ひとこと (直し38): the listener asks one question at a time
     # (and picks a short part of each card); light finds where the student shone.
     "listener": "claude-haiku-5-5",
+    "light": "claude-sonnet-5-5",
 }
 EFFORT = {
     "tagger": "low",
@@ -77,6 +78,7 @@ EFFORT = {
     "speaker": "low",
     "asker": "low",
     "listener": "low",
+    "light": "low",
 }
 
 

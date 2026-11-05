@@ -1150,6 +1150,15 @@ class Session:
         title = seat_label(self._seats[talk.meet_seat], self.library.show_private).title
         return {"meet": harvest.meet_line(title, None if use == harvest.CHOSE_NO_USE else int(use))}
 
+    def hitokoto_light(self) -> dict:
+        """今日、光ったところ: asked once, at the end or at 「ここまでにする」."""
+        talk = self._talk()
+        if talk.light is None:
+            talk.light = hitokoto.ask_light(self.gate, self, talk)
+            talk.stage = hitokoto.LIT
+            self.save()
+        return hitokoto.light_view(talk)
+
     # --- what the sitting has gathered ---
 
     def met_seats(self) -> list[str]:

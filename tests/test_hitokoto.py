@@ -15,7 +15,7 @@ from ebino.coach import LURE_FORMS
 from ebino.gate import MODELS, EFFORT, Gate, NameList
 from ebino.harvest import MOVES_PREFIX
 from ebino.ingest.scrub import normalize_for_match
-from ebino.prompts import LISTENER
+from ebino.prompts import LIGHT, LISTENER
 from ebino.records import Records
 from ebino.session import Refused, Session
 from ebino.texts import NAME_IN_QUESTION, TEXTS_DIR, load_lines, load_text
@@ -251,6 +251,15 @@ def test_with_one_person_on_the_map_the_ladder_goes_to_the_blank_line():
     assert session.hitokoto_fill("", skip=True)["next"] == "scale"  # Left empty: on to the scale.
 
 
+def test_with_no_one_on_the_map_it_goes_to_the_scale_and_on_to_the_end():
+    session, model, _, view = sitting(mark=None, opened=())
+    assert view["people"] == [] and view["stage"] == "scale" and view["question"] == WORDS["scale_q"]
+    to_end(session, forward="", way="")
+    light = session.hitokoto_light()
+    assert light["quote"] == QUESTION and light["source"] == "first"  # Nothing else to stand on.
+    assert model.kinds() == []  # Nothing written: no light request.
+
+
 def test_the_ladder_is_shown_once_a_sitting():
     session, _, _, _ = sitting()
     session.hitokoto_parts()
@@ -396,10 +405,140 @@ def test_the_meet_line_comes_only_when_a_seat_is_picked_and_the_first_line_never
     assert line.startswith(load_text("harvest_meet_prefix") + "農家")
 
 
+# --- 段5: today's light ---
+
+def test_the_light_quotes_the_students_own_words_and_ties_them_to_one_force():
+    session, model, client, _ = sitting()
+    to_scale(session)
+    to_end(session)
+    light = session.hitokoto_light()
+    assert light["quote"] == "空いたら取る" and light["force"] == "② つなげる力"
+    assert light["why"] == LIGHT_OK["why"] and light["deep"] == LIGHT_OK["deep"]
+    assert session.talk.light.by == "model"
+    assert client.options[-1]["timeout"] == hitokoto.LIGHT_SECONDS
+    sent = model.sent[-1][1]
+    assert [w["step"] for w in sent["written"]] == ["reaction", "self", "forward", "way"]
+    assert sent["chosen"] == "" and len(sent["forces"]) == 6
+    assert session.hitokoto_light() == light and model.kinds().count("light") == 1  # Asked once.
+
+
+def test_a_forces_name_alone_in_quotes_passes_and_is_shown_without_them():
+    why = "人の話を、自分の休みにつなげた。「つなげる力」そのもの。"
+    session, _, _, _ = sitting(Model(light=dict(LIGHT_OK, why=why)))
+    to_scale(session)
+    to_end(session)
+    assert session.hitokoto_light()["why"] == "人の話を、自分の休みにつなげた。つなげる力そのもの。"
+
+
+@pytest.mark.parametrize("change, reason", [
+    ({"quote": "休みは自由に取る"}, "quote_not_written"),
+    ({"quote": "休みは決めて取ります。"}, "quote_not_written"),  # A person's words, not the student's.
+    ({"force": 7}, "unknown_force"),
+    ({"why": "あなたは人の話をつなげる人。つなげる力。"}, "you_are"),
+    ({"why": "すばらしい。つなげる力が出ている。"}, "banned_word"),
+    ({"why": "いいね、つなげる力が出ている。"}, "praise"),
+    ({"why": "自分の休みにつなげて書いた。合わせる力の形。"}, "force_not_named"),
+    ({"deep": "「休みは好きに取る」の先を深める。"}, "quote_not_in_record"),
+    ({"deep": "家族と休む日の決め方。"}, "avoid_word"),
+])
+def test_a_light_that_fails_a_check_is_picked_by_code_in_the_samples_order(change, reason):
+    session, _, _, _ = sitting(Model(light=dict(LIGHT_OK, **change)))
+    to_scale(session)
+    to_end(session, scale=8)
+    light = session.hitokoto_light()
+    assert session.talk.light.by == "code" and session.talk.light.reason == reason
+    # Down from 10 with words written: the longest of the answers, ② and its fixed sentence.
+    assert light["quote"] == "空いたら取るのがいいと思った"
+    assert light["why"] == hitokoto.force_sentences()[2]
+    assert light["deep"] == "農家の「休みは空いたら取ります」の先。その人はどうやってそこにたどり着いたのか。"
+
+
+def test_code_picks_in_the_samples_order():
+    talk = hitokoto.Hitokoto(QUESTION)
+    assert code_quote(talk) == (QUESTION, 1, "first")
+    talk.scale, talk.forward = 13, "何をしたいかが増えた"
+    talk.written = [{"step": "forward", "text": talk.forward}]
+    assert code_quote(talk) == ("何をしたいかが増えた", 5, "written")
+    talk.scale, talk.way = 10, "農業"
+    talk.written.append({"step": "way", "text": "農業"})
+    assert code_quote(talk) == ("農業", 2, "written")
+    talk.way, talk.written = "", talk.written[:1]
+    assert code_quote(talk) == ("何をしたいかが増えた", 4, "written")
+
+
+def code_quote(talk):
+    light = hitokoto.code_light(talk, "test")
+    return light.quote, light.force, light.source
+
+
+def test_the_light_never_stands_on_steps_everyone_takes_and_the_first_question_only_when_nothing_else():
+    session, model, _, _ = sitting()
+    session.hitokoto_parts()
+    session.hitokoto_choose(0, "")
+    session.hitokoto_answer("", dont_know=True)
+    session.hitokoto_answer("", dont_know=True)
+    session.hitokoto_ladder(session.talk.split["b"])  # 農家 (b1's side).
+    session.hitokoto_ladder(0)
+    session.hitokoto_fill("", skip=True)
+    to_end(session, scale=10, forward="", way="")
+    model.light = dict(LIGHT_OK, quote="休みは空いたら取ります")
+    light = session.hitokoto_light()
+    # Nothing written: the words picked at the ladder's 2択, shown as picked.
+    sent = model.sent[-1][1]
+    assert sent["written"] == [] and sent["chosen"] == "畑は天気しだいなので、休みは空いたら取ります。"
+    assert light["source"] == "chosen" and light["chosen_who"] == "農家" and light["quote"] == "休みは空いたら取ります"
+    for step in ("pressed", "bubble", "mark", "opened"):
+        assert step not in json.dumps(sent, ensure_ascii=False)
+
+
+def test_the_next_step_is_shown_under_the_light_when_the_doubt_went_down_or_stayed():
+    session, _, _, _ = sitting()
+    to_scale(session)
+    to_end(session, scale=8)
+    assert session.hitokoto_light()["next_step"] == "先輩にもう一回聞く"
+    other, _, _, _ = sitting()
+    to_scale(other)
+    to_end(other, scale=12, forward="何をしたいかが増えた")
+    assert other.hitokoto_light()["next_step"] == ""
+
+
+def test_stop_here_goes_to_the_light_at_once():
+    session, model, _, _ = sitting()
+    session.hitokoto_parts()
+    session.hitokoto_choose(0, "")
+    session.hitokoto_answer("空いたら取る日が好き")
+    light = session.hitokoto_light()
+    assert session.talk.stage == "lit" and light["scale"] is None
+    with pytest.raises(Refused):
+        session.hitokoto_answer("もう一つ")
 
 
 # --- 段7: the switch, the roles, texts ---
 
+
+
+def test_the_listener_and_the_light_use_their_own_models_and_low_effort():
+    assert (MODELS["listener"], EFFORT["listener"]) == ("claude-haiku-5-5", "low")
+    assert (MODELS["light"], EFFORT["light"]) == ("claude-sonnet-5-5", "low")
+    session, _, client, _ = sitting()
+    to_scale(session)
+    to_end(session)
+    session.hitokoto_light()
+    models = [r["model"] for r in client.requests[2:]]
+    assert models == ["claude-haiku-5-5"] * 3 + ["claude-sonnet-5-5"]
+    assert all(r["output_config"]["effort"] == "low" for r in client.requests[2:])
+    assert client.requests[2]["system"][0]["text"].startswith(LISTENER.split("\n")[0])
+    assert client.requests[-1]["system"][0]["text"].startswith(LIGHT.split("\n")[0])
+
+
+def test_nothing_sent_to_the_listener_or_the_light_holds_a_name():
+    session, _, client, _ = sitting()
+    to_scale(session)
+    to_end(session)
+    session.hitokoto_light()
+    sent = json.dumps(client.requests[2:], ensure_ascii=False)
+    for name in (COMPANY, DISPLAY_NAME, "山川", "谷口", "森川", "架空農園"):
+        assert name not in sent
 
 
 # The card's label 「聞き手（AI・町の人ではありません）」, from the sample, holds
@@ -410,7 +549,7 @@ LABEL_NOT_A_QUESTION = ("who_ai",)
 
 
 def _fixed_sentences() -> list[tuple[str, str]]:
-    return list(WORDS.items())
+    return list(WORDS.items()) + [(f"force_{n}", s) for n, s in hitokoto.force_sentences().items()]
 
 
 @pytest.mark.parametrize("key, text", _fixed_sentences())
@@ -422,6 +561,15 @@ def test_every_fixed_sentence_added_to_texts_passes_the_banned_words_and_the_lur
     assert not any(normalize_for_match(lure) in body for lure in LURE_FORMS)
 
 
+def test_the_force_sentences_hold_their_forces_name_out_of_quotes():
+    for number, sentence in hitokoto.force_sentences().items():
+        assert hitokoto.FORCE_WORDS[number] in sentence and "「" not in sentence
+
+
+def test_the_sixth_force_is_this_screens_and_harvests_five_stay():
+    from ebino import harvest
+    assert hitokoto.FORCES[6] == "⑥ 創り出す力" and 6 not in harvest.FORCES
+    assert all(hitokoto.FORCES[n] == harvest.FORCES[n] for n in range(1, 6))
 
 
 def test_dont_know_words_and_the_listeners_avoid_words_are_in_texts():

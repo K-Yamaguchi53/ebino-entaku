@@ -630,11 +630,44 @@ const EbinoHitokoto = (() => {
     $("hk-stop").scrollIntoView({ block: "nearest", behavior: still() ? "auto" : "smooth" });
   }
 
+  // --- 段5: today's light ---
+
+  async function toLight() {
+    if (busy) return;
+    busy = true;
+    show("light");
+    const box = $("hk-light-box");
+    box.replaceChildren(el("h3", "", W.light_title), el("p", "hk-lead waiting", W.summing));
+    let light;
+    try {
+      light = await post("light");
+    } catch (error) {
+      box.replaceChildren(el("p", "message", app.sendFailed(error)));
+      busy = false;
+      return;
+    }
+    busy = false;
+    box.replaceChildren(el("h3", "", W.light_title));
+    if (light.scale !== null) box.append(el("p", "hk-scaleline", fill(W.light_scale, { n: light.scale })));
+    box.append(el("p", "hk-lead", light.source === "chosen" ? W.light_lead_chosen : W.light_lead),
+      el("p", "hk-big", `「${light.quote}」`));
+    if (light.source === "chosen") box.append(el("p", "hk-label", fill(W.light_chosen_who, { who: light.chosen_who })));
+    box.append(el("p", "hk-why", light.why));
+    if (light.deep) box.append(el("p", "hk-deep", `${light.deep}${W.light_deep_tail}`));
+    if (light.next_step) {
+      const step = el("div", "hk-step");
+      step.append(el("p", "hk-label", W.light_step), el("p", "hk-stepq", `「${light.next_step}」`));
+      box.append(step);
+    }
+    $("hk-now").value = light.now_question;
+    $("hk-to-sheet").focus({ preventScroll: true });
+  }
 
 
   function setup() {
     $("hk-go").addEventListener("click", () => choose(false));
     $("hk-omakase").addEventListener("click", () => choose(true));
+    $("hk-stop").addEventListener("click", toLight);
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup);

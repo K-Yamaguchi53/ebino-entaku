@@ -45,17 +45,22 @@ from .banned_words import BANNED_WORDS
 from .coach import LURE_FORMS
 from .gate import Gate, GateError, ModelUnavailable, json_answer, json_request
 from .ingest.scrub import normalize_for_match
+from .prompts import LIGHT as LIGHT_PROMPT
 from .prompts import LISTENER as LISTENER_PROMPT
 from .reflection import _QUOTED, Record, checked
 from .seat_label import KIND_LABELS
 from .texts import load_lines, load_table
 
 LISTENER = "listener"  # The gate's roles (MODELS, EFFORT).
+LIGHT = "light"
 LISTENER_SECONDS = 8.0  # The wait, with no retry; past it, the fixed question.
+LIGHT_SECONDS = 15.0  # Past it, code picks the light.
 
 MAX_PEOPLE = 3
 MAX_PART = 16  # A lit part of a card.
 MAX_QUESTION = 60
+MAX_WHY = 60
+MAX_DEEP = 50
 MAX_LINE = 120  # Each line the student writes.
 MAX_LISTENER = 2  # Questions the listener puts: one per direction.
 MAX_LADDER = 3  # Questions of the ladder.
@@ -65,7 +70,14 @@ SCALE_FIRST, SCALE_TOP = 10, 15
 REACTION, SELF = "reaction", "self"
 DIRECTIONS = (REACTION, SELF)  # In this order, each once. 前 is the scale's.
 QUESTION_WORDS = ("なぜ", "どう", "何")
+# Praise said by rote (the light): checked outside 「」 like banned_words.
+PRAISE_FORMS = ("いいね", "いいですね", "よかった", "良かった", "最高", "完璧", "天才", "上手", "見事",
+                "かっこいい", "感心")
 
+# The school's six forces: ① to ⑤ as harvest.py names them (its FORCES stay
+# as they are); ⑥ for this screen only.
+FORCES = dict(harvest.FORCES) | {6: "⑥ 創り出す力"}
+FORCE_WORDS = {number: name.split(" ", 1)[1] for number, name in FORCES.items()}
 
 # Where the sample puts the points (its viewBox is 600 x 330): the split's
 # two, then the third. The grey points are other seats met, as decoration.
@@ -131,6 +143,14 @@ def words() -> dict[str, str]:
     return rows
 
 
+def force_sentences() -> dict[int, str]:
+    """{number: the fixed sentence} for the six forces (texts/hitokoto_forces.tsv)."""
+    rows = {row["番号"]: row["文"] for row in load_table(FORCE_TEXTS, ("番号", "文"))}
+    if set(rows) != {str(n) for n in FORCES}:
+        raise ValueError(f"{FORCE_TEXTS}.tsv must have the rows 1 to 6")
+    return {int(key): value for key, value in rows.items()}
+
+
 def screen_words() -> dict:
     """What the screen is sent once, with the forces' names."""
     return {"words": words(), "kinds": KIND_LABELS}
@@ -182,6 +202,19 @@ class Asked:
 
 
 @dataclass
+class Light:
+    quote: str
+    source: str  # "written", "chosen" or "first".
+    force: int
+    why: str
+    deep: str
+    by: str  # "model" or "code".
+    reason: str = ""  # Why code picked: a code ("" when the model's passed).
+    chosen_who: str = ""  # source "chosen": whose words.
+    seconds: float = 0.0
+
+
+@dataclass
 class Hitokoto:
     first_question: str
     people: list[Person] = field(default_factory=list)
@@ -213,6 +246,7 @@ class Hitokoto:
     subject_pick: object = None  # subjects.Pick
     meet_seat: str = ""
     meet_use: str = ""
+    light: Light | None = None
     now_question: str = ""
 
     # --- what the screen gets ---
@@ -358,6 +392,33 @@ def question_stop(text: str, words_: Words, gate: Gate) -> str:
     return ""
 
 
+def light_stop(text: str, limit: int, words_: Words, gate: Gate) -> str:
+    """The light's two sentences: as a question is checked, but a sentence,
+    and no rote praise."""
+    reason = checked(text, words_.record, gate, limit)
+    if reason:
+        return reason
+    body = _outside(text)
+    if any(normalize_for_match(lure) in body for lure in LURE_FORMS):
+        return STOP_LURE
+    if _starts_you_are(text):
+        return STOP_YOU_ARE
+    if any(normalize_for_match(word) in body for word in PRAISE_FORMS):
+        return STOP_PRAISE
+    if has_avoid(text):
+        return STOP_AVOID
+    return ""
+
+
+def unquote_forces(text: str) -> str:
+    """A force's name the model put in 「」 passes: 「」 taken off (the name
+    is never in 「」 on screen)."""
+    for number, name in FORCES.items():
+        for form in (name, FORCE_WORDS[number]):
+            text = text.replace(f"「{form}」", FORCE_WORDS[number])
+    return text
+
+
 # --- the listener ---
 
 def _send(gate: Gate, role: str, system: str, data: dict, schema: dict, seconds: float, max_tokens: int):
@@ -454,3 +515,107 @@ def ask_listener(gate: Gate, session, talk: Hitokoto, direction: str, answer: st
         asked = Asked(direction, text.strip(), LISTENER, "", seconds)
     talk.asked.append(asked)
     return asked
+
+
+# --- the light ---
+
+LIGHT_SCHEMA = {
+    "type": "object",
+    "properties": {"quote": {"type": "string"}, "force": {"type": "integer"}, "why": {"type": "string"},
+                   "deep": {"type": "string"}},
+    "required": ["quote", "force", "why", "deep"], "additionalProperties": False,
+}
+
+
+def light_words(talk: Hitokoto) -> list[dict]:
+    """The student's own words the light may pick from: never of home, money or health."""
+    return [w for w in talk.written if not has_avoid(w["text"])]
+
+
+def chosen_two(talk: Hitokoto) -> Person | None:
+    return talk.people[talk.ladder_two] if talk.ladder_two is not None else None
+
+
+def code_light(talk: Hitokoto, reason: str) -> Light:
+    """The sample's chooseLight, in its order, with the forces' fixed sentences."""
+    texts, sentences = words(), force_sentences()
+    written = light_words(talk)
+    longest = max((w["text"] for w in written if w["step"] in (REACTION, SELF, "fill")), key=len, default="")
+    person = talk.people[talk.chosen] if talk.chosen is not None else None
+    deep_word = fill(texts["deep_word"], who=person.title, word=chosen_words(talk)) if person else ""
+    forward = talk.forward if not has_avoid(talk.forward) else ""
+    way = talk.way if not has_avoid(talk.way) else ""
+    scale = talk.scale
+
+    def light(quote, force, deep, source="written", who=""):
+        return Light(quote, source, force, sentences[force], deep, "code", reason, who)
+
+    if scale is not None and scale < SCALE_FIRST and longest:
+        return light(longest, 2, deep_word)
+    if scale is not None and scale > SCALE_FIRST and forward:
+        return light(forward, 5, texts["deep_more"])
+    if way:
+        return light(way, 2, texts["deep_way"])
+    if scale == SCALE_FIRST and forward:
+        return light(forward, 4, texts["deep_need"])
+    if longest:
+        return light(longest, 1, deep_word)
+    two = chosen_two(talk)
+    if two:
+        return light(two.text, 2, texts["deep_chosen"], "chosen", two.title)
+    return light(talk.first_question, 1, "", "first")
+
+
+def ask_light(gate: Gate, session, talk: Hitokoto) -> Light:
+    written = light_words(talk)
+    two = chosen_two(talk)
+    if not written and not two:
+        return code_light(talk, NOTHING_WRITTEN)
+    data = {"first_question": talk.first_question,
+            "written": [{"id": str(i + 1), "step": w["step"], "text": w["text"]} for i, w in enumerate(written)],
+            "chosen": "" if written else two.text,
+            "forces": [{"number": n, "name": FORCE_WORDS[n]} for n in FORCES]}
+    system = LIGHT_PROMPT.format(why_limit=MAX_WHY, deep_limit=MAX_DEEP, banned="・".join(BANNED_WORDS))
+    reply, reason, seconds = _send(gate, LIGHT, system, data, LIGHT_SCHEMA, LIGHT_SECONDS, 1500)
+    if reply is None:
+        light = code_light(talk, reason)
+        light.seconds = seconds
+        return light
+    quote = reply.get("quote").strip() if isinstance(reply.get("quote"), str) else ""
+    force = reply.get("force")
+    why = unquote_forces(reply.get("why").strip()) if isinstance(reply.get("why"), str) else ""
+    deep = unquote_forces(reply.get("deep").strip()) if isinstance(reply.get("deep"), str) else ""
+    sources = [w["text"] for w in written] if written else [two.text]
+    check_words = Words(session, talk)
+    if len(quote) < 2 or not any(quote in source for source in sources) or gate.names.hits(quote):
+        reason = STOP_QUOTE_NOT_WRITTEN
+    elif not isinstance(force, int) or isinstance(force, bool) or force not in FORCES:
+        reason = STOP_FORCE
+    elif not why or not deep:
+        reason = STOP_MISSING
+    else:
+        reason = light_stop(why, MAX_WHY, check_words, gate) or light_stop(deep, MAX_DEEP, check_words, gate)
+        if not reason and FORCE_WORDS[force] not in why:
+            reason = STOP_FORCE_NOT_NAMED
+    if reason:
+        light = code_light(talk, reason)
+    else:
+        light = Light(quote, "written" if written else "chosen", force, why, deep, "model", "",
+                      "" if written else two.title)
+    light.seconds = seconds
+    return light
+
+
+def next_step(talk: Hitokoto) -> str:
+    """The 前 answer, shown under the light when the doubt went down or stayed,
+    and not already the light's words."""
+    if talk.scale is None or talk.scale > SCALE_FIRST or not talk.forward or has_avoid(talk.forward):
+        return ""
+    return "" if talk.light and talk.light.quote == talk.forward else talk.forward
+
+
+def light_view(talk: Hitokoto) -> dict:
+    light = talk.light
+    return {"scale": talk.scale, "quote": light.quote, "source": light.source, "chosen_who": light.chosen_who,
+            "why": light.why, "deep": light.deep, "force": FORCES[light.force], "next_step": next_step(talk),
+            "now_question": talk.now_question or talk.first_question}
