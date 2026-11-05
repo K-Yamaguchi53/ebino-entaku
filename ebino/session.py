@@ -31,7 +31,7 @@ from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_S
 from . import librarian, texts
 from .gate import Gate, GateError, ModelUnavailable, NameList, load_names
 from .guard import Guard
-from . import asker, one_to_one
+from . import asker, hitokoto, one_to_one
 from .index import Entry, build_index, load_topics, load_utterances
 from .ingest.run import OUTPUT_DIR as INGESTED_DIR
 from .ingest.scrub import normalize_for_match
@@ -219,6 +219,9 @@ class Session:
     one_spoken: list[speaker.Spoken] = field(default_factory=list)
     # The teacher's questions put to each person (直し36-3), by seat and item.
     one_rephrased: dict[str, dict[str, asker.Rephrased]] = field(default_factory=dict)
+    # 帰る前に、ひとこと (直し38, hitokoto.py): in place of the reflection
+    # sheet unless EBINO_REFLECT=old. None until it starts.
+    talk: hitokoto.Hitokoto | None = None
 
     def __post_init__(self):
         self._subject_counts = Counter()  # With no records (tests): this sitting's only.
@@ -856,6 +859,58 @@ class Session:
             "meet": meet | {"reason": current.meet_reason} if meet else None,
             "meet_reason": current.meet_reason,  # Kept even with no seat picked.
         }
+
+    # --- 帰る前に、ひとこと (直し38, hitokoto.py) ---
+
+    def _talk(self, *stages: str) -> hitokoto.Hitokoto:
+        talk = self.talk
+        if talk is None:
+            raise Refused("hitokoto_not_started")
+        if stages and talk.stage not in stages:
+            raise Refused("not_now")
+        return talk
+
+    def hitokoto_begin(self, opened) -> dict:
+        """Today's map: the people on it, the split between two of them, the
+        counts. opened: the bubbles the student opened, in that order."""
+        if not any(r.status in (roundtable.ANSWERED, roundtable.SILENT) for r in self.rounds):
+            raise Refused("no_round_yet")
+        if self.talk is not None:
+            raise Refused("hitokoto_started")
+        opened = [uid for uid in opened if isinstance(uid, str)] if isinstance(opened, list) else []
+        self.talk = hitokoto.begin(self, opened, _sheet_heading)
+        self.save()
+        talk = self.talk
+        view = talk.map_view()
+        if talk.stage == hitokoto.SCALE:  # No one on the map: straight to the scale.
+            view["question"] = talk.asked[-1].text
+        return view
+
+    def hitokoto_parts(self) -> dict:
+        """The listener's short part of each card, asked once (8 seconds)."""
+        talk = self._talk(hitokoto.MAP)
+        if not talk.parts_asked:
+            hitokoto.ask_parts(self.gate, talk)
+            self.save()
+        return {"parts": {str(index): part for index, part in talk.parts.items()}}
+
+    def hitokoto_choose(self, person, part, omakase: bool = False) -> dict:
+        """A lit part or a card pressed, or 「おまかせ」 (code picks: the first
+        lit part, else the first card); then the listener's first question."""
+        talk = self._talk(hitokoto.MAP)
+        if omakase:
+            person = min(talk.parts) if talk.parts else 0
+            part = talk.parts.get(person, "")
+        else:
+            if not isinstance(person, int) or isinstance(person, bool) or not 0 <= person < len(talk.people):
+                raise Refused("unknown_person")
+            part = part if isinstance(part, str) else ""
+            if part and talk.parts.get(person) != part:
+                raise Refused("unknown_part")
+        talk.chosen, talk.chosen_part, talk.omakase = person, part, bool(omakase)
+        talk.stage = hitokoto.TALK
+        self.save()
+        return {"next": "chosen", "omakase": bool(omakase), "person": person, "part": part}
 
     # --- what the sitting has gathered ---
 

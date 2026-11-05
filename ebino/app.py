@@ -29,7 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from . import inside, relief
+from . import hitokoto, inside, relief
 from .config import PlaceError, data_dir, load_env_file, records_dir
 from .gate import Gate, load_names
 from .records import Records
@@ -49,6 +49,8 @@ STATIC_FILES = {
     "/map.js": ("map.js", "text/javascript; charset=utf-8"),
     # A seat as a person at one to one (直し34-3), drawn by code.
     "/person.js": ("person.js", "text/javascript; charset=utf-8"),
+    # 帰る前に、ひとこと (直し38): its screen.
+    "/hitokoto.js": ("hitokoto.js", "text/javascript; charset=utf-8"),
     # Hand-drawn lines on the map (MIT), bundled: nothing is loaded from outside.
     "/rough.js": ("rough.js", "text/javascript; charset=utf-8"),
     "/rough.LICENSE.txt": ("rough.LICENSE.txt", "text/plain; charset=utf-8"),
@@ -61,6 +63,7 @@ MAP_FILES = {
     relief.IMAGE_PATH: (relief.RELIEF_DIR / relief.IMAGE, "image/webp"),
 }
 MAX_BODY = 16 * 1024
+HITOKOTO = "/api/hitokoto/"  # 帰る前に、ひとこと's steps (直し38).
 # Seconds a connection may sit without sending or taking bytes. Waiting for
 # the model is not counted: that happens after the request is read.
 CONNECTION_TIMEOUT = 20
@@ -103,6 +106,10 @@ class App:
             "map": view,
             # Whose words are in the app, as counts from the seat table (直し31-5).
             "inside": inside.view(self.library.seats),
+            # 帰る前に、ひとこと (直し38): its words; the screen keeps the
+            # reflection sheet until the new one is turned on.
+            "reflect": "old",
+            "hitokoto": hitokoto.screen_words(),
         }
 
     def start(self, body: dict) -> dict:
@@ -173,7 +180,22 @@ class App:
             return session.subject_more()
         if path == "/api/subject_choose":
             return session.subject_choose(body.get("choice"))
+        if path.startswith(HITOKOTO):
+            return self._hitokoto(session, path[len(HITOKOTO):], body)
         raise Refused("unknown_path")
+
+    def _hitokoto(self, session: Session, step: str, body: dict) -> dict:
+        """帰る前に、ひとこと (直し38): /api/hitokoto/<step>."""
+        skip = body.get("skip") is True
+        steps = {
+            "begin": lambda: session.hitokoto_begin(body.get("opened")),
+            "parts": session.hitokoto_parts,
+            "choose": lambda: session.hitokoto_choose(body.get("person"), body.get("part", ""),
+                                                      omakase=body.get("omakase") is True),
+        }
+        if step not in steps:
+            raise Refused("unknown_path")
+        return steps[step]()
 
 
 def make_handler(app: App, port: int, timeout: float = CONNECTION_TIMEOUT):

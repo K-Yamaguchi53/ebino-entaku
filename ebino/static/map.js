@@ -1275,6 +1275,8 @@ const EbinoMap = (() => {
     let width = frame.clientWidth;
     let room = "";
     const changed = () => {
+      // The table hidden (the reflection, 直し38): no size to lay the map out in.
+      if (!frame.clientWidth || !frame.clientHeight) return;
       const now = roomSize(), key = `${now.w}x${now.h}`;
       if (!view || (frame.clientWidth === width && key === room)) return;
       width = frame.clientWidth;
@@ -2619,6 +2621,7 @@ const EbinoMap = (() => {
     const write = button("card", () => openOne(seatId, card));
     const below = button("read", () => { closeChoices(false); app.readBelow(tableRoundNo, utteranceId, card); });
     node.append(head, read, paragraph, mark, write, below);
+    if (app.bubbleOpened) app.bubbleOpened(utteranceId);  // For today's map (直し38).
     // The first time a bubble is pressed, a line under each button says what
     // it does (直し32-4); after that the buttons alone.
     const help = app.firstHelp();

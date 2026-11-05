@@ -21,6 +21,9 @@ const state = {
   // to the town's adults), one seat (a question card), or an AI's question
   // (the answer starts the next round). Each keeps its own unsent words.
   to: { kind: "all" }, drafts: {},
+  // 帰る前に、ひとこと (直し38): which reflection ("hitokoto", or "old" when
+  // EBINO_REFLECT=old), its words, and the bubbles opened, in that order.
+  reflect: "old", hitokoto: null, opened: [],
 };
 
 const $ = (id) => document.getElementById(id);
@@ -71,7 +74,9 @@ function rankingTitle(piece) {
 
 async function setup() {
   const data = await call("/api/setup");
-  Object.assign(state, { texts: data.texts, kinds: data.kinds, seats: data.seats, changedChoices: data.changed_choices });
+  Object.assign(state, { texts: data.texts, kinds: data.kinds, seats: data.seats, changedChoices: data.changed_choices,
+    reflect: data.reflect, hitokoto: data.hitokoto });
+  if (state.reflect === "hitokoto") useHitokotoName(data.texts);
   for (const seat of data.seats) state.seatById[seat.seat_id] = seat;
   for (const line of data.texts.start_notice) $("start-notice").append(el("li", { text: line }));
   $("start-purpose").textContent = data.texts.start_purpose;
@@ -99,7 +104,7 @@ async function setup() {
   // mark, a seat's question card and the quote's card (直し26-2).
   const lent = { state, cardEntry, cardDone, setNow, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
     readBelow, shownQuotes, phrased, askSeat, answerTo, firstHelp, openParagraph, backToEveryone, oneOpen, oneAsk,
-    cardFromOne, oneThanks, foldAiSeat };
+    cardFromOne, oneThanks, bubbleOpened, foldAiSeat };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
 
@@ -554,7 +559,7 @@ function fill(text) {
 function nowState() {
   const now = state.now;
   if (!$("start").hidden) return "start";
-  if (!$("reflect").hidden) return "reflect";
+  if (!$("reflect").hidden || !$("hitokoto").hidden) return "reflect";
   if (now.preparing) return "preparing";
   if (now.asking) return "asking";
   if (!state.firstQuestion) return "write";
@@ -1321,6 +1326,7 @@ function firstHelp() {
 // whose it is (with its source's note) in the drawer, not by the map. 閉じる
 // or Esc closes it, the keyboard back on the button pressed.
 async function openParagraph(utteranceId, whose, from) {
+  bubbleOpened(utteranceId);
   const text = await paragraphOf(utteranceId);
   $("drawer-paragraph").replaceChildren(el("p", { class: "whose", text: whose }),
     el("p", { class: "paragraph-text", text }));
@@ -1476,6 +1482,27 @@ function cardEntry(seatId, tag = "div") {
   return open;
 }
 
+// --- 帰る前に、ひとこと (直し38) ---
+
+// The step at the top and the button to it say 帰る前に、ひとこと; the line
+// under the steps after a round says the same button's name; on its own
+// screen, no line (its own steps are there).
+function useHitokotoName(texts) {
+  const words = state.hitokoto.words;
+  // The step keeps its mark (④) from texts/now_steps.tsv; its name is the new one.
+  for (const step of texts.now_steps) if (step.id === "reflect") step.text = step.text.replace(/^(\S+\s+)?.*$/, `$1${words.name}`);
+  texts.now_line.after = { ...texts.now_line.after, text: words.now_after };
+  texts.now_line.reflect = { ...texts.now_line.reflect, text: "" };
+  $("to-reflect").textContent = words.name;
+}
+
+// A bubble opened (its choices, or its paragraph): the people on today's
+// map come from these too, the one opened last first.
+function bubbleOpened(utteranceId) {
+  state.opened = state.opened.filter((id) => id !== utteranceId);
+  state.opened.push(utteranceId);
+}
+
 // --- the reflection sheet (SPEC 5-2) ---
 
 function radios(container, name, options) {
@@ -1533,6 +1560,10 @@ function answerable() {
 function openReflection() {
   closeDrawer();
   $("table").hidden = true;
+  if (state.reflect === "hitokoto") {
+    EbinoHitokoto.open({ call, state, setNow, sendFailed, showBackToStart });
+    return;
+  }
   $("reflect").hidden = false;
   setNow();
   document.querySelector(".reflect-heavy-talk").textContent = state.texts.heavy_talk_notice;

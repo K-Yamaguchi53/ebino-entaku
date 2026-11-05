@@ -1,0 +1,88 @@
+ID	文字
+name	帰る前に、ひとこと
+step_map	今日の地図
+step_talk	帰る前に、ひとこと
+step_light	光ったところ
+step_sheet	1枚
+first_label	最初の問い
+map_lead	最初の問いに、今日の人たちが返した言葉。いちばん引っかかった所を1つ押してください。
+map_split	割れたところ（点線の2人）
+map_counts	話を聞いた{people}人・印をつけた言葉 {marks}つ・残した質問カード {cards}枚
+omakase	おまかせ
+omakase_said	おまかせで選びました。
+go	この言葉で話す
+stop	ここまでにする
+dont_know	わからない
+thinking	考えています
+summing	まとめています
+who_ai	聞き手（AI・町の人ではありません）
+who_teacher	先生の問い
+who_me	あなた
+send	送る
+placeholder	ひとことでいい
+again	だいじょうぶ。ひとことでいいよ。
+ask_reaction	「{word}」を読んで、最初に思ったことは？
+ask_self	その人の話は、自分にも当てはまりそう？ どんなところが？
+ladder_two	2人の言葉。自分に近いのは、どっち？
+ladder_two_me	{who}に近い
+ladder_three	話を聞いた人のうち、いちばん残った人は？
+ladder_fill	空いている所だけ、埋めてください。
+ladder_fill_line	{who}の話の、［　　］のところが近いと思った。
+fill_ok	これでいい
+fill_skip	空けておく
+scale_q	最初の問いの迷いを10とすると、いまはいくつ？（増えていてもいい）
+scale_low	0 迷いなし
+scale_first	10 最初
+scale_ok	これにする
+scale_me	いまは {n}
+scale_down	下がったね。あと1つ下げるとしたら、何がありそう？
+scale_same	何があれば、1つ下がりそう？
+scale_up	迷いが増えたのは、考えが広がったしるし。どこが増えた？
+skip	とばす
+way_q	まだ決めなくていい。頭に置いておきたい道は？
+way_ok	置いておく
+way_none	いまはない
+way_example	例：農業もおもしろいかも
+subject_q	授業で習ったことと近い話はあった？
+subject_yes	あった
+subject_no	なかった
+subject_unsure	わからない
+subject_which	どの授業？
+subject_example	例：家庭科の保育
+meet_pick	席を選ぶ
+meet_met	会った席
+meet_others	ほかの席
+meet_ok	これにする
+meet_none	選ばない
+light_title	今日、光ったところ
+light_scale	迷いは、最初の10から {n} に。
+light_lead	ここが、よかった。
+light_lead_chosen	あなたが選んだ言葉。
+light_chosen_who	（{who}の言葉）
+light_deep_tail	そこを深めると、おもしろくなりそう。
+light_step	次の一歩になりそうなこと（あなたが書いた）
+now_label	最後に、いまの問いを書き直すなら（書かなくてもいい）
+to_sheet	1枚にする
+sheet_title	帰る前に、ひとこと ── 今日の1枚
+sheet_now	いまの問い
+sheet_same	（書き直さなかった）
+sheet_story	今日の道すじ
+sheet_step	次の一歩になりそうなこと
+story_people	{people}の話を聞いた。
+story_word	{who}の{*word}が引っかかった。
+story_chosen	{who}の言葉に近いと選んだ。
+story_wrote	そこで{*text}と書いた。
+story_scale	迷いは10から{n}へ。
+story_more	増えたのは{*text}。
+story_way	頭に置いておきたい道は{*text}。
+story_subject	授業とつながった話もあった。
+story_subject_note	授業とつながった話もあった（{note}）。
+print	印刷する（担任の先生に渡せます）
+print_note	この1枚に名前は入りません。担任の先生に渡すかどうかは、自分で決めてください。
+print_side	名前は残りません。渡すかどうかは自分で決めます。
+deep_word	{who}の「{word}」の先。その人はどうやってそこにたどり着いたのか。
+deep_more	増えた迷いのうち、いちばん気になる1つ。
+deep_way	その道の、どこがおもしろそうに見えたのか。
+deep_need	それがあったら、何が変わりそうか。
+deep_chosen	なぜこっちだったのか。
+now_after	ほかの人にも聞くか、『帰る前に、ひとこと』で今日をまとめよう。

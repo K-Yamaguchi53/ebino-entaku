@@ -158,7 +158,8 @@ def test_while_a_send_is_out_the_button_waits_and_a_second_press_sends_nothing()
 
 def test_every_way_to_write_goes_to_the_one_box():
     assert "card-form-template" not in HTML and 'class="card-form"' not in HTML
-    assert HTML.count("<textarea") == 3  # The box, and the reflection's two.
+    # The box, the reflection's two, and 帰る前に、ひとこと's question held now (直し38).
+    assert HTML.count("<textarea") == 4
     entry = _top("cardEntry")
     assert "askSeat(seatId)" in entry and "card-form" not in entry
     assert "askSeat(seatId);" in _top("openCardFor")

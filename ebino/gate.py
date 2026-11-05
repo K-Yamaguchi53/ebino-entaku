@@ -61,6 +61,9 @@ MODELS = {
     # ingest, which axes a page answers and a seat's own question on its
     # ranking; at one to one, the teacher's questions put to that person.
     "asker": "claude-haiku-5-5",
+    # 帰る前に、ひとこと (直し38): the listener asks one question at a time
+    # (and picks a short part of each card); light finds where the student shone.
+    "listener": "claude-haiku-5-5",
 }
 EFFORT = {
     "tagger": "low",
@@ -73,6 +76,7 @@ EFFORT = {
     "coach": "medium",
     "speaker": "low",
     "asker": "low",
+    "listener": "low",
 }
 
 

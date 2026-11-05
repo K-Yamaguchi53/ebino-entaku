@@ -1155,3 +1155,136 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-cards { grid-tem
 .risen-shadow { fill: var(--shadow); filter: blur(6px); pointer-events: none; }
 .one-on .yard.lifted { visibility: visible; }
 .one-on .risen-school, .one-on .risen-shadow { visibility: hidden; }
+
+/* --- 帰る前に、ひとこと (直し38): the teacher's sample, in the night's colours.
+   The page scrolls here. The listener (AI) speaks in its own blue card with
+   its label; the teacher's questions have the lamp's edge; the student's
+   words are on the right; people's words on paper. --- */
+.now-line:empty { display: none; }
+.hitokoto { max-width: 780px; margin: 0 auto; padding: 8px 16px 40px; line-height: 1.7; }
+/* Broken between words, not inside one, as every box a student reads in (直し31続き-5). */
+.hitokoto { word-break: auto-phrase; overflow-wrap: break-word; }
+.hk-title { margin: 18px 0 4px; font-family: var(--mincho); font-weight: 600; font-size: clamp(1.3rem, 2.6vw, 1.6rem); letter-spacing: .08em; }
+.hk-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 18px; padding: 0; list-style: none; font-size: 13px; color: var(--faint); }
+.hk-steps li { padding: 3px 12px; border: 1px solid var(--moon-faint); border-radius: 999px; }
+.hk-steps li.on { color: var(--night); background: var(--lamp-bright); border-color: var(--lamp-bright); font-weight: 700; }
+.hk-steps li.done { color: var(--soft); }
+.hk-label { margin: 0; font-size: 13px; color: var(--soft); letter-spacing: .04em; }
+.hk-first { margin: 0 0 4px; font-family: var(--mincho); font-size: 20px; overflow-wrap: break-word; }
+.hk-map-box { margin: 10px 0 14px; padding: 10px; background: var(--night-2); border: 1px solid var(--moon-faint); border-radius: 14px; }
+.hk-map-box svg { display: block; width: 100%; height: auto; }
+.hk-split { margin: 0 0 4px; text-align: center; color: var(--lamp); font-size: 15px; line-height: 1.6; }
+.hk-split-label { margin-right: .6em; color: var(--moon); font-size: 12px; }
+.hk-basin { fill: var(--night-2); stroke: var(--moon); stroke-opacity: .5; stroke-width: 2; stroke-dasharray: 6 5; }
+.hk-river { fill: none; stroke: var(--river); stroke-opacity: .55; stroke-width: 3; }
+.hk-grey { fill: var(--faint); opacity: .55; }
+.hk-split-line { stroke: var(--lamp); stroke-width: 2; stroke-dasharray: 4 6; opacity: .8; }
+.hk-glow-in { stop-color: var(--lamp-bright); stop-opacity: .9; }
+.hk-glow-out { stop-color: var(--lamp); stop-opacity: 0; }
+.hk-pt { fill: var(--kind, var(--kind-adult)); stroke: var(--lamp-bright); stroke-width: 2; }
+.hk-pt.on { stroke: var(--paper-light); stroke-width: 4; }
+.hk-pt-label { fill: var(--ink); font-size: 15px; text-anchor: middle; font-family: var(--gothic); }
+.hk-counts { fill: var(--faint); font-size: 13px; text-anchor: middle; font-family: var(--gothic); }
+.hk-cards { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 4px; }
+.hk-said { display: block; width: 100%; margin: 0; padding: 10px 14px; text-align: left; background: var(--paper); color: var(--paper-ink);
+  border: 2px solid var(--paper-line); border-radius: 10px; font-family: var(--mincho); font-size: 16px; line-height: 1.9; }
+button.hk-said:hover, button.hk-said[aria-pressed="true"] { border-color: var(--lamp); }
+button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
+.hk-from { display: block; font-family: var(--gothic); font-size: 12px; color: var(--paper-soft); }
+.hk-note { display: block; margin-top: 2px; font-family: var(--gothic); font-size: 12px; color: var(--paper-soft); }
+.hk-words { overflow-wrap: break-word; }
+.hk-kw { min-height: 0; margin: 0 1px; padding: 0 4px; background: var(--lamp-soft); color: var(--paper-ink); border: 0;
+  border-bottom: 2px solid var(--lamp); border-radius: 4px; font: inherit; line-height: 1.6; }
+.hk-kw:hover { background: var(--lamp-glow); }
+.hk-kw[aria-pressed="true"] { background: var(--lamp); font-weight: 700; }
+.hk-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.hk-primary { min-height: 46px; padding: 8px 22px; background: var(--lamp); color: var(--night); border: 0; border-radius: 10px; font-weight: 700; }
+.hk-primary:hover { background: var(--lamp-bright); }
+.hk-primary:disabled { opacity: .4; cursor: default; }
+.hk-log { display: flex; flex-direction: column; gap: 12px; }
+.hk-card { max-width: 92%; padding: 12px 16px; border-radius: 12px; overflow-wrap: break-word; }
+.hk-card .hk-q { margin: 0; font-size: 17px; }
+.hk-card .hk-q + .hk-q { margin-top: 4px; }
+.hk-who { display: block; margin-bottom: 2px; font-size: 12px; letter-spacing: .06em; }
+.hk-card.ai { align-self: flex-start; background: var(--ai-deep); color: var(--ai-ink); border: 1px solid var(--ai); }
+.hk-card.ai .hk-who { color: var(--ai); }
+.hk-card.ai.waiting .hk-q { color: var(--soft); }
+.hk-card.teacher { align-self: flex-start; background: var(--lamp-faint); border: 1px solid var(--lamp-soft); }
+.hk-card.teacher .hk-who { color: var(--lamp); }
+.hk-card.me { align-self: flex-end; background: var(--night-3); border: 1px solid var(--moon-faint); }
+.hk-card.me .hk-who { color: var(--soft); text-align: right; }
+.hk-input { margin-top: 12px; }
+.hk-input .message { margin: 0 0 8px; }
+.hk-answer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.hk-answer input[type="text"] { flex: 1 1 12em; min-width: 0; min-height: 46px; padding: 8px 12px; background: var(--paper); color: var(--paper-ink);
+  border: 2px solid var(--paper-line); border-radius: 10px; font-size: 16px; }
+.hk-pick { min-height: 44px; padding: 8px 14px; background: var(--night-3); color: var(--ink); border: 1px solid var(--moon); border-radius: 10px; }
+.hk-pick:hover { border-color: var(--lamp); }
+.hk-picks, .hk-uses { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.hk-uses .hk-pick { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.hk-force { font-size: 12px; color: var(--soft); }
+.hk-options { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.hk-quote { display: block; width: 100%; padding: 10px 14px; text-align: left; background: var(--paper); color: var(--paper-ink);
+  border: 2px solid var(--paper-line); border-radius: 10px; font-family: var(--mincho); font-size: 16px; line-height: 1.7; }
+.hk-quote small { display: block; margin-top: 2px; font-family: var(--gothic); font-size: 12px; color: var(--paper-soft); }
+.hk-quote:hover { border-color: var(--lamp); }
+.hk-fill-line { margin: 6px 0 0; font-family: var(--mincho); font-size: 17px; line-height: 2.2; }
+.hk-fill-line input { width: 9em; max-width: 60%; margin: 0 4px; padding: 2px 8px; background: var(--paper); color: var(--paper-ink);
+  border: 0; border-bottom: 2px solid var(--lamp); border-radius: 4px; font-size: 16px; }
+.hk-scale { margin-top: 8px; }
+.hk-scale input[type="range"] { width: 100%; accent-color: var(--lamp); }
+.hk-scale-now { margin: 0; font-family: var(--mincho); font-size: 28px; color: var(--lamp-bright); }
+.hk-ticks { display: flex; justify-content: space-between; margin: 0 0 6px; font-size: 12px; color: var(--faint); }
+.hk-meet select { width: 100%; min-height: 46px; margin-top: 8px; padding: 6px 10px; background: var(--paper); color: var(--paper-ink);
+  border: 2px solid var(--paper-line); border-radius: 10px; font-size: 16px; }
+.hk-harvest { margin: 0; padding: 18px 20px; align-self: stretch; }
+.hk-exit { margin: 14px 0 0; text-align: right; }
+.hk-light { padding: 22px 20px; text-align: center; border: 1px solid var(--lamp-soft); border-radius: 16px;
+  background: radial-gradient(circle at 50% 0, var(--lamp-faint), transparent 70%), var(--night-2); overflow-wrap: break-word; }
+.hk-light h3 { margin: 0 0 10px; font-family: var(--mincho); font-weight: 600; font-size: 20px; color: var(--lamp-bright); }
+.hk-scaleline { margin: 0 0 12px; font-size: 14px; color: var(--soft); }
+.hk-lead { margin: 0; font-family: var(--mincho); font-size: 17px; color: var(--lamp-bright); }
+.hk-lead.waiting { color: var(--soft); }
+.hk-big { margin: 8px 0; font-family: var(--mincho); font-size: 24px; line-height: 1.6; color: var(--paper); }
+.hk-why { max-width: 34em; margin: 0 auto; font-size: 15px; }
+.hk-deep { margin: 12px 0 0; font-family: var(--mincho); font-size: 17px; }
+.hk-step { margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--lamp-soft); }
+.hk-stepq { margin: 0; font-family: var(--mincho); font-size: 20px; color: var(--lamp-bright); }
+#hk-light > .hk-label { display: block; margin-top: 22px; }
+#hk-now { width: 100%; min-height: 72px; margin-top: 4px; padding: 10px 12px; background: var(--paper); color: var(--paper-ink);
+  border: 2px solid var(--paper-line); border-radius: 10px; font-family: var(--mincho); font-size: 17px; resize: vertical; }
+.hk-sheet { padding: 28px 30px; background: var(--paper-light); color: var(--paper-ink); border-radius: 6px; overflow-wrap: break-word; }
+.hk-sheet h3 { margin: 0 0 14px; padding-bottom: 6px; font-family: var(--mincho); font-size: 20px; border-bottom: 2px solid var(--paper-ink); }
+.hk-sheet .hk-label { color: var(--paper-soft); }
+.hk-qq { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: center; margin-bottom: 18px; }
+.hk-qbox { min-height: 60px; padding: 10px 12px; border: 1px solid var(--paper-line); border-radius: 6px; font-family: var(--mincho); font-size: 17px; }
+.hk-qbox p { margin: 0; }
+.hk-arrow { margin: 0; font-size: 22px; color: var(--lamp); }
+.hk-story { margin: 0 0 16px; font-family: var(--mincho); font-size: 16px; line-height: 2; }
+.hk-story b { font-weight: 600; background: linear-gradient(transparent 60%, var(--lamp-soft) 60%); }
+.hk-litbox { margin-bottom: 14px; padding: 12px 14px; background: var(--paper); border: 1px solid var(--lamp); border-radius: 6px; }
+.hk-litbox p { margin: 0; }
+.hk-lit { font-family: var(--mincho); font-size: 17px; }
+.hk-print-note { margin: 18px 0 0; font-size: 12px; color: var(--paper-soft); }
+.hk-back { margin-top: 20px; }
+.hk-heavy-talk { margin-top: 28px; }
+@media (max-width: 560px) {
+  .hk-qq { grid-template-columns: minmax(0, 1fr); }
+  .hk-arrow { justify-self: center; transform: rotate(90deg); }
+  .hk-sheet { padding: 20px 16px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hk-card, .hk-light { animation: hk-rise .35s ease-out both; }
+  .hk-glow { animation: hk-breathe 2.4s ease-in-out infinite; }
+}
+@keyframes hk-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes hk-breathe { 50% { opacity: .55; } }
+/* Printed: the one sheet alone, ink on the page's white. */
+@media print {
+  html:has(#hk-sheet:not([hidden])), html:has(#hk-sheet:not([hidden])) body { background: none; color: var(--paper-ink); }
+  body:has(#hk-sheet:not([hidden])) :is(.masthead, .now, #start, #table, #reflect, .hk-title, .hk-steps, #hk-map, #hk-talk,
+    #hk-light, .hk-print-row, .hk-back, .hk-heavy-talk) { display: none !important; }
+  .hitokoto { max-width: none; padding: 0; }
+  .hk-sheet { padding: 0; background: none; }
+  .hk-litbox { background: none; break-inside: avoid; }
+}
