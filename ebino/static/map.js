@@ -3120,8 +3120,10 @@ const EbinoMap = (() => {
       await mine.flight.finished.catch(() => {});
       if (one !== mine) return;
     }
-    // Near it, the person's feet low in the frame, room for its words beside it.
-    const w = view.W / ONE_ZOOM, h = w * view.H / view.W;
+    // Near it, the person's feet low in the frame, room for its words beside
+    // it; a seat at the school (its window, its track) as near as the
+    // nearest zoom, where the school is large and its seniors out (直し35-4).
+    const w = view.W / (view.homes.school.has(seatId) ? view.closest : ONE_ZOOM), h = w * view.H / view.W;
     await moveTo({ x: home[0] - w * 0.36, y: home[1] - h * 0.86, w, h }, motion ? CAMERA_FOR : 0);
     if (one !== mine) return;
     standUp(motion);

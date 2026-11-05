@@ -95,3 +95,15 @@ def test_the_person_whole_in_the_frame_and_the_ai_seat_steps_back():
     placed = MAP[MAP.index("function placeOne("):]
     placed = placed[:placed.index("\n  }\n")]
     assert "getBBox()" in placed
+
+
+def test_a_senior_is_met_at_the_real_size_schools_window_no_nearer_than_the_nearest_zoom():
+    # 直し35-4: to its home (a window, the track), as near as the nearest zoom; the others as before.
+    opened = MAP[MAP.index("async function openOne("):]
+    opened = opened[:opened.index("\n  }\n")]
+    assert "const w = view.W / (view.homes.school.has(seatId) ? view.closest : ONE_ZOOM)" in opened
+    assert "const home = spotOf(seatId);" in opened
+    # The risen school steps aside, the one on the map is seen where the person stands.
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    assert ".one-on .yard.lifted { visibility: visible; }" in css
+    assert ".one-on .risen-school, .one-on .risen-shadow { visibility: hidden; }" in css
