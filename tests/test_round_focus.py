@@ -18,4 +18,4 @@ def test_a_new_round_takes_the_focus_on_its_question_without_a_jump():
     assert "asked.tabIndex = -1;" in render  # Not a stop of its own for Tab.
     assert "asked.focus({ preventScroll: true });" in render
     rule = re.search(r"\.round-question:focus-visible \{[^}]*\}", CSS).group(0)
-    assert "outline: 2px solid var(--lamp)" in rule and "#" not in rule
+    assert "outline: var(--focus-w) solid var(--lamp)" in rule and "#" not in rule

@@ -62,9 +62,9 @@ def test_they_take_a_press_over_the_map_and_look_as_they_did():
     tag = tag[:tag.index("}")]
     assert "pointer-events: auto; cursor: pointer;" in tag and "min-height: 0;" in tag and "margin: 0;" in tag
     assert ".map-bar .map-heading-press { all: unset; cursor: pointer;" in CSS
-    assert "button.split-tag:focus-visible { outline: 2px solid var(--lamp);" in CSS
-    # The heading's box scrolls: the ring inside it, or it is cut off.
-    assert ".map-bar .map-heading-press:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px;" in CSS
+    assert "button.split-tag:focus-visible { outline: var(--focus-w) solid var(--lamp);" in CSS
+    # The heading's box scrolls: the ring inside it, or it is cut off (3px, 直し41の続き).
+    assert ".map-bar .map-heading-press:focus-visible { outline: var(--focus-w) solid var(--lamp); outline-offset: calc(-1 * var(--focus-w));" in CSS
     assert "body:has(#table:not([hidden])):has(#map:not([hidden])) .map-heading { flex: 0 1 auto; min-height: 0; overflow: auto;" in CSS
 
 

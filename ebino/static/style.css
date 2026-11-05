@@ -89,6 +89,29 @@
   --display: "Ebino Title", var(--mincho);
   /* The window's height (the iPad's bars left out where the browser can). */
   --vh: 100vh;
+
+  /* --- the steps (直し41の続き): sizes of words, spaces and corners, one scale --- */
+  --fs-xs: .75rem;
+  --fs-s: .88rem;
+  --fs-m: 1rem;
+  --fs-l: 1.25rem;
+  --fs-num: 2.1rem;  /* A count read at a glance. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --r-s: 6px;
+  --r-m: 8px;
+  --r-l: 10px;
+  --r-pill: 999px;
+  /* The keyboard's ring on HTML's buttons and boxes: 3px, 2px from the edge. */
+  --focus-w: 3px;
+  --focus-gap: 2px;
+  /* A part's motion: .15 to .2s; a press sinks in .1s. */
+  --quick: .15s;
+  --step: .2s;
+  --press: .1s;
 }
 @supports (height: 100svh) { :root { --vh: 100svh; } }
 
@@ -177,15 +200,23 @@ h2 { font-family: var(--mincho); font-size: 1.25rem; font-weight: 600; letter-sp
 h3 { font-family: var(--mincho); }
 button {
   font: inherit; cursor: pointer; color: var(--ink); background: transparent; min-height: 44px;
-  border: 1px solid var(--moon-soft); border-radius: 6px; padding: 6px 14px;
-  transition: border-color .2s, background-color .2s, color .2s;
+  border: 1px solid var(--moon-soft); border-radius: var(--r-s); padding: 6px 14px;
+  transition: border-color var(--step), background-color var(--step), color var(--step), scale var(--press) ease-out;
 }
 button:hover { border-color: var(--moon); }
 button.quiet { border-color: var(--moon-faint); color: var(--soft); }
 button.quiet:hover { color: var(--ink); border-color: var(--moon-soft); }
 button:disabled { opacity: .5; cursor: wait; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 2px solid var(--lamp); outline-offset: 3px;
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+summary:focus-visible {
+  outline: var(--focus-w) solid var(--lamp); outline-offset: var(--focus-gap);
+}
+/* The moment of a press (直し41の続き): the thing pressed sinks to .97 for
+   .1s (scale, so it never undoes a transform of its own). Not with motion
+   reduced. The map's points keep their own. */
+@media (prefers-reduced-motion: no-preference) {
+  button:active:not(:disabled), summary:active, .lab-choice:active:not(:disabled) { scale: .97; }
+  summary { transition: border-color var(--step), background-color var(--step), color var(--step), scale var(--press) ease-out; }
 }
 /* On paper the lamp's honey would hardly show: the ring is the paper's ink there. */
 .quote :focus-visible, .closing-word :focus-visible, .harvest :focus-visible {
@@ -259,7 +290,21 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   min-height: 56px; font-weight: 700; letter-spacing: .3em; color: var(--night); background: var(--lamp); border: 0;
   border-radius: 8px; padding: 12px 26px 12px 32px; box-shadow: 0 0 26px var(--lamp-soft), 0 8px 22px var(--shadow);
 }
-#ask-button:hover { background: var(--lamp-bright); }
+#ask-button { position: relative; transition: background-color var(--step), box-shadow var(--step), scale var(--press) ease-out; }
+#ask-button:hover { background: var(--lamp-bright); box-shadow: 0 0 34px var(--lamp-glow), 0 8px 22px var(--shadow); }
+#ask-button:active:not(:disabled) { background: var(--lamp); }
+/* 「聞く」 pressed (直し41の続き): one small ring goes out and is gone, .4s, no bounce. */
+@media (prefers-reduced-motion: no-preference) {
+  #ask-button.rang::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    animation: ask-rang .4s ease-out 1 both; }
+}
+@keyframes ask-rang {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--lamp) 75%, transparent); }
+  to { box-shadow: 0 0 0 12px color-mix(in srgb, var(--lamp) 0%, transparent); }
+}
+.ask textarea { transition: box-shadow var(--step); }
+.ask textarea:hover:not(:focus) { box-shadow: 0 0 0 1px var(--lamp-soft), 0 0 30px var(--lamp-faint), 0 14px 34px var(--shadow); }
+.input-to-clear:hover { border-color: currentColor; background: var(--moon-faint); }
 .hints { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
 .hints button {
   border-color: var(--moon-faint); color: var(--soft); font-size: 16px; border-radius: 999px; padding: 4px 16px;
@@ -392,7 +437,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* 質問カード: one paper card, the student's question written on it. */
 .card-done { font-size: 14px; color: var(--soft); }
 /* The new round's question takes the keyboard's focus after 「聞く」. */
-.round-question:focus-visible { outline: 2px solid var(--lamp); outline-offset: 4px; border-radius: 4px; }
+.round-question:focus-visible { outline: var(--focus-w) solid var(--lamp); outline-offset: 4px; border-radius: 4px; }
 /* In the seat list, the open card spans the list under its seat's line;
    its seat is marked while it is open. */
 /* As wide as the seats' columns (--line, from app.js), and alone on its line. */
@@ -467,7 +512,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .choice:hover { border-color: var(--moon); background: var(--night-3); }
 .choice:has(input:checked) { border-color: var(--lamp); background: var(--lamp-faint); color: var(--paper-light); }
 .choice:has(input:checked)::before { background: var(--lamp); border-color: var(--lamp); box-shadow: 0 0 12px var(--lamp-glow); }
-.choice:has(input:focus-visible) { outline: 2px solid var(--lamp); outline-offset: 3px; }
+.choice:has(input:focus-visible) { outline: var(--focus-w) solid var(--lamp); outline-offset: var(--focus-gap); }
 .choice:has(input:disabled) { cursor: default; }
 .choice:has(input:disabled):not(:has(input:checked)) { opacity: .5; }
 .moves .choice { display: flex; min-width: 0; margin: 0 0 10px; }
@@ -754,6 +799,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   border-radius: 8px; font-family: var(--gothic); font-size: 11px; line-height: 1.5; opacity: .75; }
 .quote .spoken-mark { color: var(--paper-soft); opacity: 1; }
 .spoken-note { margin: 4px 0 0; font-size: 14px; color: var(--soft); }
+body.one-open .input-area .spoken-note { display: none; }
 .quote .paragraph .source { display: block; margin-top: 4px; }
 .table-bubble .who { width: 0; min-width: 100%; margin-top: 2px; font-family: var(--gothic); font-size: 12px;
   line-height: 1.5; color: var(--paper-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -763,7 +809,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* A lamp card at the table takes a press (直し26-2): its ring of light where
    the keyboard is, just outside the paper; marked, the lamp round it. */
 .table-bubble { pointer-events: auto; cursor: pointer; outline: none; }
-.table-bubble:focus-visible { outline: 2px solid var(--lamp); outline-offset: 3px; }
+.table-bubble:focus-visible { outline: var(--focus-w) solid var(--lamp); outline-offset: var(--focus-gap); }
 .table-bubble.marked { box-shadow: 0 0 0 3px var(--lamp), 0 0 24px var(--lamp-soft), 0 8px 20px var(--shadow); }
 /* Its choices: a small card of the night by it, two choices to a line, in
    Gothic; the paragraph on paper, in Mincho, under them. */
@@ -823,7 +869,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* Over a seat at the table whose card has no room: pressed, it shows it. */
 .seat-press { position: absolute; width: 44px; height: 44px; border-radius: 50%; pointer-events: auto;
   cursor: pointer; outline: none; }
-.seat-press:focus-visible { box-shadow: 0 0 0 2px var(--lamp); }
+.seat-press:focus-visible { box-shadow: 0 0 0 var(--focus-w) var(--lamp); }
 .split-tag { background: var(--veil); color: var(--lamp); border: 1px dashed var(--lamp-soft);
   font-family: var(--mincho); font-weight: 600; font-size: .9rem; }
 /* At the table, a seat's name is a small card set by its chair. */
@@ -840,12 +886,12 @@ button.split-tag { pointer-events: auto; cursor: pointer; margin: 0; min-height:
   letter-spacing: inherit; transition: none; }
 button.split-tag:hover { border-color: var(--lamp-soft); }
 button.split-tag:active { background: var(--lamp-faint); }
-button.split-tag:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+button.split-tag:focus-visible { outline: var(--focus-w) solid var(--lamp); outline-offset: var(--focus-gap); }
 .map-bar .map-heading-press { all: unset; cursor: pointer; border-radius: 4px; }
 .map-bar .map-heading-press:active { background: var(--lamp-faint); }
 /* Inside its box: the heading's own box scrolls (overflow: auto) and would
    cut a ring drawn outside it. */
-.map-bar .map-heading-press:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; background: var(--lamp-faint); }
+.map-bar .map-heading-press:focus-visible { outline: var(--focus-w) solid var(--lamp); outline-offset: calc(-1 * var(--focus-w)); background: var(--lamp-faint); }
 /* One to one (直し40-1): neither heading is seen or pressed; nor the dashed
    line down the table's middle (it looked like a line of the sports ground).
    Back at the meeting, as before. */
@@ -856,20 +902,61 @@ body.one-open #map-heading { visibility: hidden; }
 /* Under the map, never over it: 地図にもどす, the table's heading, the zoom. */
 /* Tall enough from the start for a heading in two lines: the bar never
    grows when the table opens, so the sources stay where the round put them. */
-.map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 6px 0 4px; min-height: 58px; }
-.map-bar button { min-width: 44px; min-height: 44px; padding: 0 14px; font-size: .92rem; color: var(--ink);
-  background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: 8px; }
-.map-bar button:hover { border-color: var(--moon); }
+.map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); padding: 6px 0 4px; min-height: 58px; }
+.map-bar button { min-width: 44px; min-height: 44px; padding: 0 14px; font-size: var(--fs-s); color: var(--ink);
+  background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: var(--r-m); }
+.map-bar button:hover { border-color: var(--moon); background: var(--night-3); }
 .map-back { border-color: var(--lamp-soft); }
+.map-bar .map-back { border-color: var(--lamp); color: var(--lamp-bright); }
+.map-bar .map-back:hover { background: var(--lamp-faint); border-color: var(--lamp-bright); }
+.map-now { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; min-height: 0; }
+.map-now:not(:has(.map-back:not([hidden]))):has(.map-heading:empty) { display: none; }
 .map-heading { flex: 1 1 16em; margin: 0; font-family: var(--mincho); font-weight: 600; font-size: 1.05rem;
   line-height: 1.35; color: var(--lamp); }
-.map-heading:empty { visibility: hidden; }
-.map-zoom { display: flex; gap: 6px; margin-left: auto; }
-.map-zoom button { font-weight: bold; }
+.map-heading:empty { display: none; }
+/* The drawer's buttons and whose words are in, in one group: no boxes,
+   quiet words with a small chevron; the cursor underlines them on a faint
+   ground, so they are seen to be pressable. */
+.map-drawers { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--sp-2); min-width: 0; }
+.map-bar .drawer-button, .map-bar #inside summary { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  min-height: 40px; padding: 0 var(--sp-2) 0 var(--sp-3); font-size: var(--fs-s); font-weight: 700; color: var(--soft); text-align: left;
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-s); cursor: pointer; list-style: none;
+  text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.map-bar #inside summary::-webkit-details-marker { display: none; }
+.map-bar .drawer-button::after, .map-bar #inside summary::after { content: ""; flex: none; width: 6px; height: 6px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; rotate: -45deg; opacity: .8;
+  transition: translate var(--quick) ease-out; }
+.map-bar .drawer-button:hover, .map-bar #inside summary:hover { color: var(--ink); background: var(--moon-faint); border-color: transparent;
+  text-decoration-line: underline; }
+.map-bar .drawer-button[aria-expanded="true"], .map-bar #inside details[open] summary { color: var(--lamp-bright); background: var(--lamp-faint); }
+@media (prefers-reduced-motion: no-preference) {
+  .map-bar .drawer-button:hover::after, .map-bar #inside summary:hover::after { translate: 2px 0; }
+}
+/* ＋, − and 全体: one small band. */
+.map-zoom { display: flex; gap: 0; margin-left: auto; border: 1px solid var(--faint); border-radius: var(--r-pill);
+  background: var(--night-2); }
+.map-bar .map-zoom button { flex: 1; min-width: 44px; min-height: 40px; padding: 0 var(--sp-3); font-weight: bold; border: 0; border-radius: 0; white-space: nowrap;
+  background: transparent; }
+.map-bar .map-zoom button:first-child { border-radius: var(--r-pill) 0 0 var(--r-pill); }
+.map-bar .map-zoom button:last-child { border-radius: 0 var(--r-pill) var(--r-pill) 0; }
+.map-bar .map-zoom button + button { border-left: 1px solid var(--faint); }
+.map-bar .map-zoom button:hover { background: var(--night-3); }
+.map-bar .map-zoom button:focus-visible { outline-offset: calc(-1 * var(--focus-w)); }
 /* The met count and the sources. */
 .map-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 16px;
   border-top: 1px solid var(--moon-faint); padding: 4px 2px 0; }
-.map-met { margin: 0; font-size: .88rem; font-weight: bold; color: var(--lamp); }
+.map-met { margin: 0; font-size: var(--fs-s); font-weight: bold; color: var(--lamp); line-height: 1.2;
+  display: flex; align-items: baseline; gap: var(--sp-2); }
+/* The number alone in the Mincho, large; when it grows it lights once, softly. */
+.map-met-count { font-family: var(--mincho); font-size: var(--fs-num); font-weight: 600; line-height: 1; color: var(--lamp-bright);
+  font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: no-preference) {
+  .map-met-count.grew { animation: met-grew 1.2s ease-out 1; }
+}
+@keyframes met-grew {
+  from { text-shadow: 0 0 18px var(--lamp-glow); }
+  to { text-shadow: 0 0 0 transparent; }
+}
 .map-source { margin: 0; font-size: .7rem; line-height: 1.45; color: var(--faint); display: flex; flex-wrap: wrap;
   gap: 0 14px; flex: 1 1 18em; justify-content: flex-end; }
 .map-source span { min-width: 0; overflow-wrap: anywhere; }
@@ -891,6 +978,10 @@ body.one-open #map-heading { visibility: hidden; }
   .map-bubble, .map-bubble .thread { animation: none !important; }
   .table-bubble { animation: none !important; }
   .pt.quiet-glow .halo, .press-ring { animation: none !important; display: none; }
+  /* 直し41の続き: no sinking, no ring, no light on the count, nothing slides. */
+  button, summary, .lab-choice, #ask-button { scale: none !important; }
+  #ask-button::after, .map-met-count { animation: none !important; }
+  .map-bar .drawer-button::after, .map-bar #inside summary::after { transition: none !important; translate: none !important; }
 }
 
 /* Japanese broken between words, not inside one (直し31続き-5): 「ポスタ／ー」
@@ -937,20 +1028,23 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { grid-column: 1; 
 body:has(#table:not([hidden])):has(#map:not([hidden])) #map { width: 100%; height: 100%; margin: 0; display: flex; gap: 12px; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .map-room { flex: 1 1 auto; min-width: 0; min-height: 0; container-type: size; display: grid; place-items: center; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .map-frame { width: min(100cqw, 100cqh * var(--ratio, 1.3)); }
-body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar { flex: 0 0 200px; flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: flex-end;
-  min-height: 0; padding: 0; gap: 8px; }
+/* 直し41の続き: top to bottom as index.html has it (no CSS order); the
+   room left over shared between the groups. */
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar { flex: 0 0 200px; flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: space-between;
+  min-height: 0; padding: var(--sp-1) 0 0; gap: var(--sp-3); }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar button { min-height: 40px; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar .map-heading-press { min-height: 0; }
-body:has(#table:not([hidden])):has(#map:not([hidden])) .map-met { order: -1; }
-body:has(#table:not([hidden])):has(#map:not([hidden])) .map-heading { flex: 0 1 auto; min-height: 0; overflow: auto; font-size: 1rem; }
-body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-buttons { flex-direction: column; }
-body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom { margin: 0; }
-body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom button { flex: 1; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-met { flex-direction: column; gap: 2px; padding: 0 var(--sp-1); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-now { flex: 0 1 auto; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-heading { flex: 0 1 auto; min-height: 0; overflow: auto; font-size: var(--fs-m); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-drawers { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-buttons { flex-direction: column; gap: 2px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom { margin: 0; flex: none; }
 /* Whose words are in the app: a card over the map's left side, in the
    room beside the map where there is room (直し32-1). */
 /* 直し33-1: its button at the head of the map's buttons, over no part of
    the map; opened, the card over the map's right side, by the button. */
-body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: absolute; z-index: 7; top: 0; right: 0; width: 200px; margin: 0; padding: 0;
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: static; width: auto; margin: 0; padding: 0;
   border: 0; background: none; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .inside-body { position: absolute; z-index: 6; top: 0; right: 212px; width: var(--inside-w, 320px);
   padding: 12px 18px; border: 1px solid var(--moon-faint); border-radius: 8px;
@@ -965,11 +1059,9 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .hints { margin: 
 /* Shut (直し33-1): only its button, as narrow as its words, small, over the
    map's corner; open, the card over the map (the map does not move). */
 body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { --inside-w: min(340px, 42cqw); }
-body:has(#table:not([hidden])):has(#map:not([hidden])) #inside summary { margin: 0; padding: 4px 12px; text-align: center;
-  border: 1px solid var(--moon-soft); border-radius: 999px; background: color-mix(in srgb, var(--night-2) 92%, transparent);
-  font-size: 14px; min-height: 0; line-height: 1.6; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside summary { margin: 0; line-height: 1.4; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #inside summary::marker { content: ""; }
-body:has(#table:not([hidden])):has(#map:not([hidden])) #inside details[open] summary { border-color: var(--lamp); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #inside details[open] summary { border-color: var(--lamp-soft); }
 /* Before the first question the eye goes to it once: lit in the lamp's
    colour; one soft ring goes out from it, once (no blinking); with motion
    reduced, lit and still. */
@@ -1033,15 +1125,36 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #table > .map-source { gr
   body:has(#table:not([hidden])):has(#map:not([hidden])) #map { height: auto; flex: 1 1 auto; min-height: 0; flex-direction: column; gap: 0; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-room { flex: 1 1 auto; container-type: size; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-frame { width: min(100cqw, 100cqh * var(--ratio, 1.3)); margin: 0 auto; }
-  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar { flex: none; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 6px 0 0; }
-  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-heading { flex: 1 1 100%; order: 9; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar { flex: none; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 6px 0 0;
+    gap: var(--sp-1) var(--sp-3); }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar button { min-height: 40px; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-met-count { font-size: 1.7rem; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-met { flex-direction: row; }
+  /* Its row kept from the start (empty, as tall as a button), so the bar
+     never grows when the table opens: the map keeps its width, and the
+     AI's seat over it its room. */
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-now,
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-now:not(:has(.map-back:not([hidden]))):has(.map-heading:empty) {
+    display: flex; flex: 1 1 20em; flex-direction: row; flex-wrap: wrap; align-items: center; min-height: 40px; }
+  /* The split's heading put in the box (直し41の続き): the words as large as
+     ever; the box grows to three lines at most, then scrolls inside itself
+     with room at its ends, and 「帰る前に、ひとこと」 may take two lines so
+     the box keeps its width. */
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .ask textarea { field-sizing: content; height: auto;
+    min-height: calc(var(--rule) * 2 + 16px); max-height: calc(var(--rule) * 3 + 16px); overflow-y: auto; scroll-padding-block: 8px; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .to-reflect { flex: none; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #to-reflect { white-space: normal; word-break: keep-all; max-width: 7em; line-height: 1.35; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-heading { flex: 1 1 16em; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-drawers { flex-direction: row; flex-wrap: wrap; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-drawers { gap: 0; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar .drawer-button, body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar #inside summary { padding: 0 var(--sp-1) 0 var(--sp-2); }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar .map-zoom button { min-width: 44px; padding: 0 var(--sp-2); }
   /* Upright: its button under the map's buttons; the card over the map. */
-  body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: static; width: auto; margin: 6px 0 0; }
-  body:has(#table:not([hidden])):has(#map:not([hidden])) #inside summary { display: inline-block; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #inside { position: static; width: auto; margin: 0; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) #inside .inside-body { top: 0; right: 0; width: min(420px, 100%); max-height: calc(100cqh - 56px); }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-buttons { flex-direction: row; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom { margin-left: auto; }
-  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom button { flex: none; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-zoom { flex: none; }
   /* The map a little smaller than the width where the height asks for it,
      so its buttons, the counts card and the AI's seat fit under it. */
   body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { container-type: size; display: flex; flex-direction: column; overflow: hidden; }
@@ -1365,3 +1478,12 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
   .hk-sheet { padding: 0; background: none; }
   .hk-litbox { background: none; break-inside: avoid; }
 }
+
+/* The map's first stop for the keyboard (直し41の続き): seen only when the
+   keyboard is on it, over the map's corner; pressed, past the points to the
+   map's column. */
+.map-skip { position: absolute; z-index: 40; top: var(--sp-2); left: var(--sp-2); min-height: 40px; padding: 0 var(--sp-3);
+  font-size: var(--fs-s); font-weight: 700; color: var(--night); background: var(--lamp); border: 0; border-radius: var(--r-m);
+  box-shadow: 0 6px 18px var(--shadow); }
+.map-skip:hover { background: var(--lamp-bright); }
+.map-skip:not(:focus) { width: 1px; height: 1px; min-height: 0; padding: 0; overflow: hidden; clip-path: inset(50%); opacity: 0; }

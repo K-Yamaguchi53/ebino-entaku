@@ -65,7 +65,7 @@ def test_a_seat_with_its_card_up_has_no_name_label_and_one_without_takes_a_press
     assert "node.tabIndex = 0;" in press and 'setAttribute("role", "button")' in press
     assert "pressable(node, () => {" in press and "opened = seatId;" in press
     assert "pointer-events: auto" in CSS[CSS.index(".seat-press {"):]
-    assert ".seat-press:focus-visible { box-shadow: 0 0 0 2px var(--lamp); }" in CSS
+    assert ".seat-press:focus-visible { box-shadow: 0 0 0 var(--focus-w) var(--lamp); }" in CSS
 
 
 def test_a_tail_crosses_no_label_put_before_and_the_labels_after_keep_off_it():

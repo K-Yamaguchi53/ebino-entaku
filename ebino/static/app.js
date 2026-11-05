@@ -68,6 +68,7 @@ function onMap(action) {
     action(EbinoMap);
   } catch (error) {
     $("map").hidden = true;
+    placeInside();
   }
 }
 
@@ -172,6 +173,7 @@ async function start(lab, chosen) {
   $("start").hidden = true;
   $("table").hidden = false;
   $("inside").hidden = !$("inside-counts").children.length;
+  placeInside();
   setNow();
   onMap((map) => map.show());  // Draws the rim and the river once the map is on screen.
   renderPurposes(data.purposes);
@@ -690,12 +692,32 @@ function setupDrawer() {
   }
   $("drawer-close").addEventListener("click", () => closeDrawer());
   setupInside();
+  setupMapSkip();
   $("drawer").addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || !drawerOpen()) return;
     event.preventDefault();
     event.stopPropagation();
     closeDrawer();
   });
+}
+
+// The map's first stop for the keyboard (直し41 段2): seen only when it is
+// there; pressed, the keyboard goes past the points to the first thing that
+// can be pressed in the map's column. The points' own order is as before.
+function setupMapSkip() {
+  const skip = $("map-skip");
+  skip.textContent = state.texts.map_skip;
+  skip.addEventListener("click", () => {
+    const first = [...document.querySelectorAll(".map-bar button, .map-bar summary")]
+      .find((node) => !node.disabled && node.offsetParent !== null && !node.closest("[hidden]"));
+    if (first) first.focus();
+  });
+}
+
+// With no map, whose words are in stands in the page, before the AI's seat,
+// as it did before it went into the map's column (直し41 段2).
+function placeInside() {
+  if ($("map").hidden && $("inside").closest("#map")) $("ai-seat").before($("inside"));
 }
 
 // The one screen is on: the table is out and the map with it.
@@ -968,6 +990,8 @@ async function ask() {
   if (!question) return;
   const button = $("ask-button");
   button.disabled = true;
+  // The map's quiet glow stops as the question goes (直し41の続き).
+  onMap((map) => map.asked());
   // The waiting line is the one at the top now (直し31-5).
   hideMessage();
   setNow({ asking: true });
@@ -1904,6 +1928,15 @@ function backToStart() {
 }
 
 $("ask-form").addEventListener("submit", send);
+// 「聞く」 pressed (直し41の続き): one small ring goes out from it and is gone
+// (CSS, with motion not reduced only; no bounce).
+$("ask-button").addEventListener("click", (event) => {
+  const button = event.currentTarget;
+  button.classList.remove("rang");
+  void button.offsetWidth;
+  button.classList.add("rang");
+});
+$("ask-button").addEventListener("animationend", (event) => event.currentTarget.classList.remove("rang"));
 $("input-to-clear").addEventListener("click", backToEveryone);
 // The box emptied: the split's line goes with what it was about (直し40-1).
 $("question").addEventListener("input", () => {

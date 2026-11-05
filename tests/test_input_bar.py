@@ -52,6 +52,7 @@ const state = { texts: %(texts)s, seatById: { S1: { title: "理容師", detail: 
   cardAgain: {}, drafts: {}, to: null, needsShown: false, aiAnswered: false, firstQuestion: "q", now: {} };
 const log = [];
 const setNow = (c) => log.push(["now", c || {}]);
+const onMap = () => {};
 const hideMessage = () => {}, showMessage = (t) => log.push(["message", t]);
 const sendFailed = (e) => String(e);
 const renderRound = (r) => log.push(["round", r.round]);

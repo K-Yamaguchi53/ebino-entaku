@@ -61,6 +61,10 @@
       <section id="map" class="map" hidden>
         <div class="map-room">
           <div id="map-frame" class="map-frame">
+            <!-- 直し41 段2: the map's first stop for the keyboard, seen only
+                 when it is there; pressed, the keyboard goes past the points
+                 to the first thing pressable in the map's column. -->
+            <button type="button" id="map-skip" class="map-skip"></button>
             <svg id="map-svg" role="group" aria-label="えびのの地図と席の点" xmlns="http://www.w3.org/2000/svg"></svg>
             <div id="map-overlay" class="map-overlay"></div>
             <!-- The opening (直し30-3): over the map once a Lab is picked, a few
@@ -83,45 +87,50 @@
         <div id="opening-bar" class="opening-bar" hidden>
           <button type="button" id="opening-skip" class="quiet"></button>
         </div>
-        <!-- Under the map, never over it: 地図にもどす, the table's heading,
-             the drawer's buttons and the zoom buttons; the buttons' words
-             come from texts/map_buttons.tsv and texts/drawer_parts.tsv. -->
+        <!-- The map's column (直し41 段2), top to bottom in this order, the
+             keyboard's too (no CSS order): the seats met; what means
+             something now (地図にもどす・円卓にもどす, the split's heading); the
+             drawer's buttons, whose words are in among them; at the foot
+             ＋, − and 全体 in one band. The words come from
+             texts/map_buttons.tsv and texts/drawer_parts.tsv. -->
         <div class="map-bar map-controls">
-          <button type="button" id="map-back" class="map-back" hidden></button>
-          <p class="map-met">会った席 <span id="map-met-count">0</span></p>
-          <p id="map-heading" class="map-heading"></p>
-          <div id="drawer-buttons" class="drawer-buttons"></div>
+          <p class="map-met"><span class="map-met-label">会った席</span> <span id="map-met-count" class="map-met-count">0</span></p>
+          <div class="map-now">
+            <button type="button" id="map-back" class="map-back" hidden></button>
+            <p id="map-heading" class="map-heading"></p>
+          </div>
+          <div class="map-drawers">
+            <!-- Whose words are in the app, and examples of questions (直し31-5):
+                 shut (直し33-1), only its small button shows, with the
+                 drawer's; pressed, it opens at once over the map; pressed
+                 again, Esc or a press outside shuts it. With no map app.js
+                 puts it back in the page, before the AI's seat. -->
+            <section id="inside" class="inside" hidden>
+              <details id="inside-fold">
+                <summary id="inside-open"></summary>
+                <div class="inside-body">
+                  <div class="inside-counts-part">
+                    <p id="inside-heading" class="inside-heading"></p>
+                    <ul id="inside-counts" class="inside-counts"></ul>
+                    <p id="inside-end" class="inside-end"></p>
+                  </div>
+                  <div class="inside-examples">
+                    <p id="examples-lead" class="examples-lead"></p>
+                    <ul id="examples" class="examples-list"></ul>
+                    <p id="examples-end" class="examples-end"></p>
+                    <div id="work-questions" class="hints"></div>
+                  </div>
+                </div>
+              </details>
+            </section>
+            <div id="drawer-buttons" class="drawer-buttons"></div>
+          </div>
           <div class="map-zoom">
             <button type="button" id="map-zoom-in"></button>
             <button type="button" id="map-zoom-out"></button>
             <button type="button" id="map-zoom-all"></button>
           </div>
         </div>
-      </section>
-
-      <!-- Whose words are in the app, and examples of questions (直し31-5):
-           by the map, so the counts' marks and the map's points are seen
-           together (直し32-1). Shut (直し33-1): only its small button shows,
-           at the head of the map's buttons, over no part of the map (on an
-           upright screen, under the map's buttons); pressed, it opens at
-           once over the map; pressed again, Esc or a press outside shuts it. -->
-      <section id="inside" class="inside" hidden>
-        <details id="inside-fold">
-          <summary id="inside-open"></summary>
-          <div class="inside-body">
-            <div class="inside-counts-part">
-              <p id="inside-heading" class="inside-heading"></p>
-              <ul id="inside-counts" class="inside-counts"></ul>
-              <p id="inside-end" class="inside-end"></p>
-            </div>
-            <div class="inside-examples">
-              <p id="examples-lead" class="examples-lead"></p>
-              <ul id="examples" class="examples-list"></ul>
-              <p id="examples-end" class="examples-end"></p>
-              <div id="work-questions" class="hints"></div>
-            </div>
-          </div>
-        </details>
       </section>
 
       <!-- The AI's seat (直し32-3): コーチ and オブザーバー sit here, out of the

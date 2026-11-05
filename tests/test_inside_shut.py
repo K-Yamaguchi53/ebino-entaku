@@ -36,11 +36,15 @@ def test_pressed_again_esc_or_outside_shuts_it_and_the_keyboard_goes_back():
 
 
 def test_its_button_is_over_no_part_of_the_map():
-    # Landscape: at the head of the map's buttons' column (200px, map-bar);
-    # upright: under the map's buttons, in the page's flow.
-    assert "#inside { position: absolute; z-index: 7; top: 0; right: 0; width: 200px;" in CSS
-    assert "#inside { position: static; width: auto; margin: 6px 0 0; }" in CSS
+    # 直し41の続き: in the map's column (200px, map-bar), with the drawer's
+    # buttons, in index.html's order; upright, in the same row as theirs.
+    bar = HTML[HTML.index('<div class="map-drawers">'):HTML.index('<div class="map-zoom">')]
+    assert bar.index('<section id="inside" class="inside" hidden>') < bar.index('<div id="drawer-buttons"')
+    assert "#inside { position: static; width: auto; margin: 0; padding: 0;" in CSS
+    assert "#inside { position: static; width: auto; margin: 0; }" in CSS
     assert ".map-bar { flex: 0 0 200px;" in CSS
+    # With no map it goes back to the page, before the AI's seat.
+    assert '$("ai-seat").before($("inside"))' in _top("placeInside")
 
 
 def test_the_map_does_not_move_for_it():

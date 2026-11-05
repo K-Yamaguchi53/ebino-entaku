@@ -93,7 +93,7 @@ def test_one_mark_in_one_place_and_the_map_follows_it():
     assert "onMap((map) => map.marked())" in mark
     marked = _inner("marked")
     assert "app.state.marks" in marked and 'setAttribute("aria-pressed"' in marked
-    assert "return { init, show, round, refresh, marked, markOf, layoutAgain, oneAnswer };" in MAP
+    assert "return { init, show, round, refresh, marked, markOf, layoutAgain, oneAnswer, asked };" in MAP
 
 
 def test_the_card_is_the_seat_lists_own_with_its_box_empty():
@@ -146,7 +146,8 @@ def test_the_choices_are_drawn_in_the_nights_colours_with_a_focus_ring():
     rules = CSS[CSS.index(".table-bubble { pointer-events: auto;"):CSS.index("/* Under the card a seat shows when pressed. */")]
     assert not re.search(r"#[0-9a-fA-F]{3,6}\b|rgba?\(", rules)
     assert "var(--gothic)" in rules and "var(--mincho)" in rules and "var(--veil)" in rules
-    assert ".table-bubble:focus-visible { outline: 2px solid var(--lamp)" in rules
+    assert ".table-bubble:focus-visible { outline: var(--focus-w) solid var(--lamp); outline-offset: var(--focus-gap); }" in rules
+    assert "--focus-w: 3px;" in CSS and "--focus-gap: 2px;" in CSS
 
 
 _SPOT = """

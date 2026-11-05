@@ -182,6 +182,9 @@ SPOKEN_DROP_OK = "spoken_drop_ok"
 BACK_TO_START_CONFIRM = "back_to_start_confirm"
 BACK_TO_START_YES = "back_to_start_yes"
 BACK_TO_START_NO = "back_to_start_no"
+# The map's first stop for the keyboard, seen only when it is there: it goes
+# past the points to the map's column (直し41 段2).
+MAP_SKIP = "map_skip"
 BUBBLE_CHOICE_IDS = ("paragraph", "mark", "card", "read")
 # Under each of them, the first time a student presses a bubble (直し32-4).
 BUBBLE_CHOICES_HELP = "bubble_choices_help"
@@ -197,7 +200,7 @@ SCREEN_TEXTS = (
     OPENING_SKIP, AI_ANSWER_HINT, CARD_ALREADY,
     HARVEST_SUBJECT_QUESTION, HARVEST_SUBJECT_PICK, HARVEST_SUBJECT_NONE,
     START_PURPOSE, INSIDE_HEADING, INSIDE_END, INSIDE_OPEN, QUESTION_EXAMPLES_LEAD, QUESTION_EXAMPLES_END,
-    SPOKEN_NOTE, SPOKEN_MARK, AI_SEAT_LABEL, AI_SEAT_NOTE, AI_SEAT_MARK,
+    SPOKEN_NOTE, SPOKEN_MARK, AI_SEAT_LABEL, AI_SEAT_NOTE, AI_SEAT_MARK, MAP_SKIP,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS, QUESTION_EXAMPLES)
 

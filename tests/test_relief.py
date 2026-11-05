@@ -695,9 +695,12 @@ def test_the_voices_and_headings_are_mincho_the_small_words_gothic_from_the_mach
 def test_the_maps_buttons_and_the_tables_heading_are_under_the_map_not_over_it():
     html = (app_module.STATIC_DIR / "index.html").read_text(encoding="utf-8")
     frame = html[html.index('<div id="map-frame"'):html.index('<div id="map-overlay"')]
-    assert "<button" not in frame
+    # 直し41の続き: only the keyboard's skip, seen when it has the keyboard.
+    assert frame.count("<button") == 1 and '<button type="button" id="map-skip" class="map-skip"></button>' in frame
+    assert ".map-skip:not(:focus) { width: 1px; height: 1px;" in (app_module.STATIC_DIR / "style.css").read_text(encoding="utf-8")
     # Beside the map on the one screen (直し32-1), never over it.
-    bar = html[html.index('class="map-bar'):html.index("</section>", html.index('class="map-bar'))]
+    # To the map's end (whose words are in is a section in the column now, 直し41の続き).
+    bar = html[html.index('class="map-bar'):html.index("<!-- The AI's seat", html.index('class="map-bar'))]
     for button in ("map-back", "map-zoom-in", "map-zoom-out", "map-zoom-all"):
         assert f'id="{button}"' in bar
     assert 'id="map-heading"' in bar
@@ -866,7 +869,7 @@ def test_the_reflection_is_one_card_at_a_time_its_question_in_mincho_its_fields_
     choice = _rule(css, ".choice")
     assert "border-radius: 10px" in choice and "min-height: 52px" in choice
     assert "position: absolute; opacity: 0;" in _rule(css, ".choice input")
-    assert "outline: 2px solid var(--lamp)" in _rule(css, ".choice:has(input:focus-visible)")
+    assert "outline: var(--focus-w) solid var(--lamp)" in _rule(css, ".choice:has(input:focus-visible)")
     assert ".step label:not(.choice) {" in css  # A block label would undo the choice's shape.
 
 

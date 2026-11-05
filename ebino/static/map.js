@@ -2083,6 +2083,11 @@ const EbinoMap = (() => {
     if (quiet) quiet();
     quiet = null;
   }
+  // A question sent (直し41の続き): the glow stops then, not when its round
+  // comes; nothing glows while the answer is waited for.
+  function asked() {
+    stopQuiet();
+  }
 
   function round(result) {
     stopQuiet();
@@ -3264,7 +3269,15 @@ const EbinoMap = (() => {
       const words = [seat.title, seat.detail, isSilent(id) ? app.state.texts.not_asked_yet : ""];
       node.setAttribute("aria-label", words.filter(Boolean).join("　"));
     }
-    $("map-met-count").textContent = String(app.state.met.size);
+    // The seats met: when the number grows it lights once, softly (直し41の続き;
+    // the light is CSS, with motion not reduced only).
+    const count = $("map-met-count"), was = Number(count.textContent) || 0;
+    count.textContent = String(app.state.met.size);
+    if (app.state.met.size > was) {
+      count.classList.remove("grew");
+      void count.offsetWidth;  // The light again from its start.
+      count.classList.add("grew");
+    }
     placeAskMarks();
   }
 
@@ -3610,5 +3623,5 @@ const EbinoMap = (() => {
     relayout();
   }
 
-  return { init, show, round, refresh, marked, markOf, layoutAgain, oneAnswer };
+  return { init, show, round, refresh, marked, markOf, layoutAgain, oneAnswer, asked };
 })();
