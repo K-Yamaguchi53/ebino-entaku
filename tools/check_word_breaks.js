@@ -4,11 +4,17 @@
 //
 //   (selectors) => [{ selector, text, at }]
 //
+// With no selectors it reads the boxes listed in DEFAULTS, the question
+// buttons at one to one among them (直し36-4: put to the person, they are
+// longer than the teacher's).
+//
 // For each element the selectors find (shown, with text), it reads where
 // each line of its text begins (a Range per character) and says each line
 // that begins inside a word as Intl.Segmenter (ja, word) cuts the text.
 // Nothing is sent anywhere; it reads the page as it is.
 (selectors) => {
+  const DEFAULTS = [".one-asks .one-ask", ".one-bubble .voice", ".table-bubble .voice", ".ai-seat", ".now-line"];
+  if (!selectors || !selectors.length) selectors = DEFAULTS;
   const segmenter = new Intl.Segmenter("ja", { granularity: "word" });
   const found = [];
   for (const selector of selectors) {

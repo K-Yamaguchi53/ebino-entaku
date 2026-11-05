@@ -54,6 +54,12 @@ def test_the_maps_card_and_the_card_form_are_gone():
     assert ".map-card" not in CSS and ".card-form" not in CSS
 
 
+def test_the_check_reads_the_question_buttons_put_to_the_person_by_default():
+    # 直し36-4.
+    source = CHECK.read_text(encoding="utf-8")
+    assert 'const DEFAULTS = [".one-asks .one-ask",' in source
+
+
 def test_the_check_reads_the_page_only():
     source = CHECK.read_text(encoding="utf-8")
     assert 'new Intl.Segmenter("ja", { granularity: "word" })' in source

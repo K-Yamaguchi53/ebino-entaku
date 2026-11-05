@@ -76,4 +76,6 @@ def test_the_check_of_five_sizes_and_five_moments_is_kept():
         assert size in check
     for moment in ("before_question", "table_out", "bubble_pressed", "writing_to_seat", "answering_ai"):
         assert moment in check
+    # 直し36-4: the questions put to the person, offered and not pressed, and whether one is cut off.
+    assert '"one_asks"' in check and 'bad.push("clipped")' in check
     assert "s.scrollHeight" in check and "window.innerHeight" in check

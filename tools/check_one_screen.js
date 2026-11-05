@@ -4,7 +4,7 @@
 //
 //   async (page) => { ... }   with BASE set below
 //
-// For each of the five sizes and each of the seven moments it opens the page
+// For each of the five sizes and each of the eight moments it opens the page
 // afresh, goes to that moment, and reads whether the page is taller (or
 // wider) than the window. Only the drawer and long boxes may scroll inside
 // themselves. It returns a table: size -> moment -> "ok" or the overflow.
@@ -13,10 +13,14 @@
 // school_zoom (直し35-6): the seniors' count pressed, the camera near the
 // school with the seniors at its windows; table_out is the meeting round
 // the risen school.
+// one_asks (直し36-4): the person stood up, its questions offered, before
+// any is pressed; with a model that puts them to the person (the preview's
+// fake one), the questions put. A question button cut off is said too
+// ("clipped"), and how many were put ("put N").
 async (page) => {
   const BASE = globalThis.EBINO_BASE || "http://127.0.0.1:8851/";
   const SIZES = [[768, 1024], [1180, 820], [1366, 650], [1536, 760], [1920, 1080]];
-  const MOMENTS = ["before_question", "school_zoom", "table_out", "bubble_pressed", "writing_to_seat", "one_to_one", "answering_ai"];
+  const MOMENTS = ["before_question", "school_zoom", "table_out", "bubble_pressed", "writing_to_seat", "one_asks", "one_to_one", "answering_ai"];
   const browser = page.context().browser();
   const table = {};
   const measure = (p) => p.evaluate(() => {
@@ -50,7 +54,7 @@ async (page) => {
             await p.waitForSelector(".table-bubble:not(.unplaced):not(.ai)", { timeout: 20000 });
             await p.waitForTimeout(reduce ? 600 : 1500);
           }
-          if (["bubble_pressed", "writing_to_seat", "one_to_one"].includes(moment)) {
+          if (["bubble_pressed", "writing_to_seat", "one_asks", "one_to_one"].includes(moment)) {
             await p.locator(".table-bubble:not(.unplaced):not(.ai)").first().click();
             await p.waitForSelector(".map-choices");
           }
@@ -59,6 +63,11 @@ async (page) => {
             await p.waitForTimeout(300);
             await p.focus("#question");
             await p.keyboard.type("休みの日に、店のことを考えますか？");
+          }
+          if (moment === "one_asks") {
+            await p.locator('.map-choices button[data-choice="card"]').click();
+            await p.waitForSelector(".one-asks .one-ask", { timeout: 15000 });
+            await p.waitForTimeout(800);
           }
           if (moment === "one_to_one") {
             await p.locator('.map-choices button[data-choice="card"]').click();
@@ -83,7 +92,14 @@ async (page) => {
           if (m.h > m.vh) bad.push(`tall ${m.h}>${m.vh}`);
           if (m.w > m.vw) bad.push(`wide ${m.w}>${m.vw}`);
           if (errors.length) bad.push(`errors ${errors.length}`);
-          row[moment] = bad.length ? bad.join(" ") : "ok";
+          let put = "";
+          if (["one_asks", "one_to_one"].includes(moment)) {
+            const asks = await p.locator(".one-asks .one-ask").evaluateAll((els) => els.map((e) => ({
+              cut: e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1, put: e.dataset.rephrased === "1" })));
+            if (asks.some((a) => a.cut)) bad.push("clipped");
+            put = ` (put ${asks.filter((a) => a.put).length})`;
+          }
+          row[moment] = (bad.length ? bad.join(" ") : "ok") + put;
         } catch (error) {
           row[moment] = "could not reach: " + String(error).split("\n")[0].slice(0, 120);
         }
