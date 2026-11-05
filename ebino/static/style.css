@@ -1116,6 +1116,18 @@ body.one-open #ai-seat { visibility: hidden; }
   background: color-mix(in srgb, var(--night-2) 94%, transparent); color: var(--ink); font-size: 15px; line-height: 1.5; }
 .one-ask:hover, .one-ask:focus-visible { border-color: var(--lamp); }
 .one-asks.busy .one-ask { opacity: .6; }
+/* The person stood up and its questions not back yet (直し40-0): where they
+   go, three dots and no words, until they come or the wait is over. Still
+   with motion reduced. */
+.one-wait { display: flex; gap: 7px; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 10px;
+  border: 1px dashed var(--lamp-soft); background: color-mix(in srgb, var(--night-2) 94%, transparent); }
+.one-wait span { width: 8px; height: 8px; border-radius: 50%; background: var(--lamp); opacity: .45; }
+@media (prefers-reduced-motion: no-preference) {
+  .one-wait span { animation: one-wait 1.2s ease-in-out infinite; }
+  .one-wait span:nth-child(2) { animation-delay: .2s; }
+  .one-wait span:nth-child(3) { animation-delay: .4s; }
+}
+@keyframes one-wait { 40% { opacity: 1; } }
 .one-bubble.not-found .voice { color: var(--paper-soft); }
 .one-card { pointer-events: auto; margin-top: 8px; min-height: 40px; padding: 4px 14px; color: var(--paper-ink); background: var(--paper-light);
   border-color: var(--paper-soft); }
@@ -1229,6 +1241,20 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
 .hk-ticks { display: flex; justify-content: space-between; margin: 0 0 6px; font-size: 12px; color: var(--faint); }
 .hk-meet select { width: 100%; min-height: 46px; margin-top: 8px; padding: 6px 10px; background: var(--paper); color: var(--paper-ink);
   border: 2px solid var(--paper-line); border-radius: 10px; font-size: 16px; }
+/* Answered or picked (直し40-0): not faded, the people's and the student's
+   words as readable as before. Done shows in the edges (dashed, the
+   question's card in moonlight); the one picked keeps the lamp's edge and a
+   small mark; the buttons that went on are gone. */
+#hk-log .hk-done { pointer-events: none; }
+#hk-log .hk-done :is(button, input, select):disabled { opacity: 1; cursor: default; }
+#hk-log .hk-done :is(.hk-primary, button.quiet) { display: none; }
+#hk-log .hk-done :is(.hk-quote, .hk-pick):not(.hk-chosen) { border-style: dashed; }
+#hk-log .hk-done .hk-pick:not(.hk-chosen) { border-color: var(--moon-soft); }
+#hk-log .hk-done .hk-chosen { border-color: var(--lamp); box-shadow: 0 0 0 2px var(--lamp-soft); }
+#hk-log .hk-done .hk-chosen::before { content: "✓" / ""; margin-right: .4em; font-weight: 700; color: var(--lamp); }
+#hk-log .hk-done .hk-quote.hk-chosen::before { color: var(--paper-ink); }
+#hk-log .hk-done :is(.hk-meet select, .hk-fill-line input, .hk-answer input) { border-style: dashed; }
+.hk-card.teacher:has(.hk-done) { border-color: var(--moon-soft); }
 .hk-harvest { margin: 0; padding: 18px 20px; align-self: stretch; }
 .hk-exit { margin: 14px 0 0; text-align: right; }
 .hk-light { padding: 22px 20px; text-align: center; border: 1px solid var(--lamp-soft); border-radius: 16px;

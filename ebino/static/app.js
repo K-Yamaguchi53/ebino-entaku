@@ -1561,7 +1561,7 @@ function openReflection() {
   closeDrawer();
   $("table").hidden = true;
   if (state.reflect === "hitokoto") {
-    EbinoHitokoto.open({ call, state, setNow, sendFailed, showBackToStart });
+    EbinoHitokoto.open({ call, state, setNow, sendFailed, showBackToStart, shownQuotes });
     return;
   }
   $("reflect").hidden = false;

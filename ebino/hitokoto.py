@@ -116,7 +116,7 @@ BLANK_TEXTS = "hitokoto_blank"
 AVOID_TEXTS = "listener_avoid"
 TEXT_IDS = (
     "name", "step_map", "step_talk", "step_light", "step_sheet", "first_label", "map_lead", "map_split",
-    "map_counts", "omakase", "omakase_said", "go", "stop", "dont_know", "thinking", "summing", "who_ai",
+    "map_counts", "omakase", "omakase_said", "go", "stop", "to_light", "dont_know", "thinking", "summing", "who_ai",
     "who_teacher", "who_me", "send", "placeholder", "again", "ask_reaction", "ask_self", "ladder_two",
     "ladder_two_me", "ladder_three", "ladder_fill", "ladder_fill_line", "fill_ok", "fill_skip", "scale_q",
     "scale_low", "scale_first", "scale_ok", "scale_me", "scale_down", "scale_same", "scale_up", "skip", "way_q",

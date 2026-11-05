@@ -9,7 +9,7 @@
 const EbinoHitokoto = (() => {
   const SVG = "http://www.w3.org/2000/svg";
   const STEPS = ["map", "talk", "light", "sheet"];
-  let app = null;  // What app.js lends: call, el, state, setNow, sendFailed, showBackToStart.
+  let app = null;  // What app.js lends: call, state, setNow, sendFailed, showBackToStart, shownQuotes.
   let W = {};  // The words (texts/hitokoto.tsv).
   let view = null;  // Today's map, as the server sent it.
   let picked = null;  // { person, part } pressed on the map.
@@ -70,6 +70,7 @@ const EbinoHitokoto = (() => {
     $("hk-go").textContent = W.go;
     $("hk-omakase").textContent = W.omakase;
     $("hk-stop").textContent = W.stop;
+    $("hk-stop").hidden = false;
     $("hk-now-label").textContent = W.now_label;
     $("hk-to-sheet").textContent = W.to_sheet;
     $("hk-print").textContent = W.print;
@@ -124,7 +125,8 @@ const EbinoHitokoto = (() => {
     box.replaceChildren();
     if (view.split) {
       const line = el("p", "hk-split");
-      line.append(el("span", "hk-split-label", W.map_split), el("span", "hk-split-heading", view.split.heading));
+      // Its ”…” as 「…」, as on the other screens (直し40-0): on screen only, the record as it was.
+      line.append(el("span", "hk-split-label", W.map_split), el("span", "hk-split-heading", app.shownQuotes(view.split.heading)));
       box.append(line);
     }
     const map = svg("svg", { viewBox: "0 0 600 330", "aria-hidden": "true", focusable: "false" });
@@ -156,7 +158,7 @@ const EbinoHitokoto = (() => {
     box.append(map);
     box.setAttribute("role", "img");
     box.setAttribute("aria-label", [W.step_map, fill(W.map_counts, view.counts),
-      ...view.people.map((p) => p.title), view.split ? `${W.map_split}${view.split.heading}` : ""].filter(Boolean).join("。"));
+      ...view.people.map((p) => p.title), view.split ? `${W.map_split}${app.shownQuotes(view.split.heading)}` : ""].filter(Boolean).join("。"));
   }
 
   // Each person's words, as recorded. Before the parts come back, or with
@@ -315,7 +317,7 @@ const EbinoHitokoto = (() => {
     unsure.addEventListener("click", () => go({ dont_know: true }, W.dont_know));
   }
 
-  async function ladderStep(step, body, shown) {
+  async function ladderStep(step, body, shown, box = null) {
     if (busy) return;
     busy = true;
     let result;
@@ -323,16 +325,39 @@ const EbinoHitokoto = (() => {
       result = await post(step, body);
     } catch (error) {
       busy = false;
+      if (box) unlock(box);
       return message(app.sendFailed(error));
     }
     busy = false;
-    if (result.status === "ask_again") return message(result.message);
+    if (result.status === "ask_again") {
+      if (box) unlock(box);
+      return message(result.message);
+    }
     if (shown) say("me", shown);
     next(result);
   }
 
-  function lock(box) {
+  // Answered or picked (直し40-0): nothing more to press, but the card is not
+  // faded: the people's and the student's words read as before. That it is
+  // done shows in its edge (style.css .hk-done), the one picked by a small
+  // mark; the buttons that went on are gone.
+  function lock(box, chosen = null) {
     for (const node of box.querySelectorAll("input, button, select, textarea")) node.disabled = true;
+    box.classList.add("hk-done");
+    if (chosen) {
+      chosen.classList.add("hk-chosen");
+      chosen.setAttribute("aria-pressed", "true");
+    }
+  }
+
+  // A send that failed: the box can be answered again.
+  function unlock(box) {
+    for (const node of box.querySelectorAll("input, button, select, textarea")) node.disabled = false;
+    box.classList.remove("hk-done");
+    for (const node of box.querySelectorAll(".hk-chosen")) {
+      node.classList.remove("hk-chosen");
+      node.removeAttribute("aria-pressed");
+    }
   }
 
   // 2択: the split's two people's own words; no 「どっちでもない」.
@@ -340,8 +365,8 @@ const EbinoHitokoto = (() => {
     const box = el("div", "hk-options");
     for (const option of result.options) {
       const quote = button("hk-quote", option.said ? `「${option.text}」` : option.text, () => {
-        lock(box);
-        ladderStep("ladder", { choice: option.index }, fill(W.ladder_two_me, { who: option.title }));
+        lock(box, quote);
+        ladderStep("ladder", { choice: option.index }, fill(W.ladder_two_me, { who: option.title }), box);
       });
       quote.append(el("small", "", `${option.title}（${option.kind_label}）`));
       box.append(quote);
@@ -354,10 +379,11 @@ const EbinoHitokoto = (() => {
   function ladderThree(result) {
     const box = el("div", "hk-picks");
     for (const option of result.options) {
-      box.append(button("hk-pick", option.title, () => {
-        lock(box);
-        ladderStep("ladder", { choice: option.index }, option.title);
-      }));
+      const pick = button("hk-pick", option.title, () => {
+        lock(box, pick);
+        ladderStep("ladder", { choice: option.index }, option.title, box);
+      });
+      box.append(pick);
     }
     say("teacher", result.question, box);
     box.querySelector("button").focus({ preventScroll: true });
@@ -383,12 +409,12 @@ const EbinoHitokoto = (() => {
       event.preventDefault();
       const text = input.value.trim();
       lock(form);
-      if (text) ladderStep("fill", { text }, `${result.before}${text}${result.after}`);
-      else ladderStep("fill", { skip: true }, "");
+      if (text) ladderStep("fill", { text }, `${result.before}${text}${result.after}`, form);
+      else ladderStep("fill", { skip: true }, "", form);
     });
     empty.addEventListener("click", () => {
       lock(form);
-      ladderStep("fill", { skip: true }, "");
+      ladderStep("fill", { skip: true }, "", form);
     });
   }
 
@@ -413,7 +439,7 @@ const EbinoHitokoto = (() => {
         result = await post("scale", { value: Number(range.value) });
       } catch (error) {
         busy = false;
-        box.querySelectorAll("input, button").forEach((node) => { node.disabled = false; });
+        unlock(box);
         return message(app.sendFailed(error));
       }
       busy = false;
@@ -448,12 +474,12 @@ const EbinoHitokoto = (() => {
         result = await post(step, body);
       } catch (error) {
         busy = false;
-        form.querySelectorAll("input, button").forEach((node) => { node.disabled = false; });
+        unlock(form);
         return message(app.sendFailed(error));
       }
       busy = false;
       if (result.status === "ask_again") {
-        form.querySelectorAll("input, button").forEach((node) => { node.disabled = false; });
+        unlock(form);
         input.focus();
         return message(result.message);
       }
@@ -482,15 +508,15 @@ const EbinoHitokoto = (() => {
     const box = el("div", "hk-picks");
     const answers = [["yes", W.subject_yes], ["no", W.subject_no], ["unsure", W.subject_unsure]];
     for (const [key, text] of answers) {
-      box.append(button("hk-pick", text, async () => {
+      const pick = button("hk-pick", text, async () => {
         if (busy) return;
         busy = true;
-        lock(box);
+        lock(box, pick);
         try {
           await post("subject", { answer: key });
         } catch (error) {
           busy = false;
-          box.querySelectorAll("button").forEach((node) => { node.disabled = false; });
+          unlock(box);
           return message(app.sendFailed(error));
         }
         busy = false;
@@ -502,7 +528,8 @@ const EbinoHitokoto = (() => {
         } else {
           askMeet();
         }
-      }));
+      });
+      box.append(pick);
     }
     say("teacher", W.subject_q, box);
     box.querySelector("button").focus({ preventScroll: true });
@@ -541,7 +568,8 @@ const EbinoHitokoto = (() => {
 
   async function subjectStep(step, body) {
     const box = $("hk-subject");
-    lock(box);
+    // Waiting only: the card is drawn again with what comes back.
+    for (const node of box.querySelectorAll("button")) node.disabled = true;
     try {
       showSubject((await post(step, body)).subject);
     } catch (error) {
@@ -575,7 +603,7 @@ const EbinoHitokoto = (() => {
         result = await post("meet", { seat_id: seat });
       } catch (error) {
         busy = false;
-        box.querySelectorAll("select, button").forEach((node) => { node.disabled = false; });
+        unlock(box);
         return message(app.sendFailed(error));
       }
       busy = false;
@@ -592,16 +620,16 @@ const EbinoHitokoto = (() => {
 
   function askUse(uses) {
     const box = el("div", "hk-uses");
-    const go = async (use, text) => {
+    const go = async (use, text, chosen) => {
       if (busy) return;
       busy = true;
-      lock(box);
+      lock(box, chosen);
       let result;
       try {
         result = await post("use", { use });
       } catch (error) {
         busy = false;
-        box.querySelectorAll("button").forEach((node) => { node.disabled = false; });
+        unlock(box);
         return message(app.sendFailed(error));
       }
       busy = false;
@@ -612,22 +640,29 @@ const EbinoHitokoto = (() => {
       atEnd();
     };
     for (const use of uses) {
-      const choice = button("hk-pick", null, () => go(use.force, use.text));
+      const choice = button("hk-pick", null, () => go(use.force, use.text, choice));
       choice.append(el("span", "", use.text), el("span", "hk-force", use.name));
       box.append(choice);
     }
-    box.append(button("hk-pick", W.meet_none, () => go("none", W.meet_none)));
+    const none = button("hk-pick", W.meet_none, () => go("none", W.meet_none, none));
+    box.append(none);
     say("teacher", app.state.texts.harvest_use_question, box);
     box.querySelector("button").focus({ preventScroll: true });
   }
 
-  // Everything asked: 「ここまでにする」 goes on to the light.
+  // Everything asked: the main button 「光ったところを見る」 goes on to the
+  // light (直し40-0). 「ここまでにする」, the quiet way out at any time before,
+  // goes: both would do the same.
   function atEnd() {
     clearInput();
-    $("hk-stop").classList.add("hk-primary");
-    $("hk-stop").classList.remove("quiet");
-    $("hk-stop").focus({ preventScroll: true });
-    $("hk-stop").scrollIntoView({ block: "nearest", behavior: still() ? "auto" : "smooth" });
+    const go = button("hk-primary", W.to_light, toLight);
+    go.id = "hk-to-light";
+    const row = el("div", "hk-row");
+    row.append(go);
+    $("hk-input").append(row);
+    $("hk-stop").hidden = true;
+    go.focus({ preventScroll: true });
+    go.scrollIntoView({ block: "nearest", behavior: still() ? "auto" : "smooth" });
   }
 
   // --- 段5: today's light ---

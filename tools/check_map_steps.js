@@ -10,9 +10,13 @@
 // the whole map and after each press of ＋ until the seniors are out at
 // their windows, it counts what overlaps on screen: two seats' pieces, a
 // piece and the seniors' count (the label), a piece or the label and the
-// AI's seat, folded and opened (its cards shown for the count only). It
-// returns a table: size -> [{ press, zoom, out, pieces, label, aiFolded,
-// aiOpened }], and the folded seat's size. Nothing is sent anywhere.
+// AI's seat, folded and opened (its cards shown for the count only); and
+// (直し40-0) near: an adult's point and a senior whose edges (shape and
+// stroke) are less than 4px apart on screen, not only over each other. Once
+// the seniors are out, two presses more (nearer, they are further apart).
+// It returns a table: size -> [{ press, zoom, out, pieces, label, near,
+// least, aiFolded, aiOpened }], and the folded seat's size. Nothing is sent
+// anywhere.
 async (page) => {
   const BASE = globalThis.EBINO_BASE || "http://127.0.0.1:8851/";
   const SIZES = [[768, 1024], [1180, 820], [1366, 650], [1536, 760], [1920, 1080]];
@@ -37,7 +41,8 @@ async (page) => {
       await p.waitForFunction(() => !document.querySelector("#map-back") || document.querySelector("#map-back").hidden);
       await p.waitForTimeout(600);
       const first = await p.evaluate(() => document.querySelector("#map-frame svg").viewBox.baseVal.width);
-      for (let press = 0; press <= 12; press++) {
+      let beyond = 0;
+      for (let press = 0; press <= 14; press++) {
         const got = await p.evaluate(() => {
           const frame = document.querySelector("#map-frame").getBoundingClientRect();
           const inFrame = (b) => b.width > 0 && b.right > frame.left && b.left < frame.right && b.bottom > frame.top && b.top < frame.bottom;
@@ -54,6 +59,20 @@ async (page) => {
             if (Math.hypot(a[0] - b[0], a[1] - b[1]) < half(pieces[i]) + half(pieces[j]) - 0.5) pairs++;
           }
           const onLabel = pieces.filter((b) => label.some((l) => meet(b, l))).length;
+          // An adult's point and a senior: edge to edge, the stroke counted (直し40-0).
+          const reach = (node) => {
+            const s = node.querySelector(".shape"), b = s.getBoundingClientRect(), local = s.getBBox();
+            const k = local.width ? b.width / local.width : 1;
+            return { at: mid(b), r: Math.max(b.width, b.height) / 2 + (parseFloat(getComputedStyle(s).strokeWidth) || 0) * k / 2, b };
+          };
+          const adults = [...document.querySelectorAll(".pt.kind-adult:not(.school-home)")].filter(shown).map(reach).filter((x) => inFrame(x.b));
+          const seniors = [...document.querySelectorAll(".pt.school-home")].filter(shown).map(reach).filter((x) => inFrame(x.b));
+          let near = 0, least = null;
+          for (const a of adults) for (const s of seniors) {
+            const gap = Math.hypot(a.at[0] - s.at[0], a.at[1] - s.at[1]) - a.r - s.r;
+            if (least === null || gap < least) least = gap;
+            if (gap < 4) near++;
+          }
           const seat = document.querySelector("#ai-seat");
           const covered = () => {
             const box = seat.getBoundingClientRect();
@@ -66,12 +85,15 @@ async (page) => {
           const aiOpened = covered();
           if (folded) seat.classList.add("folded");
           return { out: document.querySelector("#map-frame").classList.contains("seniors-out"), pieces: pairs, label: onLabel,
+            near, least: least === null ? null : +least.toFixed(1),
             aiFolded, aiOpened, folded, foldedSize: [Math.round(foldedBox.width), Math.round(foldedBox.height)],
             vb: document.querySelector("#map-frame svg").viewBox.baseVal.width };
         });
         rows.push({ press, zoom: +(first / got.vb).toFixed(2), out: got.out, pieces: got.pieces, label: got.label,
-          aiFolded: got.aiFolded, aiOpened: got.aiOpened, folded: got.folded, foldedSize: got.foldedSize });
-        if (got.out) break;
+          near: got.near, least: got.least, aiFolded: got.aiFolded, aiOpened: got.aiOpened, folded: got.folded,
+          foldedSize: got.foldedSize });
+        // Out: two presses nearer too, the same counts (直し40-0).
+        if (got.out && ++beyond > 2) break;
         await p.click("#map-zoom-in");
         await p.waitForTimeout(450);
       }

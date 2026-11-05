@@ -170,7 +170,8 @@ def test_every_invented_seat_has_a_home_and_none_overlap_on_the_five_screens(pic
         # them, on the school (直し39).
         assert counts["windows"] + counts["rows"] == 45 and counts["past"] == 0, name
         assert one["westOfCut"] == 0 and one["offSchool"] == 0, name
-        assert 36 <= counts["windows"] <= 40, name
+        # 直し40-0: passed over further from an adult's point (4px edge to edge): fewer windows.
+        assert 30 <= counts["windows"] <= 40, name
         assert one["overlaps"] == 0 and one["outside"] == 0, (name, one["least"])
         assert one["schoolOverlaps"] == 0, name
         assert one["onAdults"] == 0, name  # 直し37-1: a window or square under an adult's place passed over.
@@ -180,6 +181,24 @@ def test_every_invented_seat_has_a_home_and_none_overlap_on_the_five_screens(pic
         assert {"A000", "A001"} <= set(one["noPlace"]), name
         assert one["names"] == ["adult", "cross", "cross", "outsider_teacher", "poster"], name
         assert one["room"]["rows"] >= 30, name
+
+
+def test_an_adults_point_and_a_senior_are_four_pixels_apart_edge_to_edge_when_the_seniors_come_out():
+    # 直し40-0 (39's report, 7): not only not over each other. The seniors come
+    # out with the windows 2 * SCHOOL_R_PX apart on screen (nearer, further):
+    # passed over within SCHOOL_CLEAR steps, the nearest a lit point (its
+    # circle and stroke) and a senior can be leaves EDGE_GAP_PX between them.
+    values = {name: float(re.search(rf"\b{name} = ([\d.]+)[,;]", SCRIPT).group(1))
+              for name in ("SCHOOL_CLEAR", "EDGE_GAP_PX", "POINT_REACH_PX", "SENIOR_REACH_PX")}
+    reach = re.search(r"const SCHOOL_R_PX = (\d+), CLOSEST_MORE = [\d.]+, MAX_POINT_PX = (\d+);", SCRIPT)
+    school_r, max_point = float(reach.group(1)), float(reach.group(2))
+    assert values["EDGE_GAP_PX"] == 4
+    # A lit point's circle is MAX_POINT_PX at most, its stroke 1.6 of POINT_R's 7.5 (style.css).
+    assert values["POINT_REACH_PX"] >= max_point * (1 + 0.8 / 7.5)
+    assert values["SENIOR_REACH_PX"] >= school_r * (7 / 7.5) * (1 + 0.8 / 7)
+    nearest = values["SCHOOL_CLEAR"] * 2 * school_r
+    assert nearest - values["POINT_REACH_PX"] - values["SENIOR_REACH_PX"] >= values["EDGE_GAP_PX"] - 1e-9
+    assert "Math.hypot(ax - p[0], ay - p[1]) >= seniorStep * SCHOOL_CLEAR" in SCRIPT
 
 
 @node

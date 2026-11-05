@@ -20,7 +20,14 @@ def test_the_steps_check_presses_plus_at_the_five_sizes_and_counts_the_ai_seat_b
         assert size in STEPS
     assert 'await p.click("#map-zoom-in");' in STEPS and 'await p.click("#map-back");' in STEPS
     assert 'seat.classList.remove("folded");' in STEPS and "aiFolded" in STEPS and "aiOpened" in STEPS
-    assert "if (got.out) break;" in STEPS  # Up to the seniors at their windows.
+    # Up to the seniors at their windows, and two presses nearer (直し40-0).
+    assert "if (got.out && ++beyond > 2) break;" in STEPS
+
+
+def test_the_steps_check_counts_an_adults_point_and_a_senior_under_four_pixels_apart():
+    # 直し40-0: edge to edge, the stroke counted; not only over each other.
+    assert 'document.querySelectorAll(".pt.kind-adult:not(.school-home)")' in STEPS
+    assert "if (gap < 4) near++;" in STEPS and "near: got.near" in STEPS
 
 
 def test_the_meeting_check_holds_each_sizes_least_bubbles():

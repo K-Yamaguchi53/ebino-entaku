@@ -29,7 +29,7 @@ async (page) => {
   const HK_MOMENTS = ["hk_map", "hk_talk", "hk_ladder", "hk_scale", "hk_keep", "hk_light", "hk_sheet"];
   // The button that goes on, at each moment.
   const HK_NEXT = { hk_map: "#hk-go", hk_talk: "#hk-input button[type=submit]", hk_ladder: ".hk-options .hk-quote, .hk-picks .hk-pick, .hk-fill .hk-primary",
-    hk_scale: ".hk-scale button", hk_keep: "#hk-stop", hk_light: "#hk-to-sheet", hk_sheet: "#hk-print" };
+    hk_scale: ".hk-scale button", hk_keep: "#hk-to-light", hk_light: "#hk-to-sheet", hk_sheet: "#hk-print" };
   const browser = page.context().browser();
   const table = {};
   const measure = (p) => p.evaluate(() => {
@@ -211,9 +211,10 @@ async (page) => {
     await p.locator("#hk-log .hk-picks button:not([disabled])").nth(1).click();  // なかった
     await p.waitForSelector(".hk-meet select");
     await p.locator(".hk-meet .quiet").click();  // 選ばない
-    await p.waitForFunction(() => document.activeElement && document.activeElement.id === "hk-stop");
+    // 段4 over: the main button goes on to the light (直し40-0).
+    await p.waitForFunction(() => document.activeElement && document.activeElement.id === "hk-to-light");
     if (moment === "hk_keep") return;
-    await p.click("#hk-stop");
+    await p.click("#hk-to-light");
     await p.waitForSelector("#hk-light-box .hk-big", { timeout: 20000 });
     if (moment === "hk_light") return;
     await p.click("#hk-to-sheet");

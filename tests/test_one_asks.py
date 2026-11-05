@@ -84,3 +84,37 @@ def test_the_keyboard_starts_at_the_first_question_and_the_chairs_step_aside():
     assert 'overlay.querySelector(".one-asks .one-ask")' in opened and "first.focus(" in opened
     css = (STATIC / "style.css").read_text(encoding="utf-8")
     assert ".one-on .table .chair { visibility: hidden; }" in css
+
+
+# --- 直し40-0: while the questions are asked for, three dots where they go ---
+
+def test_stood_up_with_no_questions_back_three_dots_show_until_they_come():
+    opened = _body(MAP, "async function openOne(")
+    assert "mine.asks.then(() => { mine.back = true; });" in opened
+    stood = _body(MAP, "function standUp(")
+    # Only once it has stood up (STAND_FOR; at once with motion reduced), and only if nothing came back before.
+    assert "new Promise((done) => setTimeout(done, motion ? STAND_FOR : 0)).then(() => {" in stood
+    assert "if (one === mine && !mine.back) showWait();" in stood
+    # Nothing came back (the request failed): the dots go too.
+    assert 'for (const old of overlay.querySelectorAll(".one-wait")) old.remove();' in stood
+    wait = _body(MAP, "function showWait(")
+    assert 'div("one-asks one-wait")' in wait and 'wait.setAttribute("aria-busy", "true");' in wait
+    assert "textContent" not in wait  # No words: nothing added to texts/.
+    assert "one.panel = wait;" in wait and "placeOne();" in wait
+    # The questions (the teacher's, past the wait) take the dots' place.
+    assert 'for (const old of overlay.querySelectorAll(".one-asks")) old.remove();' in _body(MAP, "function showAsks(")
+    assert 'for (const node of overlay.querySelectorAll(".one-bubble, .one-asks")) node.remove();' in _body(MAP, "function endOne(")
+
+
+def test_the_dots_move_only_when_motion_is_not_reduced():
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    moving = css[css.index("@media (prefers-reduced-motion: no-preference) {\n  .one-wait span"):]
+    moving = moving[:moving.index("\n}\n")]
+    assert "animation: one-wait" in moving
+    plain = css[css.index(".one-wait span {"):]
+    assert "animation" not in plain[:plain.index("}")]
+
+
+def test_the_wait_is_still_eight_seconds():
+    from ebino import asker
+    assert asker.ONE_TIMEOUT_SECONDS == 8.0

@@ -156,9 +156,14 @@ const EbinoMap = (() => {
   // windows are that far apart on screen (twice it), and the nearest zoom is
   // CLOSEST_MORE times nearer than that. Points never over MAX_POINT_PX.
   const SCHOOL_R_PX = 5, CLOSEST_MORE = 1.6, MAX_POINT_PX = 10;
-  // A window or square this many window steps from an adult's point is passed
-  // over (直し37-1): a senior (5px) and a point (10px at most) side by side.
-  const SCHOOL_CLEAR = 1.6;
+  // A window or spot this many window steps from an adult's point is passed
+  // over (直し37-1), so no senior sits on it; and (直し40-0) edge to edge
+  // they are EDGE_GAP_PX apart on screen or more: a lit point reaches
+  // POINT_REACH_PX from its middle (its circle, 10px at most, and stroke), a
+  // senior SENIOR_REACH_PX, and the windows are 2 * SCHOOL_R_PX apart when
+  // the seniors come out (nearer, further). (11.2 + 5.3 + 4) / 10 = 2.05.
+  const EDGE_GAP_PX = 4, POINT_REACH_PX = 11.2, SENIOR_REACH_PX = 5.3;
+  const SCHOOL_CLEAR = 2.05;
   // The AI's seat in a corner of the map (直し35-2), tried in this order.
   const AI_CORNERS = ["bottom-right", "bottom-left", "top-left"];
   const RECOMPOSE = 0.03;  // The room's shape this much off the drawing's: it is drawn again.
@@ -3175,6 +3180,7 @@ const EbinoMap = (() => {
     // The questions, put to this person, asked for while the camera flies
     // (直し36-3; 直し39: at most eight seconds; the teacher's questions past that).
     mine.asks = app.oneOpen(seatId).catch(() => null);
+    mine.asks.then(() => { mine.back = true; });
     frame.classList.add("one-on");
     // The AI's seat steps back too (直し34-3: it covered the person's feet and words).
     document.body.classList.add("one-open");
@@ -3230,13 +3236,34 @@ const EbinoMap = (() => {
     placeOne();
     // The questions to pick from (直し34-4), asked for while it stands up.
     const mine = one;
+    // Stood up and not back yet (直し40-0): three dots where they go, until
+    // they come (past the wait, the teacher's) or nothing does.
+    new Promise((done) => setTimeout(done, motion ? STAND_FOR : 0)).then(() => {
+      if (one === mine && !mine.back) showWait();
+    });
     // The keyboard goes to the first of them (直し34-5: it was six Tabs away).
     mine.asks.then((view) => {
-      if (!view || one !== mine) return;
+      if (one !== mine) return;
+      if (!view) {
+        for (const old of overlay.querySelectorAll(".one-wait")) old.remove();
+        return;
+      }
       showAsks(view);
       const first = overlay.querySelector(".one-asks .one-ask");
       if (first) first.focus({ preventScroll: true });
     }, () => {});
+  }
+
+  // Where the questions go, while they are asked for: three dots, no words
+  // (直し40-0); busy for screen readers. The questions take its place.
+  function showWait() {
+    for (const old of overlay.querySelectorAll(".one-asks")) old.remove();
+    const wait = div("one-asks one-wait");
+    wait.setAttribute("aria-busy", "true");
+    for (let n = 0; n < 3; n++) wait.append(document.createElement("span"));
+    overlay.append(wait);
+    one.panel = wait;
+    placeOne();
   }
 
   // Up to three questions under its words, each a button; pressed, that
