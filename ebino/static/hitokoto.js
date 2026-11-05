@@ -419,7 +419,7 @@ const EbinoHitokoto = (() => {
       busy = false;
       say("me", fill(W.scale_me, { n: range.value }));
       say("teacher", result.question);
-      lineBox("forward", { send: W.send, skip: W.skip }, () => {});
+      lineBox("forward", { send: W.send, skip: W.skip }, () => askWay());
     });
     box.append(now, range, ticks, ok);
     say("teacher", question, box);
@@ -470,6 +470,165 @@ const EbinoHitokoto = (() => {
     return form;
   }
 
+  // --- 段4: what to keep, and the harvest card's ② and ③ ---
+
+  function askWay() {
+    const card = say("teacher", W.way_q);
+    lineBox("way", { send: W.way_ok, skip: W.way_none, placeholder: W.way_example }, () => askSubject(), card);
+  }
+
+  function askSubject() {
+    clearInput();
+    const box = el("div", "hk-picks");
+    const answers = [["yes", W.subject_yes], ["no", W.subject_no], ["unsure", W.subject_unsure]];
+    for (const [key, text] of answers) {
+      box.append(button("hk-pick", text, async () => {
+        if (busy) return;
+        busy = true;
+        lock(box);
+        try {
+          await post("subject", { answer: key });
+        } catch (error) {
+          busy = false;
+          box.querySelectorAll("button").forEach((node) => { node.disabled = false; });
+          return message(app.sendFailed(error));
+        }
+        busy = false;
+        say("me", text);
+        if (key === "yes") {
+          const which = say("teacher", W.subject_which);
+          lineBox("subject_note", { send: W.send, skip: W.skip, placeholder: W.subject_example, label: W.subject_which },
+            (result) => { showSubject(result.subject); askMeet(); }, which);
+        } else {
+          askMeet();
+        }
+      }));
+    }
+    say("teacher", W.subject_q, box);
+    box.querySelector("button").focus({ preventScroll: true });
+  }
+
+  // ③ under the lesson's line: the card as the reflection sheet shows it
+  // (the question held now on the left, the subject's card on the right).
+  function showSubject(subject) {
+    if (!subject) return;
+    let box = $("hk-subject");
+    if (!box) {  // Under the lesson's line and the student's answer to it.
+      box = el("div", "harvest hk-harvest");
+      box.id = "hk-subject";
+      $("hk-log").append(box);
+    }
+    box.replaceChildren(el("h3", "", app.state.texts.harvest_heading), el("p", "subject-link", subject.link));
+    const cards = el("div", "subject-cards");
+    subject.cards.forEach((card, index) => {
+      const node = el("div", "subject-card");
+      node.append(el("p", "when", card.when), el("p", "subject", card.subject));
+      if (card.heading) node.append(el("p", "heading", `「${card.heading}」`));
+      node.append(el("p", "note", card.note));
+      if (subject.choose) node.append(button("quiet", app.state.texts.harvest_subject_pick, () => subjectStep("subject_choose", { choice: index })));
+      cards.append(node);
+    });
+    const question = el("div", "subject-question");
+    question.append(el("p", "label", app.state.texts.harvest_subject_question), el("p", "words", subject.question));
+    const tie = el("div", `subject-tie${subject.cards.length > 1 ? " two" : ""}`);
+    const between = el("div", "subject-tie-line");
+    between.setAttribute("aria-hidden", "true");
+    tie.append(question, between, cards);
+    box.append(tie);
+    if (subject.choose) box.append(button("quiet", app.state.texts.harvest_subject_none, () => subjectStep("subject_choose", { choice: "none" })));
+    if (subject.more) box.append(button("", app.state.texts.harvest_subject_more, () => subjectStep("subject_more", {})));
+  }
+
+  async function subjectStep(step, body) {
+    const box = $("hk-subject");
+    lock(box);
+    try {
+      showSubject((await post(step, body)).subject);
+    } catch (error) {
+      box.querySelectorAll("button").forEach((node) => { node.disabled = false; });
+    }
+  }
+
+  // The seat to hear more from (texts/meet_question.txt), or none; a seat: ②.
+  function askMeet() {
+    clearInput();
+    const box = el("div", "hk-meet");
+    const select = el("select");
+    select.setAttribute("aria-label", app.state.texts.meet_question);
+    select.append(new Option(W.meet_pick, ""));
+    const met = el("optgroup");
+    met.label = W.meet_met;
+    const others = el("optgroup");
+    others.label = W.meet_others;
+    for (const seat of app.state.seats) {
+      (app.state.met.has(seat.seat_id) ? met : others).append(new Option([seat.title, seat.detail].filter(Boolean).join("　"), seat.seat_id));
+    }
+    if (met.children.length) select.append(met);
+    select.append(others);
+    const row = el("div", "hk-row");
+    const go = async (seat) => {
+      if (busy) return;
+      busy = true;
+      lock(box);
+      let result;
+      try {
+        result = await post("meet", { seat_id: seat });
+      } catch (error) {
+        busy = false;
+        box.querySelectorAll("select, button").forEach((node) => { node.disabled = false; });
+        return message(app.sendFailed(error));
+      }
+      busy = false;
+      say("me", seat ? select.selectedOptions[0].textContent : W.meet_none);
+      if (result.uses.length) askUse(result.uses);
+      else atEnd();
+    };
+    row.append(button("hk-primary", W.meet_ok, () => { if (select.value) go(select.value); }),
+      button("quiet", W.meet_none, () => go("")));
+    box.append(select, row);
+    say("teacher", app.state.texts.meet_question, box);
+    select.focus({ preventScroll: true });
+  }
+
+  function askUse(uses) {
+    const box = el("div", "hk-uses");
+    const go = async (use, text) => {
+      if (busy) return;
+      busy = true;
+      lock(box);
+      let result;
+      try {
+        result = await post("use", { use });
+      } catch (error) {
+        busy = false;
+        box.querySelectorAll("button").forEach((node) => { node.disabled = false; });
+        return message(app.sendFailed(error));
+      }
+      busy = false;
+      say("me", text);
+      const card = el("div", "harvest hk-harvest");
+      card.append(el("h3", "", app.state.texts.harvest_heading), el("p", "", result.meet));
+      $("hk-log").append(card);
+      atEnd();
+    };
+    for (const use of uses) {
+      const choice = button("hk-pick", null, () => go(use.force, use.text));
+      choice.append(el("span", "", use.text), el("span", "hk-force", use.name));
+      box.append(choice);
+    }
+    box.append(button("hk-pick", W.meet_none, () => go("none", W.meet_none)));
+    say("teacher", app.state.texts.harvest_use_question, box);
+    box.querySelector("button").focus({ preventScroll: true });
+  }
+
+  // Everything asked: 「ここまでにする」 goes on to the light.
+  function atEnd() {
+    clearInput();
+    $("hk-stop").classList.add("hk-primary");
+    $("hk-stop").classList.remove("quiet");
+    $("hk-stop").focus({ preventScroll: true });
+    $("hk-stop").scrollIntoView({ block: "nearest", behavior: still() ? "auto" : "smooth" });
+  }
 
 
 

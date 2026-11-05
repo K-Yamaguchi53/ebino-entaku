@@ -87,6 +87,16 @@ def to_scale(session):
     return session.hitokoto_answer("部活がない日は空いたら休む")
 
 
+def to_end(session, scale=8, forward="先輩にもう一回聞く", way="農業", subject="no"):
+    session.hitokoto_scale(scale)
+    session.hitokoto_forward(forward)
+    session.hitokoto_way(way)
+    session.hitokoto_subject(subject)
+    if subject == "yes":
+        session.hitokoto_subject_note("家庭科")
+    return session.hitokoto_meet("")
+
+
 # --- 段1: today's map ---
 
 def test_the_map_shows_the_marked_person_first_then_the_bubble_opened_with_their_own_words():
@@ -332,6 +342,58 @@ def test_the_scale_is_zero_to_fifteen():
             session.hitokoto_scale(value)
 
 
+# --- 段4: what to keep, and the harvest card's ② and ③ ---
+
+def test_the_subject_card_comes_only_after_yes():
+    session, _, _, _ = sitting()
+    to_scale(session)
+    session.hitokoto_scale(10)
+    session.hitokoto_forward("", skip=True)
+    session.hitokoto_way("", skip=True)
+    assert session.hitokoto_subject("no") == {"next": "meet"}
+    with pytest.raises(Refused):
+        session.hitokoto_subject_note("家庭科")
+    other, _, _, _ = sitting()
+    to_scale(other)
+    other.hitokoto_scale(10)
+    other.hitokoto_forward("", skip=True)
+    other.hitokoto_way("", skip=True)
+    assert other.hitokoto_subject("yes") == {"next": "subject_note"}
+    view = other.hitokoto_subject_note("家庭科")
+    assert view["next"] == "meet" and "subject" in view  # None with no catalog: no ③ to show.
+
+
+def test_the_subject_card_is_asked_with_the_question_and_the_lessons_name(monkeypatch):
+    from ebino import subjects
+    seen = {}
+
+    def choose(gate, catalog, lab, words, counts):
+        seen.update(words)
+        return subjects.Pick(subjects.STATUS_OFF)
+
+    monkeypatch.setattr(subjects, "choose", choose)
+    session, _, _, _ = sitting()
+    to_scale(session)
+    to_end(session, subject="yes")
+    assert seen == {"question": QUESTION, "answer": "家庭科", "move": ""}
+
+
+def test_the_meet_line_comes_only_when_a_seat_is_picked_and_the_first_line_never():
+    session, _, _, _ = sitting()
+    to_scale(session)
+    assert to_end(session) == {"uses": []}
+    with pytest.raises(Refused):
+        session.hitokoto_use("none")
+    other, _, _, _ = sitting()
+    to_scale(other)
+    other.hitokoto_scale(8)
+    other.hitokoto_forward("", skip=True)
+    other.hitokoto_way("", skip=True)
+    other.hitokoto_subject("unsure")
+    uses = other.hitokoto_meet("S02")["uses"]
+    assert uses and all(set(u) == {"force", "name", "text"} for u in uses)
+    line = other.hitokoto_use(uses[0]["force"])["meet"]
+    assert line.startswith(load_text("harvest_meet_prefix") + "農家")
 
 
 

@@ -1065,6 +1065,91 @@ class Session:
         self.save()
         return {"next": "way"}
 
+    def hitokoto_way(self, text, skip: bool = False) -> dict:
+        """「まだ決めなくていい。頭に置いておきたい道は？」 (optional)."""
+        talk = self._talk(hitokoto.WAY)
+        text, named = self._kept_line(talk, "way", text, skip)
+        if named:
+            return named
+        talk.way, talk.stage = text, hitokoto.SUBJECT
+        self.save()
+        return {"next": "subject"}
+
+    def hitokoto_subject(self, answer) -> dict:
+        """「授業で習ったことと近い話はあった？」: yes, no, or not sure."""
+        talk = self._talk(hitokoto.SUBJECT)
+        if answer not in hitokoto.SUBJECT_ANSWERS:
+            raise Refused("unknown_answer")
+        talk.subject = answer
+        talk.stage = hitokoto.SUBJECT_NOTE if answer == "yes" else hitokoto.MEET
+        self.save()
+        return {"next": talk.stage}
+
+    def hitokoto_subject_note(self, text, skip: bool = False) -> dict:
+        """Which lesson (optional); then ③, asked for once, with the question
+        held now and the lesson's name as the record's words."""
+        talk = self._talk(hitokoto.SUBJECT_NOTE)
+        text, named = self._kept_line(talk, "subject", text, skip)
+        if named:
+            return named
+        talk.subject_note = text
+        talk.subject_pick = subjects.choose(self.gate, self.library.subject_catalog, self.lab,
+                                            {"question": talk.first_question, "answer": text, "move": ""},
+                                            self._shown_subjects())
+        for shown in talk.subject_pick.on_screen():
+            self._count_shown_subject(shown)
+        talk.stage = hitokoto.MEET
+        self.save()
+        return {"next": "meet", "subject": self._talk_subject(talk)}
+
+    def _talk_subject(self, talk: hitokoto.Hitokoto) -> dict | None:
+        return subjects.view(self.library.subject_catalog, talk.subject_pick, talk.first_question)
+
+    def hitokoto_subject_choose(self, choice) -> dict:
+        talk = self._talk(hitokoto.MEET, hitokoto.USE, hitokoto.END)
+        pick = talk.subject_pick
+        if pick is None or pick.status != subjects.STATUS_CHOOSE or pick.chosen:
+            raise Refused("not_choosing")
+        if choice != subjects.CHOSE_NONE and (not isinstance(choice, int) or isinstance(choice, bool)
+                                              or not 0 <= choice < len(pick.order[:2])):
+            raise Refused("unknown_subject")
+        subjects.pick_one(self.library.subject_catalog, self.lab, pick, choice, self._shown_subjects())
+        self.save()
+        return {"subject": self._talk_subject(talk)}
+
+    def hitokoto_subject_more(self) -> dict:
+        talk = self._talk(hitokoto.MEET, hitokoto.USE, hitokoto.END)
+        pick = talk.subject_pick
+        if pick is None or len(pick.order) < 2 or pick.two_shown:
+            raise Refused("no_other_subject")
+        pick.index = (pick.index + 1) % len(pick.order)
+        pick.presses += 1
+        self._count_shown_subject(pick.shown())
+        self.save()
+        return {"subject": self._talk_subject(talk)}
+
+    def hitokoto_meet(self, seat_id) -> dict:
+        """The seat to hear more from (texts/meet_question.txt), or none. A
+        seat: ②'s uses, as the record fits them."""
+        talk = self._talk(hitokoto.MEET)
+        seat_id = seat_id if isinstance(seat_id, str) else ""
+        if seat_id and seat_id not in self._seats:
+            raise Refused("unknown_seat")
+        talk.meet_seat = seat_id
+        talk.stage = hitokoto.USE if seat_id else hitokoto.END
+        self.save()
+        return {"uses": [harvest.use_view(force) for force in harvest.uses_offered(self)] if seat_id else []}
+
+    def hitokoto_use(self, use) -> dict:
+        """② picked, or 「選ばない」: the card's ② line (never ①)."""
+        talk = self._talk(hitokoto.USE)
+        if use not in [str(force) for force in harvest.uses_offered(self)] + [harvest.CHOSE_NO_USE]:
+            raise Refused("unknown_use")
+        talk.meet_use, talk.stage = use, hitokoto.END
+        self.save()
+        title = seat_label(self._seats[talk.meet_seat], self.library.show_private).title
+        return {"meet": harvest.meet_line(title, None if use == harvest.CHOSE_NO_USE else int(use))}
+
     # --- what the sitting has gathered ---
 
     def met_seats(self) -> list[str]:
