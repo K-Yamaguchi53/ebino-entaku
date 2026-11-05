@@ -72,6 +72,11 @@ const EbinoMap = (() => {
   const PARAGRAPH_STEPS = [0, 8, PARAGRAPH_LINES, 4, 3, 2];
   const DRAW_FOR = 1800;  // ms to draw the rim; the river follows.
   const RIPPLE_FOR = 1600;  // ms of the ring a seat sends out when its voice lights.
+  // 直し41: before the first question, now and then one point (two at most)
+  // glows softly and goes back, QUIET_FOR ms each, QUIET_GAP ms apart at
+  // random: people in the basin, not a call to press. Never with motion reduced.
+  const QUIET_FOR = 2 * 1000, QUIET_GAP = [1400, 3800], QUIET_MAX = 2;
+  const PRESS_RING_FOR = 400;  // ms of the small ring a point sends out when pressed.
   const FADE_FOR = 300;  // ms a card takes to go, at the end of its BUBBLE_FOR.
   // The round table (the picture only): round the basin's middle, flat at
   // the height of the ground there, in map units.
@@ -103,6 +108,10 @@ const EbinoMap = (() => {
   const ZOOM_STEP = 1.4;
   const POINT_R = 7.5;  // A point's radius at scale 1 (see shape()).
   const MIN_POINT_PX = 3;  // A point is never smaller than this on screen.
+  // 直し41: a point is drawn at least this big (its radius, CSS px), so the
+  // whole map shows people, not grains. Drawn only: where the points go
+  // (homePlace), what takes a press (HIT_PX) and the seniors are as before.
+  const MIN_DRAWN_PX = 6.5;
   const TOKEN = 1.3;  // A seat at the table, larger than its point.
   // On a narrow map a seat's label at the table is cut here, with 「…」 (its
   // card below has the whole title).
@@ -210,6 +219,44 @@ const EbinoMap = (() => {
   const reduced = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = (id) => document.getElementById(id);
   const wait = (ms) => new Promise((done) => timers.push(setTimeout(done, ms)));
+
+  // The quiet glow (直し41). pick() gives the points that may glow now. rng,
+  // later and cancel can be given (the tests do). Motion reduced: no timer at
+  // all. Returns what stops it, the glow on any point taken off.
+  function quietGlow(pick, { rng = Math.random, later = setTimeout, cancel = clearTimeout, reduce = reduced } = {}) {
+    if (reduce()) return () => {};
+    let timer = null, on = true;
+    const glowing = new Set();
+    const wait = () => QUIET_GAP[0] + rng() * (QUIET_GAP[1] - QUIET_GAP[0]);
+    const step = () => {
+      if (!on) return;
+      const free = pick().filter((node) => !glowing.has(node));
+      if (free.length && glowing.size < QUIET_MAX) {
+        const node = free[Math.min(free.length - 1, Math.floor(rng() * free.length))];
+        glowing.add(node);
+        node.classList.add("quiet-glow");
+        later(() => { node.classList.remove("quiet-glow"); glowing.delete(node); }, QUIET_FOR);
+      }
+      timer = later(step, wait());
+    };
+    timer = later(step, wait());
+    return () => {
+      on = false;
+      cancel(timer);
+      for (const node of glowing) node.classList.remove("quiet-glow");
+      glowing.clear();
+    };
+  }
+
+  // A point pressed (直し41): one small ring goes out and is gone. Not with motion reduced.
+  function pressRing(node) {
+    if (reduced() || !node || !node.animate) return;
+    const ring = svgEl("circle", { class: "ripple press-ring", r: 10 });
+    node.append(ring);
+    const wave = ring.animate([{ transform: "scale(1)", opacity: 0.85 }, { transform: "scale(2.2)", opacity: 0 }],
+      { duration: PRESS_RING_FOR, easing: "ease-out" });
+    wave.finished.then(() => ring.remove(), () => ring.remove());
+  }
 
   function svgEl(tag, attrs = {}) {
     const node = document.createElementNS(NS, tag);
@@ -1098,13 +1145,20 @@ const EbinoMap = (() => {
     return Math.min(Math.max(view.S, MIN_POINT_PX * (vb.w / across) / POINT_R), MAX_POINT_PX * (vb.w / across) / POINT_R);
   }
 
+  // A point's drawn scale (直し41): never under MIN_DRAWN_PX, never over MAX_POINT_PX.
+  function drawnScale() {
+    const perPx = vb.w / (frame.clientWidth || 1);
+    return Math.min(Math.max(pointScale(), MIN_DRAWN_PX * perPx / POINT_R), MAX_POINT_PX * perPx / POINT_R);
+  }
+
   function rescale() {
     const f = pointScale();
+    const drawn = drawnScale();
     const perPx = vb.w / (frame.clientWidth || 1);
     const atSchool = Math.min(f, SCHOOL_R_PX * perPx / POINT_R);
     for (const { node, at } of Object.values(points)) {
       const [x, y] = at();
-      node.setAttribute("transform", `translate(${x} ${y}) scale(${node.classList.contains("school-home") ? atSchool : f})`);
+      node.setAttribute("transform", `translate(${x} ${y}) scale(${node.classList.contains("school-home") ? atSchool : drawn})`);
     }
     for (const token of tokens) {
       const k = token.chair ? Math.max(f * token.scale, MIN_CHAIR_PX * perPx / CHAIR_R) : f * token.scale;
@@ -1228,6 +1282,8 @@ const EbinoMap = (() => {
     let dragged = false, pinch = null;
     svg.addEventListener("pointerdown", (event) => {
       down.set(event.pointerId, { x: event.clientX, y: event.clientY, start: [event.clientX, event.clientY] });
+      const pressed = event.target.closest && event.target.closest(".points .pt");
+      if (pressed) pressRing(pressed);
       dragged = false;
       pinch = null;
     });
@@ -1319,6 +1375,7 @@ const EbinoMap = (() => {
     recompose();
     rescale();
     relayout();
+    startQuiet();
     if (drawn) return;
     drawn = true;
     if (reduced()) return;
@@ -1464,7 +1521,7 @@ const EbinoMap = (() => {
     const nodes = [...tableLayer.querySelectorAll(".token .shape, .chair circle, .chair .hit" +
       (withBacks ? ", .token .chair-back, .chair .back, .table-foot .leg, .table-foot .base" : ""))];
     // A seat of the round at the size it has once lit (not met yet, it is drawn smaller).
-    const reach = 9.5 * pointScale() * frameBox.width / vb.w;
+    const reach = 9.5 * drawnScale() * frameBox.width / vb.w;
     const seats = tableTop ? [] : roundSeats.map((id) => toFrame(...spotOf(id)))
       .map(([px, py]) => [px - reach, py - reach, 2 * reach, 2 * reach]);
     // While the table is open the map's words are not shown (直し33-5): nothing to keep off.
@@ -2014,7 +2071,21 @@ const EbinoMap = (() => {
   // The seats quoted light up one after another, each with its first quote
   // in a short bubble. On the picture the round table follows; on the flat
   // map, the splits. No seat answered: nothing lights.
+  // The quiet glow runs on the first map only: once a round comes, never again.
+  let quiet = null, quietOver = false;
+  function startQuiet() {
+    if (quiet || quietOver) return;
+    quiet = quietGlow(() => [...svg.querySelectorAll(".points .pt:not(.met):not(.lit):not(.away):not(.school-home)")]
+      .filter((node) => node.getClientRects().length));
+  }
+  function stopQuiet() {
+    quietOver = true;
+    if (quiet) quiet();
+    quiet = null;
+  }
+
   function round(result) {
+    stopQuiet();
     if (!map) return;
     if (!view) { pending = result; return; }
     clearRound();

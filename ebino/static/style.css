@@ -627,20 +627,29 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
    by a lamp. Lit by this round: the honey lamp itself. The shape tells the
    kind, its thin ring the kind's own tint. */
 .pt { cursor: pointer; outline: none; }
-.pt .shape { fill: var(--night-3); stroke: var(--kind); stroke-width: 1.4; transform: scale(.72);
+/* 直し41: not met .84 of met (was .72), so the whole map shows people, not grains. */
+.pt .shape { fill: var(--night-3); stroke: var(--kind); stroke-width: 1.4; transform: scale(.84);
   transition: transform .45s ease, fill .45s ease; }
 .pt.met .shape { fill: var(--paper); transform: none; }
 .pt.lit .shape { fill: var(--lamp-bright); stroke: var(--lamp); stroke-width: 1.6; transform: none; }
 .pt .halo { fill: url(#lamp-glow); opacity: 0; transition: opacity .45s ease; }
 .pt.met .halo { fill: url(#paper-glow); opacity: .8; }
 .pt.lit .halo { fill: url(#lamp-glow); opacity: 1; }
-.pt.hover .shape, .pt:focus-visible .shape { stroke: var(--ink); stroke-width: 2.6; transform: none; }
+.pt.hover .shape, .pt:focus-visible .shape { stroke: var(--ink); stroke-width: 2.6; transform: scale(1.15); transition-duration: .15s; }
 .pt .met-mark { display: none; }
 .pt .ask-mark { display: none; fill: var(--ink); font-family: var(--gothic); font-size: 15px; font-weight: bold;
   paint-order: stroke; stroke: var(--veil-thin); stroke-width: 3px; }
 .pt.silent .ask-mark { display: inline; }
 /* The soft ring a seat sends out, once, when its voice lights. */
 .ripple { fill: none; stroke: var(--lamp); stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; opacity: 0; }
+.press-ring { stroke: var(--ink); }
+/* The quiet glow before the first question (直し41, map.js quietGlow): the
+   lamp's halo comes up and goes down once, over two seconds. Only with
+   motion not reduced; map.js does not even run its timer otherwise. */
+@media (prefers-reduced-motion: no-preference) {
+  .pt.quiet-glow .halo { animation: quiet-glow 2s ease-in-out 1; }
+}
+@keyframes quiet-glow { 0%, 100% { opacity: 0; } 50% { opacity: .75; } }
 
 /* The round table, over the basin: a top with a rim of light, a lamp in
    the middle, the chairs round it. Only the chairs of the seats speaking
@@ -881,6 +890,7 @@ body.one-open #map-heading { visibility: hidden; }
   .choice, .choice::before { transition: none !important; }
   .map-bubble, .map-bubble .thread { animation: none !important; }
   .table-bubble { animation: none !important; }
+  .pt.quiet-glow .halo, .press-ring { animation: none !important; display: none; }
 }
 
 /* Japanese broken between words, not inside one (直し31続き-5): 「ポスタ／ー」
