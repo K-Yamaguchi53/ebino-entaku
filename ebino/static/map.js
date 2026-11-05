@@ -139,6 +139,11 @@ const EbinoMap = (() => {
   // front) and its ground's corners are where seats go, as on the picture.
   const PLAIN_YARD = { width: 1400, height: 760, field: [[40, 150], [560, 150], [560, 720], [40, 720]],
     roof: [[680, 290], [1360, 290], [1360, 540], [680, 540]], wall: 110, rows: [565, 615], columns: 20 };
+  // The track on the ground with no picture (直し35-1), in metres as the
+  // school's model has it (build_school.py: the field 96.2 m east-west by
+  // 126.5 m north-south, an oval of two straights and two half circles,
+  // four lanes): drawn on the field's four corners as they are.
+  const TRACK = { field: [96.2, 126.5], rOut: 42, half: 16, lanes: 4, lane: 1.25, segs: 24 };
   const WORD_PAD = 2;  // CSS px kept clear round a word drawn on the map.
   const SLIDE_MOST = 40;  // CSS px the school's name may slide off a seat's point.
   // Where a seat's 「？」 may go, by its point (x, y, which way the text runs
@@ -471,11 +476,48 @@ const EbinoMap = (() => {
     const polygon = (className, spots) => svgEl("polygon", { class: className, points: spots.map((p) => p.join(",")).join(" ") });
     const [nw, ne, se, sw] = model.roof, wall = PLAIN_YARD.wall;
     group.append(polygon("yard-ground", model.field));
+    const track = trackOn(model.field);
+    group.append(svgEl("path", { class: "yard-track", "fill-rule": "evenodd",
+      d: [track.lanes[track.lanes.length - 1], track.lanes[0]].map((ring) => `M${ring.map((p) => p.join(",")).join("L")}Z`).join("") }));
+    group.append(polygon("yard-infield", track.lanes[0]));
+    for (const ring of track.lanes) group.append(polygon("yard-line", ring));
+    group.append(svgEl("line", { class: "yard-line", x1: track.middle[0][0], y1: track.middle[0][1],
+      x2: track.middle[1][0], y2: track.middle[1][1] }));
     building.append(polygon("yard-wall", [sw, se, [se[0], se[1] + wall], [sw[0], sw[1] + wall]]), polygon("yard-roof", [nw, ne, se, sw]));
     for (const [wx, wy] of model.windows) {
       building.append(svgEl("rect", { class: "yard-window", x: wx - 9, y: wy - 14, width: 18, height: 28, rx: 2 }));
     }
     group.append(building);
+  }
+
+  // The track's lane lines (inner first) and the straight across its
+  // middle, on a field given by its corners (north-west, north-east,
+  // south-east, south-west): each spot in metres taken to the field's
+  // corners as they are drawn. It reads nothing but what it is given.
+  function trackOn([nw, ne, se, sw]) {
+    const [fw, fl] = TRACK.field;
+    const at = (mx, my) => {  // metres from the field's middle, east and north
+      const u = 0.5 + mx / fw, v = 0.5 - my / fl;
+      const top = [nw[0] + (ne[0] - nw[0]) * u, nw[1] + (ne[1] - nw[1]) * u];
+      const foot = [sw[0] + (se[0] - sw[0]) * u, sw[1] + (se[1] - sw[1]) * u];
+      return [top[0] + (foot[0] - top[0]) * v, top[1] + (foot[1] - top[1]) * v].map((n) => Math.round(n * 10) / 10);
+    };
+    const ring = (r) => {
+      const spots = [];
+      for (let k = 0; k <= TRACK.segs; k++) {
+        const t = Math.PI * k / TRACK.segs;
+        spots.push(at(r * Math.cos(t), TRACK.half + r * Math.sin(t)));
+      }
+      for (let k = 0; k <= TRACK.segs; k++) {
+        const t = Math.PI + Math.PI * k / TRACK.segs;
+        spots.push(at(r * Math.cos(t), -TRACK.half + r * Math.sin(t)));
+      }
+      return spots;
+    };
+    const rIn = TRACK.rOut - TRACK.lanes * TRACK.lane;
+    const lanes = [];
+    for (let k = 0; k <= TRACK.lanes; k++) lanes.push(ring(rIn + k * TRACK.lane));
+    return { lanes, middle: [at(-rIn, 0), at(rIn, 0)] };
   }
 
   // What homesOf needs of the drawing as it is: the map's box, the yard's
