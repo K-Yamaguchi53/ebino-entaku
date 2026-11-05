@@ -80,7 +80,9 @@ def test_pressing_a_question_the_box_answers_it_and_reflecting_goes_to_it_first(
 
 HARNESS = """
 const made = {};
-const part = (id) => made[id] || (made[id] = { id, textContent: "", hidden: true, children: [],
+const part = (id) => made[id] || (made[id] = { id, textContent: "", hidden: true, children: [], attrs: {}, folded: null,
+  classList: { toggle(name, on) { if (name === "folded") made[id].folded = on; } },
+  setAttribute(k, v) { this.attrs[k] = v; },
   replaceChildren(...kids) { this.children = kids; if (kids.every((kid) => typeof kid === "string")) this.textContent = kids.join(""); },
   append(kid) { this.children.push(kid); } });
 const $ = part;
@@ -96,15 +98,21 @@ const first = [$("ai-seat").hidden, $("ai-seat-note").hidden, $("ai-seat-note").
 renderAiSeat(2, band);
 const second = [$("ai-seat-note").hidden];
 renderAiSeat(2, band);
-process.stdout.write(JSON.stringify({ first, second, label: $("ai-seat-label").textContent }));
+foldAiSeat(true);
+const folded = [$("ai-seat").folded, $("ai-seat-open").hidden, $("ai-seat-open").attrs["aria-expanded"]];
+renderAiSeat(3, band);
+const opened = [$("ai-seat").folded, $("ai-seat-open").hidden, $("ai-seat-open").attrs["aria-expanded"]];
+process.stdout.write(JSON.stringify({ first, second, folded, opened, label: $("ai-seat-label").textContent }));
 """
 
 
 @node
 def test_the_line_that_says_it_is_the_ais_comes_the_first_time_only():
-    program = HARNESS % {"source": _top("renderAiSeat")}
+    program = HARNESS % {"source": _top("renderAiSeat") + _top("foldAiSeat") + _top("openAiSeat")}
     out = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=30)
     assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
     got = json.loads(out.stdout.decode("utf-8"))
     assert got["first"] == [False, False, "NOTE", 2]
     assert got["second"] == [True] and got["label"] == "LABEL"
+    # 直し37-2: folded back at the map, the button that opens it shown; a round's questions open it.
+    assert got["folded"] == [True, False, "false"] and got["opened"] == [False, True, "true"]

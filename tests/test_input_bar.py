@@ -58,6 +58,7 @@ const renderRound = (r) => log.push(["round", r.round]);
 const renderSeats = () => log.push(["seats"]);
 const bandAnswered = (r, role) => log.push(["answered", r, role]);
 const cardDone = () => ({});
+const foldAiSeat = () => {};  // The AI's seat folded or open (直し37-2): its own tests.
 %(source)s
 """
 

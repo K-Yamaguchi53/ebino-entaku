@@ -1041,6 +1041,22 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { position: abso
   margin: 0; padding: 8px 10px; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--ai) transparent;
   box-shadow: 0 10px 28px var(--shadow); }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-head { margin-bottom: 4px; }
+/* 直し37-2: back at the map, folded: its heading and the button that opens
+   it, at the same corner (the bottom ones: its foot where it was; the right
+   ones: its right side where it was), as wide as they are. Its place and
+   the upright band under the map do not change. */
+.ai-seat.folded .ai-seat-note, .ai-seat.folded .ai-seat-cards { display: none; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat.folded { height: auto; width: auto;
+  max-width: var(--ai-w, 320px); overflow: visible; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat.folded .ai-seat-head { margin: 0; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .stage[data-ai-corner$="right"] #ai-seat.folded { left: auto;
+  right: var(--ai-right, 8px); }
+.ai-seat-open { display: inline-grid; place-items: center; width: 44px; height: 44px; flex: none; margin-left: auto;
+  border: 1px solid var(--ai); border-radius: 10px; background: transparent; color: var(--ai-ink); }
+.ai-seat-open::before { content: ""; width: 10px; height: 10px; border: solid currentColor; border-width: 0 2px 2px 0;
+  transform: rotate(-135deg) translate(-2px, -2px); }
+.ai-seat-open:hover, .ai-seat-open:focus-visible { border-color: var(--ai-ink); }
+.ai-seat-open[hidden] { display: none; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-question { padding: 6px 10px; }
 @media (orientation: portrait) {
   body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-cards { grid-template-columns: 1fr 1fr; }

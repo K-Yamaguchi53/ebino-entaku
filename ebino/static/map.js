@@ -1705,6 +1705,8 @@ const EbinoMap = (() => {
     stage.style.setProperty("--ai-top", bottom ? "auto" : `${Math.round(f.top - s.top + top)}px`);
     stage.style.setProperty("--ai-bottom", bottom ? `${Math.round(s.bottom - f.bottom + 8)}px` : "auto");
     stage.style.setProperty("--ai-w", `${w}px`);
+    // Folded (直し37-2) it keeps to its corner's side.
+    stage.style.setProperty("--ai-right", `${Math.round(s.right - f.right + 8)}px`);
     stage.style.setProperty("--ai-h", `${h}px`);
     stage.dataset.aiCorner = view.aiCorner;
   }
@@ -3053,6 +3055,7 @@ const EbinoMap = (() => {
       if (mine !== roundNo) return;
     }
     clearTable();
+    app.foldAiSeat(true);  // Back at the map: the AI's seat folded (直し37-2).
   }
 
   // --- marks that stay: met seats, and 「？」 on seats nobody asked yet ---

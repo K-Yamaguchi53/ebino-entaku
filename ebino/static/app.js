@@ -99,7 +99,7 @@ async function setup() {
   // mark, a seat's question card and the quote's card (直し26-2).
   const lent = { state, cardEntry, cardDone, setNow, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
     readBelow, shownQuotes, phrased, askSeat, answerTo, firstHelp, openParagraph, backToEveryone, oneOpen, oneAsk,
-    cardFromOne, oneThanks };
+    cardFromOne, oneThanks, foldAiSeat };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
 
@@ -786,6 +786,7 @@ function askSeat(seatId) {
 // 「答える」 on an AI's question: the box answers it.
 function answerTo(roundNo, role) {
   if (sending()) return;
+  foldAiSeat(false);  // Answering it: open (直し37-2).
   hideDone();
   setTo({ kind: "ai", roundNo, role });
 }
@@ -1091,7 +1092,28 @@ function renderAiSeat(roundNo, band) {
     cards.append(button);
   }
   seat.hidden = false;
+  $("ai-seat-open").onclick = openAiSeat;
+  foldAiSeat(false);  // A round's questions: open while the meeting is out (直し37-2).
   mapMoved();  // The map's cards keep off it.
+}
+
+// Back at the map the AI's seat is folded (直し37-2): its heading and the
+// button that opens it, at the same corner; its place on the map and the
+// upright screen's band under the map stay as they were, so the meeting's
+// bubbles and the map do not move when it comes out again. The button
+// (named by the heading) opens it, the keyboard to its first question.
+function foldAiSeat(fold) {
+  const seat = $("ai-seat"), open = $("ai-seat-open");
+  if (!seat || !open) return;
+  seat.classList.toggle("folded", fold);
+  open.hidden = !fold;
+  open.setAttribute("aria-expanded", String(!fold));
+}
+
+function openAiSeat() {
+  foldAiSeat(false);
+  const first = document.querySelector("#ai-seat-cards .ai-question:not(:disabled)") || document.querySelector("#ai-seat-cards .ai-question");
+  if (first) first.focus({ preventScroll: true });
 }
 
 // The question the box at the foot answers, lit; the box back to everyone, none.
