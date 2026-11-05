@@ -608,6 +608,17 @@ class Session:
         self.save()
         return {"item": item, **words, **self.one_view(seat_id)}
 
+    def one_thanks(self, seat_id: str) -> dict:
+        """「ありがとうございました」, once every item was asked: the seat is
+        kept as thanked (its mark on the map), and one to one ends."""
+        self._one_seat(seat_id)
+        if not self.one_view(seat_id)["done"]:
+            raise Refused("not_done")
+        if seat_id not in self.one_thanked:
+            self.one_thanked.append(seat_id)
+        self.save()
+        return {"thanked": list(self.one_thanked)}
+
     def one_free_question(self, seat_id: str, question: str) -> dict:
         """A question the student wrote: the librarian looks among this
         seat's words only. Found: those words; not: nothing (the screen says

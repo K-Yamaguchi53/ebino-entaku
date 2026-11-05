@@ -135,6 +135,8 @@ class App:
             return session.one_view(body.get("seat_id"))
         if path == "/api/one/ask":
             return session.one_ask(body.get("seat_id"), body.get("item"))
+        if path == "/api/one/thanks":
+            return session.one_thanks(body.get("seat_id"))
         if path == "/api/one/free":
             return session.one_free_question(body.get("seat_id"), body.get("question", ""))
         if path == "/api/ask_card":

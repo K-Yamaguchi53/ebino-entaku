@@ -2779,6 +2779,7 @@ const EbinoMap = (() => {
       node.classList.toggle("met", app.state.met.has(id));
       node.classList.toggle("silent", isSilent(id));
       node.classList.toggle("carded", app.state.carded.has(id));
+      node.classList.toggle("thanked", app.state.thanked.has(id));  // 直し34-5
       const seat = seatOf(id);
       const words = [seat.title, seat.detail, isSilent(id) ? app.state.texts.not_asked_yet : ""];
       node.setAttribute("aria-label", words.filter(Boolean).join("　"));
@@ -2882,7 +2883,13 @@ const EbinoMap = (() => {
     placeOne();
     // The questions to pick from (直し34-4), asked for while it stands up.
     const mine = one;
-    app.oneOpen(mine.seatId).then((view) => { if (one === mine) showAsks(view); }, () => {});
+    // The keyboard goes to the first of them (直し34-5: it was six Tabs away).
+    app.oneOpen(mine.seatId).then((view) => {
+      if (one !== mine) return;
+      showAsks(view);
+      const first = overlay.querySelector(".one-asks .one-ask");
+      if (first) first.focus({ preventScroll: true });
+    }, () => {});
   }
 
   // Up to three questions under its words, each a button; pressed, that
@@ -2894,6 +2901,28 @@ const EbinoMap = (() => {
     panel.setAttribute("role", "group");
     panel.setAttribute("aria-label", whoOf(seatOf(one.seatId)));
     const mine = one;
+    // Every item asked (直し34-5): 「聞き終えました」 and one choice,
+    // 「ありがとうございました」; pressed, the seat is thanked (its mark) and
+    // one to one closes.
+    if (view.done) {
+      panel.append(div("one-done", app.state.texts.one_words.done));
+      const thanks = document.createElement("button");
+      thanks.type = "button";
+      thanks.className = "one-ask one-thanks";
+      thanks.textContent = app.state.texts.one_words.thanks;
+      thanks.addEventListener("click", async () => {
+        thanks.disabled = true;
+        try {
+          await app.oneThanks(mine.seatId);
+          if (one !== mine) return;
+          refresh();
+          closeOne();
+        } catch (error) {
+          thanks.disabled = false;
+        }
+      });
+      panel.append(thanks);
+    }
     for (const { item, question } of view.questions) {
       const ask = document.createElement("button");
       ask.type = "button";

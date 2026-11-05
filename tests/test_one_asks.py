@@ -64,3 +64,23 @@ def test_the_questions_are_buttons_and_a_written_one_goes_to_free():
     assert "app.cardFromOne(mine.seatId, question)" in answer
     assert 'if (state.to.kind === "seat" && state.now.one) return sendOne(state.to.seatId);' in APP
     assert 'call("/api/one/free"' in _body(APP, "async function sendOne(")
+
+
+def test_done_shows_the_teachers_line_and_one_choice_that_thanks_and_closes(the_app):
+    # 直し34-5.
+    words = texts.screen_texts()["one_words"]
+    assert words["done"] == "聞き終えました" and words["thanks"] == "ありがとうございました"
+    asks = _body(MAP, "function showAsks(")
+    assert "if (view.done)" in asks and "app.state.texts.one_words.done" in asks and "app.state.texts.one_words.thanks" in asks
+    assert "await app.oneThanks(mine.seatId);" in asks and "closeOne();" in asks
+    assert 'node.classList.toggle("thanked", app.state.thanked.has(id));' in MAP
+    for item in ("目的", "結果"):
+        the_app.handle("/api/one/ask", {"seat_id": "P01", "item": item})
+    assert the_app.handle("/api/one/thanks", {"seat_id": "P01"}) == {"thanked": ["P01"]}
+
+
+def test_the_keyboard_starts_at_the_first_question_and_the_chairs_step_aside():
+    opened = _body(MAP, "function standUp(")
+    assert 'overlay.querySelector(".one-asks .one-ask")' in opened and "first.focus(" in opened
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    assert ".one-on .table .chair { visibility: hidden; }" in css

@@ -4,7 +4,7 @@
 
 const state = {
   texts: {}, kinds: {}, seats: [], seatById: {},
-  lastOrder: [], met: new Set(), silent: new Set(), carded: new Set(), marks: {},
+  lastOrder: [], met: new Set(), silent: new Set(), carded: new Set(), thanked: new Set(), marks: {},
   askBoxes: {},  // Round number -> the box of 「司会が○○に聞いてみる」.
   bands: {},  // Round number -> the band of コーチ and オブザーバー below.
   // Before the reflection, one answer to コーチ or オブザーバー (直し30-1):
@@ -99,7 +99,7 @@ async function setup() {
   // mark, a seat's question card and the quote's card (直し26-2).
   const lent = { state, cardEntry, cardDone, setNow, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
     readBelow, shownQuotes, phrased, askSeat, answerTo, firstHelp, openParagraph, backToEveryone, oneOpen, oneAsk,
-    cardFromOne };
+    cardFromOne, oneThanks };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
 
@@ -876,6 +876,13 @@ async function cardFromOne(seatId, text) {
 
 const oneOpen = (seatId) => call("/api/one/open", { seat_id: seatId });
 const oneAsk = (seatId, item) => call("/api/one/ask", { seat_id: seatId, item });
+
+// 「ありがとうございました」 (直し34-5): the seat kept as thanked, its mark on the map.
+async function oneThanks(seatId) {
+  const done = await call("/api/one/thanks", { seat_id: seatId });
+  for (const id of done.thanked) state.thanked.add(id);
+  return done;
+}
 
 // To an AI's question: the answer starts the next round (直し29-1).
 async function sendAnswer(roundNo, role) {

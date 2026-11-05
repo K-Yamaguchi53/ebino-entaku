@@ -120,3 +120,16 @@ def test_a_written_question_is_looked_for_in_this_seats_words_only(sitting, monk
     assert "好きな色" not in str(kept.sessions[-1]["one_to_one"])  # The written words are not kept here.
     with pytest.raises(Refused):
         s.one_free_question("A01", "")
+
+
+def test_thanks_only_once_every_item_was_asked_and_kept(sitting):
+    # 直し34-5: 「聞き終えました」 and the one choice 「ありがとうございました」.
+    s, kept = sitting
+    with pytest.raises(Refused):
+        s.one_thanks("P01")  # Not every item asked yet.
+    for item in ("目的", "結果"):
+        s.one_ask("P01", item)
+    assert s.one_view("P01")["done"]
+    assert s.one_thanks("P01") == {"thanked": ["P01"]}
+    assert s.one_thanks("P01") == {"thanked": ["P01"]}  # Twice: kept once.
+    assert kept.sessions[-1]["one_to_one"] == [{"seat_id": "P01", "items": ["目的", "結果"], "free_found": [], "thanked": True}]

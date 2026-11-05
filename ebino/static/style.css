@@ -1118,3 +1118,10 @@ body.one-open #ai-seat { visibility: hidden; }
 .one-bubble.not-found .voice { color: var(--paper-soft); }
 .one-card { pointer-events: auto; margin-top: 8px; min-height: 40px; padding: 4px 14px; color: var(--paper-ink); background: var(--paper-light);
   border-color: var(--paper-soft); }
+/* 聞き終えました and the thanks (直し34-5); a seat thanked keeps a ring on the map. */
+.one-done { padding: 4px 2px; color: var(--paper-light); font-size: 15px; }
+.one-thanks { border-color: var(--lamp); }
+.pt.thanked .halo { opacity: 1; stroke: var(--lamp); stroke-width: 2.4; fill-opacity: .35; }
+/* The empty chairs out of the way at one to one: not seen, not reached by Tab (直し34-5). */
+.one-on .table .chair { visibility: hidden; }
+.one-on .pt.silent .ask-mark { display: none; }
