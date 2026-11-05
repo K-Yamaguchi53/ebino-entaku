@@ -694,7 +694,7 @@ def test_the_maps_buttons_and_the_tables_heading_are_under_the_map_not_over_it()
     frame = html[html.index('<div id="map-frame"'):html.index('<div id="map-overlay"')]
     assert "<button" not in frame
     # Beside the map on the one screen (直し32-1), never over it.
-    bar = html[html.index('class="map-bar'):html.index('<div id="map-card"')]
+    bar = html[html.index('class="map-bar'):html.index("</section>", html.index('class="map-bar'))]
     for button in ("map-back", "map-zoom-in", "map-zoom-out", "map-zoom-all"):
         assert f'id="{button}"' in bar
     assert 'id="map-heading"' in bar
@@ -883,11 +883,10 @@ def test_the_harvest_and_the_sheet_are_one_sheet_of_paper_in_mincho_and_print_as
     assert html.index('id="harvest"') < html.index('id="sheet"')  # The harvest heads the sheet.
 
 
-def test_the_question_card_is_a_paper_card_and_the_heavy_talk_notice_is_quiet():
+def test_the_heavy_talk_notice_is_quiet_and_the_old_card_form_is_gone():
     css = _css()
-    card = _rule(css, ".card-form")
-    assert "background: var(--paper)" in card and "box-shadow:" in card
-    assert "var(--gothic)" in _rule(css, ".card-form textarea") and "var(--mincho)" in _rule(css, ".card-form label")
+    # The card form under the seat list and the map's card are no more (直し32-2, 直し33-5): the box at the foot writes.
+    assert ".card-form" not in css and ".map-card" not in css
     heavy = _rule(css, ".heavy-talk")
     assert "color: var(--soft)" in heavy and "var(--lamp" not in heavy and "var(--warn" not in heavy
     assert "font-size: 16px" in heavy

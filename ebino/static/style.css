@@ -160,7 +160,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   outline: 2px solid var(--lamp); outline-offset: 3px;
 }
 /* On paper the lamp's honey would hardly show: the ring is the paper's ink there. */
-.quote :focus-visible, .closing-word :focus-visible, .card-form :focus-visible, .harvest :focus-visible {
+.quote :focus-visible, .closing-word :focus-visible, .harvest :focus-visible {
   outline-color: var(--paper-ink);
 }
 input[type="text"], textarea, select {
@@ -362,25 +362,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .seat.met .title::after { content: " ✓"; }
 .seat .not-asked { font-size: 14px; color: var(--soft); }
 /* 質問カード: one paper card, the student's question written on it. */
-.card-form { margin-top: 10px; max-width: 26rem; padding: 14px 16px 16px; border-radius: 4px; color: var(--paper-ink);
-  background: var(--paper); box-shadow: 0 0 0 1px var(--paper-line), 0 0 18px var(--lamp-faint), 0 10px 24px var(--shadow); }
-.card-form label { display: block; font-family: var(--mincho); font-size: 17px; font-weight: 600; line-height: 1.6; }
-.card-form textarea { --rule: calc(17px * 1.7); display: block; width: 100%; margin-top: 8px; padding: 6px 10px; resize: vertical;
-  font: 17px/1.7 var(--gothic); color: var(--paper-ink); border: 1px solid var(--paper-line); border-radius: 3px;
-  background: linear-gradient(to bottom, transparent calc(var(--rule) - 1px), var(--paper-line) 0) 0 6px / 100% var(--rule) local,
-    var(--paper-light); }
-.card-form button { margin-top: 10px; color: var(--paper-ink); background: var(--paper-light); border-color: var(--paper-soft); }
-.card-form button:hover { background: var(--paper-2); }
 .card-done { font-size: 14px; color: var(--soft); }
 /* The new round's question takes the keyboard's focus after 「聞く」. */
 .round-question:focus-visible { outline: 2px solid var(--lamp); outline-offset: 4px; border-radius: 4px; }
 /* In the seat list, the open card spans the list under its seat's line;
    its seat is marked while it is open. */
 /* As wide as the seats' columns (--line, from app.js), and alone on its line. */
-.seat-row > .card-form { flex: 0 0 var(--line, 100%); max-width: none; margin-top: 2px;
-  margin-right: calc(100% - var(--line, 100%)); }
-.card-form .card-for { margin: 0 0 4px; font-family: var(--gothic); font-size: 14px; font-weight: bold;
-  color: var(--paper-soft); }
 .seat.writing { box-shadow: 0 0 0 1px var(--lamp), 0 0 12px var(--lamp-faint); }
 
 /* --- the reflection: one card at a time, in the middle, unhurried --- */
@@ -585,6 +572,10 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .dim .relief-image { opacity: .42; }
 .dim .basin-fill, .dim .river, .dim .rim, .dim .points, .dim .place-names, .dim .school, .dim .school-picture,
 .dim .home-names, .dim .home-gate, .dim .yard, .dim .crossing { opacity: .26; }
+/* While the seats are gathered (直し33-5), the map's and the homes' names
+   are not shown: the cards and their buttons never come over them, and
+   they are back with 「地図にもどす」. */
+.dim .place-names, .dim .home-names, .dim .school text { visibility: hidden; }
 /* While the round table is open, the map's points behind take no mouse,
    press or touch (直し27-4); the table's own seats and chairs do. */
 .dim .points { pointer-events: none; }
@@ -836,10 +827,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   gap: 0 14px; flex: 1 1 18em; justify-content: flex-end; }
 .map-source span { min-width: 0; overflow-wrap: anywhere; }
 .school { pointer-events: none; }
-.map-card { background: var(--night-2); border: 1px solid var(--moon-soft); border-radius: 8px; padding: 12px 16px; margin-top: 8px; }
-.map-card .title { font-weight: bold; }
-.map-card .not-asked { font-size: .88rem; color: var(--soft); }
-.map-card .close { margin-top: 8px; font-size: 15px; padding: 2px 14px; }
 
 @media (max-width: 640px) {
   .ask { grid-template-columns: 1fr; }
@@ -863,9 +850,10 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
    with lang="ja"); a phrase longer than its line still breaks rather than
    running out of the box. Every box a student reads in. */
 .now-line, .start-purpose, .inside, .purposes, .message, .reflect-needs, .spoken-note,
-.quote, .map-bubble, .table-bubble, .table-label, .map-choices, .map-tip, .map-card, .split-tag,
+.quote, .map-bubble, .table-bubble, .table-label, .map-choices, .map-tip, .split-tag,
 .harvest, .sheet, .first-question, .lab-question, .promises, .notice-list,
-.round, .ai-band, .ai-card, .closing, .ask-seat, .split, .map-hint, .heavy-talk, .seats, #reflect {
+.round, .ai-band, .ai-card, .closing, .ask-seat, .split, .map-hint, .heavy-talk, .seats, #reflect,
+.ai-seat, .drawer-body, .ask textarea, .input-to {
   word-break: auto-phrase;
   overflow-wrap: break-word;
 }
@@ -979,9 +967,6 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .input-area .message, bod
   max-width: none; text-align: left; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .map-met { white-space: nowrap; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #table > .map-source { grid-column: 1 / -1; grid-row: 3; margin: -4px 0 0; font-size: .6rem; line-height: 1.3; }
-/* The card of an empty chair's 「？」, over the map's lower left. */
-body:has(#table:not([hidden])):has(#map:not([hidden])) .map-card { position: absolute; z-index: 8; left: 8px; bottom: 8px; width: min(380px, 90%); margin: 0;
-  box-shadow: 0 10px 28px var(--shadow); }
 /* A low screen (1366×650): the box one line shorter. */
 @media (max-height: 700px) {
   body:has(#table:not([hidden])):has(#map:not([hidden])) .masthead h1 { font-size: 18px; }
@@ -1040,6 +1025,8 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .ask { grid-template-colu
 .ai-mark { display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 9px;
   background: var(--ai); color: var(--ai-deep); font: 800 15px/1 var(--gothic); letter-spacing: .04em; }
 .ai-seat-note { margin: 0 0 8px; font-size: 14px; line-height: 1.6; color: var(--ai-ink); }
+/* On the one screen, under the school, a little smaller so it reads whole (直し33-5). */
+body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-note { margin-bottom: 4px; font-size: 13px; line-height: 1.45; }
 .ai-seat-cards { display: grid; gap: 8px; }
 .ai-question { display: grid; gap: 2px; width: 100%; text-align: left; padding: 8px 12px; min-height: 44px;
   border: 1px solid var(--ai); border-radius: 10px; background: color-mix(in srgb, var(--ai-deep) 70%, var(--night));
@@ -1057,7 +1044,7 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .ask { grid-template-colu
 body:has(#table:not([hidden])):has(#map:not([hidden])) .stage { --ai-w: max(220px, calc(var(--yard-w, 340px) - 16px)); }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { position: absolute; z-index: 6; left: calc(var(--yard-left, 0px) + (var(--yard-w, 340px) - var(--ai-w)) / 2);
   bottom: 0; margin: 0; width: var(--ai-w);
-  max-height: calc(42% - 4px); overflow: auto; scrollbar-width: thin; scrollbar-color: var(--ai) transparent;
+  max-height: calc(45% - 4px); overflow: auto; scrollbar-width: thin; scrollbar-color: var(--ai) transparent;
   box-shadow: 0 10px 28px var(--shadow); }
 /* Its questions side by side in the school's column, so both are read
    whole in the room under the school. */

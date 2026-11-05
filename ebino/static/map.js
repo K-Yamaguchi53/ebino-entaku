@@ -90,7 +90,7 @@ const EbinoMap = (() => {
   // takes at the table (style.css: two lines of words, whose under them),
   // and the gap between two. On a wide screen the right column stays over
   // the room the AI's seat takes under the school (AI_ROOM of the height).
-  const GATHER_CARD = { w: 236, h: 112, gap: 10 }, AI_ROOM = 0.42;
+  const GATHER_CARD = { w: 236, h: 112, gap: 10 }, AI_ROOM = 0.45;
   // Quicker since 直し31-6 (were 1100, 1100, 160): the table is there sooner.
   const CAMERA_FOR = 700, FLY_FOR = 700, FLY_GAP = 90, BACK_FOR = 700;
   const CLOSEST = 3.5;  // The nearest zoom shows this part of the whole across.
@@ -147,7 +147,7 @@ const EbinoMap = (() => {
 
   let map = null;  // The drawing from /api/setup.
   let app = null;  // What app.js lends: state, cardEntry, renderSeats, shownQuotes.
-  let svg, overlay, frame, card;
+  let svg, overlay, frame;
   let lastSeats = [];  // The seats as last drawn, to draw them again (直し33-2).
   let yardPicture = null;  // The school's large picture once it has loaded (直し33-2).
   let view = null;  // How the map's (x, y) reach the drawing (flatView, reliefView).
@@ -251,7 +251,6 @@ const EbinoMap = (() => {
     svg = $("map-svg");
     overlay = $("map-overlay");
     frame = $("map-frame");
-    card = $("map-card");
     controls();
     const go = () => {
       if (!map.relief) return build(seats, false);
@@ -1079,16 +1078,6 @@ const EbinoMap = (() => {
       if (frame.parentElement) watch.observe(frame.parentElement);
     }
     window.addEventListener("resize", changed);
-    // The screen's keyboard takes the lower part of the screen: the card
-    // being written in stays in sight.
-    if (window.visualViewport) window.visualViewport.addEventListener("resize", keepCardInSight);
-    window.addEventListener("resize", keepCardInSight);
-  }
-
-  // The card of an empty chair, whole on screen when it opens and while one
-  // writes in it.
-  function keepCardInSight() {
-    if (card && !card.hidden && card.contains(document.activeElement)) card.scrollIntoView({ block: "nearest" });
   }
 
   // Draws the rim, then the river, as if by hand. Called when the map is on
@@ -1246,7 +1235,8 @@ const EbinoMap = (() => {
     const reach = 9.5 * pointScale() * frameBox.width / vb.w;
     const seats = tableTop ? [] : roundSeats.map((id) => toFrame(...spotOf(id)))
       .map(([px, py]) => [px - reach, py - reach, 2 * reach, 2 * reach]);
-    const words = [...svg.querySelectorAll(".place-names text, .home-names text, .school text, .school > :not(text), " +
+    // While the table is open the map's words are not shown (直し33-5): nothing to keep off.
+    const words = tableTop ? [] : [...svg.querySelectorAll(".place-names text, .home-names text, .school text, .school > :not(text), " +
       ".school-picture image")].map((node) => boxIn(node, frameBox));
     const cover = tableTop && tableTop.map(([x, y]) => toFrame(x, y));
     // The arrow and the four ways' names (直し25-3), once they are put.
@@ -1450,11 +1440,13 @@ const EbinoMap = (() => {
         taken.push([spots[k][0], spots[k][1], items[k].w, items[k].h]);
       });
     };
-    // The headings, then the empty chairs' labels.
-    put([...overlay.querySelectorAll(".split-tag"), ...overlay.querySelectorAll(".table-label.empty")],
-      (items) => planLabels(frameSize, items, fixed));
-    // At the table, the cards of the seats that spoke, in seat_order (直し26-1).
+    // The headings first.
+    put([...overlay.querySelectorAll(".split-tag")], (items) => planLabels(frameSize, items, fixed));
+    // At the table, the cards of the seats that spoke, in seat_order (直し26-1),
+    // before the empty chairs' labels (直し33-5: a long one in a card's column
+    // left that card out); the labels then where the cards leave room.
     const { named, planned } = placeTableBubbles(frameBox, frameSize, taken);
+    put([...overlay.querySelectorAll(".table-label.empty")], (items) => planLabels(frameSize, items, [...fixed, ...taken]));
     // The names of the other seats there (a seat whose card is up has none:
     // the card says who), then a seat's name card.
     const labels = [...overlay.querySelectorAll(".table-label:not(.empty)")];
@@ -2244,7 +2236,10 @@ const EbinoMap = (() => {
     close.className = "close";
     close.textContent = app.state.texts.bubble_close;
     close.addEventListener("click", () => closeChoices(true));
-    head.append(div("who", whoOf(seatOf(seatId))), close);
+    // Never broken inside a word nor its （…） (直し33-5: 「架空の川／1」).
+    const who = div("who");
+    who.append(app.phrased(whoOf(seatOf(seatId))));
+    head.append(who, close);
     const button = (key, action) => {
       const item = document.createElement("button");
       item.type = "button";
@@ -2373,7 +2368,11 @@ const EbinoMap = (() => {
     // the line by the edge (soft), which step behind it if it must.
     const shown = [...overlay.querySelectorAll(".table-bubble:not(.unplaced), .table-label:not(.unplaced), " +
       ".map-compass, .map-around, .map-hint")].filter((other) => other !== card && getComputedStyle(other).visibility !== "hidden");
-    const others = shown.map((other) => boxIn(other, frameBox));
+    // And the words on the map and the homes' names (直し33-5: pressed a
+    // second time, the choices came over a place name and a seat's label).
+    const words = [...svg.querySelectorAll(".place-names text, .home-names text, .school text")].map((other) => boxIn(other, frameBox));
+    const others = [...shown.map((other) => boxIn(other, frameBox)),
+      ...seenWords(frameWH, words, tableTop && tableTop.map(([x, y]) => toFrame(x, y)))];
     const seat = seatAtTable(card);
     const own = boxIn(card, frameBox), hard = fixedBoxes(frameBox, false, false, withBacks);
     // A tail never crosses the table's top (top); it crosses no seat or chair either (block) but as a last resort.

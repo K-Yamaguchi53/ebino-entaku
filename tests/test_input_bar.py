@@ -35,8 +35,11 @@ HARNESS = """
 const made = {};
 const part = (id) => made[id] || (made[id] = { id, textContent: "", hidden: false, value: "", disabled: false,
   dataset: {}, maxLength: 0, placeholder: "", title: "", attrs: {}, focused: 0,
-  setAttribute(k, v) { this.attrs[k] = v; }, focus() { this.focused += 1; } });
+  setAttribute(k, v) { this.attrs[k] = v; }, focus() { this.focused += 1; },
+  replaceChildren(...kids) { this.textContent = kids.join(""); } });
 const $ = part;
+// Its words kept whole in their phrases (直し33-5): here, the words as they are.
+const phrased = (text) => text;
 const sent = [];
 let answer = null, release = null;
 async function call(path, body) {

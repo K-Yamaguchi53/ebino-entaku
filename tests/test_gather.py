@@ -92,3 +92,9 @@ def test_a_card_shows_the_head_of_its_words_and_all_of_them_pressed():
     clamp = CSS[CSS.index('.table-bubble:not([aria-expanded="true"]) .voice {'):]
     clamp = clamp[:clamp.index("}")]
     assert "-webkit-line-clamp: 2;" in clamp and "overflow: hidden;" in clamp
+
+
+def test_the_cards_are_put_before_the_empty_chairs_labels():
+    # A long label put first took a card's place in its column (直し33-5).
+    laid = _inner("relayout")
+    assert laid.index("placeTableBubbles(frameBox, frameSize, taken)") < laid.index('".table-label.empty"')

@@ -750,7 +750,8 @@ function setTo(next, { focus = true } = {}) {
   state.to = next;
   const words = state.texts.input_to;
   const label = next.kind === "seat" ? words.seat.replace("{seat}", seatName(next.seatId)) : words[next.kind];
-  $("input-to-label").textContent = label;
+  // Never broken inside a word nor its （…） (直し33-5: 「架空の川／1」).
+  $("input-to-label").replaceChildren(phrased(label));
   $("question-label").textContent = label;
   const clear = $("input-to-clear");
   clear.hidden = next.kind === "all";
@@ -1019,7 +1020,7 @@ async function loadBand(roundNo, box) {
 function renderAiSeat(roundNo, band) {
   const seat = $("ai-seat");
   $("ai-seat-mark").textContent = state.texts.ai_seat_mark;
-  $("ai-seat-label").textContent = state.texts.ai_seat_label;
+  $("ai-seat-label").replaceChildren(phrased(state.texts.ai_seat_label));  // 「ませ／ん」 no more (直し33-5).
   const note = $("ai-seat-note");
   if (!state.aiNoted) {
     state.aiNoted = roundNo;

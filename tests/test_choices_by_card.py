@@ -27,7 +27,7 @@ def _inner(name):
 def test_the_choices_say_whose_they_are_and_close_with_the_teachers_word():
     assert texts.screen_texts()["bubble_close"] == "閉じる"
     opened = _inner("openChoices")
-    assert 'head.append(div("who", whoOf(seatOf(seatId))), close);' in opened
+    assert 'who.append(app.phrased(whoOf(seatOf(seatId))));' in opened
     assert "close.textContent = app.state.texts.bubble_close;" in opened
     assert 'close.addEventListener("click", () => closeChoices(true));' in opened
     assert "node.append(head, read," in opened

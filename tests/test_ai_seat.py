@@ -81,10 +81,12 @@ def test_pressing_a_question_the_box_answers_it_and_reflecting_goes_to_it_first(
 HARNESS = """
 const made = {};
 const part = (id) => made[id] || (made[id] = { id, textContent: "", hidden: true, children: [],
-  replaceChildren(...kids) { this.children = kids; }, append(kid) { this.children.push(kid); } });
+  replaceChildren(...kids) { this.children = kids; if (kids.every((kid) => typeof kid === "string")) this.textContent = kids.join(""); },
+  append(kid) { this.children.push(kid); } });
 const $ = part;
 function el(tag, attrs, ...kids) { return { tag, attrs, kids, classList: { add() {} }, addEventListener() {} }; }
 function mapMoved() {}
+const phrased = (text) => text;  // Kept whole in its phrases (直し33-5): here, as it is.
 const state = { texts: { ai_seat_mark: "AI", ai_seat_label: "LABEL", ai_seat_note: "NOTE" } };
 %(source)s
 const band = { cards: [{ role: "coach", label: "C", question: "Q1" }, { role: "observer", label: "O", question: "Q2" }],
