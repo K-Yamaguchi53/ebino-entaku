@@ -98,7 +98,7 @@ async function setup() {
   // What the map may use: the round's own ways to a quote's paragraph, its
   // mark, a seat's question card and the quote's card (直し26-2).
   const lent = { state, cardEntry, cardDone, setNow, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
-    readBelow, shownQuotes, phrased, askSeat, answerTo, firstHelp, openParagraph };
+    readBelow, shownQuotes, phrased, askSeat, answerTo, firstHelp, openParagraph, backToEveryone };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
 
@@ -558,6 +558,7 @@ function nowState() {
   if (now.asking) return "asking";
   if (!state.firstQuestion) return "write";
   if (now.reading) return "reading";
+  if (now.one) return "one";  // One to one (直し34-3).
   if (cardOpen()) return "card";
   if (state.to.kind === "ai") return "answer_ai";
   if (now.choices) return "pressed";
@@ -1739,7 +1740,8 @@ function backToStart() {
 $("ask-form").addEventListener("submit", send);
 $("input-to-clear").addEventListener("click", backToEveryone);
 $("question").addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && state.to.kind !== "all") {
+  // At one to one, Esc goes back to the table (map.js), the box with it (直し34-3).
+  if (event.key === "Escape" && state.to.kind !== "all" && !state.now.one) {
     event.preventDefault();
     backToEveryone();
   }

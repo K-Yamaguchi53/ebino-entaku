@@ -115,6 +115,9 @@ DRAWER_PARTS = "drawer_parts"
 DRAWER_PART_IDS = ("paragraph", "rounds", "seats", "purposes")
 # The one box at the foot (直し32-2): to whom it goes (and the × back to
 # everyone), its button's word for each, and the line after a send.
+# One to one's words (直し34): 「円卓にもどす」 and the rest.
+ONE_WORDS = "one_words"
+ONE_WORD_IDS = ("back",)
 INPUT_TO = "input_to"
 INPUT_TO_IDS = ("all", "seat", "ai", "clear")
 INPUT_SEND = "input_send"
@@ -154,7 +157,7 @@ CARD_ALREADY = "card_already"
 NOW_STEPS = "now_steps"
 NOW_LINE = "now_line"
 NOW_STEP_IDS = ("write", "read", "ask", "reflect")
-NOW_LINE_IDS = ("start", "preparing", "write", "asking", "reading", "table", "pressed", "card", "after", "reflect")
+NOW_LINE_IDS = ("start", "preparing", "write", "asking", "reading", "table", "pressed", "card", "one", "after", "reflect")
 START_PURPOSE = "start_purpose"
 INSIDE_HEADING = "inside_heading"
 INSIDE_COUNTS = "inside_counts"
@@ -260,6 +263,7 @@ def screen_texts() -> dict:
     texts[DRAWER_PARTS] = id_table(DRAWER_PARTS, DRAWER_PART_IDS)
     texts[BUBBLE_CHOICES_HELP] = id_table(BUBBLE_CHOICES_HELP, BUBBLE_CHOICE_IDS)
     texts[INPUT_TO] = id_table(INPUT_TO, INPUT_TO_IDS)
+    texts[ONE_WORDS] = id_table(ONE_WORDS, ONE_WORD_IDS)
     texts[INPUT_SEND] = id_table(INPUT_SEND, INPUT_SEND_IDS)
     texts[INPUT_DONE] = id_table(INPUT_DONE, INPUT_DONE_IDS)
     texts[SEAT_ICONS] = seat_icons()

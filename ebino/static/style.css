@@ -853,7 +853,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .quote, .map-bubble, .table-bubble, .table-label, .map-choices, .map-tip, .split-tag,
 .harvest, .sheet, .first-question, .lab-question, .promises, .notice-list,
 .round, .ai-band, .ai-card, .closing, .ask-seat, .split, .map-hint, .heavy-talk, .seats, #reflect,
-.ai-seat, .drawer-body, .ask textarea, .input-to {
+.ai-seat, .drawer-body, .ask textarea, .input-to, .one-bubble, .one-asks {
   word-break: auto-phrase;
   overflow-wrap: break-word;
 }
@@ -1093,3 +1093,19 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #opening-skip { min-heigh
 .yard-roof { fill: var(--night-3); stroke: var(--moon-soft); stroke-width: 3; }
 .yard-wall { fill: var(--night); stroke: var(--moon-faint); stroke-width: 3; }
 .yard-window { fill: color-mix(in srgb, var(--lamp) 22%, var(--night)); }
+
+/* One to one (直し34-3): the other seats, cards and the table step back;
+   the person stands at its home, its words by its head. */
+.one-on .table-bubble, .one-on .table-label, .one-on .seat-press, .one-on .map-hint, .one-on .split-tag,
+.one-on .map-around, .one-on .map-compass, .one-on .map-tip { visibility: hidden; }
+.one-on .table .token:not(.one-self), .one-on .table .chair, .one-on .table-top-group, .one-on .table-foot,
+.one-on .table-glow, .one-on .table-shadow, .one-on .table-split, .one-on .table-lamp { opacity: .16; }
+.one-on .table .token.stood { visibility: hidden; }
+body.one-open #ai-seat { visibility: hidden; }
+.one-person { pointer-events: none; }
+.one-person .shade { opacity: .35; }
+.one-bubble { position: absolute; z-index: 5; padding: 12px 16px 10px; border-radius: 6px; background: var(--paper); color: var(--paper-ink);
+  box-shadow: 0 10px 26px var(--shadow); }
+.one-bubble .voice { font-family: var(--mincho); font-size: 18px; line-height: 1.8; }
+.one-bubble .who { margin-top: 4px; font-size: 13px; color: var(--paper-soft); }
+.one-bubble .spoken-mark { display: inline-block; margin-bottom: 4px; }

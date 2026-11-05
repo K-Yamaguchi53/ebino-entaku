@@ -108,7 +108,7 @@ def test_the_large_picture_first_and_without_it_the_plain_yard():
 
 def test_the_drawing_follows_the_rooms_shape_but_not_while_a_round_plays():
     again = _inner("recompose")
-    assert "if (!view || camera || playing || flights.length) return false;" in again
+    assert "if (!view || camera || playing || flights.length || one) return false;" in again
     # The table open: opened again for the same round, at once (直し33-4).
     assert "if (reopen) openTable(reopen.result, reopen.order, tableCenter(), () => true, true);" in again
     assert "const motion = !reduced() && !again;" in MAP

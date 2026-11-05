@@ -47,6 +47,8 @@ STATIC_FILES = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/map.js": ("map.js", "text/javascript; charset=utf-8"),
+    # A seat as a person at one to one (直し34-3), drawn by code.
+    "/person.js": ("person.js", "text/javascript; charset=utf-8"),
     # Hand-drawn lines on the map (MIT), bundled: nothing is loaded from outside.
     "/rough.js": ("rough.js", "text/javascript; charset=utf-8"),
     "/rough.LICENSE.txt": ("rough.LICENSE.txt", "text/plain; charset=utf-8"),

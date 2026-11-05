@@ -576,7 +576,7 @@ const EbinoMap = (() => {
   // With the table open (直し33-4), it is opened again for the same round,
   // at once, its seats where the new shape gives them room.
   function recompose() {
-    if (!view || camera || playing || flights.length) return false;
+    if (!view || camera || playing || flights.length || one) return false;
     const room = roomSize(), want = room.w / room.h, have = view.W / view.H;
     if (Math.abs(want - have) <= RECOMPOSE * have) return false;
     const lit = Object.keys(points).filter((id) => points[id].node.classList.contains("lit"));
@@ -912,6 +912,10 @@ const EbinoMap = (() => {
 
   function clampView(v) {
     const w = Math.min(view.W, Math.max(view.W / CLOSEST, v.w)), h = w * view.H / view.W;
+    // At one to one the camera may go past the drawing's edge (直し34-3: a
+    // home at the top, the way out or a window, had the person's head cut
+    // off), keeping the drawing's edge no further in than half the frame.
+    if (one) return { x: Math.min(view.W - w / 2, Math.max(-w / 2, v.x)), y: Math.min(view.H - h / 2, Math.max(-h / 2, v.y)), w, h };
     return { x: Math.min(view.W - w, Math.max(0, v.x)), y: Math.min(view.H - h, Math.max(0, v.y)), w, h };
   }
 
@@ -985,7 +989,7 @@ const EbinoMap = (() => {
     $("map-zoom-in").addEventListener("click", () => moveTo(zoomAround(ZOOM_STEP), 300));
     $("map-zoom-out").addEventListener("click", () => moveTo(zoomAround(1 / ZOOM_STEP), 300));
     $("map-zoom-all").addEventListener("click", () => moveTo({ x: 0, y: 0, w: view.W, h: view.H }, 500));
-    $("map-back").addEventListener("click", closeTable);
+    $("map-back").addEventListener("click", () => (one ? closeOne() : closeTable()));
 
     svg.addEventListener("wheel", (event) => {
       if (!view) return;
@@ -1054,6 +1058,8 @@ const EbinoMap = (() => {
     svg.addEventListener("click", () => closeChoices(false));
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && choices) closeChoices(true);
+      // Esc at one to one: back to the table, as 「円卓にもどす」 (直し34-3).
+      else if (event.key === "Escape" && one && !event.defaultPrevented && !$("drawer").contains(document.activeElement)) closeOne();
     });
   }
 
@@ -1454,6 +1460,7 @@ const EbinoMap = (() => {
     put([...labels.filter((label) => !named.has(label.dataset.seat)), ...overlay.querySelectorAll(".map-tip")],
       (items) => planLabels(frameSize, items, [...fixed, ...taken]));
     placeSeatPresses(planned);
+    if (one) placeOne();
     putChoices();
     placeAskMarks();
   }
@@ -2281,8 +2288,8 @@ const EbinoMap = (() => {
         busy = false;
       }
     });
-    const write = app.state.carded.has(seatId) ? div("done", "質問カードにしました")
-      : button("card", () => { closeChoices(false); app.askSeat(seatId); });
+    // One to one with this seat (直し34-3), its card made or not.
+    const write = button("card", () => openOne(seatId, card));
     const below = button("read", () => { closeChoices(false); app.readBelow(tableRoundNo, utteranceId, card); });
     node.append(head, read, paragraph, mark, write, below);
     // The first time a bubble is pressed, a line under each button says what
@@ -2718,6 +2725,7 @@ const EbinoMap = (() => {
   }
 
   function clearTable() {
+    if (one) endOne();
     tableOf = null;
     tokens = [];
     tableTop = null;
@@ -2790,6 +2798,145 @@ const EbinoMap = (() => {
     returnFocus = from;
     // The one box at the foot writes to it (直し32-2), the keyboard in it.
     app.askSeat(seatId);
+  }
+
+  // --- one to one (直し34-3) ---
+  // 「この人に聞きたいことを書く」 on a card at the table: the seat goes back
+  // to its home, the camera comes near it there, the seat stands up as a
+  // person (person.js), one hand up, and talks from there; the other seats
+  // and cards step back. 「円卓にもどす」 or Esc: the person is a seat again,
+  // the camera goes back and the table is as it was. Motion reduced: the
+  // near view with the person standing, at once. The AI's seat never stands
+  // up (it is not one of the town's people): it has no card at the table.
+  const ONE_ZOOM = 2.4;  // The camera this much nearer.
+  const PERSON_PART = 0.5;  // The person this part of the frame's height.
+  const STAND_FOR = 450;  // ms the seat takes to stand up.
+  let one = null;  // { seatId, home, token, group, scale, flight }
+
+  // A seat's place among the seats of its kind in seat ID order (person.js).
+  function placeAmong(seatId) {
+    const kind = seatOf(seatId).kind;
+    const ids = app.state.seats.filter((seat) => seat.kind === kind).map((seat) => seat.seat_id).sort();
+    return Math.max(0, ids.indexOf(seatId));
+  }
+
+  async function openOne(seatId, card) {
+    if (!tableAt || !points[seatId] || one) return;
+    closeChoices(false);
+    const motion = !reduced();
+    const token = tokens.find((t) => t.id === seatId && !t.chair) || null;
+    const home = spotOf(seatId);
+    one = { seatId, home, token, group: null, words: card ? card.querySelector(".voice").textContent : "",
+      spoken: Boolean(card && card.classList.contains("spoken")) };
+    const mine = one;
+    frame.classList.add("one-on");
+    // The AI's seat steps back too (直し34-3: it covered the person's feet and words).
+    document.body.classList.add("one-open");
+    $("map-back").textContent = app.state.texts.one_words.back;
+    app.setNow({ one: true });
+    app.askSeat(seatId);  // The box at the foot writes to this person.
+    if (token) token.node.classList.add("one-self");
+    // Back home first.
+    if (token && motion) {
+      const f = pointScale();
+      mine.flight = token.node.animate([
+        { transform: `translate(${token.at[0]}px, ${token.at[1]}px) scale(${f * TOKEN})` },
+        { transform: `translate(${home[0]}px, ${home[1]}px) scale(${f})` },
+      ], { duration: FLY_FOR * 0.7, easing: "cubic-bezier(.3,.7,.2,1)", fill: "forwards" });
+      await mine.flight.finished.catch(() => {});
+      if (one !== mine) return;
+    }
+    // Near it, the person's feet low in the frame, room for its words beside it.
+    const w = view.W / ONE_ZOOM, h = w * view.H / view.W;
+    await moveTo({ x: home[0] - w * 0.36, y: home[1] - h * 0.86, w, h }, motion ? CAMERA_FOR : 0);
+    if (one !== mine) return;
+    standUp(motion);
+  }
+
+  // The seat stands up as a person: in its kind's colour, stretched up from
+  // the seat, its head and legs coming out.
+  function standUp(motion) {
+    const [x, y] = one.home;
+    const s = PERSON_PART * vb.h / EbinoPerson.HEIGHT;
+    const group = svgEl("g", { class: "one-person" });
+    group.append(EbinoPerson.figure(seatOf(one.seatId).kind, one.seatId, placeAmong(one.seatId), "wave"));
+    group.setAttribute("transform", `translate(${x} ${y}) scale(${s})`);
+    tableLayer.append(group);
+    Object.assign(one, { group, scale: s });
+    if (one.token) one.token.node.classList.add("stood");
+    if (motion && group.animate) {
+      group.animate([
+        { transform: `translate(${x}px, ${y}px) scale(${s * 0.3}, ${s * 0.1})`, opacity: 0.8 },
+        { transform: `translate(${x}px, ${y}px) scale(${s * 0.55}, ${s * 0.75})`, opacity: 1, offset: 0.5 },
+        { transform: `translate(${x}px, ${y}px) scale(${s})`, opacity: 1 },
+      ], { duration: STAND_FOR, easing: "cubic-bezier(.3,.7,.2,1)" });
+    }
+    const bubble = div("one-bubble");
+    bubble.setAttribute("role", "status");
+    if (one.spoken) bubble.append(div("spoken-mark", app.state.texts.spoken_mark));
+    const voice = div("voice");
+    voice.textContent = one.words;
+    bubble.append(voice, div("who", whoOf(seatOf(one.seatId))));
+    overlay.append(bubble);
+    one.bubble = bubble;
+    placeOne();
+  }
+
+  // The person's words by its head, on the side with room (right first),
+  // inside the frame; what one to one adds under them (直し34-4) below.
+  function placeOne() {
+    if (!one || !one.bubble) return;
+    const frameBox = overlay.getBoundingClientRect();
+    const [hx, hy] = toFrame(one.home[0], one.home[1] - EbinoPerson.HEIGHT * 0.9 * one.scale);
+    // The person's own outline as it stands (its hand up included), not as
+    // it is while standing up: the bubble keeps clear of it.
+    const bb = one.group.firstElementChild.getBBox();
+    const [rx] = toFrame(one.home[0] + (bb.x + bb.width) * one.scale, one.home[1]);
+    const [lx] = toFrame(one.home[0] + bb.x * one.scale, one.home[1]);
+    const bubble = one.bubble;
+    // Right of the person where its words fit, else left; with room on
+    // neither side as wide as they would be, narrower on the wider side.
+    const most = Math.min(frameBox.width * 0.5, 28 * 18);
+    const roomRight = frameBox.width - 8 - (rx + 12), roomLeft = lx - 12 - 8;
+    bubble.style.maxWidth = `${Math.floor(most)}px`;
+    let { width } = bubble.getBoundingClientRect();
+    const right = width <= roomRight || (width > roomLeft && roomRight >= roomLeft);
+    if (width > (right ? roomRight : roomLeft)) {
+      bubble.style.maxWidth = `${Math.floor(Math.max(120, right ? roomRight : roomLeft))}px`;
+      width = bubble.getBoundingClientRect().width;
+    }
+    const { height } = bubble.getBoundingClientRect();
+    const left = right ? Math.min(rx + 12, frameBox.width - 8 - width) : Math.max(8, lx - 12 - width);
+    const top = Math.min(Math.max(8, hy - 12), frameBox.height - height - 8);
+    bubble.style.left = `${left}px`;
+    bubble.style.top = `${top}px`;
+    bubble.classList.toggle("left", left < hx);
+  }
+
+  // One to one's own parts gone (the table cleared, or closed).
+  function endOne() {
+    const { token, group, flight } = one;
+    one = null;
+    for (const node of overlay.querySelectorAll(".one-bubble, .one-asks")) node.remove();
+    if (group) group.remove();
+    if (flight) flight.cancel();
+    if (token) token.node.classList.remove("one-self", "stood");
+    frame.classList.remove("one-on");
+    document.body.classList.remove("one-open");
+    $("map-back").textContent = app.state.texts.map_buttons.back.text;
+    app.setNow({ one: false });
+  }
+
+  // 「円卓にもどす」 or Esc: the person a seat again, the camera back, the table as it was.
+  async function closeOne() {
+    if (!one) return;
+    const seatId = one.seatId;
+    endOne();
+    app.backToEveryone();
+    await moveTo({ x: 0, y: 0, w: view.W, h: view.H }, reduced() ? 0 : BACK_FOR);
+    relayout();
+    const card = overlay.querySelector(`.table-bubble[data-seat="${seatId}"]:not(.unplaced)`);
+    if (card) card.focus({ preventScroll: true });
   }
 
   // A seat kind's mark as on the map, small, for the counts over the
