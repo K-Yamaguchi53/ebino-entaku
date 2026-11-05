@@ -548,7 +548,7 @@ function scene(width) {
   // put by planLabels clear of the table's top. The split's heading is
   // under the map, not in the frame.
   // Where the seats gather (直し33-4): by the map's side, the camera on the whole drawing.
-  const center = gatherAt({ W: view.W, H: view.H, mapBox: view.mapBox, upright: false, unit: view.W / width });
+  const center = riseAt({ W: view.W, H: view.H, mapBox: view.mapBox, upright: false, model: view.yard.model });
   const f = pointScale();
   const { seats } = seating(round, round.seat_order, frontAngle(center));
   const cover = ring(center, 0, TABLE_LIFT).map((p) => toFrame(...p));
@@ -589,7 +589,7 @@ process.stdout.write(JSON.stringify(result));
 def _scenes():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     consts = script[script.index("  const NS ="):script.index("  let map = null;")]
-    names = ["centroid", "reliefView", "onTable", "ring", "gatherAt", "frontAngle", "seating", "pointScale", "yardModel",
+    names = ["centroid", "reliefView", "onTable", "ring", "riseAt", "frontAngle", "seating", "pointScale", "yardModel",
              "homesOf", "schoolSquares", "clearOf", "freeBlock", "windowStep", "trackOn", "schoolOnMap", "chooseSpot",
              "planLabels", "within", "seenWords", "planBubble", "topStrips"]
     source = "".join(_inner_function(script, name) for name in names)

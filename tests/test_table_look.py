@@ -1,9 +1,7 @@
-"""The round table reads as a round table of wood one sits round (直し29-2):
-its top thick, its side in front, a thin light on its near rim, the top in
-dark wood under the lamp, one leg and its foot under it; each seat on a
-chair whose back is to the outside, an empty chair the same chair in a
-dotted line. The table's size, the seats' spots and the cards' layout are
-as before."""
+"""The round table (直し35-3: the school's ring, risen from the map; before
+it a table of wood, 直し29-2): its rim lit, the lamp in its middle; each
+seat on a chair whose back is to the outside, an empty chair the same chair
+in a dotted line. The seats' spots and the cards' layout are as before."""
 
 from ebino import app as app_module
 
@@ -21,18 +19,12 @@ def _opened():
     return MAP[MAP.index("async function openTable("):MAP.index("function tableBubble(")]
 
 
-def test_the_top_is_thick_wood_with_a_lit_rim_and_one_leg():
+def test_the_table_is_the_risen_schools_ring_its_rim_lit_and_the_lamp_in_its_middle():
     opened = _opened()
-    assert "const under = ring(center, 0, TABLE_LIFT - TABLE_THICK);" in opened
-    assert 'polygon("table-edge", under)' in opened and '"table-rim-light"' in opened
-    assert 'polygon("table-grain"' in opened
-    assert 'svgEl("g", { class: "table-foot" })' in opened and 'class: "leg"' in opened and 'class: "base"' in opened
-    # Under the top, so the top hides all but a little of it.
-    assert opened.index("foot, top);") > opened.index('polygon("table-shadow"')
-    for name in ("--wood:", "--wood-deep:", "--wood-side:", "--wood-lit:"):
-        assert name in ROOT
-    assert ".top-mid { stop-color: var(--wood);" in CSS and ".top-out { stop-color: var(--wood-deep);" in CSS
-    # The lamp and its light stay, and the split's dashed line on the top.
+    assert "const risen = riseSchool(center, motion);" in opened
+    assert 'top.append(risen.group, polygon("table-rim-glow", tableTop), lamp);' in opened
+    assert "table-grain" not in opened and "table-foot" not in opened  # No table of wood any more.
+    # The lamp and its light stay (in the glass roof), and the split's dashed line.
     assert 'svgEl("g", { class: "table-lamp" })' in opened and '"table-split"' in opened
 
 

@@ -1037,7 +1037,7 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-note { margin-bo
    --ai-top, --ai-w, --ai-h), over none of the seats' homes; its questions
    side by side where it is wide. */
 body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { position: absolute; z-index: 6;
-  left: var(--ai-left, 8px); top: var(--ai-top, 8px); width: var(--ai-w, 320px); max-height: var(--ai-h, 40%);
+  left: var(--ai-left, 8px); top: var(--ai-top, auto); bottom: var(--ai-bottom, auto); width: var(--ai-w, 320px); height: var(--ai-h, 40%);
   margin: 0; padding: 8px 10px; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--ai) transparent;
   box-shadow: 0 10px 28px var(--shadow); }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-head { margin-bottom: 4px; }
@@ -1126,3 +1126,12 @@ body.one-open #ai-seat { visibility: hidden; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-cards { grid-template-columns: 1fr 1fr; }
 /* A seat with no place on the map: its point's line dotted. */
 .pt.no-place .shape { stroke-dasharray: 3 2; }
+/* The meeting (直し35-3): the school lifted from the map, a faint shadow
+   under it; the one on the map unseen meanwhile (but at one to one, where
+   the person stands at its home on the map, the lifted one steps aside). */
+.yard.lifted { visibility: hidden; }
+.map-frame:has(svg.dim) .map-around, .map-frame:has(svg.dim) .map-compass { visibility: hidden; }
+.risen-school { pointer-events: none; }
+.risen-shadow { fill: var(--shadow); filter: blur(6px); pointer-events: none; }
+.one-on .yard.lifted { visibility: visible; }
+.one-on .risen-school, .one-on .risen-shadow { visibility: hidden; }

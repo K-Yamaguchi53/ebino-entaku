@@ -132,7 +132,7 @@ def test_the_ais_seat_sits_in_a_free_corner_of_the_map():
     # Chosen once for the drawing as it is: it stays through a round.
     assert "view.aiCorner === undefined" in corner
     assert "placeAiCorner();" in _inner("relayout") and "placeYardColumn" not in MAP
-    assert "left: var(--ai-left, 8px); top: var(--ai-top, 8px); width: var(--ai-w, 320px);" in CSS
+    assert "left: var(--ai-left, 8px); top: var(--ai-top, auto); bottom: var(--ai-bottom, auto); width: var(--ai-w, 320px);" in CSS
     assert "--yard-left" not in CSS
 
 
