@@ -236,7 +236,8 @@ def test_ba_ii_lets_these_moves_through(text):
 
 # Outside the list: the question examples are the teacher's own samples of a
 # student's question (直し31続き-2), not words a model writes to a student.
-NOT_A_MODELS_SENTENCE = {"question_examples", "question_examples_lead", "question_examples_end"}
+# The questions offered at one to one (直し34-1) are the teacher's words too: not checked.
+NOT_A_MODELS_SENTENCE = {"question_examples", "question_examples_lead", "question_examples_end", "ask_questions"}
 
 
 def test_no_screen_text_holds_a_banned_word():

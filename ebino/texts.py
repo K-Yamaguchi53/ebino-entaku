@@ -214,6 +214,21 @@ def load_lines(name: str) -> list[str]:
     return [line.strip() for line in load_text(name).splitlines() if line.strip()]
 
 
+# The questions offered at one to one (直し34-1): the teacher's draft, one a
+# line, 種類 (the kind of the seat's words) / 項目 (an item of them) / 質問.
+ASK_QUESTIONS = "ask_questions"
+ASK_QUESTION_COLUMNS = ("種類", "項目", "質問")
+
+
+def ask_questions() -> dict[str, list[tuple[str, str]]]:
+    """{種類: [(項目, 質問), ...] in the file's order}, from ask_questions.txt
+    (a table with a header row, though a .txt: the teacher's own file)."""
+    out: dict[str, list[tuple[str, str]]] = {}
+    for row in read_table(TEXTS_DIR / f"{ASK_QUESTIONS}.txt", ASK_QUESTION_COLUMNS):
+        out.setdefault(row["種類"], []).append((row["項目"], row["質問"]))
+    return out
+
+
 def load_table(name: str, columns: tuple[str, ...], may_be_empty: tuple[str, ...] = ()) -> list[dict[str, str]]:
     """A tab-separated table in texts/: its rows, in order."""
     return read_table(TEXTS_DIR / f"{name}.tsv", columns, may_be_empty)
