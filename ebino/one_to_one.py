@@ -23,6 +23,11 @@ GROUPS = (GROUP_ARTICLE, GROUP_POSTER, GROUP_CROSS, GROUP_OUTSIDER)
 CROSS_AXES = ("行く前", "向こうで", "帰ってきて", "これから")
 OUTSIDER_AXES = ("来たわけ", "見えたこと", "したかったこと")
 
+# Each time, the questions offered: at most this many, of the items not asked yet.
+ONE_QUESTIONS = 3
+# The words shown for an item: its pieces as recorded, up to about this many characters.
+ONE_CHARS = 160
+
 # An article's sections that are one item, and those with no question.
 ARTICLE_SAME_ITEM = {"本文タイトル": "本文"}
 ARTICLE_NO_QUESTION = ("キャッチコピー", "ランキング")

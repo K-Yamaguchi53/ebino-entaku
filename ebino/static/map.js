@@ -2880,6 +2880,96 @@ const EbinoMap = (() => {
     overlay.append(bubble);
     one.bubble = bubble;
     placeOne();
+    // The questions to pick from (直し34-4), asked for while it stands up.
+    const mine = one;
+    app.oneOpen(mine.seatId).then((view) => { if (one === mine) showAsks(view); }, () => {});
+  }
+
+  // Up to three questions under its words, each a button; pressed, that
+  // item's words in its bubble and the questions after it.
+  function showAsks(view) {
+    if (!one) return;
+    for (const old of overlay.querySelectorAll(".one-asks")) old.remove();
+    const panel = div("one-asks");
+    panel.setAttribute("role", "group");
+    panel.setAttribute("aria-label", whoOf(seatOf(one.seatId)));
+    const mine = one;
+    for (const { item, question } of view.questions) {
+      const ask = document.createElement("button");
+      ask.type = "button";
+      ask.className = "one-ask";
+      ask.dataset.item = item;
+      ask.textContent = question;
+      ask.addEventListener("click", async () => {
+        if (panel.classList.contains("busy")) return;
+        panel.classList.add("busy");
+        try {
+          const answer = await app.oneAsk(mine.seatId, item);
+          if (one !== mine) return;
+          says(answer.pieces, answer.source);
+          showAsks(answer);
+          const next = overlay.querySelector(".one-asks .one-ask");
+          if (next) next.focus({ preventScroll: true });
+        } catch (error) {
+          panel.classList.remove("busy");
+        }
+      });
+      panel.append(ask);
+    }
+    overlay.append(panel);
+    one.panel = panel;
+    placeOne();
+  }
+
+  // Its words in its bubble: the item's pieces, as spoken words where they
+  // were let through (a small mark says so), as recorded otherwise.
+  function says(pieces, source) {
+    if (!one || !one.bubble) return;
+    const voice = one.bubble.querySelector(".voice");
+    voice.textContent = pieces.map((piece) => piece.spoken || piece.text).join("");
+    const spoken = pieces.some((piece) => piece.spoken);
+    one.bubble.classList.toggle("spoken", spoken);
+    const mark = one.bubble.querySelector(".spoken-mark");
+    if (spoken && !mark) one.bubble.prepend(div("spoken-mark", app.state.texts.spoken_mark));
+    if (!spoken && mark) mark.remove();
+    one.bubble.querySelector(".who").textContent = [whoOf(seatOf(one.seatId)), source && source.note].filter(Boolean).join("　");
+    one.bubble.classList.remove("not-found");
+    for (const old of overlay.querySelectorAll(".one-card")) old.remove();  // Its words now, no card to make.
+    placeOne();
+  }
+
+  // A question written (app.sendOne): found, its words; not, the teacher's
+  // line and 「質問カードにする」, which makes it a card to the person.
+  function oneAnswer(answer, question) {
+    if (!one) return;
+    if (answer.found) {
+      says(answer.pieces, answer.source);
+    } else {
+      one.bubble.querySelector(".voice").textContent = app.state.texts.one_words.not_found;
+      // Only who it is: no words of theirs, so no source and no spoken mark.
+      one.bubble.querySelector(".who").textContent = whoOf(seatOf(one.seatId));
+      one.bubble.classList.remove("spoken");
+      const mark = one.bubble.querySelector(".spoken-mark");
+      if (mark) mark.remove();
+      one.bubble.classList.add("not-found");
+      const mine = one;
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "one-card";
+      card.textContent = app.state.texts.one_words.to_card;
+      card.addEventListener("click", async () => {
+        card.disabled = true;
+        try {
+          await app.cardFromOne(mine.seatId, question);
+          card.remove();
+        } catch (error) {
+          card.disabled = false;
+        }
+      });
+      for (const old of overlay.querySelectorAll(".one-card")) old.remove();
+      one.bubble.append(card);
+    }
+    showAsks(answer);
   }
 
   // The person's words by its head, on the side with room (right first),
@@ -2911,6 +3001,28 @@ const EbinoMap = (() => {
     bubble.style.left = `${left}px`;
     bubble.style.top = `${top}px`;
     bubble.classList.toggle("left", left < hx);
+    // The questions under the words; with no room there, above them, then
+    // beside them: the first spot inside the frame that covers neither the
+    // words nor the person (else the one that covers least).
+    const panel = one.panel;
+    if (!panel || !panel.isConnected) return;
+    panel.style.maxWidth = `${Math.floor(Math.min(frameBox.width * 0.46, 24 * 16))}px`;
+    const p = panel.getBoundingClientRect();
+    const [, py] = toFrame(one.home[0], one.home[1] + bb.y * one.scale);
+    const [, fy] = toFrame(one.home[0], one.home[1]);
+    const taken = [[left, top, width, height], [lx, py, rx - lx, fy - py]];
+    const clampL = (x) => Math.max(8, Math.min(x, frameBox.width - p.width - 8));
+    const clampT = (y) => Math.max(8, Math.min(y, frameBox.height - p.height - 8));
+    const spots = [[left, top + height + 10], [left, top - p.height - 10],
+      [left + width + 10, top], [left - p.width - 10, top],
+      // Beside the person, the other side from its words.
+      [rx + 12, top], [rx + 12, fy - p.height], [lx - p.width - 12, top], [lx - p.width - 12, fy - p.height]]
+      .map(([x, y]) => [clampL(x), clampT(y)]);
+    const covered = ([x, y]) => taken.reduce((sum, [l, t, w, h]) =>
+      sum + Math.max(0, Math.min(x + p.width, l + w) - Math.max(x, l)) * Math.max(0, Math.min(y + p.height, t + h) - Math.max(y, t)), 0);
+    const [pLeft, pTop] = spots.reduce((best, spot) => (covered(spot) < covered(best) ? spot : best));
+    panel.style.left = `${pLeft}px`;
+    panel.style.top = `${pTop}px`;
   }
 
   // One to one's own parts gone (the table cleared, or closed).
@@ -2959,5 +3071,5 @@ const EbinoMap = (() => {
     relayout();
   }
 
-  return { init, show, round, refresh, marked, markOf, layoutAgain };
+  return { init, show, round, refresh, marked, markOf, layoutAgain, oneAnswer };
 })();

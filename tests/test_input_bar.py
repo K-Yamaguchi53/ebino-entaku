@@ -49,7 +49,7 @@ async function call(path, body) {
 }
 globalThis.document = { querySelectorAll: () => [] };
 const state = { texts: %(texts)s, seatById: { S1: { title: "理容師", detail: "" } }, carded: new Set(),
-  cardAgain: {}, drafts: {}, to: null, needsShown: false, aiAnswered: false, firstQuestion: "q" };
+  cardAgain: {}, drafts: {}, to: null, needsShown: false, aiAnswered: false, firstQuestion: "q", now: {} };
 const log = [];
 const setNow = (c) => log.push(["now", c || {}]);
 const hideMessage = () => {}, showMessage = (t) => log.push(["message", t]);

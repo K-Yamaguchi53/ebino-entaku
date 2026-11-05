@@ -28,7 +28,8 @@ from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS
 from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_SEAT_HEADER, CLOSING_KIND_LABELS,
                     CLOSING_QUESTION, MODEL_UNAVAILABLE, NAME_IN_QUESTION, SCHOOL_LABEL, load_optional_text, load_table,
                     load_text)
-from .gate import Gate, NameList, load_names
+from . import librarian, texts
+from .gate import Gate, GateError, ModelUnavailable, NameList, load_names
 from .guard import Guard
 from . import one_to_one
 from .index import Entry, build_index, load_topics, load_utterances
@@ -205,6 +206,12 @@ class Session:
     # An AI question answered after the screen asked for one before the
     # reflection (直し30-1): one mark, no name, no time.
     ai_answered_after_notice: bool = False
+    # One to one (直し34): the items asked, by seat, in the order asked; the
+    # free questions' outcome (found or not, no words); the seats thanked.
+    one_asked: dict[str, list[str]] = field(default_factory=dict)
+    one_free: dict[str, list[bool]] = field(default_factory=dict)
+    one_thanked: list[str] = field(default_factory=list)
+    one_spoken: list[speaker.Spoken] = field(default_factory=list)
 
     def __post_init__(self):
         self._subject_counts = Counter()  # With no records (tests): this sitting's only.
@@ -222,6 +229,12 @@ class Session:
             # shown, and why the original was kept (直し31-7).
             record["spoken"] = [dict(spoken.record(), round=number) for number, r in enumerate(self.rounds, start=1)
                                 for spoken in r.spoken.values()]
+            # One to one (直し34): the items asked by name, whether a free
+            # question found an answer, who was thanked; and its spoken words.
+            record["one_to_one"] = [{"seat_id": seat_id, "items": items, "free_found": self.one_free.get(seat_id, []),
+                                     "thanked": seat_id in self.one_thanked}
+                                    for seat_id, items in self._one_seats().items()]
+            record["one_spoken"] = [spoken.record() for spoken in self.one_spoken]
             self.records.save_session(record)
 
     # --- what the student does ---
@@ -506,6 +519,118 @@ class Session:
         state.card_id = card.card_id
         self.save()
         return card.front()
+
+    # --- one to one (直し34) ---
+
+    def _one_seats(self) -> dict[str, list[str]]:
+        seats = {seat_id: list(items) for seat_id, items in self.one_asked.items()}
+        for seat_id in [*self.one_free, *self.one_thanked]:
+            seats.setdefault(seat_id, [])
+        return seats
+
+    def _one_seat(self, seat_id) -> Seat:
+        seat = self._seats.get(seat_id) if isinstance(seat_id, str) else None
+        if seat is None:
+            raise Refused("unknown_seat")
+        return seat
+
+    def one_items(self, seat_id: str) -> list[tuple[str, str, list[Utterance]]]:
+        """(item, the teacher's question, its pieces) for each item of the
+        seat's words that has a question and some words, in the questions'
+        order (one_to_one.py says which items a seat's words have)."""
+        seat = self._one_seat(seat_id)
+        pieces = [u for u in self.library.utterances if u.seat_id == seat_id]
+        asked = texts.ask_questions()
+        tables = self.library.ask_tables
+        out = []
+        if pieces and all(one_to_one.is_page(u.section) for u in pieces):
+            group = one_to_one.GROUP_OUTSIDER if seat.kind == "outsider_teacher" else one_to_one.GROUP_CROSS
+            pages = tables["pages"].get(seat_id, {})
+            for item, question in asked[group]:
+                found = [u for u in pieces if item in pages.get(u.section, [])]
+                if found:
+                    out.append((item, question, found))
+        elif seat.kind == "poster":
+            for item, question in asked[one_to_one.GROUP_POSTER]:
+                found = [u for u in pieces if u.section == item]
+                if found:
+                    out.append((item, question, found))
+        else:
+            ranking = tables["ranking"].get(seat_id)
+            for item, question in asked[one_to_one.GROUP_ARTICLE]:
+                found = [u for u in pieces if one_to_one.ARTICLE_SAME_ITEM.get(u.section, u.section) == item]
+                if found:
+                    out.append((item, question, found))
+                if item == "本文" and ranking:  # The ranking after the body, as in the article.
+                    found = [u for u in pieces if u.section == "ランキング"]
+                    if found:
+                        out.append(("ランキング", ranking, found))
+        return out
+
+    def one_view(self, seat_id: str) -> dict:
+        """The questions to offer now: up to ONE_QUESTIONS of the items not
+        asked yet, in order; done once every item with words has been asked."""
+        items = self.one_items(seat_id)
+        asked = self.one_asked.get(seat_id, [])
+        left = [(item, question) for item, question, _ in items if item not in asked]
+        return {"seat_id": seat_id, "questions": [{"item": item, "question": question}
+                                                  for item, question in left[:one_to_one.ONE_QUESTIONS]],
+                "done": bool(items) and not left, "asked": list(asked)}
+
+    def _one_words(self, seat_id: str, pieces: list[Utterance]) -> dict:
+        """The words shown at one to one: the pieces as recorded, up to about
+        ONE_CHARS, as spoken words where the speaker's checks let them through."""
+        shown, total = [], 0
+        for piece in pieces:
+            shown.append(piece)
+            total += len(piece.text)
+            if total >= one_to_one.ONE_CHARS:
+                break
+        spoken = {}
+        if config.speaker_on():
+            quotes = [{"id": u.id, "voice": u.voice, "text": u.text, "paragraph": u.paragraph or u.text} for u in shown]
+            for result in speaker.speak(self.gate, quotes):
+                spoken[result.utterance_id] = result
+                self.one_spoken.append(result)
+        return {"pieces": [{"utterance_id": u.id, "text": u.text, "spoken": spoken[u.id].spoken if u.id in spoken else "",
+                            "said": not u.note} for u in shown],
+                "source": self.passage_source(seat_id, shown)}
+
+    def one_ask(self, seat_id: str, item: str) -> dict:
+        """A question picked: that item's words, and the questions after it."""
+        found = {name: pieces for name, _, pieces in self.one_items(seat_id)}
+        if not isinstance(item, str) or item not in found:
+            raise Refused("unknown_item")
+        asked = self.one_asked.setdefault(seat_id, [])
+        if item not in asked:
+            asked.append(item)
+        words = self._one_words(seat_id, found[item])
+        self.save()
+        return {"item": item, **words, **self.one_view(seat_id)}
+
+    def one_free_question(self, seat_id: str, question: str) -> dict:
+        """A question the student wrote: the librarian looks among this
+        seat's words only. Found: those words; not: nothing (the screen says
+        so and offers the question card)."""
+        self._one_seat(seat_id)
+        question = (question or "").strip()
+        if not question:
+            raise Refused("empty_question")
+        if len(question) > MAX_QUESTION_CHARS:
+            raise Refused("question_too_long")
+        entries = [entry for entry in self.library.entries if entry.seat_id == seat_id]
+        ids = []
+        if entries:
+            try:
+                ids = librarian.find(self.gate, entries, question).utterance_ids
+            except (GateError, ModelUnavailable):
+                ids = []
+        pieces = [self._utterances[i] for i in ids if i in self._utterances and self._utterances[i].seat_id == seat_id]
+        self.one_free.setdefault(seat_id, []).append(bool(pieces))
+        self.save()
+        if not pieces:
+            return {"found": False, **self.one_view(seat_id)}
+        return {"found": True, **self._one_words(seat_id, pieces[:1]), **self.one_view(seat_id)}
 
     def next_purposes(self) -> list[dict]:
         return [self.purpose_view(sample) for sample in self.shelf.next()]

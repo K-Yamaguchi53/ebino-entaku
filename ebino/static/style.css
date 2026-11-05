@@ -1109,3 +1109,12 @@ body.one-open #ai-seat { visibility: hidden; }
 .one-bubble .voice { font-family: var(--mincho); font-size: 18px; line-height: 1.8; }
 .one-bubble .who { margin-top: 4px; font-size: 13px; color: var(--paper-soft); }
 .one-bubble .spoken-mark { display: inline-block; margin-bottom: 4px; }
+/* The questions at one to one (直し34-4): buttons under its words. */
+.one-asks { position: absolute; z-index: 5; display: grid; gap: 6px; pointer-events: auto; }
+.one-ask { min-height: 44px; padding: 8px 14px; text-align: left; border-radius: 10px; border: 1px solid var(--lamp-soft);
+  background: color-mix(in srgb, var(--night-2) 94%, transparent); color: var(--ink); font-size: 15px; line-height: 1.5; }
+.one-ask:hover, .one-ask:focus-visible { border-color: var(--lamp); }
+.one-asks.busy .one-ask { opacity: .6; }
+.one-bubble.not-found .voice { color: var(--paper-soft); }
+.one-card { pointer-events: auto; margin-top: 8px; min-height: 40px; padding: 4px 14px; color: var(--paper-ink); background: var(--paper-light);
+  border-color: var(--paper-soft); }

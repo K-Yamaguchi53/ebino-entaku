@@ -98,7 +98,8 @@ async function setup() {
   // What the map may use: the round's own ways to a quote's paragraph, its
   // mark, a seat's question card and the quote's card (直し26-2).
   const lent = { state, cardEntry, cardDone, setNow, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
-    readBelow, shownQuotes, phrased, askSeat, answerTo, firstHelp, openParagraph, backToEveryone };
+    readBelow, shownQuotes, phrased, askSeat, answerTo, firstHelp, openParagraph, backToEveryone, oneOpen, oneAsk,
+    cardFromOne };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
 
@@ -802,6 +803,8 @@ async function send(event) {
   const button = $("ask-button");
   if (button.disabled || !$("question").value.trim()) return;
   hideDone();
+  // At one to one the box asks that person (直し34-4); else it makes a card.
+  if (state.to.kind === "seat" && state.now.one) return sendOne(state.to.seatId);
   if (state.to.kind === "seat") return sendCard(state.to.seatId);
   if (state.to.kind === "ai") return sendAnswer(state.to.roundNo, state.to.role);
   return ask();
@@ -836,6 +839,43 @@ async function sendCard(seatId) {
     : state.texts.input_done.seat.replace("{seat}", seatName(seatId)));
   renderSeats();  // The seat marked on the map too (map.refresh).
 }
+
+// At one to one (直し34-4): a question written is looked for among this
+// person's words only (/api/one/free). Found, those words in its bubble;
+// not, 「記事には書いてありませんでした。」 and the way to a question card.
+async function sendOne(seatId) {
+  const button = $("ask-button");
+  const question = $("question").value.trim();
+  button.disabled = true;
+  hideMessage();
+  let answer;
+  try {
+    answer = await call("/api/one/free", { seat_id: seatId, question });
+  } catch (error) {
+    showMessage(sendFailed(error));
+    return;
+  } finally {
+    button.disabled = false;
+  }
+  $("question").value = "";
+  delete state.drafts[`seat:${seatId}`];
+  onMap((map) => map.oneAnswer(answer, question));
+}
+
+// 「質問カードにする」 at one to one: the question written, as a card to that
+// person (/api/card, as always: the card goes to the person).
+async function cardFromOne(seatId, text) {
+  const card = await call("/api/card", { seat_id: seatId, text });
+  state.carded.add(seatId);
+  if (card.again) state.cardAgain[seatId] = card.text;
+  showDone(card.again ? state.texts.card_already.replace("{card}", card.text)
+    : state.texts.input_done.seat.replace("{seat}", seatName(seatId)));
+  renderSeats();
+  return card;
+}
+
+const oneOpen = (seatId) => call("/api/one/open", { seat_id: seatId });
+const oneAsk = (seatId, item) => call("/api/one/ask", { seat_id: seatId, item });
 
 // To an AI's question: the answer starts the next round (直し29-1).
 async function sendAnswer(roundNo, role) {

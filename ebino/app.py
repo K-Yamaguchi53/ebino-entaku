@@ -130,6 +130,13 @@ class App:
         if path == "/api/coach_answer":
             return session.coach_answer(body.get("round"), body.get("role", ""), body.get("answer", ""),
                                         after_notice=body.get("after_notice") is True)
+        # One to one (直し34-4): the questions now, a question picked, a question written.
+        if path == "/api/one/open":
+            return session.one_view(body.get("seat_id"))
+        if path == "/api/one/ask":
+            return session.one_ask(body.get("seat_id"), body.get("item"))
+        if path == "/api/one/free":
+            return session.one_free_question(body.get("seat_id"), body.get("question", ""))
         if path == "/api/ask_card":
             return session.ask_card(body.get("round"))
         if path == "/api/ask_seat":
