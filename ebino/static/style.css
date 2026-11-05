@@ -1496,3 +1496,32 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
   box-shadow: 0 6px 18px var(--shadow); }
 .map-skip:hover { background: var(--lamp-bright); }
 .map-skip:not(:focus) { width: 1px; height: 1px; min-height: 0; padding: 0; overflow: hidden; clip-path: inset(50%); opacity: 0; }
+
+/* --- 直し41の続き 段5: one look from the map to 帰る前に、ひとこと ---
+   「帰る前に、ひとこと」 at the foot of the one screen: not a large square
+   box but a rounded button in the lamp's light, with the same small chevron
+   as the column's; its words unchanged. */
+#to-reflect { display: inline-flex; align-items: center; gap: var(--sp-2); border-radius: var(--r-pill);
+  border-color: var(--lamp-soft); color: var(--lamp-bright); background: color-mix(in srgb, var(--night-2) 85%, var(--lamp) 15%);
+  font-weight: 700; letter-spacing: .08em; }
+#to-reflect::after { content: ""; flex: none; width: 7px; height: 7px; border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor; rotate: -45deg; }
+#to-reflect:hover { border-color: var(--lamp); background: color-mix(in srgb, var(--night-2) 70%, var(--lamp) 30%); }
+/* 帰る前に、ひとこと on a wide screen (where it is filmed): wider,
+   its title larger, the day's map a lit card like the map before it, not
+   a thin form in the middle of the night. */
+@media (min-width: 1400px) {
+  .hitokoto { max-width: 1040px; padding-top: var(--sp-4); }
+  .hk-title { font-size: 2.1rem; margin-top: var(--sp-5); }
+  .hk-first { font-size: 24px; }
+  .hk-said { font-size: 18px; }
+  .hk-card .hk-q { font-size: 19px; }
+}
+.hk-map-box { background: radial-gradient(ellipse 80% 70% at 50% 45%, var(--night-3), var(--night-2) 70%);
+  border-color: var(--moon-faint); border-radius: var(--r-l); box-shadow: 0 18px 40px var(--shadow), inset 0 0 0 1px var(--moon-faint); }
+.hk-primary { border-radius: var(--r-pill); padding: 8px 26px; box-shadow: 0 0 22px var(--lamp-soft); }
+.hk-primary:disabled { box-shadow: none; opacity: 1; background: transparent; color: var(--lamp-bright);
+  border: 1px dashed var(--lamp-soft); }
+/* The day's map no taller than leaves its button in the first screen. */
+.hk-map-box svg { max-height: 40vh; }
+.hk-said { border-radius: var(--r-l); box-shadow: 0 8px 22px var(--shadow); transition: border-color var(--step), box-shadow var(--step); }
