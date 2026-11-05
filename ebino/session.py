@@ -651,7 +651,8 @@ class Session:
             return one_tidy.Tidied(utterance.text)
         if utterance.id not in self._tidied:
             tidied = one_tidy.tidy_page(utterance.text)
-            if tidied.text and self.gate.names.hits(tidied.text):
+            if tidied.text and (self.gate.names.hits(tidied.text)
+                                or tidied.joined and self.gate.names.hits(tidied.joined)):
                 tidied = one_tidy.Tidied("", tidied.dropped, (*tidied.reasons, one_tidy.NAME))
             self._tidied[utterance.id] = tidied
         return self._tidied[utterance.id]
@@ -694,8 +695,12 @@ class Session:
         shown = shown[:len(said)]
         spoken = {}
         if config.speaker_on():
-            quotes = [{"id": u.id, "voice": u.voice, "text": text,
-                       "paragraph": text if one_to_one.is_page(u.section) else u.paragraph or u.text}
+            # The speaker is given the words as before: a heading's line
+            # break is the bubble's only (11/6).
+            quotes = [{"id": u.id, "voice": u.voice,
+                       "text": text.replace("\n", "") if one_to_one.is_page(u.section) else text,
+                       "paragraph": text.replace("\n", "") if one_to_one.is_page(u.section)
+                       else u.paragraph or u.text}
                       for u, text in zip(shown, said)]
             for result in speaker.speak(self.gate, quotes):
                 spoken[result.utterance_id] = result

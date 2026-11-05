@@ -44,8 +44,9 @@ TIDIED = {
     "p4": "",
     "p5": "ありがとう。",
     "p6": "〇〇さんに声をかけてもらって、町の店を手伝うようになった。",
-    # A line with no sentence's end and the next one: one (the PDF's break or not).
-    "p7": "ありがとうみんなに会えてうれしかった。大切にしたいことまた話そう。",
+    # A line with no sentence's end and the next one: one (the PDF's break or
+    # not), but a heading after a sentence's end a line of its own (11/6).
+    "p7": "ありがとうみんなに会えてうれしかった。\n大切にしたいこと。\nまた話そう。",
     "p8": "大切にしたいこと。",
 }
 AXES = {"p1": ["行く前"], "p2": ["向こうで"], "p6": ["帰ってきて"], "p3": ["これから"], "p4": ["これから"],
@@ -113,9 +114,10 @@ def test_the_title_is_the_first_line_only_short_with_no_sentences_end():
     for line in ("ありがとう", "外に出てみようと思った", "毎日が楽しい", "まず手を動かす", "いつ帰るのか",
                  "向こうで驚いたこと。", "なぜ？", "・言葉の壁", "一度は外に出て、町の外の働き方を見てみたかった"):
         assert not one_tidy.is_title(line), line
-    # One a page, the first: a second line like a title stays (p7's 「大切にしたいこと」).
+    # One a page, the first: a second line like a title stays (p7's
+    # 「大切にしたいこと」), a heading on a line of its own (11/6).
     tidied = one_tidy.tidy_page("向こうで\n大切にしたいこと\n人の話を聞く。")
-    assert tidied.text == "大切にしたいこと人の話を聞く。" and tidied.reasons == (one_tidy.DROP_TITLE,)
+    assert tidied.text == "大切にしたいこと。\n人の話を聞く。" and tidied.reasons == (one_tidy.DROP_TITLE,)
 
 
 def test_a_short_line_of_the_body_and_a_page_of_one_line_stay():
@@ -132,6 +134,27 @@ def test_a_line_the_pdf_broke_is_joined_and_a_bullet_is_not():
     assert one_tidy.tidy_page("はじめに\n・毎日、市場で\n野菜を買った").text == "毎日、市場で野菜を買った。"
     # Letters of the alphabet: the break was a space.
     assert one_tidy.tidy_page("はじめに\nThank\nyou と言った。").text == "Thank you と言った。"
+
+
+def test_a_heading_inside_the_page_is_a_line_of_its_own():
+    # The teacher, 11/6: 「不安だったこと」 run into the next line was hard to read.
+    page = "旅のこと\n食べ物はおいしいかな？過ごせるかな？\n不安だったこと\n無事に帰れるかな？"
+    tidied = one_tidy.tidy_page(page)
+    assert tidied.text == "食べ物はおいしいかな？過ごせるかな？\n不安だったこと。\n無事に帰れるかな？"
+    assert tidied.joined == "食べ物はおいしいかな？過ごせるかな？不安だったこと無事に帰れるかな？"
+    # A line that goes on (〜は, 〜の, 〜で) is never a heading: joined as before.
+    for left in ("だから一度は", "町の店の", "毎日、市場で"):
+        tidied = one_tidy.tidy_page(f"はじめに\n楽しかった。\n{left}\n手伝った。")
+        assert tidied.text == f"楽しかった。{left}手伝った。" and tidied.joined == ""
+    # A bullet is never a heading, and a heading before a bullet stays as it was.
+    assert one_tidy.tidy_page("はじめに\n・不安だったこと\n無事に帰れるかな？").text == "不安だったこと無事に帰れるかな？"
+
+
+def test_a_name_parted_by_a_heading_is_still_caught():
+    tidied = one_tidy.tidy_page(NAMED)
+    assert tidied.text == "町の谷。\n口さんに教わった。" and tidied.joined == "町の谷口さんに教わった。"
+    names = NameList.build(SEATS, {})
+    assert not names.hits(tidied.text) and names.hits(tidied.joined)
 
 
 def test_each_bullet_a_sentence_its_head_gone():
@@ -276,7 +299,7 @@ def test_the_bubble_parts_its_pieces_where_a_sentence_ends():
     says = MAP[MAP.index("  function says(pieces, source) {"):MAP.index("  function oneAnswer(")]
     assert 'voice.replaceChildren(...pieces.map((piece) => div("one-piece", piece.spoken || piece.text)));' in says
     assert '.join("")' not in says
-    assert ".one-bubble .voice .one-piece { display: block; }" in CSS
+    assert ".one-bubble .voice .one-piece { display: block; white-space: pre-line; }" in CSS
 
 
 def test_one_tidy_is_code_only():
