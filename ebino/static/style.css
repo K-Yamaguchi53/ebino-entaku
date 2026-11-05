@@ -638,11 +638,13 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .river path { stroke: var(--river); fill: none; }
 .drawing path { transition-property: stroke-dashoffset; transition-timing-function: ease-in-out; }
 /* While the round table is open, the map steps back under it. */
-.relief-image, .basin-fill, .river, .rim, .points, .place-names, .school, .school-picture, .home-names,
+.relief-image, .relief-blur, .basin-fill, .river, .rim, .points, .place-names, .school, .school-picture, .home-names,
 .home-gate, .yard, .crossing {
   transition: opacity .9s ease;
 }
-.dim .relief-image { opacity: .42; }
+.dim .relief-image, .dim .relief-blur { opacity: .42; }
+/* The blurred ground round the picture (直し41の続き 段4): only seen, never pressed. */
+.relief-blur { pointer-events: none; }
 .dim .basin-fill, .dim .river, .dim .rim, .dim .points, .dim .place-names, .dim .school, .dim .school-picture,
 .dim .home-names, .dim .home-gate, .dim .yard, .dim .crossing { opacity: .26; }
 /* While the seats are gathered (直し33-5), the map's and the homes' names
@@ -979,7 +981,7 @@ body.one-open #map-heading { visibility: hidden; }
 }
 /* Motion reduced: nothing moves; everything is at once as it ends. */
 @media (prefers-reduced-motion: reduce) {
-  .pt .halo, .pt .shape, .pt .edge, .drawing path, .chair, .relief-image, .basin-fill, .river, .rim, .points, .place-names,
+  .pt .halo, .pt .shape, .pt .edge, .drawing path, .chair, .relief-image, .relief-blur, .basin-fill, .river, .rim, .points, .place-names,
   .school, .school-picture, .map-compass, .map-around, .home-names, .home-gate, .crossing, button, .lab-choice::before, .map-bubble, .seat,
   .choice, .choice::before { transition: none !important; }
   .map-bubble, .map-bubble .thread { animation: none !important; }

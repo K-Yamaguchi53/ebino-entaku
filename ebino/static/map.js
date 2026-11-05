@@ -186,6 +186,19 @@ const EbinoMap = (() => {
   const WORD_PAD = 2;  // CSS px kept clear round a word drawn on the map.
   const SLIDE_MOST = 40;  // CSS px the school's name may slide off a seat's point.
   const NAME_MOVE_MOST = 36;  // CSS px a place name may move off the seats' points (直し41の続き).
+  // 直し41の続き 段4: under the picture, the same picture mirrored, blurred
+  // and darkened (tools/make_relief_blur.py), three times as wide and as
+  // tall, the picture in its middle: no empty black in the frame.
+  const BLUR_IMAGE = "/relief_blur.webp";
+  // Where the picture melts into it ([where, shown]): its see-through or
+  // black margin hidden, the land shown a little further in.
+  const RELIEF_FADE_X = [[0, 0], [0.016, 0], [0.04, 1], [0.96, 1], [0.984, 0], [1, 0]];
+  const RELIEF_FADE_Y = [[0, 0], [0.05, 0], [0.085, 1], [0.9, 1], [0.935, 0], [1, 0]];
+  // The whole map (「全体」, the first screen): the basin's rim this much of
+  // the frame's height, every seat's home (the ways out's triangles among
+  // them) kept inside by WHOLE_EDGE of the height, which comes first.
+  const RIM_SHARE = 0.85;
+  const WHOLE_EDGE = 0.015;  // Of the frame's height, between the frame's edge and a home or its name.
   // Where a seat's 「？」 may go, by its point (x, y, which way the text runs
   // from there), in the order tried: upper right first.
   const ASK_CORNERS = [[9, -6, "start"], [-9, -6, "end"], [9, 16, "start"], [-9, 16, "end"]];
@@ -443,7 +456,9 @@ const EbinoMap = (() => {
     }
   }
 
-  function draw(seats, withRelief) {
+  // whole: the camera at the whole map after (else at the whole drawing, as
+  // a meeting drawn again wants it).
+  function draw(seats, withRelief, whole = true) {
     svg.replaceChildren();
     overlay.replaceChildren();
     for (const old of frame.querySelectorAll(".school-count")) old.remove();
@@ -487,12 +502,32 @@ const EbinoMap = (() => {
     drawGlows();
 
     if (view.relief) {
+      const blur = layer("relief-blur");
+      blur.append(svgEl("image", { href: BLUR_IMAGE, x: ox - base.W, y: oy - base.H, width: 3 * base.W, height: 3 * base.H,
+        preserveAspectRatio: "none" }));
       const image = layer("relief-image");
-      image.append(svgEl("image", { href: map.relief.image, x: ox, y: oy, width: base.W, height: base.H }));
+      // Its edges (the render's margin, see-through or black) melt into the
+      // ground under it: two still masks, across and down (no blur here).
+      const defs = svgEl("defs", {});
+      const fade = (id, across, stops) => {
+        const ramp = svgEl("linearGradient", { id: `${id}-ramp`, x1: 0, y1: 0, x2: across ? 1 : 0, y2: across ? 0 : 1 });
+        for (const [at, on] of stops) ramp.append(svgEl("stop", { offset: at, "stop-color": on ? "#fff" : "#000" }));
+        const mask = svgEl("mask", { id, maskContentUnits: "objectBoundingBox" });
+        mask.append(svgEl("rect", { width: 1, height: 1, fill: `url(#${id}-ramp)` }));
+        defs.append(ramp, mask);
+      };
+      fade("relief-fade-x", true, RELIEF_FADE_X);
+      fade("relief-fade-y", false, RELIEF_FADE_Y);
+      image.append(defs);
+      const faded = svgEl("g", { mask: "url(#relief-fade-y)" });
+      faded.append(svgEl("image", { href: map.relief.image, x: ox, y: oy, width: base.W, height: base.H, mask: "url(#relief-fade-x)" }));
+      image.append(faded);
     }
     const fill = layer("basin-fill");
     const rimLine = view.relief ? dense(map.boundary, true).map(([x, y]) => P(x, y, 1)) : map.boundary.map(([x, y]) => P(x, y));
     fill.append(svgEl("polygon", { points: rimLine.map((p) => p.join(",")).join(" ") }));
+    view.rimBox = [Math.min(...rimLine.map((p) => p[0])), Math.min(...rimLine.map((p) => p[1])),
+      Math.max(...rimLine.map((p) => p[0])), Math.max(...rimLine.map((p) => p[1]))];
 
     const river = layer("river draw-later");
     for (const line of map.river) {
@@ -562,8 +597,53 @@ const EbinoMap = (() => {
     $("map-dem").hidden = !view.relief;
     $("map").hidden = false;
     watchSize();
-    setView(vb);
+    // Twice: the names' size on screen is set by the camera, so the whole
+    // map is found again once the camera is there.
+    const full = { ...vb };
+    view.whole = wholeView();
+    setView(view.whole, false);
+    view.whole = wholeView();
+    setView(whole ? view.whole : full);
     refresh();
+  }
+
+  // The whole map (直し41の続き 段4): the basin's rim RIM_SHARE of the
+  // frame's height, round its middle; every seat's home (the triangles of
+  // the ways out, the people from outside) kept inside, WHOLE_EDGE of the
+  // height from the frame's edges, before the rim's share. Never past the
+  // drawing (the blurred ground). It reads view and the points.
+  function wholeView() {
+    const rim = view.rimBox;
+    if (!rim) return { x: 0, y: 0, w: view.W, h: view.H };
+    const keep = [...rim];
+    const r = drawnScale() * POINT_R * 1.3;  // A point as large as it is drawn, its ring too.
+    for (const { at, node } of Object.values(points)) {
+      if (node.classList.contains("school-home")) continue;  // At the school: seen only near it.
+      const [x, y] = at();
+      keep[0] = Math.min(keep[0], x - r);
+      keep[1] = Math.min(keep[1], y - r);
+      keep[2] = Math.max(keep[2], x + r);
+      keep[3] = Math.max(keep[3], y + r);
+    }
+    // The homes' names by them (県外・海外に出た人 and the others), as large as
+    // they are drawn now.
+    for (const text of svg.querySelectorAll(".home-names text:not(.at-school)")) {
+      const b = text.getBBox();
+      if (!b.width) continue;
+      keep[0] = Math.min(keep[0], b.x);
+      keep[1] = Math.min(keep[1], b.y);
+      keep[2] = Math.max(keep[2], b.x + b.width);
+      keep[3] = Math.max(keep[3], b.y + b.height);
+    }
+    const ratio = view.W / view.H, room = 1 - 2 * WHOLE_EDGE;
+    const h = Math.min(view.H, Math.max((rim[3] - rim[1]) / RIM_SHARE, (keep[3] - keep[1]) / room,
+      (keep[2] - keep[0]) / (room * ratio)));
+    const w = h * ratio, edge = WHOLE_EDGE * h;
+    const fit = (lo, hi, size, total) => {
+      const at = Math.min(Math.max((lo + hi) / 2 - size / 2, hi + edge - size), lo - edge);
+      return Math.min(Math.max(0, at), total - size);
+    };
+    return { x: fit(keep[0], keep[2], w, view.W), y: fit(keep[1], keep[3], h, view.H), w, h };
   }
 
   // The school and its ground (直し33-2), in the yard's own units scaled to
@@ -813,7 +893,7 @@ const EbinoMap = (() => {
     const reopen = tableAt && tableOf;
     if (reopen) clearTable();
     const splits = splitsDrawn;
-    draw(lastSeats, view.relief);
+    draw(lastSeats, view.relief, !reopen);
     for (const id of lit) if (points[id]) points[id].node.classList.add("lit");
     if (reopen) openTable(reopen.result, reopen.order, tableCenter(), () => true, true);
     // The flat map's splits drawn again with it (直し40-1: they went with the
@@ -1272,7 +1352,7 @@ const EbinoMap = (() => {
     };
     $("map-zoom-in").addEventListener("click", () => moveTo(round(ZOOM_STEP), 300));
     $("map-zoom-out").addEventListener("click", () => moveTo(round(1 / ZOOM_STEP), 300));
-    $("map-zoom-all").addEventListener("click", () => moveTo({ x: 0, y: 0, w: view.W, h: view.H }, 500));
+    $("map-zoom-all").addEventListener("click", () => moveTo(view.whole, 500));
     $("map-back").addEventListener("click", () => (one ? closeOne() : closeTable()));
 
     svg.addEventListener("wheel", (event) => {
@@ -3282,7 +3362,7 @@ const EbinoMap = (() => {
     flights = [];
     for (const node of overlay.querySelectorAll(".split-tag, .table-label, .map-bubble, .table-bubble, .seat-press, .map-hint")) node.remove();
     $("map-zoom-all").focus();
-    moveTo({ x: 0, y: 0, w: view.W, h: view.H }, BACK_FOR);
+    moveTo(view.whole, BACK_FOR);
     // Each seat flies back to its home (直し33-4; motion reduced: at once).
     if (!reduced()) {
       closeChoices(false);

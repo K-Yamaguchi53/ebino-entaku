@@ -72,6 +72,9 @@ FONT_CACHE = "max-age=604800"
 # Served from mapdata/, made once by the tools (relief.py). A missing file is 404.
 MAP_FILES = {
     relief.IMAGE_PATH: (relief.RELIEF_DIR / relief.IMAGE, "image/webp"),
+    # The same picture mirrored, blurred and darkened, laid round it so the
+    # frame has no empty black (直し41の続き; tools/make_relief_blur.py).
+    "/relief_blur.webp": (relief.RELIEF_DIR / "relief_blur.webp", "image/webp"),
 }
 MAX_BODY = 16 * 1024
 HITOKOTO = "/api/hitokoto/"  # 帰る前に、ひとこと's steps (直し38).
