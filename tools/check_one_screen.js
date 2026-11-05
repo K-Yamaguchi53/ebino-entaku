@@ -4,14 +4,16 @@
 //
 //   async (page) => { ... }   with BASE set below
 //
-// For each of the five sizes and each of the five moments it opens the page
+// For each of the five sizes and each of the six moments it opens the page
 // afresh, goes to that moment, and reads whether the page is taller (or
 // wider) than the window. Only the drawer and long boxes may scroll inside
 // themselves. It returns a table: size -> moment -> "ok" or the overflow.
+// one_to_one (直し34-6): the person stood up and a question picked;
+// writing_to_seat is now the box written in at one to one.
 async (page) => {
   const BASE = globalThis.EBINO_BASE || "http://127.0.0.1:8851/";
   const SIZES = [[768, 1024], [1180, 820], [1366, 650], [1536, 760], [1920, 1080]];
-  const MOMENTS = ["before_question", "table_out", "bubble_pressed", "writing_to_seat", "answering_ai"];
+  const MOMENTS = ["before_question", "table_out", "bubble_pressed", "writing_to_seat", "one_to_one", "answering_ai"];
   const browser = page.context().browser();
   const table = {};
   const measure = (p) => p.evaluate(() => {
@@ -41,14 +43,21 @@ async (page) => {
             await p.waitForSelector(".table-bubble:not(.unplaced):not(.ai)", { timeout: 20000 });
             await p.waitForTimeout(reduce ? 600 : 1500);
           }
-          if (["bubble_pressed", "writing_to_seat"].includes(moment)) {
+          if (["bubble_pressed", "writing_to_seat", "one_to_one"].includes(moment)) {
             await p.locator(".table-bubble:not(.unplaced):not(.ai)").first().click();
             await p.waitForSelector(".map-choices");
           }
           if (moment === "writing_to_seat") {
             await p.locator('.map-choices button[data-choice="card"]').click();
             await p.waitForTimeout(300);
+            await p.focus("#question");
             await p.keyboard.type("休みの日に、店のことを考えますか？");
+          }
+          if (moment === "one_to_one") {
+            await p.locator('.map-choices button[data-choice="card"]').click();
+            await p.waitForSelector(".one-asks .one-ask", { timeout: 15000 });
+            await p.locator(".one-asks .one-ask").first().click();
+            await p.waitForTimeout(800);
           }
           if (moment === "answering_ai") {
             // The AI's seat (直し32-3) where there is one; else its card at the table.
