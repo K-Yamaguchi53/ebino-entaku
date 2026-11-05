@@ -795,6 +795,25 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   font-size: .8rem; padding: 1px 8px; border-radius: 4px; }
 .table-label.empty { background: var(--veil); color: var(--soft); box-shadow: none; border: 1px dashed var(--moon-soft); }
 .split-tag.narrow { font-size: .78rem; padding: 1px 6px; }
+/* The split's heading pressed where it is seen (直し40-1): a button that looks
+   as the tag and the heading did (no button's own size, edge or ground);
+   only the pointing hand, and a mark when pressed or when the keyboard is on
+   it. Over the map, it takes a press though the layer it is in does not. */
+button.split-tag { pointer-events: auto; cursor: pointer; margin: 0; min-height: 0; min-width: 0; text-align: left;
+  letter-spacing: inherit; transition: none; }
+button.split-tag:hover { border-color: var(--lamp-soft); }
+button.split-tag:active { background: var(--lamp-faint); }
+button.split-tag:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+.map-bar .map-heading-press { all: unset; cursor: pointer; border-radius: 4px; }
+.map-bar .map-heading-press:active { background: var(--lamp-faint); }
+/* Inside its box: the heading's own box scrolls (overflow: auto) and would
+   cut a ring drawn outside it. */
+.map-bar .map-heading-press:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; background: var(--lamp-faint); }
+/* One to one (直し40-1): neither heading is seen or pressed; nor the dashed
+   line down the table's middle (it looked like a line of the sports ground).
+   Back at the meeting, as before. */
+body.one-open #map-heading { visibility: hidden; }
+.one-on .table-split { visibility: hidden; }
 .unplaced { display: none; }
 
 /* Under the map, never over it: 地図にもどす, the table's heading, the zoom. */
@@ -883,6 +902,7 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .map-frame { width: min(1
 body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar { flex: 0 0 200px; flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: flex-end;
   min-height: 0; padding: 0; gap: 8px; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar button { min-height: 40px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar .map-heading-press { min-height: 0; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .map-met { order: -1; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .map-heading { flex: 0 1 auto; min-height: 0; overflow: auto; font-size: 1rem; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .drawer-buttons { flex-direction: column; }

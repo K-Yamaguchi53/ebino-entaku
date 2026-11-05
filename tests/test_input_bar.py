@@ -182,4 +182,4 @@ def test_the_words_are_in_texts():
     assert texts.id_table("input_to", texts.INPUT_TO_IDS)["seat"].count("{seat}") == 1
     shown = texts.screen_texts()
     assert set(shown["input_to"]) == {"all", "seat", "ai", "clear"}
-    assert set(shown["input_send"]) == {"all", "seat", "ai"} and set(shown["input_done"]) == {"seat", "ai"}
+    assert set(shown["input_send"]) == {"all", "seat", "ai"} and set(shown["input_done"]) == {"seat", "ai", "split"}

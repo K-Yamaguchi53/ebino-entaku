@@ -24,6 +24,12 @@ const state = {
   // 帰る前に、ひとこと (直し38): which reflection ("hitokoto", or "old" when
   // EBINO_REFLECT=old), its words, and the bubbles opened, in that order.
   reflect: "old", hitokoto: null, opened: [],
+  // The latest round has a split none of whose headings is pressed yet
+  // (直し40-1): 「いまやること」 says it can be pressed.
+  splitOpen: false,
+  // What the one line over the box (#input-done) says: "split" after a
+  // split's heading went into the box (直し40-1), so it goes when the box does.
+  doneKind: "",
 };
 
 const $ = (id) => document.getElementById(id);
@@ -104,7 +110,7 @@ async function setup() {
   // mark, a seat's question card and the quote's card (直し26-2).
   const lent = { state, cardEntry, cardDone, setNow, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
     readBelow, shownQuotes, phrased, askSeat, answerTo, firstHelp, openParagraph, backToEveryone, oneOpen, oneAsk,
-    cardFromOne, oneThanks, bubbleOpened, foldAiSeat };
+    cardFromOne, oneThanks, bubbleOpened, foldAiSeat, pressSplit, splitLabel };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
 
@@ -570,6 +576,8 @@ function nowState() {
   if (now.choices) return "pressed";
   if (now.table && !now.pressed) return "table";
   if (!state.aiAnswered && now.band) return "answer_ai";
+  // The latest round split and none of it pressed yet (直し40-1).
+  if (state.splitOpen) return "split";
   return "after";
 }
 
@@ -753,6 +761,7 @@ function draftKey(to) {
 
 function setTo(next, { focus = true } = {}) {
   const box = $("question");
+  if (state.doneKind === "split") hideDone();  // Whom it writes to changed: the split's line goes (直し40-1).
   if (state.to) state.drafts[draftKey(state.to)] = box.value;
   state.to = next;
   const words = state.texts.input_to;
@@ -800,8 +809,15 @@ function backToEveryone() {
   if (!sending() && state.to.kind !== "all") setTo({ kind: "all" });
 }
 
-function showDone(text) { $("input-done").textContent = text; $("input-done").hidden = false; }
-function hideDone() { $("input-done").hidden = true; }
+function showDone(text, kind = "") {
+  $("input-done").textContent = text;
+  $("input-done").hidden = false;
+  state.doneKind = kind;
+}
+function hideDone() {
+  $("input-done").hidden = true;
+  state.doneKind = "";
+}
 
 // One press sends once: the button waits while it is sent (直し31-2).
 async function send(event) {
@@ -960,7 +976,9 @@ function hideMessage() { $("ask-message").hidden = true; }
 
 function renderRound(round) {
   if (!state.firstQuestion) state.firstQuestion = round.question;
-  // A new round: its seats light (map.js says when they are done).
+  // A new round: its seats light (map.js says when they are done). Its
+  // splits not pressed yet (直し40-1).
+  state.splitOpen = round.splits.length > 0;
   setNow({ reading: false, choices: false, pressed: false, table: false, band: false });
   $("to-reflect").hidden = false;
   state.lastOrder = round.seat_order;
@@ -1411,9 +1429,35 @@ function renderSplit(roundNo, split, byId, [quotesA, quotesB]) {
     el("p", { class: "notice", text: state.texts.split_notice }),
     el("p", { class: "heading" }, phrased(shownQuotes(split.heading))),
     el("div", { class: "sides" }, side(split.side_a, quotesA), side(split.side_b, quotesB)),
-    el("button", { type: "button", class: "quiet", text: "この割れ目を次の問いにする", onclick: async () => {
-      fill((await call("/api/split", { round: roundNo, index: split.index })).heading);
-    } }));
+    el("button", { type: "button", class: "quiet", text: SPLIT_PRESS, onclick: () => pressSplit(roundNo, split.index) }));
+}
+
+// A split's heading, pressed where it is seen (直し40-1: the tag on the flat
+// map, the heading under the round table) or in the drawer: the box goes
+// back to writing to everyone (whatever was being written to a seat or an
+// AI's question stays in state.drafts), then, as before, the heading goes
+// into the box as it is (SPEC 5-1) and the keyboard with it; one line over
+// the box says it may be put in one's own words.
+const SPLIT_PRESS = "この割れ目を次の問いにする";
+
+function splitLabel(heading) {
+  return `${SPLIT_PRESS}：${shownQuotes(heading)}`;
+}
+
+async function pressSplit(roundNo, index) {
+  if (sending()) return;
+  if (state.to.kind !== "all") setTo({ kind: "all" }, { focus: false });
+  let heading;
+  try {
+    ({ heading } = await call("/api/split", { round: roundNo, index }));
+  } catch (error) {
+    showMessage(sendFailed(error));
+    return;
+  }
+  if (roundNo === state.lastRound) state.splitOpen = false;
+  fill(heading);
+  showDone(state.texts.input_done.split, "split");
+  setNow();
 }
 
 // --- seats ---
@@ -1839,6 +1883,10 @@ function backToStart() {
 
 $("ask-form").addEventListener("submit", send);
 $("input-to-clear").addEventListener("click", backToEveryone);
+// The box emptied: the split's line goes with what it was about (直し40-1).
+$("question").addEventListener("input", () => {
+  if (state.doneKind === "split" && !$("question").value.trim()) hideDone();
+});
 $("question").addEventListener("keydown", (event) => {
   // At one to one, Esc goes back to the table (map.js), the box with it (直し34-3).
   if (event.key === "Escape" && state.to.kind !== "all" && !state.now.one) {

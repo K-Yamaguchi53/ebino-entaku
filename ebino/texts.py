@@ -123,7 +123,7 @@ INPUT_TO_IDS = ("all", "seat", "ai", "clear")
 INPUT_SEND = "input_send"
 INPUT_SEND_IDS = ("all", "seat", "ai")
 INPUT_DONE = "input_done"
-INPUT_DONE_IDS = ("seat", "ai")
+INPUT_DONE_IDS = ("seat", "ai", "split")
 MAP_BUTTON_IDS = ("back", "zoom_in", "zoom_out", "zoom_all")
 # Round the map (map.js): the word on the mark that points north (the north
 # row's 方位), and by each of the map's four sides what lies that way.
@@ -157,7 +157,8 @@ CARD_ALREADY = "card_already"
 NOW_STEPS = "now_steps"
 NOW_LINE = "now_line"
 NOW_STEP_IDS = ("write", "read", "ask", "reflect")
-NOW_LINE_IDS = ("start", "preparing", "write", "asking", "reading", "table", "pressed", "card", "one", "after", "reflect")
+NOW_LINE_IDS = ("start", "preparing", "write", "asking", "reading", "table", "pressed", "card", "one", "after", "split",
+                "reflect")
 START_PURPOSE = "start_purpose"
 INSIDE_HEADING = "inside_heading"
 INSIDE_COUNTS = "inside_counts"

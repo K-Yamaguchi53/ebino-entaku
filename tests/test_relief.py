@@ -702,7 +702,9 @@ def test_the_maps_buttons_and_the_tables_heading_are_under_the_map_not_over_it()
     assert 'id="map-heading"' in bar
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     table = _inner_function(script, "openTable")
-    assert '$("map-heading").replaceChildren(app.phrased(app.shownQuotes(split.heading)))' in table
+    # A button since 直し40-1 (splitButton puts the same words in it).
+    assert '$("map-heading").replaceChildren(splitButton(result.round, split, "map-heading-press"))' in table
+    assert "press.append(app.phrased(app.shownQuotes(split.heading)));" in _inner_function(script, "splitButton")
     assert "split-tag" not in table
     assert "overlay.clientWidth >= TAG_ON_MAP" in table  # Narrower: in the split block only, as before.
     # While the table is open, Tab goes to its chairs, not to the map's points under it.
@@ -787,7 +789,8 @@ def test_cards_keep_off_the_homes_names_and_a_seats_mark_off_the_maps_words():
 
 def test_the_flat_maps_heading_wraps_between_pieces_and_labels_keep_off_the_schools_mark_and_name():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
-    assert "tag.append(app.phrased(app.shownQuotes(split.heading)));" in _inner_function(script, "drawSplits")
+    assert 'const tag = splitButton(result.round, split, "split-tag");' in _inner_function(script, "drawSplits")
+    assert "press.append(app.phrased(app.shownQuotes(split.heading)));" in _inner_function(script, "splitButton")
     assert ".school text, .school > :not(text)" in _inner_function(script, "fixedBoxes")
     # The school's name stays under its mark: a place name in its way moves, before the labels are put.
     clear = _inner_function(script, "clearSchoolName")

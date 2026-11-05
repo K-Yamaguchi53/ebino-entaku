@@ -31,7 +31,7 @@ def test_back_at_the_map_it_is_folded_and_the_meeting_or_an_answer_opens_it():
     assert "app.foldAiSeat(true);" in _inner("closeTable")
     assert "foldAiSeat(false);" in _top("renderAiSeat")  # A round's questions: the meeting is out.
     assert "foldAiSeat(false);" in _top("answerTo")
-    assert "foldAiSeat };" in APP  # Lent to the map.
+    assert "foldAiSeat, pressSplit, splitLabel };" in APP  # Lent to the map.
 
 
 def test_folded_it_is_its_heading_and_a_button_named_by_it_with_no_new_words():

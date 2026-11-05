@@ -129,6 +129,14 @@ def test_one_state_at_a_time_in_order():
     assert now({"cardOpen": True, "now": {"reading": True}}) == "reading"
     # The box at the foot answering an AI's question (直し32-2).
     assert now({"to": {"kind": "ai"}, "now": {"choices": True, "pressed": True, "table": True}}) == "answer_ai"
+    # 直し40-1: the latest round's split not pressed yet: only where it would be 「after」.
+    done = {"pressed": True, "table": True, "band": True}
+    assert now({"aiAnswered": True, "splitOpen": True, "now": dict(done)}) == "split"
+    assert now({"aiAnswered": True, "splitOpen": False, "now": dict(done)}) == "after"
+    assert now({"splitOpen": True, "now": {"table": True, "band": True}}) == "table"
+    assert now({"splitOpen": True, "now": {"band": True}}) == "answer_ai"
+    assert now({"splitOpen": True, "now": {"one": True}}) == "one"
+    assert now({"splitOpen": True, "cardOpen": True}) == "card"
 
 
 def test_the_screen_changes_the_state_where_it_happens():

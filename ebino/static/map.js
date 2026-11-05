@@ -196,6 +196,7 @@ const EbinoMap = (() => {
   let camera = null, roundNo = 0, returnFocus = null;
   let tableTop = null;  // The round table's top, a ring of spots of the drawing, while it is open.
   let roundSeats = [];  // The seats this round lights, in order.
+  let splitsDrawn = null;  // The round whose splits are on the flat map (直し40-1: drawn again with the map).
   let soon = null;
   let hovered = null;  // The seat under the mouse (the nearest of the marks it is over).
   let opened = null;  // At the table, the seat whose card was left out and is shown, pressed.
@@ -763,9 +764,16 @@ const EbinoMap = (() => {
     const lit = Object.keys(points).filter((id) => points[id].node.classList.contains("lit"));
     const reopen = tableAt && tableOf;
     if (reopen) clearTable();
+    const splits = splitsDrawn;
     draw(lastSeats, view.relief);
     for (const id of lit) if (points[id]) points[id].node.classList.add("lit");
     if (reopen) openTable(reopen.result, reopen.order, tableCenter(), () => true, true);
+    // The flat map's splits drawn again with it (直し40-1: they went with the
+    // old drawing, and their heading with them).
+    if (splits && !reopen) {
+      drawSplits(splits);
+      relayout();
+    }
     return true;
   }
 
@@ -1654,6 +1662,10 @@ const EbinoMap = (() => {
         atTable: node.classList.contains("table-label") || node.classList.contains("on-table") };
     };
     const fixed = fixedBoxes(frameBox);
+    // The seniors' count, put just before: the headings and labels keep off
+    // it too (直し40-1: on the flat map the split's tag went under it).
+    const count = frame.querySelector(".school-count:not([hidden])");
+    if (count && count.getClientRects().length) fixed.push(boxIn(count, frameBox));
     const taken = [];  // What is put, in order: the next ones keep off it.
     const put = (nodes, plan) => {
       const items = nodes.map(itemOf);
@@ -1668,8 +1680,9 @@ const EbinoMap = (() => {
         taken.push([spots[k][0], spots[k][1], items[k].w, items[k].h]);
       });
     };
-    // The headings first.
-    put([...overlay.querySelectorAll(".split-tag")], (items) => planLabels(frameSize, items, fixed));
+    // The headings first; a split's tag, pressed now, off every seat's point
+    // seen too (直し40-1: it came over points to press).
+    put([...overlay.querySelectorAll(".split-tag")], (items) => planLabels(frameSize, items, [...fixed, ...seenPoints(frameBox)]));
     // At the table, the cards of the seats that spoke, in seat_order (直し26-1),
     // before the empty chairs' labels (直し33-5: a long one in a card's column
     // left that card out); the labels then where the cards leave room.
@@ -1990,6 +2003,7 @@ const EbinoMap = (() => {
     flights = [];
     sticky = null;
     roundSeats = [];
+    splitsDrawn = null;
     hideTip();
     for (const node of overlay.querySelectorAll(".map-bubble, .split-tag, .table-label, .table-bubble, .seat-press, .map-hint")) node.remove();
     splitLayer.replaceChildren();
@@ -2036,7 +2050,10 @@ const EbinoMap = (() => {
   }
 
   // A dashed line between the first seat of each side, its heading near it.
+  // The heading is a button (直し40-1): pressed, it goes into the question
+  // box (app.pressSplit), as the drawer's button does; it looks as it did.
   function drawSplits(result) {
+    splitsDrawn = result;
     const seatOfQuote = {};
     for (const quote of result.quotes) seatOfQuote[quote.utterance_id] = quote.seat_id;
     for (const split of result.splits) {
@@ -2045,12 +2062,56 @@ const EbinoMap = (() => {
       const [ax, ay] = spotOf(a), [bx, by] = spotOf(b);
       splitLayer.append(svgEl("line", { x1: ax, y1: ay, x2: bx, y2: by }));
       // It wraps after its 「：」 or between its 「…」, never inside one (app.phrased).
-      const tag = div("split-tag");
-      tag.append(app.phrased(app.shownQuotes(split.heading)));
+      const tag = splitButton(result.round, split, "split-tag");
       tag.classList.toggle("narrow", overlay.clientWidth < NARROW);
       overlay.append(tag);
       place(tag, (ax + bx) / 2, (ay + by) / 2, 8);
     }
+    placeSplitTags();
+  }
+
+  // Every seat's point on screen, as boxes in the frame (直し40-1).
+  function seenPoints(frameBox) {
+    return [...svg.querySelectorAll(".points .pt .shape")].map((node) => boxIn(node, frameBox))
+      .filter(([x, y, w, h]) => w && x + w > 0 && y + h > 0 && x < frameBox.width && y < frameBox.height);
+  }
+
+  // The splits' tags put again as soon as they are drawn, as relayout puts
+  // them: off the fixed boxes, the seniors' count, what is over the map now
+  // (the last bubble, the name card) and every seat's point, since pressed
+  // they would cover it (直し40-1).
+  function placeSplitTags() {
+    const frameBox = overlay.getBoundingClientRect();
+    const tags = [...overlay.querySelectorAll(".split-tag")];
+    const others = [...overlay.children].filter((node) => !node.classList.contains("split-tag") && !node.classList.contains("unplaced"))
+      .map((node) => boxIn(node, frameBox));
+    const count = frame.querySelector(".school-count:not([hidden])");
+    const counted = count && count.getClientRects().length ? [boxIn(count, frameBox)] : [];
+    const items = tags.map((node) => {
+      const x = Number(node.dataset.x), y = Number(node.dataset.y);
+      const [px, py] = toFrame(x, y);
+      return { ...measure(node, frameBox), px, py, gap: Number(node.dataset.gap), inView: inView(x, y), heading: true, atTable: false };
+    });
+    const spots = planLabels({ w: frameBox.width, h: frameBox.height }, items,
+      [...fixedBoxes(frameBox), ...counted, ...others, ...seenPoints(frameBox)]);
+    tags.forEach((node, k) => {
+      node.classList.toggle("unplaced", !spots[k]);
+      if (!spots[k]) return;
+      node.style.left = `${spots[k][0]}px`;
+      node.style.top = `${spots[k][1]}px`;
+    });
+  }
+
+  // A split's heading as a button: its words as they are shown, read aloud
+  // as 「この割れ目を次の問いにする：」 and the heading (直し40-1).
+  function splitButton(roundNo, split, className) {
+    const press = document.createElement("button");
+    press.type = "button";
+    press.className = className;
+    press.append(app.phrased(app.shownQuotes(split.heading)));
+    press.setAttribute("aria-label", app.splitLabel(split.heading));
+    press.addEventListener("click", () => app.pressSplit(roundNo, split.index));
+    return press;
   }
 
   // --- the round table (the picture only) ---
@@ -2388,7 +2449,8 @@ const EbinoMap = (() => {
     // The split's heading: under the map, over neither the table's top nor
     // its chairs; on a map narrower than TAG_ON_MAP, in the split block only.
     // It wraps after its 「：」 or between its 「…」, never inside one (app.phrased).
-    if (split && overlay.clientWidth >= TAG_ON_MAP) $("map-heading").replaceChildren(app.phrased(app.shownQuotes(split.heading)));
+    // Pressed, it goes into the question box (直し40-1).
+    if (split && overlay.clientWidth >= TAG_ON_MAP) $("map-heading").replaceChildren(splitButton(result.round, split, "map-heading-press"));
     for (const chairNode of tableLayer.querySelectorAll(".chair")) chairNode.classList.add("ready");
     tableRoundNo = result.round;
     if (!pressedOnce) overlay.append(div("map-hint", app.state.texts.bubble_hint));

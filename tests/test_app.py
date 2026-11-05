@@ -299,8 +299,10 @@ def test_the_quote_marks_change_on_the_screen_only():
     # The round's heading and the sheet's row are shown through it ...
     assert 'el("p", { class: "heading" }, phrased(shownQuotes(split.heading)))' in script
     assert '"置いてきた：") + shownQuotes(split.heading)' in script
-    # ... but the heading put back into the question box (sent to the models) is not.
-    assert 'fill((await call("/api/split", { round: roundNo, index: split.index })).heading)' in script
+    # ... but the heading put back into the question box (sent to the models) is not
+    # (直し40-1: from the drawer, the map's tag or the heading under the table, the same way).
+    assert '({ heading } = await call("/api/split", { round: roundNo, index }));' in script
+    assert "fill(heading);" in script
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
