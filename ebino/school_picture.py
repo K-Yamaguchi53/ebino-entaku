@@ -23,7 +23,7 @@ Only these three files are read there, nothing else:
 
 The pictures are drawn at about twice the size they are shown. With no
 folder, a missing or broken file, the school keeps its line mark and the
-right of the screen a plain drawing of a building on its site (直し39: no ground).
+right of the screen a plain drawing of a building (直し39: no ground; 直し44: no site under it).
 """
 
 import json

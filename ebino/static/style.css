@@ -1168,7 +1168,6 @@ body.one-open #ai-seat { visibility: hidden; }
 .school-count:hover, .school-count:focus-visible { background: var(--night-3); }
 .map-frame:not(.seniors-out) .pt.school-home, .map-frame:not(.seniors-out) .home-names .at-school { display: none; }
 .map-frame:has(svg.dim) .school-count, .one-on .school-count { visibility: hidden; }
-.yard-site { fill: color-mix(in srgb, var(--night-2) 80%, var(--moon) 6%); stroke: var(--moon-faint); stroke-width: 3; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-cards { grid-template-columns: 1fr 1fr; }
 /* A seat with no place on the map: its point's line dotted. */
 .pt.no-place .shape { stroke-dasharray: 3 2; }

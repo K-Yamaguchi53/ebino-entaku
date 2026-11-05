@@ -1,7 +1,7 @@
 """直し35-2: the map alone, as large as the room lets it be (an upright
 screen: at the top, the room's foot left for the AI's seat), the school on
 it where it is, put larger (直し37-1: SCHOOL_SCALE times its real size). The school's large picture comes from
-outside the repo; with none, a plain building on its site with no name (直し39: no ground),
+outside the repo; with none, a plain building with no name (直し39: no ground; 直し44: no site),
 the same seats put on it. The AI's seat over a corner of the map."""
 
 import json

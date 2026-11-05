@@ -167,7 +167,7 @@ const EbinoMap = (() => {
   // The AI's seat in a corner of the map (直し35-2), tried in this order.
   const AI_CORNERS = ["bottom-right", "bottom-left", "top-left"];
   const RECOMPOSE = 0.03;  // The room's shape this much off the drawing's: it is drawn again.
-  // With no picture of the school (直し33-2): a plain building on its site,
+  // With no picture of the school (直し33-2): a plain building (no site, 直し44),
   // no name, in its own units; its windows (two rows on the building's
   // front, the lower first as the picture's inner row: rows past them go up
   // over the roof) are where seats go, as on the picture. No ground, no
@@ -547,8 +547,8 @@ const EbinoMap = (() => {
     }
     group.classList.add("plain");
     const [nw, ne, se, sw] = model.roof, wall = PLAIN_YARD.wall;
-    // The site under the building (直し35-2), as on the picture; no ground (直し39).
-    group.append(polygon("yard-site", model.board));
+    // No site under the building (直し44), as on the picture: the building
+    // stands on the map, not on a board; no ground (直し39).
     building.append(polygon("yard-wall", [sw, se, [se[0], se[1] + wall], [sw[0], sw[1] + wall]]), polygon("yard-roof", [nw, ne, se, sw]));
     for (const [wx, wy] of model.windows) {
       building.append(svgEl("rect", { class: "yard-window", x: wx - 9, y: wy - 14, width: 18, height: 28, rx: 2 }));

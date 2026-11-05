@@ -2,7 +2,7 @@
 one to one), its sports ground is not drawn (先生「円卓として校舎が出てくる
 ときに、グラウンドは不要」). The picture (school_yard.png, the file as it is)
 is shown from a little east of its ground's east side (field_px's two east
-corners) on; the plain one has a building and its site only. (直し35-1's
+corners) on; the plain one has a building only (直し44: no site). (直し35-1's
 track on the plain ground is gone with it.)"""
 
 import json
@@ -48,8 +48,11 @@ def test_no_track_lanes_infield_or_middle_line_is_drawn_for_either_school():
         assert gone not in MAP, gone
     for gone in (".yard-ground", ".yard-track", ".yard-infield", ".yard-line", "--track", "--infield", "--field-line"):
         assert gone not in CSS, gone
-    # The plain one: its site under the building, as the part shown.
-    assert 'group.append(polygon("yard-site", model.board));' in drawn
+    # The plain one: no site under the building (直し44), as on the picture;
+    # its roof, wall and windows only.
+    assert "yard-site" not in drawn and "yard-site" not in MAP and ".yard-site" not in CSS
+    for kept in ('polygon("yard-wall"', 'polygon("yard-roof"', '"yard-window"'):
+        assert kept in drawn, kept
     assert "field" not in _const("PLAIN_YARD")
 
 
