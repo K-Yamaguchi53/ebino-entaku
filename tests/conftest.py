@@ -14,6 +14,18 @@ DISPLAY_NAME = "山川さん"
 
 
 @pytest.fixture(autouse=True)
+def no_env_file(monkeypatch):
+    """No test reads .env (直し36: a main() that read it reached the real
+    data folder and the model). Each module's own name for load_env_file is
+    a no-op here; test_config calls config.load_env_file with its own file."""
+    from ebino import app, purpose_summary, records, tagger, talk_kinds
+    from ebino.ingest import run
+
+    for module in (app, run, purpose_summary, records, tagger, talk_kinds):
+        monkeypatch.setattr(module, "load_env_file", lambda *args, **kwargs: None)
+
+
+@pytest.fixture(autouse=True)
 def no_speaker_unless_asked(monkeypatch):
     """The bubbles as spoken words (直し31-7) are one more model request a
     round: off where a test scripts the model's answers, on where asked for."""
