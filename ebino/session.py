@@ -31,7 +31,7 @@ from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_S
 from . import librarian, texts
 from .gate import Gate, GateError, ModelUnavailable, NameList, load_names
 from .guard import Guard
-from . import asker, hitokoto, one_to_one
+from . import asker, hitokoto, one_tidy, one_to_one
 from .index import Entry, build_index, load_topics, load_utterances
 from .ingest.run import OUTPUT_DIR as INGESTED_DIR
 from .ingest.scrub import normalize_for_match
@@ -217,6 +217,9 @@ class Session:
     one_free: dict[str, list[bool]] = field(default_factory=dict)
     one_thanked: list[str] = field(default_factory=list)
     one_spoken: list[speaker.Spoken] = field(default_factory=list)
+    # A slide's pages tidied before one to one shows them (直し43,
+    # one_tidy.py): the words shown, how many lines went, and why.
+    one_tidied: list[dict] = field(default_factory=list)
     # The teacher's questions put to each person (直し36-3), by seat and item.
     one_rephrased: dict[str, dict[str, asker.Rephrased]] = field(default_factory=dict)
     # 帰る前に、ひとこと (直し38, hitokoto.py): in place of the reflection
@@ -229,6 +232,7 @@ class Session:
         self.shelf = PurposeShelf(self.library.purposes, self.rng)
         self._seats = {seat.seat_id: seat for seat in self.library.seats}
         self._utterances = {u.id: u for u in self.library.utterances}
+        self._tidied: dict[str, one_tidy.Tidied] = {}  # A slide's page tidied, by utterance ID.
 
     def save(self) -> None:
         """Kept after every step (SPEC 2-1: every action is recorded by itself)."""
@@ -245,6 +249,7 @@ class Session:
                                      "thanked": seat_id in self.one_thanked}
                                     for seat_id, items in self._one_seats().items()]
             record["one_spoken"] = [spoken.record() for spoken in self.one_spoken]
+            record["one_tidied"] = list(self.one_tidied)
             # Which was shown, the teacher's question or one put to the
             # person, and why the teacher's was kept; never the words (直し36-3).
             record["one_rephrased"] = [dict(result.record(), seat_id=seat_id)
@@ -566,7 +571,9 @@ class Session:
             pages = tables["pages"].get(seat_id, {})
             for item, question in asked[group]:
                 found = [u for u in pieces if item in pages.get(u.section, [])]
-                if found:
+                # An item none of whose pages has anything to show once tidied
+                # (a title only, a name) is not offered (直し43).
+                if any(self.one_page(u).text for u in found):
                     out.append((item, question, found))
         elif seat.kind == "poster":
             for item, question in asked[one_to_one.GROUP_POSTER]:
@@ -619,23 +626,60 @@ class Session:
                               for item, question in left[:one_to_one.ONE_QUESTIONS]],
                 "done": bool(items) and not left, "asked": list(asked)}
 
+    def one_page(self, utterance: Utterance) -> one_tidy.Tidied:
+        """A slide's page as one to one shows it (直し43, one_tidy.py): "" when
+        nothing is left or the words tidied hold a name (lines joined, a
+        name's letters may meet). Not a page: its words as recorded."""
+        if not one_to_one.is_page(utterance.section):
+            return one_tidy.Tidied(utterance.text)
+        if utterance.id not in self._tidied:
+            tidied = one_tidy.tidy_page(utterance.text)
+            if tidied.text and self.gate.names.hits(tidied.text):
+                tidied = one_tidy.Tidied("", tidied.dropped, (*tidied.reasons, one_tidy.NAME))
+            self._tidied[utterance.id] = tidied
+        return self._tidied[utterance.id]
+
     def _one_words(self, seat_id: str, pieces: list[Utterance]) -> dict:
-        """The words shown at one to one: the pieces as recorded, up to about
-        ONE_CHARS, as spoken words where the speaker's checks let them through."""
-        shown, total = [], 0
+        """The words shown at one to one: the pieces, up to about ONE_CHARS,
+        as spoken words where the speaker's checks let them through. A
+        slide's page tidied first (直し43): its title's line, its numbers
+        and the PDF's breaks gone; a page with nothing left, or a name, not
+        shown; the pages together cut at a sentence's end past ONE_CUT_CHARS.
+        The words recorded are never changed: only those shown."""
+        shown, said, met, total = [], [], [], 0
         for piece in pieces:
+            met.append(piece)
+            words = self.one_page(piece).text
+            if not words:
+                continue
             shown.append(piece)
-            total += len(piece.text)
+            said.append(words)
+            total += len(words)
             if total >= one_to_one.ONE_CHARS:
                 break
+        was_cut = False
+        if any(one_to_one.is_page(u.section) for u in shown):
+            said, was_cut = one_tidy.cut(said, one_to_one.ONE_CUT_CHARS)
+        kept = {u.id: text for u, text in zip(shown, said)}
+        last = shown[len(said) - 1].id if was_cut else ""
+        # Each page met, in order: the words shown, or "" and why; "cut" on
+        # the last shown when a cut came after it, and on a page cut off whole.
+        for piece in met:
+            if not one_to_one.is_page(piece.section):
+                continue
+            words = self.one_page(piece)
+            cut_here = was_cut and (piece.id == last or bool(words.text) and piece.id not in kept)
+            reasons = (*words.reasons, *([one_tidy.CUT] if cut_here else []))
+            self.one_tidied.append(one_tidy.Tidied(kept.get(piece.id, ""), words.dropped, reasons).record(piece.id))
+        shown = shown[:len(said)]
         spoken = {}
         if config.speaker_on():
             quotes = [{"id": u.id, "voice": u.voice, "text": u.text, "paragraph": u.paragraph or u.text} for u in shown]
             for result in speaker.speak(self.gate, quotes):
                 spoken[result.utterance_id] = result
                 self.one_spoken.append(result)
-        return {"pieces": [{"utterance_id": u.id, "text": u.text, "spoken": spoken[u.id].spoken if u.id in spoken else "",
-                            "said": not u.note} for u in shown],
+        return {"pieces": [{"utterance_id": u.id, "text": text, "spoken": spoken[u.id].spoken if u.id in spoken else "",
+                            "said": not u.note} for u, text in zip(shown, said)],
                 "source": self.passage_source(seat_id, shown)}
 
     def one_ask(self, seat_id: str, item: str) -> dict:
@@ -679,6 +723,11 @@ class Session:
             except (GateError, ModelUnavailable):
                 ids = []
         pieces = [self._utterances[i] for i in ids if i in self._utterances and self._utterances[i].seat_id == seat_id]
+        # A slide's page with nothing to show once tidied is none (直し43); why, kept.
+        for piece in pieces:
+            if not self.one_page(piece).text:
+                self.one_tidied.append(self.one_page(piece).record(piece.id))
+        pieces = [piece for piece in pieces if self.one_page(piece).text]
         self.one_free.setdefault(seat_id, []).append(bool(pieces))
         self.save()
         if not pieces:

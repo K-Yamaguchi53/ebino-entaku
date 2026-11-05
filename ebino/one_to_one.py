@@ -30,6 +30,10 @@ OUTSIDER_AXES = ("来たわけ", "見えたこと", "したかったこと")
 ONE_QUESTIONS = 3
 # The words shown for an item: its pieces as recorded, up to about this many characters.
 ONE_CHARS = 160
+# A slide's pages tidied (one_tidy.py) that come to more than this many
+# characters together are cut at a sentence's end to come to this many or
+# fewer, the first sentence always whole (直し43: 「大きく超える」, 1.5 times).
+ONE_CUT_CHARS = ONE_CHARS * 3 // 2
 
 # A ranking's item: its question is the seat's own (a table's), not the teacher's.
 RANKING_ITEM = "ランキング"

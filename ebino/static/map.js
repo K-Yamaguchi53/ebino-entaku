@@ -3388,11 +3388,13 @@ const EbinoMap = (() => {
   }
 
   // Its words in its bubble: the item's pieces, as spoken words where they
-  // were let through (a small mark says so), as recorded otherwise.
+  // were let through (a small mark says so), as recorded otherwise (a
+  // slide's page tidied, 直し43). Each piece on a line of its own: they part
+  // where a sentence ends, never run into one another.
   function says(pieces, source) {
     if (!one || !one.bubble) return;
     const voice = one.bubble.querySelector(".voice");
-    voice.textContent = pieces.map((piece) => piece.spoken || piece.text).join("");
+    voice.replaceChildren(...pieces.map((piece) => div("one-piece", piece.spoken || piece.text)));
     const spoken = pieces.some((piece) => piece.spoken);
     one.bubble.classList.toggle("spoken", spoken);
     const mark = one.bubble.querySelector(".spoken-mark");
