@@ -1,7 +1,7 @@
 """直し35-2: the map alone, as large as the room lets it be (an upright
 screen: at the top, the room's foot left for the AI's seat), the school on
 it where it is, put larger (直し37-1: SCHOOL_SCALE times its real size). The school's large picture comes from
-outside the repo; with none, a plain building and a ground with no name,
+outside the repo; with none, a plain building on its site with no name (直し39: no ground),
 the same seats put on it. The AI's seat over a corner of the map."""
 
 import json
@@ -89,10 +89,10 @@ def test_the_school_is_put_larger_where_it_is_by_one_scale():
     assert abs(653 * got["k"] - scale * 96.2 * 2.33 / 33.4225) < 0.05 * scale
 
 
-def test_the_plain_yard_has_its_windows_and_ground_and_no_name():
+def test_the_plain_yard_has_its_windows_and_site_and_no_name():
     model = _inner("yardModel")
     assert "rows.flatMap((y) => Array.from({ length: columns }" in model
-    assert re.search(r"rows: \[\d+, \d+\], columns: 20 \}", MAP)  # Two rows of 20 windows.
+    assert re.search(r"rows: \[\d+, \d+\], columns: 20[,}]", MAP)  # Two rows of 20 windows.
     drawn = _inner("drawYard")
     assert "text" not in drawn  # No name on it.
     assert 'svgEl("g", { class: "yard-building" })' in drawn and 'group.setAttribute("aria-hidden", "true")' in drawn

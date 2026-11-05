@@ -49,9 +49,6 @@
   --shadow: rgba(1, 4, 12, .6);
   --star: rgba(255, 255, 255, .7);
   --warn: #f2a493;
-  --track: #4a2a26;
-  --infield: #1f3a2c;
-  --field-line: #a9aba6;
   /* The four kinds of seat: one family, the same lightness; the shape tells them apart too. */
   --kind-adult: #dba590;
   --kind-poster: #9ec6aa;
@@ -1094,7 +1091,6 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #opening-skip { min-heigh
    plain building and a ground, no name, in the night's colours. */
 .yard { pointer-events: none; }
 .yard-landing { fill: none; }
-.yard-ground { fill: color-mix(in srgb, var(--paper) 12%, var(--night-2)); stroke: var(--moon-faint); stroke-width: 3; }
 .yard-roof { fill: var(--night-3); stroke: var(--moon-soft); stroke-width: 3; }
 .yard-wall { fill: var(--night); stroke: var(--moon-faint); stroke-width: 3; }
 .yard-window { fill: color-mix(in srgb, var(--lamp) 22%, var(--night)); }
@@ -1130,10 +1126,6 @@ body.one-open #ai-seat { visibility: hidden; }
 /* The empty chairs out of the way at one to one: not seen, not reached by Tab (直し34-5). */
 .one-on .table .chair { visibility: hidden; }
 .one-on .pt.silent .ask-mark { display: none; }
-/* The plain ground's track (直し35-1): red earth, the grass inside, white lines; night colours. */
-.yard-track { fill: var(--track); }
-.yard-infield { fill: var(--infield); }
-.yard-line { fill: none; stroke: var(--field-line); stroke-width: 2.4; }
 /* 直し35-2: the seniors folded into their count on the school until the
    windows are a point apart on screen; then at their windows, small. */
 .school-count { position: absolute; z-index: 3; min-height: 32px; padding: 3px 12px; border-radius: 16px;

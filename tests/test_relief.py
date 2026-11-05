@@ -590,7 +590,7 @@ def _scenes():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     consts = script[script.index("  const NS ="):script.index("  let map = null;")]
     names = ["centroid", "reliefView", "onTable", "ring", "riseAt", "frontAngle", "seating", "pointScale", "yardModel",
-             "homesOf", "schoolSquares", "clearOf", "freeBlock", "windowStep", "trackOn", "schoolOnMap", "chooseSpot",
+             "homesOf", "seniorRows", "clearOf", "freeBlock", "windowStep", "cutYard", "schoolOnMap", "chooseSpot",
              "planLabels", "within", "seenWords", "planBubble", "topStrips"]
     source = "".join(_inner_function(script, name) for name in names)
     seats = [make_seat(seat_id=seat, kind=kind, title=f"架空の席{seat}", company="", display_name="",

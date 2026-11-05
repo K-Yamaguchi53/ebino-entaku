@@ -121,7 +121,7 @@ const EbinoMap = (() => {
   // at a way out on the map's edge, to 県外 by the north side, to
   // 海外 by the south, beside the arrow going out, GATE_COLUMNS to a row;
   // 外から来た大人・先生 at the way to 県外, beside the arrow coming in;
-  // 探究をした先輩 at the school's windows, more than those inside its track.
+  // 探究をした先輩 at the school's windows, more than those on rows past them.
   // HOME_STEP CSS px between two side by side at the whole map.
   const HOME_STEP = 16, GATE_COLUMNS = 5;
   // The school's name never over SCHOOL_TEXT_MAX_PX on screen.
@@ -134,16 +134,23 @@ const EbinoMap = (() => {
   // times its real size; at its real size, 直し35-2, it was a few pixels
   // across at the whole map, and its seniors came out only 110 to 220 times
   // nearer, where the relief is a grey blur). The one scale for the picture,
-  // its windows, its ground and track and their squares, the school rising
+  // its windows and the rows past them, the school rising
   // at the meeting and one to one at its windows. 22: at the whole map the
-  // picture is about 0.18 of the map's shorter side (at most 0.2), and its
+  // picture (with its ground, before 直し39) is about 0.18 of the map's shorter side (at most 0.2), and its
   // seniors come out within 4 to 8 times (at most 10), 4 to 6 presses of ＋
   // (3 to 6 asked), at the five sizes. The map's metres to a unit (the relief's
-  // own, else this), the plain school's units to a metre (its ground is the
-  // model's 96.2 m across) and the ring's middle on it.
+  // own, else this), the plain school's units to a metre (the ground it had
+  // was the model's 96.2 m across in 520) and the ring's middle on it.
   const SCHOOL_SCALE = 22;
   const M_PER_UNIT = 33.4225;
-  const PLAIN_PX_PER_M = 520 / 96.2, PLAIN_RING = [1020, 290];
+  const PLAIN_PX_PER_M = 520 / 96.2, PLAIN_RING = [380, 60];
+  // The school without its sports ground (直し39, 先生「円卓として校舎が出て
+  // くるときに、グラウンドは不要」): the picture shown from CUT_GAP_M metres
+  // east of its ground's east side (field_px's two east corners) on, the
+  // ground, track, lanes and lines west of that left out; the plain one has
+  // none. Past the windows the seniors go on rows outward (seniorRows), kept
+  // RING_MARGIN window steps inside the part shown.
+  const CUT_GAP_M = 3, RING_MARGIN = 2;
   // A seat at the school (a window, the track) never more than SCHOOL_R_PX
   // across its half on screen; the seniors show at their windows once the
   // windows are that far apart on screen (twice it), and the nearest zoom is
@@ -155,16 +162,13 @@ const EbinoMap = (() => {
   // The AI's seat in a corner of the map (直し35-2), tried in this order.
   const AI_CORNERS = ["bottom-right", "bottom-left", "top-left"];
   const RECOMPOSE = 0.03;  // The room's shape this much off the drawing's: it is drawn again.
-  // With no picture of the school (直し33-2): a plain building and its ground,
+  // With no picture of the school (直し33-2): a plain building on its site,
   // no name, in its own units; its windows (two rows on the building's
-  // front) and its ground's corners are where seats go, as on the picture.
-  const PLAIN_YARD = { width: 1400, height: 760, field: [[40, 150], [560, 150], [560, 720], [40, 720]],
-    roof: [[680, 290], [1360, 290], [1360, 540], [680, 540]], wall: 110, rows: [565, 615], columns: 20 };
-  // The track on the ground with no picture (直し35-1), in metres as the
-  // school's model has it (build_school.py: the field 96.2 m east-west by
-  // 126.5 m north-south, an oval of two straights and two half circles,
-  // four lanes): drawn on the field's four corners as they are.
-  const TRACK = { field: [96.2, 126.5], rOut: 42, half: 16, lanes: 4, lane: 1.25, segs: 24 };
+  // front, the lower first as the picture's inner row: rows past them go up
+  // over the roof) are where seats go, as on the picture. No ground, no
+  // track (直し39); rise: its size as it was with them, for the meeting.
+  const PLAIN_YARD = { width: 760, height: 480, roof: [[40, 60], [720, 60], [720, 310], [40, 310]], wall: 110,
+    rows: [385, 335], columns: 20, rise: [1400, 760] };
   const WORD_PAD = 2;  // CSS px kept clear round a word drawn on the map.
   const SLIDE_MOST = 40;  // CSS px the school's name may slide off a seat's point.
   // Where a seat's 「？」 may go, by its point (x, y, which way the text runs
@@ -296,14 +300,36 @@ const EbinoMap = (() => {
   }
 
   // The yard as drawn: the picture's size and where its seats go, or the
-  // plain one's, in its own units.
+  // plain one's, in its own units; board: the part shown, its corners
+  // (north-west, north-east, south-east, south-west).
   function yardModel() {
-    if (yardPicture) return { picture: true, ...yardPicture, pxPerM: yardPicture.px_per_m };
-    const { width, height, field, roof, rows, columns } = PLAIN_YARD;
+    if (yardPicture) return cutYard(yardPicture);
+    const { width, height, roof, wall, rows, columns, rise } = PLAIN_YARD;
     const [left, right] = [roof[0][0] + 24, roof[1][0] - 24];
     const windows = rows.flatMap((y) => Array.from({ length: columns },
       (_, k) => [left + (right - left) * k / (columns - 1), y]));
-    return { picture: false, width, height, field, roof, windows, ring: PLAIN_RING, pxPerM: PLAIN_PX_PER_M };
+    const [[x0, y0], , [x1, y1]] = roof;
+    const board = [[x0 - 24, y0 - 24], [x1 + 24, y0 - 24], [x1 + 24, y1 + wall + 24], [x0 - 24, y1 + wall + 24]];
+    return { picture: false, width, height, roof, windows, board, ring: PLAIN_RING, pxPerM: PLAIN_PX_PER_M, rise };
+  }
+
+  // The picture without its ground (直し39): its ground's east side (field:
+  // north-west, north-east, south-east, south-west) CUT_GAP_M metres east,
+  // run to the picture's top and foot, and only what is east of that shown.
+  // In the part shown's own px, its left at 0: the picture at imageX, the
+  // part shown (board), the windows and the ring's middle; rise: the
+  // picture's whole size, for the meeting. Never over a
+  // window or the ring's middle (the cut kept gap west of them). The file is
+  // as it was. It reads nothing but what it is given.
+  function cutYard(p) {
+    const [, ne, se] = p.field, gap = CUT_GAP_M * p.px_per_m;
+    const most = Math.min(...p.windows.map((w) => w[0]), p.ring[0]) - gap;
+    const xAt = (y) => Math.max(0, Math.min(ne[0] + (se[0] - ne[0]) * (y - ne[1]) / ((se[1] - ne[1]) || 1) + gap, most));
+    const top = xAt(0), foot = xAt(p.height), left = Math.min(top, foot);
+    const shift = ([x, y]) => [Math.round((x - left) * 100) / 100, y];
+    const board = [[top, 0], [p.width, 0], [p.width, p.height], [foot, p.height]].map(shift);
+    return { picture: true, image: p.image, imageX: -left, imageW: p.width, width: p.width - left, height: p.height,
+      board, windows: p.windows.map(shift), ring: shift(p.ring), pxPerM: p.px_per_m, rise: [p.width, p.height] };
   }
 
   // The room the drawing has on screen (the map's room), or a guess from
@@ -499,63 +525,29 @@ const EbinoMap = (() => {
     const xs = model.windows.map((p) => p[0]), ys = model.windows.map((p) => p[1]);
     group.append(svgEl("circle", { class: "yard-landing", r: 1,
       cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2 }));
+    const polygon = (className, spots) => svgEl("polygon", { class: className, points: spots.map((p) => p.join(",")).join(" ") });
     if (model.picture) {
-      building.append(svgEl("image", { href: model.image, width: model.width, height: model.height }));
+      // Only the part east of the cut (直し39): the picture fills the part
+      // shown, so the building's box is that part, not the whole picture.
+      const fill = svgEl("pattern", { id: "yard-picture", patternUnits: "userSpaceOnUse", x: model.imageX, y: 0,
+        width: model.imageW, height: model.height });
+      fill.append(svgEl("image", { href: model.image, width: model.imageW, height: model.height }));
+      svg.querySelector("defs").append(fill);
+      const shown = polygon("yard-picture", model.board);
+      shown.setAttribute("fill", "url(#yard-picture)");
+      building.append(shown);
       group.append(building);
       return;
     }
     group.classList.add("plain");
-    const polygon = (className, spots) => svgEl("polygon", { class: className, points: spots.map((p) => p.join(",")).join(" ") });
     const [nw, ne, se, sw] = model.roof, wall = PLAIN_YARD.wall;
-    // One site under the building and its ground (直し35-2), as on the picture.
-    const [rx0, ry0] = model.roof[0], [rx1, ry1] = model.roof[2];
-    const fx = model.field.map((p) => p[0]), fy = model.field.map((p) => p[1]);
-    const [sx0, sy0, sx1, sy1] = [Math.min(...fx, rx0) - 24, Math.min(...fy, ry0) - 24, Math.max(...fx, rx1) + 24,
-      Math.max(...fy, ry1 + PLAIN_YARD.wall) + 24];
-    group.append(polygon("yard-site", [[sx0, sy0], [sx1, sy0], [sx1, sy1], [sx0, sy1]]));
-    group.append(polygon("yard-ground", model.field));
-    const track = trackOn(model.field);
-    group.append(svgEl("path", { class: "yard-track", "fill-rule": "evenodd",
-      d: [track.lanes[track.lanes.length - 1], track.lanes[0]].map((ring) => `M${ring.map((p) => p.join(",")).join("L")}Z`).join("") }));
-    group.append(polygon("yard-infield", track.lanes[0]));
-    for (const ring of track.lanes) group.append(polygon("yard-line", ring));
-    group.append(svgEl("line", { class: "yard-line", x1: track.middle[0][0], y1: track.middle[0][1],
-      x2: track.middle[1][0], y2: track.middle[1][1] }));
+    // The site under the building (直し35-2), as on the picture; no ground (直し39).
+    group.append(polygon("yard-site", model.board));
     building.append(polygon("yard-wall", [sw, se, [se[0], se[1] + wall], [sw[0], sw[1] + wall]]), polygon("yard-roof", [nw, ne, se, sw]));
     for (const [wx, wy] of model.windows) {
       building.append(svgEl("rect", { class: "yard-window", x: wx - 9, y: wy - 14, width: 18, height: 28, rx: 2 }));
     }
     group.append(building);
-  }
-
-  // The track's lane lines (inner first) and the straight across its
-  // middle, on a field given by its corners (north-west, north-east,
-  // south-east, south-west): each spot in metres taken to the field's
-  // corners as they are drawn. It reads nothing but what it is given.
-  function trackOn([nw, ne, se, sw]) {
-    const [fw, fl] = TRACK.field;
-    const at = (mx, my) => {  // metres from the field's middle, east and north
-      const u = 0.5 + mx / fw, v = 0.5 - my / fl;
-      const top = [nw[0] + (ne[0] - nw[0]) * u, nw[1] + (ne[1] - nw[1]) * u];
-      const foot = [sw[0] + (se[0] - sw[0]) * u, sw[1] + (se[1] - sw[1]) * u];
-      return [top[0] + (foot[0] - top[0]) * v, top[1] + (foot[1] - top[1]) * v].map((n) => Math.round(n * 10) / 10);
-    };
-    const ring = (r) => {
-      const spots = [];
-      for (let k = 0; k <= TRACK.segs; k++) {
-        const t = Math.PI * k / TRACK.segs;
-        spots.push(at(r * Math.cos(t), TRACK.half + r * Math.sin(t)));
-      }
-      for (let k = 0; k <= TRACK.segs; k++) {
-        const t = Math.PI + Math.PI * k / TRACK.segs;
-        spots.push(at(r * Math.cos(t), -TRACK.half + r * Math.sin(t)));
-      }
-      return spots;
-    };
-    const rIn = TRACK.rOut - TRACK.lanes * TRACK.lane;
-    const lanes = [];
-    for (let k = 0; k <= TRACK.lanes; k++) lanes.push(ring(rIn + k * TRACK.lane));
-    return { lanes, middle: [at(-rIn, 0), at(rIn, 0)] };
   }
 
   // What homesOf needs of the drawing as it is: the map's box, the school's
@@ -581,21 +573,22 @@ const EbinoMap = (() => {
   //   県外・海外に出た人: at the way out to 海外 (south) if they went abroad,
   //     else to 県外 (north), beside the arrow going out, rows inward;
   //   外から来た大人・先生: at the way to 県外, beside the arrow coming in;
-  //   探究をした先輩: one to each of the school's windows, then inside its
-  //     track, then on its ground outside the track, the windows' step apart.
+  //   探究をした先輩: one to each of the school's windows, then on the rows
+  //     past them (seniorRows, 直し39: the ground is gone), the windows'
+  //     step apart or more.
   // Returns { spots: id -> [x, y], gates, used, names: [{ kind, at, anchor,
   // school }], counts, school: the ids at the school, noPlace: the ids with
-  // no place, seniorStep: the windows' step, trackRoom: how many fit inside
-  // the track }. The same seats give the same homes. It reads nothing but
-  // what it is given.
+  // no place, seniorStep: the windows' step, room: { windows, rows }: how
+  // many fit at the windows and on the rows on the school }. The same seats
+  // give the same homes. It reads nothing but what it is given.
   function homesOf(seats, place) {
     const { mapBox: [mx, my, mw, mh], yard: { x: yx, y: yy, k, model }, unit, r, avoid = [], middle } = place;
     const step = Math.max(HOME_STEP * unit, 2.4 * r);
     const inYard = ([px, py]) => [yx + px * k, yy + py * k];
-    const windows = model.windows.map(inYard), field = model.field.map(inYard);
+    const windows = model.windows.map(inYard), board = model.board.map(inYard);
     const seniorStep = windowStep(windows);
     const gates = { out: [mx + mw / 2 + 6 * step, my + 3 * step], abroad: [mx + mw / 2 + 6 * step, my + mh - 3 * step] };
-    const spots = {}, counts = { map: 0, noPlace: 0, out: 0, abroad: 0, in: 0, windows: 0, track: 0, field: 0 };
+    const spots = {}, counts = { map: 0, noPlace: 0, out: 0, abroad: 0, in: 0, windows: 0, rows: 0, past: 0 };
     const lines = { out: [], abroad: [], in: [] }, noPlace = [], seniors = [];
     for (const seat of seats) {
       if (seat.kind === "adult" && seat.at) {
@@ -615,23 +608,22 @@ const EbinoMap = (() => {
     row(gates.out, lines.out, 1, 1, "out");
     row(gates.out, lines.in, -1, 1, "in");
     row(gates.abroad, lines.abroad, 1, -1, "abroad");
-    // The seniors: the windows, then the track's inside, then the ground round it.
-    const squares = schoolSquares(trackOn(field), field, seniorStep);
+    // The seniors: the windows, then the rows past them (直し39).
     // The school put larger (直し37-1) can lie under an adult's place: that
-    // point stays where it is, and a window or square under it is passed
+    // point stays where it is, and a window or spot under it is passed
     // over, so no senior sits on it once they come out.
     const places = seats.filter((seat) => seat.kind === "adult" && seat.at).map((seat) => seat.at);
     const free = (p) => places.every(([ax, ay]) => Math.hypot(ax - p[0], ay - p[1]) >= seniorStep * SCHOOL_CLEAR);
     const openWindows = windows.filter(free);
-    const open = squares.all.map((p, n) => ({ p, inside: n < squares.inside })).filter(({ p }) => free(p));
+    const rows = seniorRows(windows, board, seniorStep * RING_MARGIN, Math.max(0, seniors.length - openWindows.length), free);
     const school = new Set();
     seniors.forEach((seat, n) => {
-      const square = n < openWindows.length ? null : open[n - openWindows.length];
-      const spot = square ? square.p : openWindows[n];
+      const row = n < openWindows.length ? null : rows.spots[n - openWindows.length];
+      const spot = row ? row.p : openWindows[n];
       if (!spot) return;
       spots[seat.id] = spot;
       school.add(seat.id);
-      counts[!square ? "windows" : square.inside ? "track" : "field"] += 1;
+      counts[!row ? "windows" : row.shown ? "rows" : "past"] += 1;
     });
     // Those with no place, where the map is free.
     if (noPlace.length) {
@@ -650,36 +642,50 @@ const EbinoMap = (() => {
     if (counts.in) names.push({ kind: "outsider_teacher", at: [gates.out[0] - step * 1.1, gates.out[1] - step * 1.1], anchor: "end" });
     if (counts.abroad) names.push({ kind: "cross", at: [gates.abroad[0] + step * 1.1, gates.abroad[1] + step * 1.6], anchor: "start" });
     if (seniors.length) {
-      const xs = windows.map((p) => p[0]), top = Math.min(...windows.map((p) => p[1]));
+      // Over the windows and the rows in use.
+      const xs = windows.map((p) => p[0]), top = Math.min(...[...windows, ...[...school].map((id) => spots[id])].map((p) => p[1]));
       names.push({ kind: "poster", at: [(Math.min(...xs) + Math.max(...xs)) / 2, top - seniorStep * 1.5], anchor: "middle", school: true });
     }
     return { spots, gates, used: { out: counts.out > 0, in: counts.in > 0, abroad: counts.abroad > 0 }, names, counts,
       school, noPlace: new Set(noPlace.map((seat) => seat.id)), seniorStep,
-      trackRoom: open.filter(({ inside }) => inside).length };
+      room: { windows: openWindows.length, rows: rows.room } };
   }
 
-  // Spots for seats at the school past its windows, step apart on a grid
-  // round the middle of its track: those inside the track (nearest the
-  // middle first), then those on the ground (its corners as drawn) outside
-  // the track. Returns { all, inside: how many of all are inside }. It reads
-  // nothing but what it is given.
-  function schoolSquares(track, field, step) {
-    const inner = track.lanes[0], outer = track.lanes[track.lanes.length - 1];
-    const [a, b] = track.middle, mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-    const xs = field.map((p) => p[0]), ys = field.map((p) => p[1]);
-    const near = (p) => Math.hypot(p[0] - mid[0], p[1] - mid[1]);
-    const inside = [], round = [];
-    const nx = Math.ceil((Math.max(...xs) - Math.min(...xs)) / step), ny = Math.ceil((Math.max(...ys) - Math.min(...ys)) / step);
-    for (let i = -nx; i <= nx; i++) {
-      for (let j = -ny; j <= ny; j++) {
-        const p = [mid[0] + i * step, mid[1] + j * step];
-        if (within(inner, p) && clearOf(inner, p, step / 2)) inside.push(p);
-        else if (within(field, p) && !within(outer, p) && clearOf(outer, p, step / 2) && clearOf(field, p, step / 2)) round.push(p);
-      }
+  // Spots for seats at the school past its windows (直し39: the ground they
+  // went on is gone). The windows are two rows, as the sprite has them (the
+  // first half the inner row, the second the outer, in the same order):
+  // row n past the outer one has each window's spot n times as far again
+  // past the outer row as the outer is past the inner (the same step
+  // between rows), outward round the ring; each row from its middle out.
+  // Kept where `free` says and at least `margin` inside the part shown
+  // (board, its corners north-west, north-east, south-east, south-west);
+  // with no room left there, rows go on outward past it, never west of its
+  // west side (the cut), so every one has a spot. Returns { spots: [{ p,
+  // shown: on the part shown }] (need of them, or as many as there are),
+  // room: how many fit on the part shown }. It reads nothing but what it is
+  // given.
+  function seniorRows(windows, board, margin, need, free = () => true) {
+    const half = Math.floor(windows.length / 2), mid = (half - 1) / 2;
+    const order = Array.from({ length: half }, (_, k) => k).sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid));
+    const row = (n) => order.map((k) => {
+      const [ix, iy] = windows[k], [ox, oy] = windows[k + half];
+      return [ox + n * (ox - ix), oy + n * (oy - iy)];
+    });
+    const onBoard = (p) => within(board, p) && clearOf(board, p, margin);
+    const [[wx0, wy0], , , [wx1, wy1]] = board;
+    const eastOfCut = ([x, y]) => x >= wx0 + (wx1 - wx0) * (y - wy0) / ((wy1 - wy0) || 1) + margin;
+    const shown = [];
+    let n = 1;
+    for (; half && n <= 200; n++) {
+      const on = row(n).filter(onBoard);
+      if (!on.length) break;
+      shown.push(...on.filter(free));
     }
-    inside.sort((p, q) => near(p) - near(q));
-    round.sort((p, q) => near(p) - near(q));
-    return { all: [...inside, ...round], inside: inside.length };
+    const spots = shown.map((p) => ({ p, shown: true }));
+    for (; half && spots.length < need && n <= 1000; n++) {
+      for (const p of row(n)) if (eastOfCut(p) && free(p) && !onBoard(p)) spots.push({ p, shown: false });
+    }
+    return { spots: spots.slice(0, Math.max(need, 0)), room: shown.length };
   }
 
   // Whether a spot is at least d from every side of a ring of spots.
@@ -2058,9 +2064,12 @@ const EbinoMap = (() => {
   // its ring's middle a little under the map's middle and the picture whole
   // in the drawing. Returns the meeting's middle as the table's was ({ x, y,
   // level, at, scale, proj }: its ring the table's top) with the picture's
-  // corner and scale (pic). It reads nothing but what it is given.
+  // corner and scale (pic). Its scale from the yard's size as it was with its
+  // ground (model.rise, 直し39), so the table and the seats round it are as
+  // they were (直し37). It reads nothing but what it is given.
   function riseAt({ W, H, mapBox: [mx, my, mw, mh], upright, model }) {
-    const k = upright ? RISE_PART_UP * W / model.width : Math.min(RISE_PART * mh / model.height, 0.94 * W / model.width);
+    const [across, tall] = model.rise || [model.width, model.height];
+    const k = upright ? RISE_PART_UP * W / across : Math.min(RISE_PART * mh / tall, 0.94 * W / across);
     const room = upright ? H * (1 - AI_BAND_UP) : my + mh;
     const top = upright ? 0 : my;
     let cx = mx + mw / 2;

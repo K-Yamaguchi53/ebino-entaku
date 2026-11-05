@@ -5,8 +5,8 @@ SCHOOL_SCALE times its real size):
 their points dotted); 県外・海外に出た人 at a way out on the map's edge (to
 海外 by the south, else to 県外 by the north), beside the arrow going out;
 外から来た大人・先生 at the way to 県外, beside the arrow coming in;
-探究をした先輩 at the school's windows, then inside its track, then on its
-ground. With the invented seats (adults 103, two with no place; seniors 45;
+探究をした先輩 at the school's windows, then on rows past them, outward over
+the school (直し39: its ground is gone). With the invented seats (adults 103, two with no place; seniors 45;
 gone out 10, three abroad; from outside 1) no two seats seen overlap on the
 five screens at the whole map (the seniors folded into their count), and
 once the seniors come out at their windows, no two of them overlap there."""
@@ -98,6 +98,13 @@ for (const [name, [w, h]] of Object.entries(rooms)) {
   // Where the seniors come out: the windows a senior's width apart on screen.
   const zoom = unit * 2 * SCHOOL_R_PX / homes.seniorStep;
   const school = [...homes.school].map((id) => homes.spots[id].map((v) => v / unit * zoom));
+  // 直し39: the part of the school shown, and its west side (the cut).
+  const board = model.board.map(([bx, by]) => [yard.x + bx * yard.k, yard.y + by * yard.k]);
+  const cutAt = (y) => board[0][0] + (board[3][0] - board[0][0]) * (y - board[0][1]) / (board[3][1] - board[0][1]);
+  const seniorSpots = [...homes.school].map((id) => homes.spots[id]);
+  const westOfCut = seniorSpots.filter(([sx, sy]) => sx < cutAt(sy)).length;
+  const offSchool = seniorSpots.filter((p) => !within(board, p)).length;
+  const adultsOnSchool = seats.filter((s) => s.kind === "adult" && s.at && within(board, s.at)).length;
   let schoolOverlaps = 0;
   for (let i = 0; i < school.length; i++) for (let j = i + 1; j < school.length; j++) {
     if (Math.hypot(school[i][0] - school[j][0], school[i][1] - school[j][1]) < 2 * SCHOOL_R_PX - 0.01) schoolOverlaps += 1;
@@ -110,7 +117,8 @@ for (const [name, [w, h]] of Object.entries(rooms)) {
   const kindsAt = (test) => seats.filter((s) => !(s.kind === "adult" && s.at) && test(homes.spots[s.id]));
   const nearGate = (gate) => (p) => Math.hypot(p[0] - gate[0], p[1] - gate[1]) < 8 * HOME_STEP * unit;
   out[name] = { counts: homes.counts, overlaps, outside, least: least / r, schoolOverlaps, zoom, onAdults,
-    names: homes.names.map((n) => n.kind).sort(), trackRoom: homes.trackRoom,
+    names: homes.names.map((n) => n.kind).sort(), room: homes.room, westOfCut, offSchool, adultsOnSchool,
+    seniorsOnSchool: seniorSpots.length,
     allInMap: seats.every((s) => inMap(homes.spots[s.id])),
     north: kindsAt(nearGate(homes.gates.out)).map((s) => s.kind + (s.abroad ? "!" : "")).sort(),
     south: kindsAt(nearGate(homes.gates.abroad)).map((s) => s.kind + (s.abroad ? "!" : "")).sort(),
@@ -123,13 +131,12 @@ process.stdout.write(JSON.stringify(out));
 def _homes(seats, picture=None):
     lib = Library.build(seats, [], {}, False, map_data=MAP, relief_data=load_relief(VIEWBOX))
     setup = setup_of(lib)
-    names = ["centroid", "within", "reliefView", "yardModel", "compose", "schoolOnMap", "windowStep", "homesOf",
-             "schoolSquares", "clearOf", "freeBlock", "trackOn"]
+    names = ["centroid", "within", "reliefView", "yardModel", "cutYard", "compose", "schoolOnMap", "windowStep",
+             "homesOf", "seniorRows", "clearOf", "freeBlock"]
     program = PLACES % {"setup": json.dumps(setup, ensure_ascii=False), "rooms": json.dumps(ROOMS),
                         "picture": json.dumps(picture),
-                        "consts": _consts("UPRIGHT_UNDER", "AI_BAND_UP", "SCHOOL_SCALE", "SCHOOL_CLEAR", "M_PER_UNIT", "PLAIN_YARD", "TRACK", "HOME_STEP",
-                                          "POINT_R", "MIN_POINT_PX") + "\n" +
-                                  "const PLAIN_PX_PER_M = 520 / 96.2, PLAIN_RING = [1020, 290];\n"
+                        "consts": _consts("UPRIGHT_UNDER", "AI_BAND_UP", "SCHOOL_SCALE", "SCHOOL_CLEAR", "M_PER_UNIT", "PLAIN_YARD",
+                                          "CUT_GAP_M", "HOME_STEP", "POINT_R", "MIN_POINT_PX", "PLAIN_PX_PER_M") + "\n" +
                                   "const SCHOOL_R_PX = 5, MAX_POINT_PX = 10;",
                         "source": "".join(_inner(name) for name in names)}
     done = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=60)
@@ -159,8 +166,10 @@ def test_every_invented_seat_has_a_home_and_none_overlap_on_the_five_screens(pic
         assert counts["map"] + counts["noPlace"] == 103 and counts["noPlace"] >= 2, name
         assert counts["out"] == 7 and counts["abroad"] == 3 and counts["in"] == 1, name
         # 45 seniors, 40 windows less those under an adult's place (直し37-1:
-        # the school put larger lies under some; 2 here), the rest inside the track.
-        assert counts["windows"] + counts["track"] == 45 and counts["field"] == 0, name
+        # the school put larger lies under some), the rest on the rows past
+        # them, on the school (直し39).
+        assert counts["windows"] + counts["rows"] == 45 and counts["past"] == 0, name
+        assert one["westOfCut"] == 0 and one["offSchool"] == 0, name
         assert 36 <= counts["windows"] <= 40, name
         assert one["overlaps"] == 0 and one["outside"] == 0, (name, one["least"])
         assert one["schoolOverlaps"] == 0, name
@@ -170,18 +179,35 @@ def test_every_invented_seat_has_a_home_and_none_overlap_on_the_five_screens(pic
         assert one["south"] == ["cross!"] * 3, name  # Out to 海外.
         assert {"A000", "A001"} <= set(one["noPlace"]), name
         assert one["names"] == ["adult", "cross", "cross", "outsider_teacher", "poster"], name
-        assert one["trackRoom"] >= 5, name
+        assert one["room"]["rows"] >= 30, name
 
 
 @node
-def test_more_than_the_windows_go_inside_the_track_then_round_it():
-    homes = _homes(_invented((20, 70, 25, 3), abroad=10, no_place=6))
+@pytest.mark.parametrize("picture", [None, PICTURE], ids=["plain", "picture"])
+def test_more_than_the_windows_go_on_rows_past_them_on_the_school(picture):
+    # 直し39: no track or ground: past the windows, rows outward over the school.
+    homes = _homes(_invented((20, 70, 25, 3), abroad=10, no_place=6), picture)
     for name, one in homes.items():
         counts = one["counts"]
         assert counts["out"] == 15 and counts["abroad"] == 10 and counts["in"] == 3 and counts["noPlace"] >= 6, name
-        assert counts["windows"] == 40 and counts["track"] == min(30, one["trackRoom"]), name
-        assert counts["track"] + counts["field"] == 30, name
+        assert counts["windows"] == 40 and counts["rows"] == 30 and counts["past"] == 0, name
+        assert one["seniorsOnSchool"] == 70 and one["westOfCut"] == 0 and one["offSchool"] == 0, name
         assert one["overlaps"] == 0 and one["schoolOverlaps"] == 0, (name, one["least"])
+
+
+@node
+@pytest.mark.parametrize("picture", [None, PICTURE], ids=["plain", "picture"])
+def test_however_many_seniors_each_has_a_spot_none_west_of_the_cut_or_on_an_adults_point(picture):
+    # 直し39: more than the windows and the rows on the school hold: the rows
+    # go on outward, never west of the cut, never on an adult's point.
+    homes = _homes(_invented((103, 400, 2, 1), abroad=1, no_place=2), picture)
+    for name, one in homes.items():
+        counts = one["counts"]
+        assert one["seniorsOnSchool"] == 400, name
+        assert counts["windows"] + counts["rows"] + counts["past"] == 400, name
+        assert counts["rows"] == one["room"]["rows"] and counts["past"] == 400 - counts["windows"] - counts["rows"], name
+        assert one["westOfCut"] == 0, name
+        assert one["onAdults"] == 0 and one["schoolOverlaps"] == 0, name
 
 
 @node

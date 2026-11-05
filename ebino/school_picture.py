@@ -12,7 +12,9 @@ Only these three files are read there, nothing else:
                         that is the school's point on the map
                         ("school_point_px"); for the large one, where seats
                         go on it: the ring's windows ("windows_px") and the
-                        ground's four corners ("field_px"); and, to put it
+                        ground's four corners ("field_px"; 直し39: the
+                        screen shows only what is east of the ground, and
+                        no seat goes on it); and, to put it
                         on the map put larger (直し37-1: SCHOOL_SCALE times
                         its real size in static/map.js), its pixels to
                         a metre across ("px_per_m") and the ring's middle
@@ -21,7 +23,7 @@ Only these three files are read there, nothing else:
 
 The pictures are drawn at about twice the size they are shown. With no
 folder, a missing or broken file, the school keeps its line mark and the
-right of the screen a plain drawing of a building and a ground, as before.
+right of the screen a plain drawing of a building on its site (直し39: no ground).
 """
 
 import json
