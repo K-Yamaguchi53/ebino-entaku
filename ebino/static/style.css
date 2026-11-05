@@ -681,6 +681,13 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .pt.met .halo { fill: url(#paper-glow); opacity: .8; }
 .pt.lit .halo { fill: url(#lamp-glow); opacity: 1; }
 .pt.hover .shape, .pt:focus-visible .shape { stroke: var(--ink); stroke-width: 2.6; transform: scale(1.15); transition-duration: .15s; }
+/* 直し41の続き: each point's edge, behind its shape and over the points
+   drawn before it: a thin line of the map's ground, a little thicker under
+   the point (a small shadow). No new colour; no press (the press is as it was). */
+.pt .edge { fill: none; stroke: var(--night); stroke-opacity: .9; stroke-width: 4.4; stroke-linejoin: round; pointer-events: none;
+  transform: translate(0px, .7px) scale(.84); transition: transform .45s ease; }
+.pt.met .edge, .pt.lit .edge { transform: translate(0px, .7px); }
+.pt.hover .edge, .pt:focus-visible .edge { transform: translate(0px, .7px) scale(1.15); transition-duration: .15s; }
 .pt .met-mark { display: none; }
 .pt .ask-mark { display: none; fill: var(--ink); font-family: var(--gothic); font-size: 15px; font-weight: bold;
   paint-order: stroke; stroke: var(--veil-thin); stroke-width: 3px; }
@@ -972,7 +979,7 @@ body.one-open #map-heading { visibility: hidden; }
 }
 /* Motion reduced: nothing moves; everything is at once as it ends. */
 @media (prefers-reduced-motion: reduce) {
-  .pt .halo, .pt .shape, .drawing path, .chair, .relief-image, .basin-fill, .river, .rim, .points, .place-names,
+  .pt .halo, .pt .shape, .pt .edge, .drawing path, .chair, .relief-image, .basin-fill, .river, .rim, .points, .place-names,
   .school, .school-picture, .map-compass, .map-around, .home-names, .home-gate, .crossing, button, .lab-choice::before, .map-bubble, .seat,
   .choice, .choice::before { transition: none !important; }
   .map-bubble, .map-bubble .thread { animation: none !important; }

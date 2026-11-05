@@ -185,6 +185,7 @@ const EbinoMap = (() => {
     rows: [385, 335], columns: 20, rise: [1400, 760] };
   const WORD_PAD = 2;  // CSS px kept clear round a word drawn on the map.
   const SLIDE_MOST = 40;  // CSS px the school's name may slide off a seat's point.
+  const NAME_MOVE_MOST = 36;  // CSS px a place name may move off the seats' points (直し41の続き).
   // Where a seat's 「？」 may go, by its point (x, y, which way the text runs
   // from there), in the order tried: upper right first.
   const ASK_CORNERS = [[9, -6, "start"], [-9, -6, "end"], [9, 16, "start"], [-9, 16, "end"]];
@@ -1082,7 +1083,12 @@ const EbinoMap = (() => {
 
   function drawPoint(seat) {
     const point = svgEl("g", { class: `pt kind-${seat.kind}`, tabindex: 0, role: "button", "data-seat": seat.seat_id });
-    point.append(svgEl("circle", { class: "halo", r: 20 }), shape(seat.kind),
+    // 直し41の続き: behind the shape, the same shape a little larger in the
+    // map's ground with a small shadow under it (style.css .edge), so the
+    // points over each other are told apart. It takes no press.
+    const edge = shape(seat.kind);
+    edge.setAttribute("class", "edge");
+    point.append(svgEl("circle", { class: "halo", r: 20 }), edge, shape(seat.kind),
       svgEl("circle", { class: "met-mark", cx: 8, cy: -8, r: 3.5 }));
     const ask = svgEl("text", { class: "ask-mark", x: 9, y: -6 });
     ask.textContent = "？";
@@ -1701,6 +1707,7 @@ const EbinoMap = (() => {
   function relayout() {
     if (!view) return;
     clearSchoolName();
+    clearPlaceNames();
     placeAiCorner();
     foldSchool();
     placeSchoolCount(overlay.getBoundingClientRect());
@@ -1889,6 +1896,46 @@ const EbinoMap = (() => {
       const shift = below ? school.bottom + WORD_PAD - r.top : school.top - WORD_PAD - r.bottom;
       name.setAttribute("dy", shift * perPx);
     }
+  }
+
+  // A place name over a seat's point (直し41の続き): the name, not the
+  // point, moves, a little left or right or up or down (NAME_MOVE_MOST px at
+  // most), to where it covers no point and no other word; where every such
+  // place covers some, the one that covers least. The points' places and
+  // what takes their presses do not change.
+  function clearPlaceNames() {
+    const names = [...svg.querySelectorAll(".place-names text")];
+    for (const name of names) name.removeAttribute("dx");
+    if (!names.length || !names[0].getClientRects().length) return;
+    const perPx = vb.w / (overlay.clientWidth || 1);
+    const dots = [...svg.querySelectorAll(".points .pt .shape")].map((node) => node.getBoundingClientRect()).filter((r) => r.width)
+      .map((r) => [r.left - WORD_PAD, r.top - WORD_PAD, r.width + 2 * WORD_PAD, r.height + 2 * WORD_PAD]);
+    const words = [...svg.querySelectorAll(".school text, .yard-building, .home-names text")]
+      .map((node) => node.getBoundingClientRect()).filter((r) => r.width).map((r) => [r.left, r.top, r.width, r.height]);
+    const placed = [];
+    for (const name of names) {
+      const r = name.getBoundingClientRect();
+      const here = [r.left, r.top, r.width, r.height];
+      const others = [...dots, ...words, ...placed];
+      if (!others.some((b) => boxesMeet(here, b))) { placed.push(here); continue; }
+      const moves = nameMoves(r.height);
+      const best = leastCovered(moves.map(([dx, dy]) => [r.left + dx, r.top + dy, r.width, r.height]), others);
+      const [dx, dy] = moves[best];
+      if (dx) name.setAttribute("dx", dx * perPx);
+      if (dy) name.setAttribute("dy", Number(name.getAttribute("dy") || 0) + dy * perPx);
+      placed.push([r.left + dx, r.top + dy, r.width, r.height]);
+    }
+  }
+
+  // Where a name of this height may go, nearest first: where it is, then a
+  // step at a time left, right, up and down, up to NAME_MOVE_MOST px.
+  function nameMoves(height) {
+    const moves = [[0, 0]];
+    const step = Math.max(4, Math.round(height / 3));
+    for (let d = step; d <= NAME_MOVE_MOST; d += step) {
+      moves.push([-d, 0], [d, 0], [0, -d], [0, d], [-d, -d], [d, -d], [-d, d], [d, d]);
+    }
+    return moves;
   }
 
   // How far a name ([left, top, width, height]) slides left (less than 0) or
