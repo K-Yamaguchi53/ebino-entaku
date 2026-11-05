@@ -78,8 +78,30 @@ function rankingTitle(piece) {
 
 // --- start ---
 
+// The bundled Mincho and Gothic (直し41), asked for by name before anything
+// is measured: the map's labels, the school's name and the bubbles are
+// placed by the width of their words. A line too slow does not hold the
+// screen past FONT_WAIT_MS; the words then swap in, and the map is laid out
+// again when they have (fontsDone).
+const FONTS = ['400 16px "Ebino Mincho"', '700 16px "Ebino Mincho"', '400 16px "Ebino Gothic"', '700 16px "Ebino Gothic"'];
+const FONT_WAIT_MS = 15000;
+
+function fontsReady() {
+  if (!document.fonts || !document.fonts.load) return Promise.resolve();
+  const all = Promise.all(FONTS.map((font) => document.fonts.load(font, "あ").catch(() => null)));
+  return Promise.race([all, new Promise((done) => setTimeout(done, FONT_WAIT_MS))]);
+}
+
+// A font came in after the screen was drawn: the map's places measured
+// afresh, as when the window changes, unless a bubble is open on it.
+function fontsDone() {
+  if (document.querySelector(".map-bubble")) return;
+  mapMoved();
+}
+
 async function setup() {
-  const data = await call("/api/setup");
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", fontsDone);
+  const [data] = await Promise.all([call("/api/setup"), fontsReady()]);
   Object.assign(state, { texts: data.texts, kinds: data.kinds, seats: data.seats, changedChoices: data.changed_choices,
     reflect: data.reflect, hitokoto: data.hitokoto });
   if (state.reflect === "hitokoto") useHitokotoName(data.texts);

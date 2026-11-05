@@ -678,8 +678,9 @@ def test_every_colour_is_named_once_at_the_top_and_used_by_its_name():
 
 def test_the_voices_and_headings_are_mincho_the_small_words_gothic_from_the_machine():
     css = _css()
-    assert ('--mincho: "Hiragino Mincho ProN", "Yu Mincho", "BIZ UDPMincho", "Noto Serif CJK JP", serif;' in css)
-    assert ('--gothic: "Hiragino Sans", "BIZ UDPGothic", "Yu Gothic UI", "Noto Sans CJK JP", sans-serif;' in css)
+    # 直し41: the bundled fonts first, the machine's after them (kept, in case they do not load).
+    assert ('--mincho: "Ebino Mincho", "Hiragino Mincho ProN", "Yu Mincho", "BIZ UDPMincho", "Noto Serif CJK JP", serif;' in css)
+    assert ('--gothic: "Ebino Gothic", "Hiragino Sans", "BIZ UDPGothic", "Yu Gothic UI", "Noto Sans CJK JP", sans-serif;' in css)
     assert '--display: "Ebino Title", var(--mincho);' in css
     assert "@import" not in css and "http" not in css  # Nothing from outside.
     body = re.search(r"\nbody \{([^}]*)\}", css).group(1)

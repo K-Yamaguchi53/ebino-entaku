@@ -57,7 +57,18 @@ STATIC_FILES = {
     # The title's characters only, cut out of Shippori Mincho B1 (OFL, its
     # text beside it in title.OFL.txt).
     "/title.woff": ("title.woff", "font/woff"),
+    # The Mincho and the Gothic of every other word, all their characters
+    # (BIZ UDPMincho and BIZ UDPGothic, OFL; the text is in fonts/OFL.txt,
+    # which is not served). The same look on every machine (直し41).
+    "/fonts/BIZUDPMincho-Regular.woff2": ("fonts/BIZUDPMincho-Regular.woff2", "font/woff2"),
+    "/fonts/BIZUDPMincho-Bold.woff2": ("fonts/BIZUDPMincho-Bold.woff2", "font/woff2"),
+    "/fonts/BIZUDPGothic-Regular.woff2": ("fonts/BIZUDPGothic-Regular.woff2", "font/woff2"),
+    "/fonts/BIZUDPGothic-Bold.woff2": ("fonts/BIZUDPGothic-Bold.woff2", "font/woff2"),
+    # The tab's small picture: a round table of dots on the night (直し41).
+    "/favicon.svg": ("favicon.svg", "image/svg+xml"),
 }
+# The fonts are large and never change: the browser may keep them.
+FONT_CACHE = "max-age=604800"
 # Served from mapdata/, made once by the tools (relief.py). A missing file is 404.
 MAP_FILES = {
     relief.IMAGE_PATH: (relief.RELIEF_DIR / relief.IMAGE, "image/webp"),
@@ -222,11 +233,11 @@ def make_handler(app: App, port: int, timeout: float = CONNECTION_TIMEOUT):
         def log_request(self, code="-", size="-"):
             print(f"{self.command} {urlsplit(self.path).path} {getattr(code, 'value', code)}")
 
-        def _send(self, status: int, data: bytes, content_type: str) -> None:
+        def _send(self, status: int, data: bytes, content_type: str, cache: str = "no-store") -> None:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(data)))
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", cache)
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Content-Security-Policy", "default-src 'self'")
             self.end_headers()
@@ -249,7 +260,8 @@ def make_handler(app: App, port: int, timeout: float = CONNECTION_TIMEOUT):
                 return self._json(HTTPStatus.OK, app.setup())
             if path in STATIC_FILES:
                 name, content_type = STATIC_FILES[path]
-                return self._send(HTTPStatus.OK, (STATIC_DIR / name).read_bytes(), content_type)
+                cache = FONT_CACHE if content_type == "font/woff2" else "no-store"
+                return self._send(HTTPStatus.OK, (STATIC_DIR / name).read_bytes(), content_type, cache)
             if path in MAP_FILES:
                 file, content_type = MAP_FILES[path]
                 try:

@@ -12,6 +12,34 @@
   font-display: swap;
 }
 
+/* Every other word: BIZ UDPMincho and BIZ UDPGothic (OFL; the text is in
+   fonts/OFL.txt), all their characters, bundled so every machine shows the
+   same (直し41). 600 is drawn by the 700. */
+@font-face {
+  font-family: "Ebino Mincho";
+  src: url("/fonts/BIZUDPMincho-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Ebino Mincho";
+  src: url("/fonts/BIZUDPMincho-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Ebino Gothic";
+  src: url("/fonts/BIZUDPGothic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Ebino Gothic";
+  src: url("/fonts/BIZUDPGothic-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
   /* --- the colours: the only place that holds a colour value --- */
   --night: #0b1326;  /* The ground: night indigo. */
@@ -56,8 +84,8 @@
   --kind-outsider_teacher: #c4add9;
 
   /* --- the type: what each machine already has; nothing is loaded from outside --- */
-  --mincho: "Hiragino Mincho ProN", "Yu Mincho", "BIZ UDPMincho", "Noto Serif CJK JP", serif;
-  --gothic: "Hiragino Sans", "BIZ UDPGothic", "Yu Gothic UI", "Noto Sans CJK JP", sans-serif;
+  --mincho: "Ebino Mincho", "Hiragino Mincho ProN", "Yu Mincho", "BIZ UDPMincho", "Noto Serif CJK JP", serif;
+  --gothic: "Ebino Gothic", "Hiragino Sans", "BIZ UDPGothic", "Yu Gothic UI", "Noto Sans CJK JP", sans-serif;
   --display: "Ebino Title", var(--mincho);
   /* The window's height (the iPad's bars left out where the browser can). */
   --vh: 100vh;
