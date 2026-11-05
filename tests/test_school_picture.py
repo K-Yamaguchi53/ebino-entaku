@@ -161,29 +161,27 @@ def _inner_function(script, name):
     return script[start:script.index("\n  }\n", start) + 5]
 
 
-def test_on_the_map_the_picture_replaces_the_mark_once_loaded_under_the_points_and_takes_no_presses():
-    load_fn = _inner_function(SCRIPT, "loadSchoolPicture")
-    assert "image.onload" in load_fn and 'classList.add("pictured")' in load_fn
-    assert "onerror" not in load_fn  # Never loaded: the line mark simply stays.
+def test_one_school_on_the_map_under_the_points_and_it_takes_no_presses():
+    # 直し35-2: the school's large picture (or the plain one) on the map
+    # where the school is; no small picture or mark beside it any more.
     draw = SCRIPT[SCRIPT.index("function draw(seats"):]
-    assert draw.index('layer("school-picture")') < draw.index('layer("points")')
-    assert ".school.pictured > :not(text) { display: none; }" in CSS
-    assert ".school-picture { pointer-events: none; }" in CSS and ".school { pointer-events: none; }" in CSS
+    draw = draw[:draw.index("\n  }\n")]
+    assert draw.index('drawYard(layer("yard"))') < draw.index('layer("points")')
+    assert "school_picture[" not in SCRIPT and "loadSchoolPicture" not in SCRIPT
+    assert ".yard { pointer-events: none; }" in CSS and ".school { pointer-events: none; }" in CSS
     # Its box is kept clear like the school's name: by labels, cards, 「？」 and place names.
-    assert ".school-picture image" in _inner_function(SCRIPT, "fixedBoxes")
-    assert ".school-picture image" in _inner_function(SCRIPT, "placeAskMarks")
-    assert ".school-picture image" in _inner_function(SCRIPT, "clearSchoolName")
+    for name in ("fixedBoxes", "placeAskMarks", "clearSchoolName"):
+        assert ".yard-building" in _inner_function(SCRIPT, name)
 
 
-def test_the_picture_and_the_name_have_a_most_and_the_name_sits_under_the_picture():
-    place = _inner_function(SCRIPT, "placeSchool")
-    assert "SCHOOL_MAX_PX * perPx" in place and "SCHOOL_MIN_PX * perPx" in place
-    assert "Math.min(20 * grown / perPx, SCHOOL_TEXT_MAX_PX)" in place
-    assert "SCHOOL_MARK_MAX_PX * perPx / 27" in place
-    assert "(picture.height - picture.point[1]) * s / perPx" in place
+def test_the_school_is_its_real_size_on_the_map_and_its_name_has_a_most():
+    on_map = _inner_function(SCRIPT, "schoolOnMap")
+    assert "const k = unitsPerM / model.pxPerM;" in on_map
+    assert "x: px - model.ring[0] * k, y: py - model.ring[1] * k, k" in on_map
+    draw = SCRIPT[SCRIPT.index("function draw(seats"):]
+    assert "schoolOnMap(schoolAt, model, base.S / mPerUnit)" in draw
+    assert "map.relief.z.m_per_unit" in draw
     consts = dict((name, float(value)) for name, value in
                   __import__("re").findall(r"(SCHOOL_[A-Z_]+) = ([\d.]+)", SCRIPT))
-    assert consts["SCHOOL_MIN_PX"] <= 70 and consts["SCHOOL_MAX_PX"] <= 140 and consts["SCHOOL_TEXT_MAX_PX"] <= 24
-    # About 70–90px across at the whole map on a PC's full screen (the
-    # relief frame is 1195px wide there, the flat one 1014px).
-    assert 70 <= consts["SCHOOL_SHARE"] * 1195 <= 90 and 70 <= consts["SCHOOL_SHARE"] * 1014 <= 90
+    assert consts["SCHOOL_TEXT_MAX_PX"] <= 24
+    assert "Math.min(TEXT_PX.school * 1.4, SCHOOL_TEXT_MAX_PX)" in _inner_function(SCRIPT, "placeSchool")

@@ -1,6 +1,6 @@
 """直し33-4: when a round's table opens, the seats that spoke gather where
-their cards have room, wherever their homes are: round a table where the
-map meets the school (upright: between the two), the camera on the whole
+their cards have room, wherever their homes are: round a table in the
+middle of the map (直し35-2), the camera on the whole
 drawing. Each card comes from its seat there, no long line from its home;
 only while they gather is a seat seen flying from its home. The round over
 (the next question, or 「地図にもどす」) they go back home; with motion
@@ -33,13 +33,13 @@ def _consts(*names):
 
 
 @node
-def test_the_table_is_where_the_map_meets_the_school_and_of_a_size_for_the_room():
+def test_the_table_is_in_the_middle_of_the_map_and_of_a_size_for_the_room():
     program = "\n".join([
-        _consts("MAP_SHARE", "YARD_SHARE", "MAP_SHARE_UP", "ROOM_GAP", "UPRIGHT_UNDER", "AI_BAND_UP", "TABLE_RX", "TABLE_TILT", "GATHER_CARD"),
+        _consts("UPRIGHT_UNDER", "AI_BAND_UP", "TABLE_RX", "TABLE_TILT", "GATHER_CARD"),
         _inner("compose"), _inner("gatherAt"), _inner("onTable"),
         f"const rooms = {json.dumps(ROOMS)}; const out = {{}};",
         "for (const [k, [w, h]] of Object.entries(rooms)) {",
-        "  const laid = compose({ w, h }, 2400, 1840, { width: 1413, height: 737 });",
+        "  const laid = compose({ w, h }, 2400, 1840);",
         "  const unit = laid.W / w, center = gatherAt({ W: laid.W, H: laid.H, mapBox: [...laid.map, 2400, 1840], upright: laid.upright, unit });",
         "  const seats = [0, 90, 180, 270].map((a) => onTable(center, a, SEAT_OUT).map((v) => v / unit));",
         "  out[k] = { at: center.at.map((v) => v / unit), upright: laid.upright, mapRight: (laid.map[0] + 2400) / unit,",
@@ -52,10 +52,8 @@ def test_the_table_is_where_the_map_meets_the_school_and_of_a_size_for_the_room(
     got = json.loads(done.stdout.decode("utf-8"))
     for name, one in got.items():
         x, y = one["at"]
-        if one["upright"]:
-            assert abs(x - one["w"] / 2) < 1 and one["mapBottom"] <= y <= one["mapBottom"] + 16, name
-        else:
-            assert one["mapRight"] <= x <= one["mapRight"] + 16 and abs(y - one["h"] / 2) < 1, name
+        # 直し35-2: the map fills the room; the table in its middle (直し35-3 lifts the school instead).
+        assert abs(x - one["w"] / 2) < 1 and abs(y - one["mapBottom"] / 2) < 1, name
         # The seats round it inside the room, the ring wider than high (seen from above at a slant).
         xs = [p[0] for p in one["seats"]]
         ys = [p[1] for p in one["seats"]]

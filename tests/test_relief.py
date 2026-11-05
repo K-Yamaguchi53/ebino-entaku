@@ -443,11 +443,11 @@ const setup = %(setup)s, round = %(round)s, screens = %(screens)s;
 const map = setup.map;
 const app = { state: { kinds: setup.kinds } };
 view = reliefView(map.relief);
-// The map alone, as before the yard beside it (直し33-2): its box the whole
-// drawing; the plain yard in its lower right quarter, for the homes there (直し33-3).
+// The map alone (直し35-2): its box the whole drawing; the plain school on
+// it at its real size, where the school is.
 view.mapBox = [0, 0, view.W, view.H];
 const yardModelHere = yardModel();
-view.yard = { x: view.W * 0.62, y: view.H * 0.66, k: view.W * 0.36 / yardModelHere.width, model: yardModelHere };
+view.yard = { ...schoolOnMap(view.proj(map.school.x, map.school.y, 0), yardModelHere, view.S / M_PER_UNIT), model: yardModelHere };
 const P = view.proj;
 const stub = () => { const node = {}; node.setAttribute = (key, value) => { node[key] = value; }; return node; };
 for (const seat of setup.seats) points[seat.seat_id] = { seat };
@@ -476,7 +476,8 @@ function scene(width) {
   const perPx = () => vb.w / fr.w;
   view.unit = view.W / width;
   homes = homesOf(setup.seats.map((s) => ({ id: s.seat_id, kind: s.kind, at: s.outer ? null : P(s.x, s.y, 1.5) })),
-    { mapBox: view.mapBox, yard: view.yard, unit: view.unit, r: Math.max(MIN_POINT_PX * view.unit, POINT_R * view.S) });
+    { mapBox: view.mapBox, yard: view.yard, unit: view.unit,
+      r: Math.min(Math.max(MIN_POINT_PX * view.unit, POINT_R * view.S), MAX_POINT_PX * view.unit) });
   // The words on the map in the frame, as the screen draws them: each its
   // size in CSS px whatever the zoom, place names a little spaced out.
   // Place names first, then the homes' names, then the school's.
@@ -589,7 +590,8 @@ def _scenes():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     consts = script[script.index("  const NS ="):script.index("  let map = null;")]
     names = ["centroid", "reliefView", "onTable", "ring", "gatherAt", "frontAngle", "seating", "pointScale", "yardModel",
-             "homesOf", "groundSquares", "chooseSpot", "planLabels", "within", "seenWords", "planBubble", "topStrips"]
+             "homesOf", "schoolSquares", "clearOf", "freeBlock", "windowStep", "trackOn", "schoolOnMap", "chooseSpot",
+             "planLabels", "within", "seenWords", "planBubble", "topStrips"]
     source = "".join(_inner_function(script, name) for name in names)
     seats = [make_seat(seat_id=seat, kind=kind, title=f"架空の席{seat}", company="", display_name="",
                        district=district) for seat, kind, district in _ROUND_SEATS]
@@ -721,22 +723,16 @@ def test_an_empty_chair_takes_a_press_over_44px_and_shows_the_keyboard_there():
     assert re.search(r"\.chair:focus-visible \.hit \{[^}]*stroke: var\(--lamp\)", css)
 
 
-def test_the_schools_mark_is_its_building_from_above_a_half_ring_and_the_lit_glass():
+def test_the_school_is_drawn_once_at_its_real_size_and_its_name_under_it():
+    # 直し35-2: no mark or small picture any more: the school (its picture or
+    # the plain one) at its real size on the map, its name under it.
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
     school = _inner_function(script, "drawSchool")
-    # The north half of a ring (13, 8.3), the wing across (x -13.5..13.5, y 0..4.8),
-    # the round roof (4.8), the glass (1.6); no flag, no triangle roof.
-    assert 'd: "M -13 0 A 13 13 0 0 1 13 0 L 8.3 0 A 8.3 8.3 0 0 0 -8.3 0 Z"' in school
-    assert 'x: -13.5, y: 0, width: 27, height: 4.8' in school
-    assert 'd: "M -4.8 0 A 4.8 4.8 0 0 1 4.8 0 Z"' in school and '{ class: "glass", r: 1.6 }' in school
-    assert "flag" not in school and "pole" not in school and "polygon" not in school
+    assert "flag" not in school and "pole" not in school and "polygon" not in school and "wing" not in school
     assert 'label.textContent = school.label;' in school and 'group.setAttribute("aria-label", school.label);' in school
-    # Its size follows the zoom as before, up to its most (直し25-1).
+    assert "y + model.height * k" in school  # Under the school.
+    # Its name keeps its size on screen whatever the zoom, up to its most.
     assert "placeSchool(perPx)" in _inner_function(script, "rescale")
-    assert "Math.max(view.S, TEXT_PX.school * perPx / 20)" in _inner_function(script, "placeSchool")
-    css = _css()
-    assert re.search(r"\.school \.wing, \.school \.dome \{[^}]*fill: var\(--night\); stroke: var\(--moon\)", css)
-    assert ".school .glass { fill: var(--lamp); }" in css and ".flag" not in css
 
 
 def test_the_flat_map_has_no_mountain_marks():

@@ -157,7 +157,12 @@ class Library:
 
     def seat_view(self, seat: Seat) -> dict:
         label = seat_label(seat, self.show_private)
-        return {"seat_id": seat.seat_id, "kind": seat.kind, "title": label.title, "detail": label.detail}
+        view = {"seat_id": seat.seat_id, "kind": seat.kind, "title": label.title, "detail": label.detail}
+        # 直し35-2: who went abroad waits at the way out to 海外 on the map
+        # (the seat table's 「越境の線の先」; 県外 or none: the way out to 県外).
+        if seat.kind == "cross" and "海外" in seat.crossing_to:
+            view["abroad"] = True
+        return view
 
     def map_view(self) -> dict | None:
         """The map part of /api/setup, or None: no map, the seat list alone."""

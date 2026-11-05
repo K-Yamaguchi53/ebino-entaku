@@ -110,29 +110,32 @@ const EbinoMap = (() => {
   const DRAG_FROM = 5;  // px moved before a press becomes a drag.
   // Words drawn on the picture, in CSS px (they keep their size as it zooms).
   const TEXT_PX = { place: 11, school: 12, home: 12 };
-  // The seats' homes (直し33-3): 地域で働く大人 at their places on the map;
-  // 県外・海外に出た人 by a way out at the map's upper right corner, GATE_COLUMNS
-  // to a row, at most GATE_ROWS rows; 探究をした先輩 at the school's windows;
-  // 外から来た大人・先生, and whoever the map and the school have no room for,
-  // on the ground, one to a square. HOME_STEP CSS px between two side by side.
-  const HOME_STEP = 16, GATE_COLUMNS = 5, GATE_ROWS = 4;
-  // The school (直し25-1). Its 3D picture: at the whole map a share of the
-  // drawing's width (about 86px on a PC's full screen, the size 19d drew it for),
-  // nearer in as the ground grows, but never under SCHOOL_MIN_PX nor over
-  // SCHOOL_MAX_PX on screen. Its name never over SCHOOL_TEXT_MAX_PX, and the
-  // line mark (with no picture) never over SCHOOL_MARK_MAX_PX across.
-  const SCHOOL_SHARE = 0.072, SCHOOL_MIN_PX = 56, SCHOOL_MAX_PX = 130;
-  const SCHOOL_TEXT_MAX_PX = 24, SCHOOL_MARK_MAX_PX = 64;
-  // The one drawing (直し33-2): the map on the left and the school with its
-  // sports ground on the right (on an upright screen the map on top, the
-  // school under it), both as large as the room lets them be; the room left
-  // round them is the round table's and its cards' (直し33-4).
-  const MAP_SHARE = 0.56;  // Landscape: the map at most this part of the room's width,
-  const YARD_SHARE = 0.56;  // the yard at most this part of its height (the AI's seat under it).
-  const MAP_SHARE_UP = 0.52;  // Upright: the map at most this part of the room's height,
-  const AI_BAND_UP = 0.26;  // and this part at its foot left for the AI's seat (直し33-4: the room keeps its size).
-  const ROOM_GAP = 16;  // CSS px between the map and the yard.
-  const UPRIGHT_UNDER = 1.4;  // A room narrower than this (width to height): the yard under the map.
+  // The seats' homes (直し35-2): 地域で働く大人 at their places on the map
+  // (those with no place, together where the map is free); 県外・海外に出た人
+  // at a way out on the map's edge, to 県外 by the north side, to
+  // 海外 by the south, beside the arrow going out, GATE_COLUMNS to a row;
+  // 外から来た大人・先生 at the way to 県外, beside the arrow coming in;
+  // 探究をした先輩 at the school's windows, more than those inside its track.
+  // HOME_STEP CSS px between two side by side at the whole map.
+  const HOME_STEP = 16, GATE_COLUMNS = 5;
+  // The school's name never over SCHOOL_TEXT_MAX_PX on screen.
+  const SCHOOL_TEXT_MAX_PX = 24;
+  // The one drawing (直し35-2): the map alone, as large as the room lets it
+  // be, in its middle (the school is on it, at its real size).
+  const AI_BAND_UP = 0.3;  // Upright: the AI's seat this part of the room's height, under the map.
+  const UPRIGHT_UNDER = 1.4;  // A room narrower than this (width to height) is upright.
+  // The school at its real size (直し35-2): the map's metres to a unit (the
+  // relief's own, else this), the plain school's units to a metre (its ground
+  // is the model's 96.2 m across) and the ring's middle on it.
+  const M_PER_UNIT = 33.4225;
+  const PLAIN_PX_PER_M = 520 / 96.2, PLAIN_RING = [1020, 290];
+  // A seat at the school (a window, the track) never more than SCHOOL_R_PX
+  // across its half on screen; the seniors show at their windows once the
+  // windows are that far apart on screen (twice it), and the nearest zoom is
+  // CLOSEST_MORE times nearer than that. Points never over MAX_POINT_PX.
+  const SCHOOL_R_PX = 5, CLOSEST_MORE = 1.6, MAX_POINT_PX = 10;
+  // The AI's seat in a corner of the map (直し35-2), tried in this order.
+  const AI_CORNERS = ["bottom-right", "bottom-left", "top-left"];
   const RECOMPOSE = 0.03;  // The room's shape this much off the drawing's: it is drawn again.
   // With no picture of the school (直し33-2): a plain building and its ground,
   // no name, in its own units; its windows (two rows on the building's
@@ -277,12 +280,12 @@ const EbinoMap = (() => {
   // The yard as drawn: the picture's size and where its seats go, or the
   // plain one's, in its own units.
   function yardModel() {
-    if (yardPicture) return { picture: true, ...yardPicture };
+    if (yardPicture) return { picture: true, ...yardPicture, pxPerM: yardPicture.px_per_m };
     const { width, height, field, roof, rows, columns } = PLAIN_YARD;
     const [left, right] = [roof[0][0] + 24, roof[1][0] - 24];
     const windows = rows.flatMap((y) => Array.from({ length: columns },
       (_, k) => [left + (right - left) * k / (columns - 1), y]));
-    return { picture: false, width, height, field, roof, windows };
+    return { picture: false, width, height, field, roof, windows, ring: PLAIN_RING, pxPerM: PLAIN_PX_PER_M };
   }
 
   // The room the drawing has on screen (the map's room), or a guess from
@@ -295,40 +298,33 @@ const EbinoMap = (() => {
       : { w: Math.max(400, window.innerWidth - 260), h: Math.max(240, window.innerHeight - 220) };
   }
 
-  // Where the map (mapW x mapH, kept in its own units) and the yard ({ width,
-  // height }) go in a room ({ w, h } CSS px): the drawing's size W x H (the
-  // room's shape), the map's corner, the yard's corner and scale, the column
-  // the yard is in. It reads nothing but what it is given.
-  function compose(room, mapW, mapH, yard) {
+  // Where the map (mapW x mapH, kept in its own units) goes in a room ({ w,
+  // h } CSS px), 直し35-2: as large as the room lets it be, in its middle;
+  // upright, at the top, the room's foot (AI_BAND_UP of it) left for the
+  // AI's seat. The drawing's size W x H (the room's shape) and the map's
+  // corner. It reads nothing but what it is given.
+  function compose(room, mapW, mapH) {
     const upright = room.w / room.h < UPRIGHT_UNDER;
-    let mw, mh;
-    if (!upright) {
-      mh = room.h;
-      mw = mh * mapW / mapH;
-      if (mw > room.w * MAP_SHARE) [mw, mh] = [room.w * MAP_SHARE, room.w * MAP_SHARE * mapH / mapW];
-    } else {
-      mw = room.w;
-      mh = mw * mapH / mapW;
-      if (mh > room.h * MAP_SHARE_UP) [mw, mh] = [room.h * MAP_SHARE_UP * mapW / mapH, room.h * MAP_SHARE_UP];
-    }
-    const u = mapW / mw;  // The drawing's units to a CSS px.
-    const ratio = yard.height / yard.width;
-    let mx, my, yx, yy, yw, column;
-    if (!upright) {
-      [mx, my] = [0, (room.h - mh) / 2];
-      const left = mw + ROOM_GAP, free = room.w - left;
-      yw = Math.min(free - ROOM_GAP, room.h * YARD_SHARE / ratio);
-      [yx, yy] = [left + (free - yw) / 2, Math.max(8, room.h * 0.04)];
-      column = [left, room.w];
-    } else {
-      [mx, my] = [(room.w - mw) / 2, 0];
-      const top = mh + ROOM_GAP, free = room.h * (1 - AI_BAND_UP) - top;
-      yw = Math.min(room.w * 0.94, (free - ROOM_GAP) / ratio);
-      [yx, yy] = [(room.w - yw) / 2, top + (free - yw * ratio) / 2];
-      column = [0, room.w];
-    }
-    return { W: room.w * u, H: room.h * u, upright, map: [mx * u, my * u],
-      yard: { x: yx * u, y: yy * u, k: yw * u / yard.width }, column: column.map((v) => v * u) };
+    const tall = upright ? room.h * (1 - AI_BAND_UP) : room.h;
+    const u = Math.max(mapW / room.w, mapH / tall);  // The drawing's units to a CSS px.
+    const W = room.w * u, H = room.h * u;
+    return { W, H, upright, map: [(W - mapW) / 2, upright ? 0 : (H - mapH) / 2] };
+  }
+
+  // The school at its real size on the map (直し35-2): its picture's (or the
+  // plain one's) ring's middle on the school's point, its metres as the
+  // map's (unitsPerM: the drawing's units to a metre across). Returns the
+  // picture's corner and its scale. It reads nothing but what it is given.
+  function schoolOnMap([px, py], model, unitsPerM) {
+    const k = unitsPerM / model.pxPerM;
+    return { x: px - model.ring[0] * k, y: py - model.ring[1] * k, k };
+  }
+
+  // How far apart the school's windows are, at the least (the drawing's units).
+  function windowStep(windows) {
+    let least = Infinity;
+    windows.forEach(([x, y], i) => windows.slice(i + 1).forEach(([u, v]) => { least = Math.min(least, Math.hypot(u - x, v - y)); }));
+    return least;
   }
 
   function build(seats, withRelief) {
@@ -351,20 +347,31 @@ const EbinoMap = (() => {
   function draw(seats, withRelief) {
     svg.replaceChildren();
     overlay.replaceChildren();
+    for (const old of frame.querySelectorAll(".school-count")) old.remove();
     for (const id of Object.keys(points)) delete points[id];
     tokens = [];
     schoolGroup = null;
     const base = withRelief ? reliefView(map.relief) : flatView();
     const model = yardModel();
-    const laid = compose(roomSize(), base.W, base.H, model);
+    const room = roomSize();
+    const laid = compose(room, base.W, base.H);
     const [ox, oy] = laid.map;
-    view = { ...base, W: laid.W, H: laid.H, upright: laid.upright, yard: { ...laid.yard, model }, column: laid.column,
-      unit: laid.W / roomSize().w,
-      mapBox: [ox, oy, base.W, base.H],
-      proj: (...at) => {
-        const [x, y] = base.proj(...at);
-        return [x + ox, y + oy];
-      } };
+    const proj = (...at) => {
+      const [x, y] = base.proj(...at);
+      return [x + ox, y + oy];
+    };
+    // The school at its real size where it is on the map (直し35-2).
+    const mPerUnit = (map.relief && map.relief.z && map.relief.z.m_per_unit) || M_PER_UNIT;
+    const schoolAt = map.school ? proj(map.school.x, map.school.y, 0) : [ox + base.W / 2, oy + base.H / 2];
+    const yard = { ...schoolOnMap(schoolAt, model, base.S / mPerUnit), model };
+    const unit = laid.W / room.w;
+    // The seniors come out at their windows from this zoom on; the nearest
+    // zoom a little nearer than that, never less near than CLOSEST.
+    const seniorStep = windowStep(model.windows) * yard.k;
+    const seniorZoom = unit * 2 * SCHOOL_R_PX / seniorStep;
+    view = { ...base, W: laid.W, H: laid.H, upright: laid.upright, yard, unit, proj,
+      mapBox: [ox, oy, base.W, base.H], mPerUnit, seniorStep, seniorZoom,
+      closest: Math.max(CLOSEST, seniorZoom * CLOSEST_MORE) };
     vb = { x: 0, y: 0, w: view.W, h: view.H };
     svg.setAttribute("viewBox", `0 0 ${view.W} ${view.H}`);
     frame.classList.toggle("relief", view.relief);
@@ -384,8 +391,6 @@ const EbinoMap = (() => {
       const image = layer("relief-image");
       image.append(svgEl("image", { href: map.relief.image, x: ox, y: oy, width: base.W, height: base.H }));
     }
-    // The school and its ground, beside the map (直し33-2).
-    drawYard(layer("yard"));
     const fill = layer("basin-fill");
     const rimLine = view.relief ? dense(map.boundary, true).map(([x, y]) => P(x, y, 1)) : map.boundary.map(([x, y]) => P(x, y));
     fill.append(svgEl("polygon", { points: rimLine.map((p) => p.join(",")).join(" ") }));
@@ -405,30 +410,36 @@ const EbinoMap = (() => {
       line.append(svgEl("circle", { cx: from[0], cy: from[1], r: 5 * S }));
     }
 
+    // The school and its ground on the map, at their real size (直し35-2).
+    drawYard(layer("yard"));
     splitLayer = layer("split-lines");
-    // The school's picture, when it comes, under the points: no seat is hidden under it.
-    const pictureLayer = layer("school-picture");
     // Each seat at its home (直し33-3), worked out from the seat table each
     // time it is drawn: 地域で働く大人 at their places, the others by the way
     // out, at the school's windows and on its ground (homesOf).
     const placed = seats.filter((seat) => seat.x !== undefined);
-    const homes = homesOf(placed.map((seat) => ({ id: seat.seat_id, kind: seat.kind,
+    const homes = homesOf(placed.map((seat) => ({ id: seat.seat_id, kind: seat.kind, abroad: Boolean(seat.abroad),
       at: seat.outer ? null : view.relief ? P(seat.x, seat.y, 1.5) : P(seat.x, seat.y) })), homePlace());
-    drawGate(layer("home-gate"), homes.gate);
+    view.homes = homes;
+    drawGates(layer("home-gate"), homes.gates, homes.used);
     const seatLayer = layer("points");
     for (const seat of placed) {
       const node = drawPoint(seat);
       const spot = homes.spots[seat.seat_id];
+      // At the school: small, and folded into its count until there is room (直し35-2).
+      if (homes.school.has(seat.seat_id)) node.classList.add("school-home");
+      // A seat with no place on the map: its point's line dotted.
+      if (homes.noPlace.has(seat.seat_id)) node.classList.add("no-place");
       points[seat.seat_id] = { node, seat, at: () => spot };
       seatLayer.append(node);
     }
     // Each home's name where it is, in the words of the seat list's headings
     // (in place of the map's four corners' boxes).
     const homeNames = layer("home-names");
-    for (const { kind, at, anchor } of homes.names) {
+    for (const { kind, at, anchor, school } of homes.names) {
       const words = app.state.kinds[kind];
       if (!words) continue;
-      const text = svgEl("text", { class: `kind-${kind}`, x: at[0], y: at[1], "text-anchor": anchor, "data-px": TEXT_PX.home });
+      const text = svgEl("text", { class: `kind-${kind}${school ? " at-school" : ""}`, x: at[0], y: at[1], "text-anchor": anchor,
+        "data-px": TEXT_PX.home });
       text.textContent = words;
       homeNames.append(text);
     }
@@ -441,9 +452,10 @@ const EbinoMap = (() => {
       names.append(text);
     }
     // Over the points so its label reads; it takes no presses (not a seat).
-    if (map.school) drawSchool(layer("school"), map.school, pictureLayer);
+    if (map.school) drawSchool(layer("school"), map.school);
     tableLayer = layer("table");
     drawAround();
+    drawSchoolCount(homes);
 
     $("map-source").textContent = map.source;
     $("map-dem").textContent = view.relief ? map.relief.source : "";
@@ -475,6 +487,12 @@ const EbinoMap = (() => {
     group.classList.add("plain");
     const polygon = (className, spots) => svgEl("polygon", { class: className, points: spots.map((p) => p.join(",")).join(" ") });
     const [nw, ne, se, sw] = model.roof, wall = PLAIN_YARD.wall;
+    // One site under the building and its ground (直し35-2), as on the picture.
+    const [rx0, ry0] = model.roof[0], [rx1, ry1] = model.roof[2];
+    const fx = model.field.map((p) => p[0]), fy = model.field.map((p) => p[1]);
+    const [sx0, sy0, sx1, sy1] = [Math.min(...fx, rx0) - 24, Math.min(...fy, ry0) - 24, Math.max(...fx, rx1) + 24,
+      Math.max(...fy, ry1 + PLAIN_YARD.wall) + 24];
+    group.append(polygon("yard-site", [[sx0, sy0], [sx1, sy0], [sx1, sy1], [sx0, sy1]]));
     group.append(polygon("yard-ground", model.field));
     const track = trackOn(model.field);
     group.append(svgEl("path", { class: "yard-track", "fill-rule": "evenodd",
@@ -520,95 +538,176 @@ const EbinoMap = (() => {
     return { lanes, middle: [at(-rIn, 0), at(rIn, 0)] };
   }
 
-  // What homesOf needs of the drawing as it is: the map's box, the yard's
-  // place and model, and the drawing's units to a CSS px.
+  // What homesOf needs of the drawing as it is: the map's box, the school's
+  // place and model, the drawing's units to a CSS px, a point's radius at
+  // the whole map, and the spots no seat with no place may cover (the place
+  // names, the school) with the map's middle they gather nearest.
   function homePlace() {
-    // A point's radius at the whole drawing (pointScale and shape()).
-    return { mapBox: view.mapBox, yard: view.yard, unit: view.unit, r: Math.max(MIN_POINT_PX * view.unit, POINT_R * view.S) };
+    const r = Math.min(Math.max(MIN_POINT_PX * view.unit, POINT_R * view.S), MAX_POINT_PX * view.unit);
+    const avoid = map.places.map((place) => view.proj(place.x, place.y, 2));
+    const { x, y, k, model } = view.yard;
+    avoid.push([x + model.ring[0] * k, y + model.ring[1] * k]);
+    const [mx, my, mw, mh] = view.mapBox;
+    const middle = map.boundary.length ? view.proj(...centroid(map.boundary), 0) : [mx + mw / 2, my + mh / 2];
+    return { mapBox: view.mapBox, yard: view.yard, unit: view.unit, r, avoid, middle };
   }
 
-  // Where each seat lives (直し33-3), in the drawing's units, from the seats
-  // as given ({ id, kind, at: its spot on the map or null }) in their order:
-  // 地域で働く大人 with a spot there; 県外・海外に出た人 in rows by the way out
-  // (GATE_COLUMNS × GATE_ROWS); 探究をした先輩 at the school's windows, one to
-  // a window (a window nearer than a point's width to one taken stays empty);
-  // then 外から来た大人・先生 first and everyone else left on the
-  // ground, one to a square. Returns { spots: id -> [x, y], gate, names:
-  // [{ kind, at, anchor }], counts }. The same seats give the same homes. It
-  // reads nothing but what it is given.
+  // Where each seat lives (直し35-2), in the drawing's units, from the seats
+  // as given ({ id, kind, at: its spot on the map or null, abroad }) in their
+  // order:
+  //   地域で働く大人 with a place: there; with none: together, GATE_COLUMNS
+  //     to a row, where the map is free (no place name, point, way out or
+  //     school near), nearest its middle;
+  //   県外・海外に出た人: at the way out to 海外 (south) if they went abroad,
+  //     else to 県外 (north), beside the arrow going out, rows inward;
+  //   外から来た大人・先生: at the way to 県外, beside the arrow coming in;
+  //   探究をした先輩: one to each of the school's windows, then inside its
+  //     track, then on its ground outside the track, the windows' step apart.
+  // Returns { spots: id -> [x, y], gates, used, names: [{ kind, at, anchor,
+  // school }], counts, school: the ids at the school, noPlace: the ids with
+  // no place, seniorStep: the windows' step, trackRoom: how many fit inside
+  // the track }. The same seats give the same homes. It reads nothing but
+  // what it is given.
   function homesOf(seats, place) {
-    const { mapBox: [mx, my, mw], yard: { x: yx, y: yy, k, model }, unit, r } = place;
+    const { mapBox: [mx, my, mw, mh], yard: { x: yx, y: yy, k, model }, unit, r, avoid = [], middle } = place;
     const step = Math.max(HOME_STEP * unit, 2.4 * r);
     const inYard = ([px, py]) => [yx + px * k, yy + py * k];
-    const windows = [], field = model.field.map(inYard);
-    for (const spot of model.windows.map(inYard)) {
-      if (windows.every(([x, y]) => Math.hypot(x - spot[0], y - spot[1]) >= 2.2 * r)) windows.push(spot);
-    }
-    const gate = [mx + mw - step * 1.4, my + step * 2.4];
-    const spots = {}, counts = { map: 0, gate: 0, windows: 0, ground: 0 }, ground = [];
+    const windows = model.windows.map(inYard), field = model.field.map(inYard);
+    const seniorStep = windowStep(windows);
+    const gates = { out: [mx + mw / 2 + 6 * step, my + 3 * step], abroad: [mx + mw / 2 + 6 * step, my + mh - 3 * step] };
+    const spots = {}, counts = { map: 0, noPlace: 0, out: 0, abroad: 0, in: 0, windows: 0, track: 0, field: 0 };
+    const lines = { out: [], abroad: [], in: [] }, noPlace = [], seniors = [];
     for (const seat of seats) {
       if (seat.kind === "adult" && seat.at) {
         spots[seat.id] = seat.at;
         counts.map += 1;
-      } else if (seat.kind === "cross" && counts.gate < GATE_COLUMNS * GATE_ROWS) {
-        const column = counts.gate % GATE_COLUMNS, row = Math.floor(counts.gate / GATE_COLUMNS);
-        spots[seat.id] = [gate[0] - (column + 1.6) * step, gate[1] + (row + 0.2) * step];
-        counts.gate += 1;
-      } else if (seat.kind === "poster" && counts.windows < windows.length) {
-        spots[seat.id] = windows[counts.windows];
-        counts.windows += 1;
-      } else ground.push(seat);
+      } else if (seat.kind === "adult") noPlace.push(seat);
+      else if (seat.kind === "cross") lines[seat.abroad ? "abroad" : "out"].push(seat);
+      else if (seat.kind === "poster") seniors.push(seat);
+      else lines.in.push(seat);
     }
-    const first = ground.filter((seat) => seat.kind === "outsider_teacher");
-    const squares = groundSquares(field, ground.length, step, 2.2 * r);
-    [...first, ...ground.filter((seat) => seat.kind !== "outsider_teacher")].forEach((seat, n) => {
-      spots[seat.id] = squares[n];
+    // At the ways out, rows of GATE_COLUMNS beside the door, inward.
+    const row = (gate, list, side, inward, key) => list.forEach((seat, n) => {
+      const c = n % GATE_COLUMNS, down = Math.floor(n / GATE_COLUMNS);
+      spots[seat.id] = [gate[0] + side * (c + 1.6) * step, gate[1] + inward * down * step];
+      counts[key] += 1;
     });
-    counts.ground = ground.length;
-    const kinds = new Set(seats.map((seat) => seat.kind));
-    const xs = windows.map((p) => p[0]), top = Math.min(...windows.map((p) => p[1]));
+    row(gates.out, lines.out, 1, 1, "out");
+    row(gates.out, lines.in, -1, 1, "in");
+    row(gates.abroad, lines.abroad, 1, -1, "abroad");
+    // The seniors: the windows, then the track's inside, then the ground round it.
+    const squares = schoolSquares(trackOn(field), field, seniorStep);
+    const school = new Set();
+    seniors.forEach((seat, n) => {
+      const spot = n < windows.length ? windows[n] : squares.all[n - windows.length];
+      if (!spot) return;
+      spots[seat.id] = spot;
+      school.add(seat.id);
+      counts[n < windows.length ? "windows" : n - windows.length < squares.inside ? "track" : "field"] += 1;
+    });
+    // Those with no place, where the map is free.
+    if (noPlace.length) {
+      // Clear of the ways out and the rows by them, so they are not taken for theirs.
+      const round = (gate) => Array.from({ length: 17 * 9 }, (_, n) => [gate[0] + (n % 17 - 8) * step, gate[1] + (Math.floor(n / 17) - 4) * step]);
+      const taken = [...avoid, ...Object.values(spots), ...round(gates.out), ...round(gates.abroad)];
+      const corner = freeBlock([mx, my, mw, mh], noPlace.length, step, taken, middle || [mx + mw / 2, my + mh / 2]);
+      noPlace.forEach((seat, n) => {
+        spots[seat.id] = [corner[0] + (n % GATE_COLUMNS) * step, corner[1] + Math.floor(n / GATE_COLUMNS) * step];
+      });
+      counts.noPlace = noPlace.length;
+    }
     const names = [];
     if (counts.map) names.push({ kind: "adult", at: [mx + step * 0.6, my + step * 1.3], anchor: "start" });
-    if (counts.gate) names.push({ kind: "cross", at: [gate[0] + step * 0.6, gate[1] - step * 0.9], anchor: "end" });
-    if (kinds.has("poster")) {
-      names.push({ kind: "poster", at: [(Math.min(...xs) + Math.max(...xs)) / 2, Math.max(step, top - step * 2)], anchor: "middle" });
+    if (counts.out) names.push({ kind: "cross", at: [gates.out[0] + step * 1.1, gates.out[1] - step * 1.1], anchor: "start" });
+    if (counts.in) names.push({ kind: "outsider_teacher", at: [gates.out[0] - step * 1.1, gates.out[1] - step * 1.1], anchor: "end" });
+    if (counts.abroad) names.push({ kind: "cross", at: [gates.abroad[0] + step * 1.1, gates.abroad[1] + step * 1.6], anchor: "start" });
+    if (seniors.length) {
+      const xs = windows.map((p) => p[0]), top = Math.min(...windows.map((p) => p[1]));
+      names.push({ kind: "poster", at: [(Math.min(...xs) + Math.max(...xs)) / 2, top - seniorStep * 1.5], anchor: "middle", school: true });
     }
-    if (first.length || ground.length) {
-      const [nw, ne] = field;
-      names.push({ kind: "outsider_teacher", at: [(nw[0] + ne[0]) / 2, Math.max(step, Math.min(nw[1], ne[1]) - step * 0.5)],
-        anchor: "middle" });
-    }
-    return { spots, gate, names, counts };
+    return { spots, gates, used: { out: counts.out > 0, in: counts.in > 0, abroad: counts.abroad > 0 }, names, counts,
+      school, noPlace: new Set(noPlace.map((seat) => seat.id)), seniorStep, trackRoom: squares.inside };
   }
 
-  // n squares on a ground (its four corners: north-west, north-east,
-  // south-east, south-west), step apart where it is large enough (closer
-  // where it is not, but never under least: then the block goes past the
-  // ground's edge rather than two touching), the block in its middle, row by
-  // row from the north. It reads nothing but what it is given.
-  function groundSquares([nw, ne, se, sw], n, step, least = 0) {
-    if (!n) return [];
-    const wide = Math.hypot(ne[0] - nw[0], ne[1] - nw[1]), deep = Math.hypot(sw[0] - nw[0], sw[1] - nw[1]);
-    const most = Math.max(1, Math.floor(wide / Math.max(least, Math.min(step, wide / 2))) - 1);
-    const columns = Math.min(most, n, Math.max(1, Math.ceil(Math.sqrt(n * wide / deep))));
-    const rows = Math.ceil(n / columns);
-    const across = Math.max(least, Math.min(step, wide / (columns + 1))), down = Math.max(least, Math.min(step, deep / (rows + 1)));
-    const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-    return Array.from({ length: n }, (_, m) => {
-      const c = m % columns, r = Math.floor(m / columns);
-      const u = 0.5 + (c - (columns - 1) / 2) * across / wide, v = 0.5 + (r - (rows - 1) / 2) * down / deep;
-      return mix(mix(nw, ne, u), mix(sw, se, u), v);
-    });
+  // Spots for seats at the school past its windows, step apart on a grid
+  // round the middle of its track: those inside the track (nearest the
+  // middle first), then those on the ground (its corners as drawn) outside
+  // the track. Returns { all, inside: how many of all are inside }. It reads
+  // nothing but what it is given.
+  function schoolSquares(track, field, step) {
+    const inner = track.lanes[0], outer = track.lanes[track.lanes.length - 1];
+    const [a, b] = track.middle, mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const xs = field.map((p) => p[0]), ys = field.map((p) => p[1]);
+    const near = (p) => Math.hypot(p[0] - mid[0], p[1] - mid[1]);
+    const inside = [], round = [];
+    const nx = Math.ceil((Math.max(...xs) - Math.min(...xs)) / step), ny = Math.ceil((Math.max(...ys) - Math.min(...ys)) / step);
+    for (let i = -nx; i <= nx; i++) {
+      for (let j = -ny; j <= ny; j++) {
+        const p = [mid[0] + i * step, mid[1] + j * step];
+        if (within(inner, p) && clearOf(inner, p, step / 2)) inside.push(p);
+        else if (within(field, p) && !within(outer, p) && clearOf(outer, p, step / 2) && clearOf(field, p, step / 2)) round.push(p);
+      }
+    }
+    inside.sort((p, q) => near(p) - near(q));
+    round.sort((p, q) => near(p) - near(q));
+    return { all: [...inside, ...round], inside: inside.length };
   }
 
-  // The way out (直し33-3): a doorway at the map's upper right corner, open
-  // outward, in 県外・海外に出た人's colour; no words (its name is by it).
-  function drawGate(group, [x, y]) {
+  // Whether a spot is at least d from every side of a ring of spots.
+  function clearOf(ring, [x, y], d) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [ax, ay] = ring[j], [bx, by] = ring[i];
+      const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1)));
+      if (Math.hypot(x - ax - t * dx, y - ay - t * dy) < d) return false;
+    }
+    return true;
+  }
+
+  // The corner of a block of n spots (GATE_COLUMNS to a row, step apart) in
+  // the map's box, with every taken spot at least two steps off it, nearest
+  // the given middle; with none so free, the map's upper left. It reads
+  // nothing but what it is given.
+  function freeBlock([mx, my, mw, mh], n, step, taken, [cx, cy]) {
+    const columns = Math.min(n, GATE_COLUMNS), rows = Math.ceil(n / columns);
+    const bw = (columns - 1) * step, bh = (rows - 1) * step, room = 2 * step;
+    let best = null, least = Infinity;
+    for (let y = my + room; y + bh <= my + mh - room; y += step) {
+      for (let x = mx + room; x + bw <= mx + mw - room; x += step) {
+        const free = taken.every(([tx, ty]) => tx < x - room || tx > x + bw + room || ty < y - room || ty > y + bh + room);
+        const d = Math.hypot(x + bw / 2 - cx, y + bh / 2 - cy);
+        if (free && d < least) [best, least] = [[x, y], d];
+      }
+    }
+    return best || [mx + room, my + room * 2];
+  }
+
+  // The ways out (直し35-2): a doorway on the map's north edge (to 県外) and,
+  // when someone went abroad, one on its south edge (to 海外); beside each,
+  // an arrow going out in 県外・海外に出た人's colour, and at the way to 県外,
+  // when someone came from outside, an arrow coming in in their colour. No
+  // words (each group's name is by it).
+  function drawGates(group, gates, used) {
     const s = view.unit;
     group.setAttribute("aria-hidden", "true");
-    group.classList.add("kind-cross");
-    group.append(svgEl("path", { class: "door", d: `M ${x - 5 * s} ${y + 9 * s} V ${y - 8 * s} H ${x + 5 * s} V ${y + 9 * s}` }),
-      svgEl("path", { class: "out", d: `M ${x - 2 * s} ${y + 3 * s} L ${x + 9 * s} ${y - 8 * s} M ${x + 3 * s} ${y - 8 * s} H ${x + 9 * s} V ${y - 2 * s}` }));
+    const door = ([x, y], down) => svgEl("path", { class: "door kind-cross", d: down
+      ? `M ${x - 5 * s} ${y - 9 * s} V ${y + 8 * s} H ${x + 5 * s} V ${y - 9 * s}`
+      : `M ${x - 5 * s} ${y + 9 * s} V ${y - 8 * s} H ${x + 5 * s} V ${y + 9 * s}` });
+    if (used.out || used.in) {
+      const [x, y] = gates.out;
+      group.append(door(gates.out, false));
+      group.append(svgEl("path", { class: "out kind-cross",
+        d: `M ${x + 2 * s} ${y - 1 * s} L ${x + 11 * s} ${y - 10 * s} M ${x + 5 * s} ${y - 10 * s} H ${x + 11 * s} V ${y - 4 * s}` }));
+      if (used.in) {
+        group.append(svgEl("path", { class: "in kind-outsider_teacher",
+          d: `M ${x - 13 * s} ${y - 12 * s} L ${x - 4 * s} ${y - 3 * s} M ${x - 4 * s} ${y - 9 * s} V ${y - 3 * s} H ${x - 10 * s}` }));
+      }
+    }
+    if (used.abroad) {
+      const [x, y] = gates.abroad;
+      group.append(door(gates.abroad, true));
+      group.append(svgEl("path", { class: "out kind-cross",
+        d: `M ${x + 2 * s} ${y + 1 * s} L ${x + 11 * s} ${y + 10 * s} M ${x + 5 * s} ${y + 10 * s} H ${x + 11 * s} V ${y + 4 * s}` }));
+    }
     for (const path of group.querySelectorAll("path")) path.style.strokeWidth = `${1.6 * s}px`;
   }
 
@@ -794,61 +893,87 @@ const EbinoMap = (() => {
   // middle, and the glass at the roof's top lit like a lamp (it does not
   // move). The southern wing, the corridors, the gate and the grounds are
   // left out: a mark this small would blur them.
-  function drawSchool(group, school, pictureLayer) {
-    const [x, y] = view.proj(school.x, school.y, 1);
-    schoolGroup = { node: group, x, y, picture: null };
+  // The school's name (texts/school_label.txt) under the school, which is
+  // drawn at its real size on the map (直し35-2: one school, no mark beside
+  // it). It takes no presses.
+  function drawSchool(group, school) {
+    const { x, y, k, model } = view.yard;
+    schoolGroup = { node: group, x: x + model.ring[0] * k, y: y + model.height * k };
     group.setAttribute("role", "img");
     group.setAttribute("aria-label", school.label);
-    group.append(
-      svgEl("path", { class: "wing", d: "M -13 0 A 13 13 0 0 1 13 0 L 8.3 0 A 8.3 8.3 0 0 0 -8.3 0 Z" }),
-      svgEl("rect", { class: "wing", x: -13.5, y: 0, width: 27, height: 4.8 }),
-      svgEl("path", { class: "dome", d: "M -4.8 0 A 4.8 4.8 0 0 1 4.8 0 Z" }),
-      svgEl("circle", { class: "glass-glow", r: 5.5 }),
-      svgEl("circle", { class: "glass", r: 1.6 }));
-    const label = svgEl("text", { x: 0, y: 25, "text-anchor": "middle" });
+    const label = svgEl("text", { x: 0, y: 0, "text-anchor": "middle" });
     label.textContent = school.label;
     group.append(label);
-    const picture = map.school_picture && map.school_picture[view.relief ? "relief" : "flat"];
-    if (picture) loadSchoolPicture(picture, pictureLayer);
   }
 
-  // The school as a 3D picture (from outside the repo, school_picture.py),
-  // in place of its line mark once it has loaded; until then, or if it never
-  // does, the line mark stays. Like the mark it takes no presses.
-  function loadSchoolPicture(picture, pictureLayer) {
-    const owner = schoolGroup;
-    const image = new Image();
-    image.onload = () => {
-      if (schoolGroup !== owner) return;  // The map was drawn again meanwhile.
-      const node = svgEl("image", { href: picture.image, width: picture.width, height: picture.height });
-      pictureLayer.append(node);
-      owner.picture = { ...picture, node };
-      owner.node.classList.add("pictured");
-      rescale();
-      relayout();
-    };
-    image.src = picture.image;
-  }
-
-  // The school's mark or picture at the zoom as it is (perPx: the drawing's
-  // units to a CSS pixel), and its name just under it, at most so large.
+  // The school's name just under the school at the zoom as it is (perPx:
+  // the drawing's units to a CSS pixel), at most so large.
   function placeSchool(perPx) {
-    const { node, x, y, picture } = schoolGroup;
-    const grown = view.relief ? Math.max(view.S, TEXT_PX.school * perPx / 20) : 1;
-    const k = Math.min(grown, SCHOOL_MARK_MAX_PX * perPx / 27);
-    node.setAttribute("transform", `translate(${x} ${y}) scale(${k})`);
-    let bottom = 4.8 * k / perPx;  // How far under the point the mark ends, on screen.
-    if (picture) {
-      const width = Math.min(Math.max(SCHOOL_SHARE * view.W, SCHOOL_MIN_PX * perPx), SCHOOL_MAX_PX * perPx);
-      const s = width / picture.width;
-      picture.node.setAttribute("transform",
-        `translate(${x - picture.point[0] * s} ${y - picture.point[1] * s}) scale(${s})`);
-      bottom = (picture.height - picture.point[1]) * s / perPx + 2;
-    }
+    const { node, x, y } = schoolGroup;
+    node.setAttribute("transform", `translate(${x} ${y}) scale(${perPx})`);
     const label = node.querySelector("text");
-    const fontPx = Math.min(20 * grown / perPx, SCHOOL_TEXT_MAX_PX);
-    label.style.fontSize = `${fontPx * perPx / k}px`;
-    label.setAttribute("y", (bottom + fontPx * 1.01) * perPx / k);
+    const fontPx = Math.min(TEXT_PX.school * 1.4, SCHOOL_TEXT_MAX_PX);
+    label.style.fontSize = `${fontPx}px`;
+    label.setAttribute("y", fontPx * 1.1);
+  }
+
+  // 「探究をした先輩 45」 on the school (直し35-2) while its windows are
+  // closer on screen than a senior's point is wide; pressed, the camera goes
+  // to the school until they come out. In the words of the seat list's
+  // heading and the count of the seat table.
+  function drawSchoolCount(homes) {
+    if (!homes.school.size) return;
+    const label = document.createElement("button");
+    label.type = "button";
+    label.className = "school-count kind-poster";
+    label.textContent = `${app.state.kinds.poster} ${homes.school.size}`;
+    label.addEventListener("click", async () => {
+      await toSchool();
+      const first = svg.querySelector(".pt.school-home");
+      if (first) first.focus({ preventScroll: true });
+    });
+    // Before the map's points in the keyboard's order (直し35-2: it was over a hundred Tabs away).
+    frame.insertBefore(label, svg);
+  }
+
+  // Whether the seniors are out at their windows: the one boundary, the
+  // windows a senior's width apart on screen (perPx: as the zoom is now).
+  function seniorsOut(perPx = vb.w / (frame.clientWidth || 1)) {
+    return view.seniorStep / perPx >= 2 * SCHOOL_R_PX;
+  }
+
+  // To the school, near enough for its seniors to come out.
+  function toSchool() {
+    const { x, y, k, model } = view.yard;
+    const w = (frame.clientWidth || 1) * view.seniorStep / (2 * SCHOOL_R_PX) / 1.15, h = w * view.H / view.W;
+    const cx = x + model.width * k / 2, cy = y + model.height * k / 2;
+    return moveTo({ x: cx - w / 2, y: cy - h / 2, w, h }, reduced() ? 0 : CAMERA_FOR);
+  }
+
+  // The count over the school, or the seniors at their windows: never both,
+  // never neither.
+  function foldSchool(perPx) {
+    const out = seniorsOut(perPx);
+    frame.classList.toggle("seniors-out", out);
+    const label = frame.querySelector(".school-count");
+    if (label) label.hidden = out;
+  }
+
+  // The count by the school, on the first side that covers no word drawn on
+  // the map, no seat and nothing laid over the map (chooseSpot).
+  function placeSchoolCount(frameBox) {
+    const label = frame.querySelector(".school-count");
+    if (!label || label.hidden) return;
+    const { x, y, k, model } = view.yard;
+    const [px, py] = toFrame(x + model.ring[0] * k, y + model.ring[1] * k);
+    label.style.left = "0px";
+    label.style.top = "0px";
+    const { width: w, height: h } = label.getBoundingClientRect();
+    const points = [...svg.querySelectorAll(".pt:not(.school-home) .shape")].map((node) => boxIn(node, frameBox));
+    const [[left, top]] = chooseSpot({ w: frameBox.width, h: frameBox.height }, { w, h, px, py, gap: 12 },
+      [...fixedBoxes(frameBox, true, true, false), ...points]);
+    label.style.left = `${Math.round(left)}px`;
+    label.style.top = `${Math.round(top)}px`;
   }
 
   // Circle, square, triangle, diamond: the kind shows in the shape as well
@@ -922,15 +1047,16 @@ const EbinoMap = (() => {
   // A point's scale: its size on the drawing, never under MIN_POINT_PX on screen.
   function pointScale() {
     const across = frame.clientWidth || 1;
-    return Math.max(view.S, MIN_POINT_PX * (vb.w / across) / POINT_R);
+    return Math.min(Math.max(view.S, MIN_POINT_PX * (vb.w / across) / POINT_R), MAX_POINT_PX * (vb.w / across) / POINT_R);
   }
 
   function rescale() {
     const f = pointScale();
     const perPx = vb.w / (frame.clientWidth || 1);
+    const atSchool = Math.min(f, SCHOOL_R_PX * perPx / POINT_R);
     for (const { node, at } of Object.values(points)) {
       const [x, y] = at();
-      node.setAttribute("transform", `translate(${x} ${y}) scale(${f})`);
+      node.setAttribute("transform", `translate(${x} ${y}) scale(${node.classList.contains("school-home") ? atSchool : f})`);
     }
     for (const token of tokens) {
       const k = token.chair ? Math.max(f * token.scale, MIN_CHAIR_PX * perPx / CHAIR_R) : f * token.scale;
@@ -943,6 +1069,7 @@ const EbinoMap = (() => {
         .forEach(([key, value]) => hit.setAttribute(key, value));
     }
     if (schoolGroup) placeSchool(perPx);
+    foldSchool(perPx);
     if (!view.relief) return;  // The flat map keeps its words' sizes from style.css.
     for (const text of svg.querySelectorAll("text[data-px]")) {
       text.style.fontSize = `${Number(text.dataset.px) * perPx}px`;
@@ -953,7 +1080,7 @@ const EbinoMap = (() => {
   // --- the camera: the part of the drawing on screen ---
 
   function clampView(v) {
-    const w = Math.min(view.W, Math.max(view.W / CLOSEST, v.w)), h = w * view.H / view.W;
+    const w = Math.min(view.W, Math.max(view.W / view.closest, v.w)), h = w * view.H / view.W;
     // At one to one the camera may go past the drawing's edge (直し34-3: a
     // home at the top, the way out or a window, had the person's head cut
     // off), keeping the drawing's edge no further in than half the frame.
@@ -1028,8 +1155,15 @@ const EbinoMap = (() => {
       $(id).textContent = words[key].text;
       if (words[key].label !== words[key].text) $(id).setAttribute("aria-label", words[key].label);
     }
-    $("map-zoom-in").addEventListener("click", () => moveTo(zoomAround(ZOOM_STEP), 300));
-    $("map-zoom-out").addEventListener("click", () => moveTo(zoomAround(1 / ZOOM_STEP), 300));
+    // ＋ and － keep the school where it is on screen while it is in view
+    // (直し35-2: so pressing ＋ comes to its windows); else round the middle.
+    const round = (factor) => {
+      const { x, y, k, model } = view.yard;
+      const sx = x + model.ring[0] * k, sy = y + model.ring[1] * k;
+      return inView(sx, sy) ? zoomAround(factor, sx, sy) : zoomAround(factor);
+    };
+    $("map-zoom-in").addEventListener("click", () => moveTo(round(ZOOM_STEP), 300));
+    $("map-zoom-out").addEventListener("click", () => moveTo(round(1 / ZOOM_STEP), 300));
     $("map-zoom-all").addEventListener("click", () => moveTo({ x: 0, y: 0, w: view.W, h: view.H }, 500));
     $("map-back").addEventListener("click", () => (one ? closeOne() : closeTable()));
 
@@ -1285,7 +1419,7 @@ const EbinoMap = (() => {
       .map(([px, py]) => [px - reach, py - reach, 2 * reach, 2 * reach]);
     // While the table is open the map's words are not shown (直し33-5): nothing to keep off.
     const words = tableTop ? [] : [...svg.querySelectorAll(".place-names text, .home-names text, .school text, .school > :not(text), " +
-      ".school-picture image")].map((node) => boxIn(node, frameBox));
+      ".yard-building")].map((node) => boxIn(node, frameBox));
     const cover = tableTop && tableTop.map(([x, y]) => toFrame(x, y));
     // The arrow and the four ways' names (直し25-3), once they are put.
     const around = withAround ? [...overlay.querySelectorAll(".map-compass, .map-around, .map-hint")].map((node) => boxIn(node, frameBox)) : [];
@@ -1458,7 +1592,9 @@ const EbinoMap = (() => {
   function relayout() {
     if (!view) return;
     clearSchoolName();
-    placeYardColumn();
+    placeAiCorner();
+    foldSchool();
+    placeSchoolCount(overlay.getBoundingClientRect());
     for (const node of overlay.querySelectorAll(".map-bubble")) node.remove();
     placeAround();
     const frameBox = overlay.getBoundingClientRect();
@@ -1507,18 +1643,46 @@ const EbinoMap = (() => {
     placeAskMarks();
   }
 
-  // The yard's column on screen, for what the one screen puts in it (the
-  // AI's seat, under the yard: style.css --yard-left, --yard-w).
-  function placeYardColumn() {
+  // The AI's seat over a corner of the map (直し35-2): the first of
+  // AI_CORNERS where, at the whole map, it covers no seat's point, way out,
+  // place name, home's name, the school or its count; with none free, the
+  // one that covers least. Chosen once for each drawing, so it stays where it
+  // is through a round (style.css --ai-left, --ai-top, --ai-w, --ai-h).
+  function placeAiCorner() {
     const stage = frame.closest(".stage");
     if (!stage) return;
     const s = stage.getBoundingClientRect(), f = frame.getBoundingClientRect();
-    const [x0, x1] = view.column.map((x) => f.left - s.left + x / view.W * f.width);
-    stage.style.setProperty("--yard-left", `${Math.round(x0)}px`);
-    stage.style.setProperty("--yard-w", `${Math.round(x1 - x0)}px`);
-    // Upright: the band at the room's foot, over which the AI's seat sits.
-    stage.style.setProperty("--room-foot", `${Math.round(s.bottom - f.bottom)}px`);
-    stage.style.setProperty("--ai-band", `${Math.round(f.height * AI_BAND_UP)}px`);
+    const w = Math.round(view.upright ? f.width * 0.56 : Math.min(Math.max(f.width * 0.36, 300), 460));
+    // Upright: the band under the map, as tall as it is.
+    const free = f.height * (1 - (view.mapBox[1] + view.mapBox[3]) / view.H) - 16;
+    const h = Math.round(view.upright ? Math.max(f.height * AI_BAND_UP, free) : f.height * 0.48);
+    if (view.aiCorner === undefined || view.aiFor !== `${Math.round(f.width)}x${Math.round(f.height)}`) {
+      const unit = view.W / f.width;  // At the whole map.
+      const spots = [...Object.values(points).map(({ at }) => at()), view.homes.gates.out, view.homes.gates.abroad,
+        ...map.places.map((place) => view.proj(place.x, place.y, 2)), ...view.homes.names.map((n) => n.at),
+        [view.yard.x + view.yard.model.ring[0] * view.yard.k, view.yard.y + view.yard.model.ring[1] * view.yard.k]]
+        .map(([x, y]) => [x / unit, y / unit]);
+      const pad = 18;
+      const boxOf = (corner) => [corner.endsWith("left") ? 8 : f.width - w - 8, corner.startsWith("top") ? 8 : f.height - h - 8];
+      const covered = (corner) => {
+        const [left, top] = boxOf(corner);
+        return spots.filter(([x, y]) => x > left - pad && x < left + w + pad && y > top - pad && y < top + h + pad).length;
+      };
+      let best = AI_CORNERS[0], least = Infinity;
+      for (const corner of AI_CORNERS) {
+        const n = covered(corner);
+        if (n < least) [best, least] = [corner, n];
+        if (!n) break;
+      }
+      view.aiCorner = best;
+      view.aiFor = `${Math.round(f.width)}x${Math.round(f.height)}`;
+    }
+    const left = view.aiCorner.endsWith("left") ? 8 : f.width - w - 8, top = view.aiCorner.startsWith("top") ? 8 : f.height - h - 8;
+    stage.style.setProperty("--ai-left", `${Math.round(f.left - s.left + left)}px`);
+    stage.style.setProperty("--ai-top", `${Math.round(f.top - s.top + top)}px`);
+    stage.style.setProperty("--ai-w", `${w}px`);
+    stage.style.setProperty("--ai-h", `${h}px`);
+    stage.dataset.aiCorner = view.aiCorner;
   }
 
   // A 「？」 by its seat, at the first of its four corners that covers no word
@@ -1527,7 +1691,7 @@ const EbinoMap = (() => {
   function placeAskMarks() {
     const marks = [...svg.querySelectorAll(".pt.silent .ask-mark")];
     if (!marks.length) return;
-    const words = [...svg.querySelectorAll(".place-names text, .home-names text, .school text, .school-picture image")]
+    const words = [...svg.querySelectorAll(".place-names text, .home-names text, .school text, .yard-building")]
       .map((node) => node.getBoundingClientRect()).filter((r) => r.width)
       .map((r) => [r.left - WORD_PAD, r.top - WORD_PAD, r.width + 2 * WORD_PAD, r.height + 2 * WORD_PAD]);
     for (const mark of marks) {
@@ -1559,7 +1723,7 @@ const EbinoMap = (() => {
       label.setAttribute("dx", slide * label.getBBox().width / school.width);
       school = label.getBoundingClientRect();
     }
-    const picture = svg.querySelector(".school-picture image");
+    const picture = svg.querySelector(".yard-building");
     if (picture) {
       const p = picture.getBoundingClientRect();
       school = { left: Math.min(school.left, p.left), right: Math.max(school.right, p.right),
@@ -1819,7 +1983,7 @@ const EbinoMap = (() => {
   // The gathering's middle and projection for a drawing ({ W, H, mapBox,
   // upright, unit }). It reads nothing but what it is given.
   function gatherAt({ W, H, mapBox: [mx, my, mw, mh], upright, unit }) {
-    const [cx, cy] = upright ? [W / 2, my + mh + ROOM_GAP * unit / 2] : [mx + mw + ROOM_GAP * unit / 2, H / 2];
+    const [cx, cy] = [mx + mw / 2, my + mh / 2];
     const across = Math.min(W, H * 1.6) / unit * TABLE_PART;
     const s = Math.min(Math.max(across, TABLE_PX_MOST[0]), TABLE_PX_MOST[1]) * unit / TABLE_RX;
     return { x: 0, y: 0, level: 0, at: [cx, cy], scale: s,

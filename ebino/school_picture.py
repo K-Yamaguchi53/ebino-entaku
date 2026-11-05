@@ -12,7 +12,11 @@ Only these three files are read there, nothing else:
                         that is the school's point on the map
                         ("school_point_px"); for the large one, where seats
                         go on it: the ring's windows ("windows_px") and the
-                        ground's four corners ("field_px")
+                        ground's four corners ("field_px"); and, to put it
+                        on the map at its real size (直し35-2), its pixels to
+                        a metre across ("px_per_m") and the ring's middle
+                        on the ground ("ring_centre_px"), the school's
+                        point on the map
 
 The pictures are drawn at about twice the size they are shown. With no
 folder, a missing or broken file, the school keeps its line mark and the
@@ -100,17 +104,22 @@ def _yard(folder: Path, about: dict) -> dict | None:
         field = _points(entry["field_px"], 4)
         if len(field) != 4:
             raise ValueError("a ground has four corners")
+        ring = _points([entry["ring_centre_px"]], 1)[0]
+        px_per_m = _number(entry["px_per_m"])
+        if not px_per_m > 0:
+            raise ValueError("a scale is more than nothing")
     except (OSError, ValueError, KeyError, TypeError):
         return None
-    if not all(0 <= x <= width and 0 <= y <= height for x, y in windows + field):
+    if not all(0 <= x <= width and 0 <= y <= height for x, y in windows + field + [ring]):
         return None
-    return {"image": URL + PICTURES["yard"], "width": width, "height": height, "windows": windows, "field": field}
+    return {"image": URL + PICTURES["yard"], "width": width, "height": height, "windows": windows, "field": field,
+            "ring": ring, "px_per_m": px_per_m}
 
 
 def load(folder: Path | None) -> dict | None:
     """{"relief", "flat", "yard": picture or None} for the screen, the
     first two {"image", "width", "height", "point"}, the yard {"image",
-    "width", "height", "windows", "field"}; None with none."""
+    "width", "height", "windows", "field", "ring", "px_per_m"}; None with none."""
     if folder is None:
         return None
     try:
