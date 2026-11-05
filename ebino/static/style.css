@@ -941,6 +941,16 @@ body.one-open #map-heading { visibility: hidden; }
 @media (prefers-reduced-motion: no-preference) {
   .map-bar .drawer-button:hover::after, .map-bar #inside summary:hover::after { translate: 2px 0; }
 }
+/* Whose words are in (the teacher, 11/6: as quiet as the drawer's buttons,
+   few would look): not one of the quiet words but a lit box of its own, at
+   all times (not only before the first question), set a little apart from
+   the drawer's buttons under it. The words stay the teacher's. */
+.map-bar #inside summary { min-height: 46px; font-size: var(--fs-m); color: var(--lamp-bright); background: var(--lamp-faint);
+  border-color: var(--lamp-soft); }
+.map-bar #inside-fold { margin-bottom: var(--sp-2); }
+.map-bar #inside summary:hover { color: var(--lamp-bright); background: color-mix(in srgb, var(--lamp) 22%, transparent);
+  border-color: var(--lamp); }
+.map-bar #inside details[open] summary { border-color: var(--lamp); }
 /* ＋, − and 全体: one small band. */
 .map-zoom { display: flex; gap: 0; margin-left: auto; border: 1px solid var(--faint); border-radius: var(--r-pill);
   background: var(--night-2); }
