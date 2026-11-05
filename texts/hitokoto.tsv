@@ -62,6 +62,7 @@ light_lead_chosen	あなたが選んだ言葉。
 light_chosen_who	（{who}の言葉）
 light_deep_tail	そこを深めると、おもしろくなりそう。
 light_step	次の一歩になりそうなこと（あなたが書いた）
+light_split	割れたところから、次の問いを立てた。解き明かす力の入り口。
 now_label	最後に、いまの問いを書き直すなら（書かなくてもいい）
 to_sheet	1枚にする
 sheet_title	帰る前に、ひとこと ── 今日の1枚
@@ -70,6 +71,8 @@ sheet_same	（書き直さなかった）
 sheet_story	今日の道すじ
 sheet_step	次の一歩になりそうなこと
 story_people	{people}の話を聞いた。
+story_split_new	割れたところから、次の問いを立てた。
+story_split_same	割れたところを、もう一度聞いた。
 story_word	{who}の{*word}が引っかかった。
 story_chosen	{who}の言葉に近いと選んだ。
 story_wrote	そこで{*text}と書いた。

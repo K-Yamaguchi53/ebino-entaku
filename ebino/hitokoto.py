@@ -25,6 +25,16 @@ EBINO_REFLECT=old), the student, at the end of the sitting:
      sentences; code decides when it cannot be used.
   6. one sheet to print, with no name on it.
 
+The split's heading (直し40-2): a question the student sent with 「聞く」
+that is a split's heading word for word (spaces at its ends aside) is the
+moderator's words, not the student's; the first question sent after a split
+was pressed that is not one (an answer to an AI's question aside) is the
+question rewritten from the split. The student's own words the checks and
+the light go by are the first question, the questions sent after it that are
+not a heading, and what is written here; code's light takes the rewritten
+question (⑤) before the sample's fifth step; the sheet's story says the
+split was asked from, or asked again as it was.
+
 Nothing a model writes reaches the screen before code checks it, as
 reflection.checked does (「」 holds the record's or the student's own words,
 no name, no banned word outside 「」), and more: no lure (coach.LURE_FORMS),
@@ -122,8 +132,9 @@ TEXT_IDS = (
     "scale_low", "scale_first", "scale_ok", "scale_me", "scale_down", "scale_same", "scale_up", "skip", "way_q",
     "way_ok", "way_none", "way_example", "subject_q", "subject_yes", "subject_no", "subject_unsure",
     "subject_which", "subject_example", "meet_pick", "meet_met", "meet_others", "meet_ok", "meet_none", "light_title", "light_scale",
-    "light_lead", "light_lead_chosen", "light_chosen_who", "light_deep_tail", "light_step", "now_label",
+    "light_lead", "light_lead_chosen", "light_chosen_who", "light_deep_tail", "light_step", "light_split", "now_label",
     "to_sheet", "sheet_title", "sheet_now", "sheet_same", "sheet_story", "sheet_step", "story_people",
+    "story_split_new", "story_split_same",
     "story_word", "story_chosen", "story_wrote", "story_scale", "story_more", "story_way", "story_subject",
     "story_subject_note", "print", "print_note", "print_side", "deep_word", "deep_more", "deep_way",
     "deep_need", "deep_chosen", "now_after",
@@ -263,6 +274,14 @@ class Hitokoto:
     meet_use: str = ""
     light: Light | None = None
     now_question: str = ""
+    # From the rounds (直し40-2): the questions sent with 「聞く」 after the
+    # first that are not a split's heading; the first of them sent after a
+    # split was pressed; whether a heading was sent as it was after one was;
+    # the last question sent that is not a heading (the first if none).
+    own_questions: list[str] = field(default_factory=list)
+    rewritten: str = ""
+    heading_sent: bool = False
+    last_question: str = ""
 
     # --- what the screen gets ---
 
@@ -377,9 +396,27 @@ def place(people: list[Person], split: dict | None) -> list[Person]:
     return people
 
 
+def split_questions(session) -> dict:
+    """What the student sent with 「聞く」, read against the splits' headings
+    (直し40-2): {own, rewritten, heading_sent, last}. A round started by an
+    answer to an AI's question is not one."""
+    headings = {split.heading.strip() for result in session.rounds for split in result.splits}
+    asked = [(number, result.question.strip()) for number, result in enumerate(session.rounds, start=1)
+             if result.question and result.ai_question is None]
+    pressed = min((number for number, _ in session.pressed_splits), default=None)
+    after = [question for number, question in asked if pressed is not None and number > pressed]
+    own = [question for _, question in asked[1:] if question not in headings]
+    mine = [question for _, question in asked if question not in headings]
+    return {"own": own, "rewritten": next((q for q in after if q not in headings), ""),
+            "heading_sent": any(q in headings for q in after), "last": mine[-1] if mine else ""}
+
+
 def begin(session, opened: list[str], sheet_heading) -> Hitokoto:
     first = next((r.question for r in session.rounds if r.question), "")
     talk = Hitokoto(first)
+    asked = split_questions(session)
+    talk.own_questions, talk.rewritten = asked["own"], asked["rewritten"]
+    talk.heading_sent, talk.last_question = asked["heading_sent"], asked["last"] or first
     talk.people = pick_people(session, opened)
     talk.split = find_split(session, talk.people, sheet_heading)
     place(talk.people, talk.split)
@@ -396,15 +433,26 @@ def begin(session, opened: list[str], sheet_heading) -> Hitokoto:
 # --- the checks ---
 
 class Words:
-    """What 「」 may hold: the record's words (reflection.Record), the people's
-    cards and lit parts, and what the student wrote here."""
+    """What 「」 may hold: the record's words (the quotes shown, the people's
+    cards and lit parts, the seats' titles) and the student's own words.
+    reflection.Record's own_words hold every question and split heading, so
+    they are not the student's here (直し40-2): the first question, the
+    questions sent after it that are not a heading, and what was written here."""
 
     def __init__(self, session, talk: Hitokoto):
         self.record = Record(session)
         self.record.quote_texts += [p.text for p in talk.people]
-        self.record.own_words += [talk.first_question, *talk.parts.values(), talk.chosen_part]
-        self.record.own_words += [w["text"] for w in talk.written]
-        self.record.own_words = [w for w in self.record.own_words if w]
+        seats = {seat.seat_id: seat for seat in session.library.seats}
+        titles = [seats[q.seat_id].title for r in session.rounds for q in r.quotes if q.seat_id in seats]
+        titles += [seats[s].title for s in session.silent_seats() if s in seats]
+        self.record.own_words = [w for w in [*titles, *student_words(talk), *talk.parts.values(), talk.chosen_part] if w]
+
+
+def student_words(talk: Hitokoto) -> list[str]:
+    """The student's own words (直し40-2): the first question, the questions
+    sent with 「聞く」 after it that are not a split's heading, and what was
+    written on this screen."""
+    return [talk.first_question, *talk.own_questions, *(w["text"] for w in talk.written)]
 
 
 def _outside(text: str) -> str:
@@ -572,9 +620,14 @@ LIGHT_SCHEMA = {
 }
 
 
+NEXT_QUESTION = "next_question"  # A question sent after the first, not a heading (直し40-2).
+
+
 def light_words(talk: Hitokoto) -> list[dict]:
-    """The student's own words the light may pick from: never of home, money or health."""
-    return [w for w in talk.written if not has_avoid(w["text"])]
+    """The student's own words the light may pick from (student_words but the
+    first question): never of home, money or health."""
+    asked = [{"step": NEXT_QUESTION, "text": question} for question in talk.own_questions]
+    return [w for w in [*talk.written, *asked] if not has_avoid(w["text"])]
 
 
 def chosen_two(talk: Hitokoto) -> Person | None:
@@ -603,6 +656,10 @@ def code_light(talk: Hitokoto, reason: str) -> Light:
         return light(way, 2, texts["deep_way"])
     if scale == SCALE_FIRST and forward:
         return light(forward, 4, texts["deep_need"])
+    # 直し40-2: a question rewritten from a split, before the sample's fifth.
+    # A heading pressed, or sent as it was, is no ground for the light.
+    if talk.rewritten and not has_avoid(talk.rewritten):
+        return Light(talk.rewritten, "written", 5, texts["light_split"], "", "code", reason)
     if longest:
         return light(longest, 1, deep_word)
     two = chosen_two(talk)
@@ -663,7 +720,7 @@ def light_view(talk: Hitokoto) -> dict:
     light = talk.light
     return {"scale": talk.scale, "quote": light.quote, "source": light.source, "chosen_who": light.chosen_who,
             "why": light.why, "deep": light.deep, "force": FORCES[light.force], "next_step": next_step(talk),
-            "now_question": talk.now_question or talk.first_question}
+            "now_question": talk.now_question or talk.last_question or talk.first_question}
 
 
 # --- the sheet ---
@@ -675,6 +732,11 @@ def story(talk: Hitokoto) -> list[dict]:
     out: list[dict] = []
     if talk.people:
         out += segments(texts["story_people"], people="・".join(p.title for p in talk.people))
+    # The split (直し40-2): a question rewritten from it, or the heading sent as it was.
+    if talk.rewritten:
+        out += segments(texts["story_split_new"])
+    elif talk.heading_sent:
+        out += segments(texts["story_split_same"])
     if talk.chosen is not None:
         out += segments(texts["story_word"], who=talk.people[talk.chosen].title, word=chosen_words(talk))
     two = chosen_two(talk)

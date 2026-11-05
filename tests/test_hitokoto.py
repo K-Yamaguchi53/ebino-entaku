@@ -210,7 +210,10 @@ def test_dont_know_twice_turns_to_the_ladder_and_a_blank_written_goes_back_to_th
     assert fill["question"] == WORDS["ladder_fill"]
     assert fill["before"] == "理容師の話の、" and fill["after"] == "のところが近いと思った。"
     back = session.hitokoto_fill("決めて取る")
-    assert back == {"next": "ask", "question": SELF_Q}
+    # 「空いたら取る」 is in no card and was never written by the student here:
+    # only the split's heading held it, and that is the moderator's words, not
+    # the student's (直し40-2), so the listener's question gives way to the fixed one.
+    assert back == {"next": "ask", "question": WORDS["ask_self"]}
     assert session.hitokoto_answer("店を閉める日を決めたい")["next"] == "scale"
     talk = session.talk
     assert talk.listener_asked == 2 and talk.ladder_shown == 3
