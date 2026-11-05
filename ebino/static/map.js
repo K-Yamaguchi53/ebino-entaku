@@ -3103,6 +3103,9 @@ const EbinoMap = (() => {
     one = { seatId, home, token, group: null, words: card ? card.querySelector(".voice").textContent : "",
       spoken: Boolean(card && card.classList.contains("spoken")) };
     const mine = one;
+    // The questions, put to this person, asked for while the camera flies
+    // (直し36-3: at most three seconds; the teacher's questions past that).
+    mine.asks = app.oneOpen(seatId).catch(() => null);
     frame.classList.add("one-on");
     // The AI's seat steps back too (直し34-3: it covered the person's feet and words).
     document.body.classList.add("one-open");
@@ -3159,8 +3162,8 @@ const EbinoMap = (() => {
     // The questions to pick from (直し34-4), asked for while it stands up.
     const mine = one;
     // The keyboard goes to the first of them (直し34-5: it was six Tabs away).
-    app.oneOpen(mine.seatId).then((view) => {
-      if (one !== mine) return;
+    mine.asks.then((view) => {
+      if (!view || one !== mine) return;
       showAsks(view);
       const first = overlay.querySelector(".one-asks .one-ask");
       if (first) first.focus({ preventScroll: true });
@@ -3198,11 +3201,12 @@ const EbinoMap = (() => {
       });
       panel.append(thanks);
     }
-    for (const { item, question } of view.questions) {
+    for (const { item, question, rephrased } of view.questions) {
       const ask = document.createElement("button");
       ask.type = "button";
       ask.className = "one-ask";
       ask.dataset.item = item;
+      if (rephrased) ask.dataset.rephrased = "1";  // Put to this person (直し36-3).
       ask.textContent = question;
       ask.addEventListener("click", async () => {
         if (panel.classList.contains("busy")) return;

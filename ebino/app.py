@@ -132,7 +132,7 @@ class App:
                                         after_notice=body.get("after_notice") is True)
         # One to one (直し34-4): the questions now, a question picked, a question written.
         if path == "/api/one/open":
-            return session.one_view(body.get("seat_id"))
+            return session.one_open(body.get("seat_id"))
         if path == "/api/one/ask":
             return session.one_ask(body.get("seat_id"), body.get("item"))
         if path == "/api/one/thanks":

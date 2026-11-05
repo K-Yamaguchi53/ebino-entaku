@@ -31,7 +31,7 @@ from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_S
 from . import librarian, texts
 from .gate import Gate, GateError, ModelUnavailable, NameList, load_names
 from .guard import Guard
-from . import one_to_one
+from . import asker, one_to_one
 from .index import Entry, build_index, load_topics, load_utterances
 from .ingest.run import OUTPUT_DIR as INGESTED_DIR
 from .ingest.scrub import normalize_for_match
@@ -217,6 +217,8 @@ class Session:
     one_free: dict[str, list[bool]] = field(default_factory=dict)
     one_thanked: list[str] = field(default_factory=list)
     one_spoken: list[speaker.Spoken] = field(default_factory=list)
+    # The teacher's questions put to each person (直し36-3), by seat and item.
+    one_rephrased: dict[str, dict[str, asker.Rephrased]] = field(default_factory=dict)
 
     def __post_init__(self):
         self._subject_counts = Counter()  # With no records (tests): this sitting's only.
@@ -240,6 +242,10 @@ class Session:
                                      "thanked": seat_id in self.one_thanked}
                                     for seat_id, items in self._one_seats().items()]
             record["one_spoken"] = [spoken.record() for spoken in self.one_spoken]
+            # Which was shown, the teacher's question or one put to the
+            # person, and why the teacher's was kept; never the words (直し36-3).
+            record["one_rephrased"] = [dict(result.record(), seat_id=seat_id)
+                                       for seat_id, found in self.one_rephrased.items() for result in found.values()]
             self.records.save_session(record)
 
     # --- what the student does ---
@@ -569,17 +575,41 @@ class Session:
                 if item == "本文" and ranking:  # The ranking after the body, as in the article.
                     found = [u for u in pieces if u.section == "ランキング"]
                     if found:
-                        out.append(("ランキング", ranking, found))
+                        out.append((one_to_one.RANKING_ITEM, ranking, found))
         return out
+
+    def one_open(self, seat_id: str) -> dict:
+        """「この人に聞く」 pressed (直し36-3): in one request, the teacher's
+        questions offered now (up to ONE_QUESTIONS) put to this person
+        (asker.py), each item once a sitting; then the questions to offer.
+        One offered later, after a question was asked, is the teacher's
+        until 「この人に聞く」 is pressed again (one request a press; with
+        every item in it, the model took longer than its 3 seconds)."""
+        items = self.one_items(seat_id)
+        done = self.one_rephrased.setdefault(seat_id, {})
+        asked = self.one_asked.get(seat_id, [])
+        offered = [(item, question, pieces) for item, question, pieces in items
+                   if item not in asked][:one_to_one.ONE_QUESTIONS]
+        todo = [{"id": item, "question": question, "paragraph": asker.item_paragraph(pieces)}
+                for item, question, pieces in offered if item not in done and item != one_to_one.RANKING_ITEM]
+        if todo and config.asker_on():
+            for result in asker.rephrase(self.gate, todo):
+                done[result.item] = result
+            self.save()
+        return self.one_view(seat_id)
 
     def one_view(self, seat_id: str) -> dict:
         """The questions to offer now: up to ONE_QUESTIONS of the items not
-        asked yet, in order; done once every item with words has been asked."""
+        asked yet, in order; done once every item with words has been asked.
+        Each as put to this person where that passed (直し36-3)."""
         items = self.one_items(seat_id)
         asked = self.one_asked.get(seat_id, [])
+        put = self.one_rephrased.get(seat_id, {})
         left = [(item, question) for item, question, _ in items if item not in asked]
-        return {"seat_id": seat_id, "questions": [{"item": item, "question": question}
-                                                  for item, question in left[:one_to_one.ONE_QUESTIONS]],
+        return {"seat_id": seat_id,
+                "questions": [{"item": item, "question": put[item].text if item in put else question,
+                               "rephrased": item in put and put[item].shown == asker.SHOWN_REPHRASED}
+                              for item, question in left[:one_to_one.ONE_QUESTIONS]],
                 "done": bool(items) and not left, "asked": list(asked)}
 
     def _one_words(self, seat_id: str, pieces: list[Utterance]) -> dict:

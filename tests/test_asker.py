@@ -7,7 +7,13 @@ Only the axes' names come back; the answer goes to the model's own table
 (ask_pages_model.tsv) beside the teacher's, which is read first.
 段2: at ingest, a seat's own question on its ranking, made by the model and
 checked by code: only the ranking paragraph's words and numbers, no banned
-word, no name, 40 characters at most, ending in 「？」."""
+word, no name, 40 characters at most, ending in 「？」.
+段3: at one to one, the teacher's questions put to that person in one
+request (3 seconds), checked by code as the ranking's, except that its
+words may come from the teacher's question too, a banned word stops it only
+when the teacher's question lacks it, and it is at most 1.5 times as long.
+Any that fails, and all when the model is late or cannot be used, show the
+teacher's question."""
 
 import pytest
 from conftest import make_seat
@@ -263,3 +269,162 @@ def test_the_ingest_report_says_the_ranking_counts():
     run = (Path(one_to_one.__file__).parent / "ingest" / "run.py").read_text(encoding="utf-8")
     assert "one to one, the model's ranking questions: made now {model['ranking_made']}" in run
     assert "not made by reason {model['ranking_not_made']}" in run
+
+
+# --- 段3: the teacher's questions put to the person at one to one ---
+
+import json  # noqa: E402
+import random  # noqa: E402
+
+import anthropic  # noqa: E402
+import httpx2  # noqa: E402
+
+from ebino.session import Library, Session  # noqa: E402
+
+SKELETON = "毎日、どんな仕事をしているんですか？"
+PARAGRAPH = "朝は5時からパンを焼きます。"
+
+
+def rephrase_check(question, skeleton=SKELETON, paragraph=PARAGRAPH):
+    gate, _ = a_gate([])
+    return asker.check_rephrase(question, skeleton, paragraph, gate)
+
+
+def test_a_question_put_to_the_person_from_the_teachers_words_and_the_paragraph_passes():
+    assert rephrase_check("朝からパンを焼く毎日は、どんな仕事ですか？") == ""
+
+
+def test_a_rephrased_question_may_keep_the_teachers_words_the_paragraph_lacks():
+    assert "仕事" not in PARAGRAPH and rephrase_check("パンを焼く仕事は、どんな毎日ですか？") == ""
+
+
+def test_a_rephrased_question_with_a_word_in_neither_the_teachers_question_nor_the_items_paragraph_is_not_shown():
+    assert rephrase_check("朝からパンを焼く毎日は、どんな職人ですか？") == "word_not_in_original"
+    assert rephrase_check("朝からパンを焼くレシピは、どんな仕事ですか？") == "word_not_in_original"
+
+
+def test_a_rephrased_question_with_a_number_not_in_the_paragraph_is_not_shown():
+    assert rephrase_check("朝6時からパンを焼く毎日は、どんな仕事ですか？") == "number_not_in_original"
+
+
+def test_a_rephrased_question_longer_than_one_and_a_half_times_the_teachers_is_not_shown():
+    long = "朝は5時からパンを焼く毎日は、どんな仕事をしているんですか？"
+    assert len(long) > len(SKELETON) * 1.5 and rephrase_check(long) == "too_long"
+
+
+def test_a_rephrased_question_with_a_name_is_not_shown():
+    assert rephrase_check("山川さんの毎日は、どんな仕事ですか？", paragraph="山川さんは" + PARAGRAPH) == "name"
+
+
+def test_a_banned_word_the_teachers_question_holds_does_not_stop_the_rephrased_one():
+    skeleton = "どうして行こうと思ったの？"  # 行こう is a banned word (34).
+    assert rephrase_check("どうして県外に行こうと思ったの？", skeleton, "県外の大学に進みました。") == ""
+
+
+def test_a_banned_word_not_in_the_teachers_question_stops_the_rephrased_one():
+    assert rephrase_check("パンを焼く毎日は、すごい仕事ですか？") == "banned_word"
+
+
+def test_the_teachers_question_given_back_shows_the_teachers():
+    assert rephrase_check(SKELETON) == "unchanged"
+
+
+from test_one_to_one import SEATS as ONE_SEATS, UTTERANCES as ONE_UTTERANCES, Kept  # noqa: E402
+
+PUT = {"プロフィール": "町で生まれて、店を継いだのはどうしてですか？", "仕事の内容": "髪を切って話を聞く毎日は、どんな仕事ですか？",
+       "本文": "休みを決めて取る話を、もっと聞かせてくれますか？", "高校生に一言": "迷ったら、高校生に伝えたいことはありますか？"}
+
+
+def put_to_the_person(request):
+    sent = json.loads(request["messages"][0]["content"])
+    return text_response({"lines": [{"id": q["id"], "question": PUT.get(q["id"], q["question"])}
+                                    for q in sent["questions"]]})
+
+
+def one_sitting(monkeypatch, answers):
+    monkeypatch.setenv("EBINO_SPEAKER", "0")
+    lib = Library.build(ONE_SEATS, ONE_UTTERANCES, {})
+    lib.ask_tables = {"pages": {"C01": {"p1": ["行く前"], "p2": ["向こうで"]}},
+                      "ranking": {"A01": "架空のランキングの質問ですか？"}}
+    client, kept = FakeClient(answers), Kept()
+    session = Session(lib, Gate(client, NameList.build(ONE_SEATS, {})), rng=random.Random(1), records=kept)
+    return session, client, kept
+
+
+def test_this_person_pressed_one_request_in_three_seconds_and_the_questions_put_to_the_person(monkeypatch):
+    session, client, kept = one_sitting(monkeypatch, put_to_the_person)
+    view = session.one_open("A01")
+    assert len(client.requests) == 1 and client.options == [{"timeout": 3.0, "max_retries": 0}]
+    assert client.requests[0]["model"] == "claude-haiku-5-5"
+    sent = json.loads(client.requests[0]["messages"][0]["content"])
+    # The questions offered now, each with its own paragraph.
+    assert [q["id"] for q in sent["questions"]] == ["プロフィール", "仕事の内容", "本文"]
+    assert sent["questions"][0]["paragraph"] == "町で生まれて、店を継ぎました。"
+    assert [(q["question"], q["rephrased"]) for q in view["questions"]] == [
+        (PUT["プロフィール"], True), (PUT["仕事の内容"], True), (PUT["本文"], True)]
+    # After one asked: the ranking's own question comes after 本文, as the table has it, not put again.
+    after = session.one_ask("A01", "プロフィール")
+    assert [(q["question"], q["rephrased"]) for q in after["questions"]] == [
+        (PUT["仕事の内容"], True), (PUT["本文"], True), ("架空のランキングの質問ですか？", False)]
+    # One offered later is the teacher's, with no request, until pressed again.
+    after = session.one_ask("A01", "仕事の内容")
+    assert after["questions"][-1] == {"item": "高校生に一言", "question": "高校生に伝えたいことはありますか？",
+                                      "rephrased": False}
+    assert len(client.requests) == 1
+    view = session.one_open("A01")
+    assert len(client.requests) == 2 and view["questions"][-1]["question"] == PUT["高校生に一言"]
+    assert [q["id"] for q in json.loads(client.requests[1]["messages"][0]["content"])["questions"]] == ["高校生に一言"]
+    session.one_open("A01")
+    assert len(client.requests) == 2  # Nothing left to put.
+    # The record: which was shown and why, never the words.
+    record = kept.sessions[-1]["one_rephrased"]
+    assert {r["item"]: r["shown"] for r in record} == {item: "rephrased" for item in PUT}
+    assert all(set(r) == {"seat_id", "item", "shown", "reason"} for r in record)
+    assert "髪を切って" not in json.dumps(kept.sessions[-1]["one_rephrased"], ensure_ascii=False)
+
+
+def test_one_that_fails_its_check_shows_the_teachers_and_the_others_do_not(monkeypatch):
+    def answers(request):
+        sent = json.loads(request["messages"][0]["content"])
+        return text_response({"lines": [{"id": q["id"], "question": "すごい" + q["question"]} if q["id"] == "本文"
+                                         else {"id": q["id"], "question": PUT[q["id"]]} for q in sent["questions"]]})
+    session, client, kept = one_sitting(monkeypatch, answers)
+    view = session.one_open("A01")
+    shown = {q["item"]: (q["question"], q["rephrased"]) for q in view["questions"]}
+    assert shown["本文"] == ("この仕事の話を、もっと聞かせてください。", False)
+    assert shown["プロフィール"] == (PUT["プロフィール"], True)
+    assert session.one_rephrased["A01"]["本文"].reason == "banned_word"
+
+
+def test_past_three_seconds_every_question_is_the_teachers(monkeypatch):
+    late = anthropic.APITimeoutError(request=httpx2.Request("POST", "https://api.invalid/v1/messages"))
+    session, client, kept = one_sitting(monkeypatch, [late])
+    view = session.one_open("A01")
+    assert [q["rephrased"] for q in view["questions"]] == [False, False, False]
+    assert view["questions"][0]["question"] == "どんな道を通って、今の仕事に就いたんですか？"
+    assert {r["reason"] for r in kept.sessions[-1]["one_rephrased"]} == {"api_error:APITimeoutError"}
+
+
+def test_the_model_not_usable_or_turned_off_every_question_is_the_teachers(monkeypatch):
+    session, client, kept = one_sitting(monkeypatch, [text_response("not json")])
+    assert not any(q["rephrased"] for q in session.one_open("A01")["questions"])
+    monkeypatch.setenv("EBINO_ASKER", "0")
+    session, client, kept = one_sitting(monkeypatch, [])
+    assert not any(q["rephrased"] for q in session.one_open("A01")["questions"])
+    assert client.requests == []
+
+
+def test_no_name_is_sent_when_putting_the_questions(monkeypatch):
+    session, client, kept = one_sitting(monkeypatch, put_to_the_person)
+    session.one_open("P01")
+    sent = client.all_sent()
+    assert all(not seat.display_name or seat.display_name not in sent for seat in ONE_SEATS)
+
+
+def test_it_is_asked_for_while_the_camera_flies_and_a_put_question_is_marked():
+    from ebino import app as app_module
+    source = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+    opened = source[source.index("async function openOne("):]
+    opened = opened[:opened.index("\n  }\n")]
+    assert opened.index("mine.asks = app.oneOpen(seatId)") < opened.index("await moveTo(")
+    assert 'if (rephrased) ask.dataset.rephrased = "1";' in source
