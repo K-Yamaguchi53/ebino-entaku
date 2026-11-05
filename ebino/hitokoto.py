@@ -171,6 +171,21 @@ def fill(template: str, **values) -> str:
     return _PLACE.sub(lambda m: str(values[m.group(2)]), template)
 
 
+def segments(template: str, **values) -> list[dict]:
+    """A sheet line as parts: {*name} is the student's or the record's words,
+    shown in 「」 and stressed; the rest is the teacher's."""
+    out, at = [], 0
+    for match in _PLACE.finditer(template):
+        if match.start() > at:
+            out.append({"text": template[at:match.start()], "strong": False})
+        value = str(values[match.group(2)])
+        out.append({"text": f"「{value}」", "strong": True} if match.group(1) else {"text": value, "strong": False})
+        at = match.end()
+    if at < len(template):
+        out.append({"text": template[at:], "strong": False})
+    return out
+
+
 @dataclass
 class Person:
     seat_id: str
@@ -619,3 +634,40 @@ def light_view(talk: Hitokoto) -> dict:
     return {"scale": talk.scale, "quote": light.quote, "source": light.source, "chosen_who": light.chosen_who,
             "why": light.why, "deep": light.deep, "force": FORCES[light.force], "next_step": next_step(talk),
             "now_question": talk.now_question or talk.first_question}
+
+
+# --- the sheet ---
+
+def story(talk: Hitokoto) -> list[dict]:
+    """今日の道すじ, in the order things happened, from the record and the
+    student's own words only (the AI writes none of it)."""
+    texts = words()
+    out: list[dict] = []
+    if talk.people:
+        out += segments(texts["story_people"], people="・".join(p.title for p in talk.people))
+    if talk.chosen is not None:
+        out += segments(texts["story_word"], who=talk.people[talk.chosen].title, word=chosen_words(talk))
+    two = chosen_two(talk)
+    if two:
+        out += segments(texts["story_chosen"], who=two.title)
+    first = next((w["text"] for w in talk.written if w["step"] in (REACTION, SELF, "fill")
+                  and not has_avoid(w["text"])), "")
+    if first:
+        out += segments(texts["story_wrote"], text=first)
+    if talk.scale is not None:
+        out += segments(texts["story_scale"], n=talk.scale)
+        if talk.scale > SCALE_FIRST and talk.forward and not has_avoid(talk.forward):
+            out += segments(texts["story_more"], text=talk.forward)
+    if talk.way and not has_avoid(talk.way):
+        out += segments(texts["story_way"], text=talk.way)
+    if talk.subject == "yes":
+        out += (segments(texts["story_subject_note"], note=talk.subject_note) if talk.subject_note
+                else segments(texts["story_subject"]))
+    return out
+
+
+def sheet_view(talk: Hitokoto) -> dict:
+    light = talk.light
+    now = talk.now_question if talk.now_question and talk.now_question != talk.first_question else ""
+    return {"first_question": talk.first_question, "now_question": now, "story": story(talk),
+            "light": {"quote": light.quote, "why": light.why} if light else None, "next_step": next_step(talk)}

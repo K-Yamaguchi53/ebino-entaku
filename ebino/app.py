@@ -205,6 +205,7 @@ class App:
             "meet": lambda: session.hitokoto_meet(body.get("seat_id", "")),
             "use": lambda: session.hitokoto_use(body.get("use", "")),
             "light": session.hitokoto_light,
+            "sheet": lambda: session.hitokoto_sheet(body.get("now_question", "")),
         }
         if step not in steps:
             raise Refused("unknown_path")

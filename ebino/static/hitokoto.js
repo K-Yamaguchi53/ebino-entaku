@@ -663,11 +663,66 @@ const EbinoHitokoto = (() => {
     $("hk-to-sheet").focus({ preventScroll: true });
   }
 
+  // --- 段6: the sheet, and printing it ---
+
+  async function toSheet() {
+    if (busy) return;
+    busy = true;
+    const line = $("hk-now-message");
+    line.hidden = true;
+    let sheet;
+    try {
+      sheet = await post("sheet", { now_question: $("hk-now").value.trim() });
+    } catch (error) {
+      line.textContent = app.sendFailed(error);
+      line.hidden = false;
+      busy = false;
+      return;
+    }
+    busy = false;
+    if (sheet.status === "ask_again") {
+      line.textContent = sheet.message;
+      line.hidden = false;
+      return;
+    }
+    const box = $("hk-sheet-body");
+    box.replaceChildren(el("h3", "", W.sheet_title));
+    const questions = el("div", "hk-qq");
+    const first = el("div", "hk-qbox");
+    first.append(el("p", "hk-label", W.first_label), el("p", "", sheet.first_question));
+    const now = el("div", "hk-qbox");
+    now.append(el("p", "hk-label", W.sheet_now), el("p", "", sheet.now_question || W.sheet_same));
+    const arrow = el("p", "hk-arrow", "→");
+    arrow.setAttribute("aria-hidden", "true");
+    questions.append(first, arrow, now);
+    box.append(questions, el("p", "hk-label", W.sheet_story));
+    const story = el("p", "hk-story");
+    for (const part of sheet.story) story.append(part.strong ? el("b", "", part.text) : part.text);
+    box.append(story);
+    if (sheet.light) {
+      const lit = el("div", "hk-litbox");
+      lit.append(el("p", "hk-label", W.light_title), el("p", "hk-lit", `「${sheet.light.quote}」`), el("p", "", sheet.light.why));
+      box.append(lit);
+    }
+    if (sheet.next_step) {
+      const step = el("div", "hk-litbox");
+      step.append(el("p", "hk-label", W.sheet_step), el("p", "hk-lit", `「${sheet.next_step}」`));
+      box.append(step);
+    }
+    box.append(el("p", "hk-print-note", W.print_note));
+    show("sheet");
+    // 最初にもどる, as under the reflection sheet (直し30-2).
+    $("hk-back").append($("back-to-start"));
+    app.showBackToStart();
+    $("hk-print").focus({ preventScroll: true });
+  }
 
   function setup() {
     $("hk-go").addEventListener("click", () => choose(false));
     $("hk-omakase").addEventListener("click", () => choose(true));
     $("hk-stop").addEventListener("click", toLight);
+    $("hk-to-sheet").addEventListener("click", toSheet);
+    $("hk-print").addEventListener("click", () => window.print());
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup);

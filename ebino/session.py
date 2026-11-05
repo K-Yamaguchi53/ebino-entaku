@@ -1159,6 +1159,18 @@ class Session:
             self.save()
         return hitokoto.light_view(talk)
 
+    def hitokoto_sheet(self, now_question) -> dict:
+        """The question as held now (optional) and the one sheet."""
+        talk = self._talk(hitokoto.LIT, hitokoto.SHEET)
+        text = _line(now_question, MAX_QUESTION_CHARS, "", required=False)
+        named = self._named(text)
+        if named:
+            return named
+        talk.now_question = text
+        talk.stage = hitokoto.SHEET
+        self.save()
+        return hitokoto.sheet_view(talk)
+
     # --- what the sitting has gathered ---
 
     def met_seats(self) -> list[str]:

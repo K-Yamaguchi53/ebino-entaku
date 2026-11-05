@@ -403,6 +403,8 @@ def test_the_meet_line_comes_only_when_a_seat_is_picked_and_the_first_line_never
     assert uses and all(set(u) == {"force", "name", "text"} for u in uses)
     line = other.hitokoto_use(uses[0]["force"])["meet"]
     assert line.startswith(load_text("harvest_meet_prefix") + "農家")
+    everything = json.dumps([other.hitokoto_light(), other.hitokoto_sheet("")], ensure_ascii=False)
+    assert MOVES_PREFIX not in everything and MOVES_PREFIX not in line
 
 
 # --- 段5: today's light ---
@@ -511,6 +513,25 @@ def test_stop_here_goes_to_the_light_at_once():
     assert session.talk.stage == "lit" and light["scale"] is None
     with pytest.raises(Refused):
         session.hitokoto_answer("もう一つ")
+
+
+# --- 段6: the sheet ---
+
+def test_the_sheet_reads_in_order_from_the_record_and_the_students_words(tmp_path):
+    session, _, _, _ = sitting(tmp_path=tmp_path)
+    to_scale(session)
+    to_end(session, subject="yes")
+    session.hitokoto_light()
+    sheet = session.hitokoto_sheet("休みの決め方で、仕事はどう変わる？")
+    story = "".join(part["text"] for part in sheet["story"])
+    assert story == ("農家・理容師の話を聞いた。農家の「休みは空いたら取ります」が引っかかった。"
+                     "そこで「空いたら取るのがいいと思った」と書いた。迷いは10から8へ。"
+                     "頭に置いておきたい道は「農業」。授業とつながった話もあった（家庭科）。")
+    assert [p["text"] for p in sheet["story"] if p["strong"]] == [
+        "「休みは空いたら取ります」", "「空いたら取るのがいいと思った」", "「農業」"]
+    assert sheet["now_question"] == "休みの決め方で、仕事はどう変わる？"
+    assert sheet["light"] == {"quote": "空いたら取る", "why": LIGHT_OK["why"]}
+    assert sheet["next_step"] == "先輩にもう一回聞く"
 
 
 # --- 段7: the switch, the roles, texts ---
