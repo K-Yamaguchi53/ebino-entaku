@@ -57,6 +57,10 @@ MODELS = {
     "coach": "claude-opus-5-5",
     # The round's bubbles as spoken words (直し31-7; the teacher chose Haiku, low).
     "speaker": "claude-haiku-5-5",
+    # One to one's questions (直し36; the teacher allowed a fast model): at
+    # ingest, which axes a page answers and a seat's own question on its
+    # ranking; at one to one, the teacher's questions put to that person.
+    "asker": "claude-haiku-5-5",
 }
 EFFORT = {
     "tagger": "low",
@@ -68,6 +72,7 @@ EFFORT = {
     "subjects": "low",
     "coach": "medium",
     "speaker": "low",
+    "asker": "low",
 }
 
 

@@ -224,6 +224,20 @@ SUBJECT_FUDA = """\
 形の例（架空）：{"fuda": "札2", "numbers": [3, 5]}　近い札がないとき：{"fuda": "なし", "numbers": []}
 """
 
+# asker.py (直し36-1): at ingest, once for each seat whose words are pages only.
+ASK_PAGES = """\
+あなたは、ある人のスライドの各ページが、生徒のどの「聞く軸」に答えているかを見分ける係です。
+渡されるのは、聞く軸の一覧（name と、その軸で生徒が聞く question）と、1人分のページの一覧（page と text）です。
+ページごとに、そのページが答えている軸の name を、0個〜いくつでも返してください。
+
+- 軸は、一覧の name をそのまま使う。一覧に無い軸を作らない。
+- どの軸にも答えていないページ（題だけ・あいさつだけ・目次だけ、など）は、空の一覧にする。
+- 文は書かない。説明も書かない。ページの文は返さない。
+- 渡された page をそのまま返す。
+
+形の例（架空）：軸「行く前」「向こうで」、ページ p1「町を出ようと決めたのは秋でした」→ {"page": "p1", "axes": ["行く前"]}
+"""
+
 # purpose_summary.py: once after ingest, for samples longer than 120 characters.
 PURPOSE_SUMMARY = """\
 あなたは、先輩の探究ポスターの「目的」を、高校生が最初の画面で読む見本にする係です。

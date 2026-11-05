@@ -304,6 +304,9 @@ def main(argv=None) -> int:
         print(library.relief_report())  # No picture: the flat map.
         print(school.report())  # No picture of the school: its line mark.
     print(library.subject_catalog.report())  # The harvest card's ③: counts only.
+    # One to one's tables (直し36): one that could not be read, by name and line.
+    for problem in library.ask_tables.get("unread", []):
+        print(f"one to one, a table not read: {problem}")
     print(f"open http://{HOST}:{server.server_address[1]}/  (Ctrl+C to stop)")
     try:
         server.serve_forever()

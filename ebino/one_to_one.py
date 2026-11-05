@@ -9,8 +9,11 @@ Which items a seat's words have:
   - a poster (探究をした先輩): its roles (ingest/poster_pdf.py ROLES);
   - pages only (県外・海外に出た人, 外から来た大人・先生 from a PDF): the
     axes a page answers, from the table the teacher keeps (ask_pages.tsv in
-    the data folder: 席・ページ・軸); with no such row, none.
+    the data folder: 席・ページ・軸), or where the teacher left a row empty,
+    from the model's table beside it (直し36, asker.py); with neither, none.
 """
+
+import re
 
 # 種類 in ask_questions.txt.
 GROUP_ARTICLE = "記事"
@@ -39,6 +42,16 @@ PAGES_FILE = "ask_pages.tsv"  # 席・ページ・軸: which axes a page answers
 RANKING_FILE = "ask_ranking.tsv"  # 席・質問: a seat's own question on its ranking (none: none shown).
 PAGES_COLUMNS = ("席", "ページ", "軸")
 RANKING_COLUMNS = ("席", "質問")
+# The model's tables (直し36): the same columns, next to the teacher's, written
+# by asker.py at ingest. Read after the teacher's: a row of the teacher's
+# with something in it is the teacher's; empty (or not there), the model's.
+PAGES_MODEL_FILE = "ask_pages_model.tsv"
+RANKING_MODEL_FILE = "ask_ranking_model.tsv"
+# In either table: nothing for this row. The teacher's 「-」 keeps it from
+# being shown even when the model's table has something; the model writes
+# it for a page with no axis and a seat it could make no question for, so
+# that seat is not asked again.
+NONE_MARK = "-"
 PAGE_SECTION = "p"  # A page's section: p1, p2, ... (ingest/slides_pdf.py).
 AXIS_SEPARATORS = ("・", "、", ",", " ", "　")
 
@@ -79,9 +92,17 @@ def axes_of(cell: str, allowed: tuple[str, ...]) -> list[str]:
     return [axis for axis in allowed if axis in named]
 
 
-def write_tables(folder, utterances, kinds: dict[str, str]) -> dict:
+def axes_for(kind: str) -> tuple[str, tuple[str, ...]]:
+    """The group of questions and its axes for a seat whose words are pages only."""
+    if kind == "outsider_teacher":
+        return GROUP_OUTSIDER, OUTSIDER_AXES
+    return GROUP_CROSS, CROSS_AXES
+
+
+def write_tables(folder, utterances, kinds: dict[str, str], gate=None) -> dict:
     """Writes the two tables to fill when they are not there (folder: the
     ingest's output); never over the teacher's. kinds: {seat ID: kind}.
+    gate: the model fills its own tables too (asker.py, 直し36); None, not.
     Returns the counts for the ingest's report (no seat, name or words)."""
     pages = pages_only(utterances)
     ranking = ranking_seats(utterances)
@@ -96,10 +117,14 @@ def write_tables(folder, utterances, kinds: dict[str, str]) -> dict:
         rows = ["\t".join(RANKING_COLUMNS)] + [f"{seat}\t" for seat in ranking]
         path.write_text("\n".join(rows) + "\n", encoding="utf-8")
         written.append(RANKING_FILE)
+    model = None
+    if gate is not None:
+        from . import asker
+        model = asker.fill_tables(gate, folder, utterances, kinds)
     tables = load_tables(folder)
     by_axis: dict[str, int] = {}
     for seat, found in tables["pages"].items():
-        allowed = OUTSIDER_AXES if kinds.get(seat) == "outsider_teacher" else CROSS_AXES
+        allowed = axes_for(kinds.get(seat, ""))[1]
         for axes in found.values():
             for axis in axes:
                 if axis in allowed:
@@ -107,25 +132,71 @@ def write_tables(folder, utterances, kinds: dict[str, str]) -> dict:
     asked = sum(1 for seat in ranking if tables["ranking"].get(seat))
     return {"pages_only_seats": len(pages), "pages": sum(len(found) for found in pages.values()),
             "pages_by_axis": by_axis, "ranking_seats": len(ranking), "ranking_questions": asked,
-            "ranking_without": {"not_written_by_the_teacher": len(ranking) - asked}, "written": written}
+            "ranking_without": {"not_written": len(ranking) - asked}, "written": written,
+            "unread": tables["unread"], "model": model}
+
+
+def read_rows(path, columns: tuple[str, ...]) -> tuple[list[dict] | None, str]:
+    """(rows, problem) of a table; rows None when it is not there or cannot
+    be read. problem: "" or the table's name and the line it could not read
+    there (直し36: it said nothing before); never a path or a cell."""
+    from .texts import read_table
+    if not path.exists():
+        return None, ""
+    try:
+        return read_table(path, columns, may_be_empty=(columns[-1],)), ""
+    except UnicodeDecodeError:
+        lines = path.read_bytes().split(b"\n")
+        bad = next((n for n, line in enumerate(lines, start=1) if not _utf8(line)), 1)
+        return None, f"{path.name} line {bad}"
+    except ValueError as error:  # read_table's: the name and a line number only.
+        found = re.search(r"line (\d+)", str(error))
+        return None, f"{path.name} line {found.group(1) if found else 1}"
+    except OSError:
+        return None, f"{path.name} line 1"
+
+
+def _utf8(line: bytes) -> bool:
+    try:
+        line.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
+
+
+def _cells(folder, teacher_file: str, model_file: str, columns: tuple[str, ...]) -> tuple[dict, list[str]]:
+    """{the row's key cells: its last cell} to show, the teacher's first, and
+    the tables that could not be read. A teacher's table that cannot be read
+    shows nothing, the model's neither: its 「-」 could not be kept."""
+    teacher, teacher_problem = read_rows(folder / teacher_file, columns)
+    model, model_problem = read_rows(folder / model_file, columns)
+    unread = [problem for problem in (teacher_problem, model_problem) if problem]
+    if teacher_problem:
+        return {}, unread
+    cells: dict[tuple, str] = {}
+    for row in model or []:
+        cells[tuple(row[c] for c in columns[:-1])] = row[columns[-1]].strip()
+    for row in teacher or []:
+        if row[columns[-1]].strip():
+            cells[tuple(row[c] for c in columns[:-1])] = row[columns[-1]].strip()
+    return {key: cell for key, cell in cells.items() if cell and cell != NONE_MARK}, unread
 
 
 def load_tables(folder) -> dict:
-    """{"pages": {seat: {page: [axes]}}, "ranking": {seat: question}} from
-    the teacher's tables in folder; a table missing or unreadable: empty."""
-    from .texts import read_table
-    out = {"pages": {}, "ranking": {}}
-    try:
-        for row in read_table(folder / PAGES_FILE, PAGES_COLUMNS, may_be_empty=("軸",)):
-            axes = axes_of(row["軸"], CROSS_AXES + OUTSIDER_AXES)
-            if axes and is_page(row["ページ"]):
-                out["pages"].setdefault(row["席"], {})[row["ページ"]] = axes
-    except (OSError, ValueError, UnicodeDecodeError):
-        pass
-    try:
-        for row in read_table(folder / RANKING_FILE, RANKING_COLUMNS, may_be_empty=("質問",)):
-            if row["質問"].strip():
-                out["ranking"][row["席"]] = row["質問"].strip()
-    except (OSError, ValueError, UnicodeDecodeError):
-        pass
+    """{"pages": {seat: {page: [axes]}}, "ranking": {seat: question},
+    "unread": [the tables not read, by name and line]} from the teacher's
+    tables in folder and the model's beside them (直し36): a row the teacher
+    filled is the teacher's, 「-」 shows nothing; an empty one is the
+    model's. A table not there is empty."""
+    out = {"pages": {}, "ranking": {}, "unread": []}
+    cells, unread = _cells(folder, PAGES_FILE, PAGES_MODEL_FILE, PAGES_COLUMNS)
+    out["unread"] += unread
+    for (seat, page), cell in cells.items():
+        axes = axes_of(cell, CROSS_AXES + OUTSIDER_AXES)
+        if axes and is_page(page):
+            out["pages"].setdefault(seat, {})[page] = axes
+    cells, unread = _cells(folder, RANKING_FILE, RANKING_MODEL_FILE, RANKING_COLUMNS)
+    out["unread"] += unread
+    for (seat,), cell in cells.items():
+        out["ranking"][seat] = cell
     return out

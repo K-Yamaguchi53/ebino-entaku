@@ -4,6 +4,9 @@
 
 Output is counts and reason codes only, so it is safe to paste into chat.
 File names never appear: they can contain a person's name.
+
+With ANTHROPIC_API_KEY set (.env), one to one's tables are filled by the
+model too (直し36, asker.py), through the gate; without it they are not.
 """
 
 import json
@@ -14,6 +17,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .. import one_to_one
+from ..config import load_env_file
+from ..gate import Gate, NameList, load_allowed
 from .article_docx import ingest_article
 from .masks import SeatMasks, load_masks
 from .pdf_chars import PdfTextStats, leftover_supplement_chars
@@ -96,6 +101,21 @@ class Report:
                 f"none by reason: {t['ranking_without']}",
                 f"one to one, tables written to fill (the teacher's kept): {t['written']}",
             ]
+            lines += [f"one to one, a table not read: {problem}" for problem in t["unread"]]
+            model = t.get("model")
+            if model is None:
+                lines.append("one to one, the model's tables: not asked (ANTHROPIC_API_KEY not set)")
+            else:
+                lines += [
+                    f"one to one, the model's pages: seats sorted now {model['page_seats_sorted']}, "
+                    f"already in its table {model['page_seats_already']}, "
+                    f"every row the teacher's {model['page_seats_by_the_teacher']}, "
+                    f"not sorted by reason {model['page_seats_not_sorted']}",
+                    f"one to one, the model's pages by axis (sorted now): {model['pages_by_axis']}, "
+                    f"pages with no axis: {model['pages_no_axis']}",
+                ]
+                lines += [f"one to one, the model's table not written (not read): {problem}"
+                          for problem in model["not_written"]]
         return lines
 
 
@@ -148,7 +168,8 @@ def _ingest_seat(
     raise IngestError("kind_and_file_type_mismatch")
 
 
-def run(data_dir: Path) -> Report:
+def run(data_dir: Path, client=None) -> Report:
+    """client: anthropic.Anthropic for the model's tables (直し36); None, not asked."""
     report = Report()
     seats = load_seats(data_dir / "seats.tsv")
     report.seats = len(seats)
@@ -188,18 +209,30 @@ def run(data_dir: Path) -> Report:
         json.dumps([u.to_dict() for u in utterances], ensure_ascii=False, indent=1),
         encoding="utf-8",
     )
-    # One to one's tables to fill, when not there; never over the teacher's (直し34-2).
-    report.ask_tables = one_to_one.write_tables(output, utterances, {seat.seat_id: seat.kind for seat in seats})
+    # One to one's tables to fill, when not there; never over the teacher's
+    # (直し34-2). The model's beside them (直し36), through the gate.
+    gate = None
+    if client is not None:
+        gate = Gate(client, NameList.build(seats, masks, load_allowed(data_dir)))
+    report.ask_tables = one_to_one.write_tables(output, utterances, {seat.seat_id: seat.kind for seat in seats}, gate)
     return report
 
 
 def main() -> int:
+    # The folder as before, from the environment only: .env is read after
+    # it (for the key), so it never picks the folder to ingest.
     data_dir = os.environ.get("EBINO_DATA_DIR")
     if not data_dir:
         print("EBINO_DATA_DIR is not set", file=sys.stderr)
         return 2
+    load_env_file()
+    client = None
+    if os.environ.get("ANTHROPIC_API_KEY"):  # Never printed.
+        import anthropic
+
+        client = anthropic.Anthropic()
     try:
-        report = run(Path(data_dir))
+        report = run(Path(data_dir), client)
     except ValueError as error:  # Table errors give line numbers, never values.
         print(error, file=sys.stderr)
         return 2

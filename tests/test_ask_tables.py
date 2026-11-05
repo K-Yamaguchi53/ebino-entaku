@@ -4,8 +4,8 @@ a table the teacher keeps, ask_pages.tsv (席・ページ・軸), next to the
 ingest's output, outside the repo; a seat's own question on its ranking in
 ask_ranking.tsv (席・質問). Ingest writes each with its rows to fill when it
 is not there, and never over one that is. Only an axis's name is taken from
-a 軸 cell, any other word dropped. No model writes either here (see the
-report: a model writing a question shown to a student is not built)."""
+a 軸 cell, any other word dropped. No model writes either of the teacher's
+tables: since 直し36 the model writes its own beside them (test_asker.py)."""
 
 from ebino import one_to_one
 from ebino.ingest.utterance import Utterance
@@ -46,17 +46,19 @@ def test_the_teachers_tables_are_never_written_over_and_only_axes_are_taken(tmp_
     assert tables["pages"] == {"C01": {"p1": ["行く前", "向こうで"]}, "O01": {"p1": ["来たわけ"]}}
     assert tables["ranking"] == {"A01": "一番の思い出は何ですか？"}  # A03's left empty: none shown.
     assert counts["pages_by_axis"] == {"行く前": 1, "向こうで": 1, "来たわけ": 1}
-    assert counts["ranking_questions"] == 1 and counts["ranking_without"] == {"not_written_by_the_teacher": 1}
+    assert counts["ranking_questions"] == 1 and counts["ranking_without"] == {"not_written": 1}
 
 
-def test_no_table_or_a_broken_one_is_empty(tmp_path):
-    assert one_to_one.load_tables(tmp_path) == {"pages": {}, "ranking": {}}
+def test_no_table_or_a_broken_one_is_empty_and_the_broken_one_is_said(tmp_path):
+    assert one_to_one.load_tables(tmp_path) == {"pages": {}, "ranking": {}, "unread": []}
     (tmp_path / "ask_pages.tsv").write_text("ほかの見出し\n", encoding="utf-8")
     assert one_to_one.load_tables(tmp_path)["pages"] == {}
+    assert one_to_one.load_tables(tmp_path)["unread"] == ["ask_pages.tsv line 1"]
 
 
 def test_ingest_writes_them_and_says_the_counts():
     from pathlib import Path
     run = (Path(one_to_one.__file__).parent / "ingest" / "run.py").read_text(encoding="utf-8")
     assert "report.ask_tables = one_to_one.write_tables(output, utterances," in run
+    assert "{seat.seat_id: seat.kind for seat in seats}, gate)" in run
     assert "one to one, ranking questions:" in run

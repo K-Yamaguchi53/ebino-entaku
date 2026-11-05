@@ -1,6 +1,7 @@
 import json
 
 from conftest import COMPANY, PERSON, make_seat, write_article, write_seats
+from ebino.ingest import run as run_module
 from ebino.ingest.run import main, run
 from ebino.ingest.scrub import normalize_for_match
 
@@ -197,6 +198,11 @@ def test_seat_ids_with_any_letter_and_files_in_subfolders(tmp_path):
     assert "R6_s02L" not in read_output(tmp_path)
 
 
-def test_main_needs_the_data_folder(monkeypatch):
+def test_main_needs_the_data_folder_and_never_takes_it_from_env_file(monkeypatch):
+    # 直し36: .env is read for the key only, after the folder was found in
+    # the environment; with none, it stops before .env is read at all.
+    read = []
+    monkeypatch.setattr(run_module, "load_env_file", lambda: read.append(True))
     monkeypatch.delenv("EBINO_DATA_DIR", raising=False)
     assert main() == 2
+    assert read == []
