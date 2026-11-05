@@ -274,6 +274,36 @@ class Hitokoto:
     def question_count(self) -> int:
         return sum(1 for a in self.asked if a.step != "forward")
 
+    def record(self) -> dict:
+        """As kept with the sitting: no name; the student's words passed the name check."""
+        light = self.light
+        return {
+            "people": [{"seat_id": p.seat_id, "utterance_id": p.utterance_id, "why": p.why} for p in self.people],
+            "split": bool(self.split),
+            "parts": {"asked": self.parts_asked, "lit": len(self.parts), "reason": self.parts_reason,
+                      "seconds": self.parts_seconds},
+            "chosen": ({"seat_id": self.people[self.chosen].seat_id, "part": self.chosen_part, "omakase": self.omakase}
+                       if self.chosen is not None else None),
+            "asked": [{"step": a.step, "text": a.text, "by": a.by, "fallback": a.fallback, "seconds": a.seconds}
+                      for a in self.asked],
+            "answers": list(self.answers),
+            "ladder": {"two": self.people[self.ladder_two].seat_id if self.ladder_two is not None else "",
+                       "three": self.people[self.ladder_three].seat_id if self.ladder_three is not None else "",
+                       "fill": self.fill_text},
+            "scale": self.scale,
+            "forward": self.forward,
+            "way": self.way,
+            "subject": self.subject,
+            "subject_note": self.subject_note,
+            "subject_pick": subjects.record(self.subject_pick),
+            "meet_seat": self.meet_seat,
+            "meet_use": self.meet_use,
+            "light": ({"quote": light.quote, "source": light.source, "force": light.force, "by": light.by,
+                       "reason": light.reason, "seconds": light.seconds} if light else None),
+            "now_question": self.now_question,
+            "stage": self.stage,
+        }
+
 
 # --- who is on the map ---
 

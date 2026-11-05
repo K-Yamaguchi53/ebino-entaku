@@ -534,8 +534,55 @@ def test_the_sheet_reads_in_order_from_the_record_and_the_students_words(tmp_pat
     assert sheet["next_step"] == "先輩にもう一回聞く"
 
 
+def test_the_sheet_and_the_record_hold_no_name(tmp_path, monkeypatch):
+    monkeypatch.setenv("EBINO_SHOW_COMPANY", "1")
+    session, _, _, _ = sitting(tmp_path=tmp_path)
+    to_scale(session)
+    session.hitokoto_scale(8)
+    session.hitokoto_forward("先輩にもう一回聞く")
+    session.hitokoto_way("農業")
+    session.hitokoto_subject("no")
+    session.hitokoto_meet("S01")
+    session.hitokoto_use("none")
+    shown = json.dumps([session.hitokoto_light(), session.hitokoto_sheet("")], ensure_ascii=False)
+    kept = (tmp_path / "sessions" / f"{session.session_id}.json").read_text(encoding="utf-8")
+    for name in (COMPANY, DISPLAY_NAME, "山川", "谷口", "森川", "架空農園"):
+        assert name not in shown and name not in json.dumps(json.loads(kept)["hitokoto"], ensure_ascii=False)
+
+
+def test_the_record_keeps_the_questions_and_why_a_fixed_one_was_used(tmp_path):
+    session, _, _, _ = sitting(Model(reaction="あなたは決めて取る人？"), tmp_path=tmp_path)
+    to_scale(session)
+    to_end(session)
+    session.hitokoto_light()
+    record = json.loads((tmp_path / "sessions" / f"{session.session_id}.json").read_text(encoding="utf-8"))
+    kept = record["hitokoto"]
+    assert kept["asked"][0]["by"] == "fixed" and kept["asked"][0]["fallback"] == "you_are"
+    assert "あなたは決めて取る人" not in json.dumps(record, ensure_ascii=False)  # Failed words are not kept.
+    assert kept["asked"][1]["text"] == SELF_Q and kept["asked"][1]["by"] == "listener"
+    assert kept["scale"] == 8 and kept["way"] == "農業"
+    assert kept["light"]["quote"] == "空いたら取る" and kept["light"]["force"] == 2 and kept["light"]["by"] == "model"
+    assert record["reflection"] is None
+
+
 # --- 段7: the switch, the roles, texts ---
 
+def test_the_old_reflection_comes_back_with_ebino_reflect_old(monkeypatch):
+    session, _, _, _ = sitting()
+    assert app_module.App(library(), session.gate).setup()["reflect"] == "hitokoto"
+    monkeypatch.setenv("EBINO_REFLECT", "old")
+    assert app_module.App(library(), session.gate).setup()["reflect"] == "old"
+    with pytest.raises(Refused):
+        session.hitokoto_parts()
+    other = Session(library(), session.gate, rng=random.Random(1))
+    with pytest.raises(Refused):
+        other.hitokoto_begin([])
+
+
+def test_the_new_api_has_a_path_for_each_step():
+    for step in ("begin", "parts", "choose", "answer", "ladder", "fill", "scale", "forward", "way", "subject",
+                 "subject_note", "subject_choose", "subject_more", "meet", "use", "light", "sheet"):
+        assert f'"{step}":' in (app_module.Path(app_module.__file__)).read_text(encoding="utf-8")
 
 
 def test_the_listener_and_the_light_use_their_own_models_and_low_effort():

@@ -30,7 +30,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from . import hitokoto, inside, relief
-from .config import PlaceError, data_dir, load_env_file, records_dir
+from .config import PlaceError, data_dir, load_env_file, records_dir, reflect_old
 from .gate import Gate, load_names
 from .records import Records
 from .school_picture import SchoolPicture, folder_from_env
@@ -106,9 +106,9 @@ class App:
             "map": view,
             # Whose words are in the app, as counts from the seat table (直し31-5).
             "inside": inside.view(self.library.seats),
-            # 帰る前に、ひとこと (直し38): its words; the screen keeps the
-            # reflection sheet until the new one is turned on.
-            "reflect": "old",
+            # Which reflection (直し38): 帰る前に、ひとこと, or the sheet as
+            # before when EBINO_REFLECT=old; and the new one's words.
+            "reflect": "old" if reflect_old() else "hitokoto",
             "hitokoto": hitokoto.screen_words(),
         }
 

@@ -82,6 +82,16 @@ def asker_on(environ=os.environ) -> bool:
     return environ.get(ASKER_ENV, "").strip() != "0"
 
 
+REFLECT_ENV = "EBINO_REFLECT"
+
+
+def reflect_old(environ=os.environ) -> bool:
+    """帰る前に、ひとこと (直し38) unless EBINO_REFLECT=old: then the
+    reflection sheet as before, with the harvest card's ①. Read when the app
+    starts, so a restart switches it."""
+    return environ.get(REFLECT_ENV, "").strip() == "old"
+
+
 def load_env_file(path: Path = ENV_FILE, environ=os.environ) -> None:
     """Read KEY=value lines from .env. A variable already set wins.
 

@@ -249,6 +249,10 @@ class Session:
             # person, and why the teacher's was kept; never the words (直し36-3).
             record["one_rephrased"] = [dict(result.record(), seat_id=seat_id)
                                        for seat_id, found in self.one_rephrased.items() for result in found.values()]
+            # 帰る前に、ひとこと (直し38): the questions put and why a fixed one
+            # was, the student's words (they passed the name check), the
+            # ladder, the scale, what was kept and the light; no name.
+            record["hitokoto"] = self.talk.record() if self.talk is not None else None
             self.records.save_session(record)
 
     # --- what the student does ---
@@ -863,6 +867,8 @@ class Session:
     # --- 帰る前に、ひとこと (直し38, hitokoto.py) ---
 
     def _talk(self, *stages: str) -> hitokoto.Hitokoto:
+        if config.reflect_old():
+            raise Refused("reflect_old")
         talk = self.talk
         if talk is None:
             raise Refused("hitokoto_not_started")
@@ -880,6 +886,8 @@ class Session:
     def hitokoto_begin(self, opened) -> dict:
         """Today's map: the people on it, the split between two of them, the
         counts. opened: the bubbles the student opened, in that order."""
+        if config.reflect_old():
+            raise Refused("reflect_old")
         if not any(r.status in (roundtable.ANSWERED, roundtable.SILENT) for r in self.rounds):
             raise Refused("no_round_yet")
         if self.talk is not None:
