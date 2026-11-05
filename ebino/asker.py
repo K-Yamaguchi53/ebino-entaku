@@ -11,10 +11,22 @@ At ingest, once for each seat whose words are pages only (県外・海外に出�
 group each page answers, 0 or more. Only the axes' names are taken from the
 answer; any other word is dropped, and no sentence is taken at all.
 
+At ingest, once for each seat with a ranking (an article's ランキング: what
+it ranks differs from person to person), one request: the model reads the
+ranking's paragraph and makes one question on it for that person. Code
+checks it before it is kept (check_ranking); one check failed, no question
+for that seat:
+  - every run of kanji or katakana and every number in it is in the
+    ranking's paragraph (the speaker's word_not_in_original, 直し31続き-1);
+  - no banned word at all: a ranking has no teacher's question under it, so
+    one in the paragraph stops it too; no name (the gate's list);
+  - at most MAX_CHARS characters, one line, ending in 「？」.
+
 What the model gives is written to tables of its own next to the teacher's
-(one_to_one.py: ask_pages_model.tsv, the same columns), never into the
-teacher's, and one_to_one.load_tables reads the teacher's first. A seat
-written there once, with 「-」 for a page with no axis, is not asked again;
+(one_to_one.py: ask_pages_model.tsv and ask_ranking_model.tsv, the same
+columns), never into the teacher's, and one_to_one.load_tables reads the
+teacher's first. A seat written there once, with 「-」 for a page with no
+axis or a ranking with no question that passed, is not asked again;
 to have it made anew, the table is deleted and the ingest run again. A seat
 whose rows the teacher filled every one of is not asked. A request that
 fails or does not come back within INGEST_TIMEOUT_SECONDS leaves the seat
@@ -25,8 +37,11 @@ import json
 from collections import Counter
 
 from . import one_to_one
+from .banned_words import banned_in
 from .gate import Gate, GateError, ModelUnavailable, json_answer, json_request
-from .prompts import ASK_PAGES
+from .prompts import ASK_PAGES, ASK_RANKING
+from .speaker import (_DIGITS, _KANJI_NUMBER, STOP_EMPTY, STOP_LONG, STOP_NAME, STOP_NUMBER, STOP_WORD,
+                      _plain, _words)
 from .texts import ask_questions
 
 ROLE = "asker"
@@ -34,6 +49,16 @@ ROLE = "asker"
 INGEST_TIMEOUT_SECONDS = 30.0
 # A page's words sent: about this many characters at most.
 PAGE_CHARS = 800
+# A ranking's paragraph sent: at most this many characters.
+RANKING_CHARS = 600
+# A question on a button: at most this many characters, ending in this.
+MAX_CHARS = 40
+QUESTION_END = "？"
+# Why a question is not used (with speaker.py's STOP_EMPTY, STOP_NAME,
+# STOP_WORD, STOP_NUMBER, STOP_LONG).
+STOP_BANNED = "banned_word"
+STOP_END = "no_question_mark"
+STOP_LINES = "not_one_line"
 
 
 def _pages_schema(axes: list[str]) -> dict:
@@ -93,6 +118,71 @@ def sort_pages(gate: Gate, texts: dict[str, str], axes: list[tuple[str, str]]) -
     return out
 
 
+def _not_in(question: str, *sources: str) -> str:
+    """"" or why not: a number or a run of kanji or katakana of the
+    question in none of the sources (as the speaker checks, 直し31続き-1)."""
+    plains = [_plain(source) for source in sources]
+    for word in _words(question):
+        if not any(word in source for source in plains):
+            return STOP_NUMBER if _DIGITS.fullmatch(word) or _KANJI_NUMBER.fullmatch(word) else STOP_WORD
+    return ""
+
+
+def _form(question: str) -> str:
+    """"" or why not: its length and its end."""
+    if "\n" in question or "\t" in question or "\r" in question:
+        return STOP_LINES
+    if len(question) > MAX_CHARS:
+        return STOP_LONG
+    if not question.endswith(QUESTION_END):
+        return STOP_END
+    return ""
+
+
+def check_ranking(question: str, paragraph: str, gate: Gate) -> str:
+    """"" when the question on a ranking may be kept; else why not."""
+    question = question.strip()
+    if not question:
+        return STOP_EMPTY
+    if gate.names.hits(question):
+        return STOP_NAME
+    if banned_in(question):  # Any: there is no teacher's question to compare with.
+        return STOP_BANNED
+    return _not_in(question, paragraph) or _form(question)
+
+
+def ranking_paragraph(utterances, seat_id: str) -> str:
+    """The seat's ranking as recorded: its paragraphs, each once, joined."""
+    found: list[str] = []
+    for utterance in utterances:
+        if utterance.seat_id == seat_id and utterance.section == "ランキング":
+            paragraph = utterance.paragraph or utterance.text
+            if paragraph not in found:
+                found.append(paragraph)
+    return "\n".join(found)[:RANKING_CHARS]
+
+
+RANKING_SCHEMA = {
+    "type": "object",
+    "properties": {"question": {"type": "string"}},
+    "required": ["question"],
+    "additionalProperties": False,
+}
+
+
+def ranking_question(gate: Gate, paragraph: str) -> tuple[str, str]:
+    """(the question, "") or ("", why not). Raises GateError or
+    ModelUnavailable when no answer came (a reason code only)."""
+    request = json_request(ROLE, ASK_RANKING, json.dumps({"ranking": paragraph}, ensure_ascii=False),
+                           RANKING_SCHEMA, max_tokens=500)
+    answer = json_answer(gate.send(ROLE, request, timeout=INGEST_TIMEOUT_SECONDS))
+    question = answer.get("question") if isinstance(answer, dict) else None
+    if not isinstance(question, str):
+        raise ModelUnavailable("bad_output")
+    reason = check_ranking(question, paragraph, gate)
+    return ("", reason) if reason else (question.strip(), "")
+
+
 def _append(path, columns: tuple[str, ...], rows: list[str]) -> None:
     """Rows added to the model's table, its header first when it is new."""
     new = not path.exists()
@@ -108,7 +198,8 @@ def fill_tables(gate: Gate, folder, utterances, kinds: dict[str, str]) -> dict:
     counts for the ingest's report: no seat, name or words."""
     counts = {"page_seats_sorted": 0, "page_seats_already": 0, "page_seats_by_the_teacher": 0,
               "pages_by_axis": Counter(), "pages_no_axis": 0, "page_seats_not_sorted": Counter(),
-              "not_written": []}
+              "ranking_made": 0, "ranking_not_made": Counter(), "ranking_already": 0,
+              "ranking_by_the_teacher": 0, "ranking_not_asked": Counter(), "not_written": []}
     asked = ask_questions()
     teacher, _ = one_to_one.read_rows(folder / one_to_one.PAGES_FILE, one_to_one.PAGES_COLUMNS)
     filled = {(row["席"], row["ページ"]) for row in teacher or [] if row["軸"].strip()}
@@ -138,6 +229,38 @@ def fill_tables(gate: Gate, folder, utterances, kinds: dict[str, str]) -> dict:
                 counts["pages_no_axis"] += not found[page]
             _append(path, one_to_one.PAGES_COLUMNS, rows)  # Seat by seat: what is done stays done.
             counts["page_seats_sorted"] += 1
-    counts["pages_by_axis"] = dict(counts["pages_by_axis"])
-    counts["page_seats_not_sorted"] = dict(counts["page_seats_not_sorted"])
+    _fill_ranking(gate, folder, utterances, counts)
+    for key in ("pages_by_axis", "page_seats_not_sorted", "ranking_not_made", "ranking_not_asked"):
+        counts[key] = dict(counts[key])
     return counts
+
+
+def _fill_ranking(gate: Gate, folder, utterances, counts: dict) -> None:
+    """A question on each seat's ranking, in the model's table: the question,
+    or 「-」 when it failed a check (no question for that seat). A request
+    that failed or came back late leaves the seat to ask again."""
+    teacher, _ = one_to_one.read_rows(folder / one_to_one.RANKING_FILE, one_to_one.RANKING_COLUMNS)
+    filled = {row["席"] for row in teacher or [] if row["質問"].strip()}
+    path = folder / one_to_one.RANKING_MODEL_FILE
+    model, problem = one_to_one.read_rows(path, one_to_one.RANKING_COLUMNS)
+    if problem:
+        counts["not_written"].append(problem)
+        return
+    done = {row["席"] for row in model or []}
+    for seat in one_to_one.ranking_seats(utterances):
+        if seat in done:
+            counts["ranking_already"] += 1
+            continue
+        if seat in filled:
+            counts["ranking_by_the_teacher"] += 1
+            continue
+        try:
+            question, reason = ranking_question(gate, ranking_paragraph(utterances, seat))
+        except (GateError, ModelUnavailable) as error:
+            counts["ranking_not_asked"][str(error)] += 1
+            continue
+        if reason:
+            counts["ranking_not_made"][reason] += 1
+        else:
+            counts["ranking_made"] += 1
+        _append(path, one_to_one.RANKING_COLUMNS, [f"{seat}\t{question or one_to_one.NONE_MARK}"])

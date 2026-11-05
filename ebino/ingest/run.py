@@ -114,6 +114,12 @@ class Report:
                     f"one to one, the model's pages by axis (sorted now): {model['pages_by_axis']}, "
                     f"pages with no axis: {model['pages_no_axis']}",
                 ]
+                lines.append(
+                    f"one to one, the model's ranking questions: made now {model['ranking_made']}, "
+                    f"not made by reason {model['ranking_not_made']}, "
+                    f"already in its table {model['ranking_already']}, "
+                    f"the teacher's {model['ranking_by_the_teacher']}, "
+                    f"not asked by reason {model['ranking_not_asked']}")
                 lines += [f"one to one, the model's table not written (not read): {problem}"
                           for problem in model["not_written"]]
         return lines

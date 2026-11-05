@@ -4,7 +4,10 @@ invented.
 
 段1: at ingest, which axes each page of a seat with pages only answers.
 Only the axes' names come back; the answer goes to the model's own table
-(ask_pages_model.tsv) beside the teacher's, which is read first."""
+(ask_pages_model.tsv) beside the teacher's, which is read first.
+段2: at ingest, a seat's own question on its ranking, made by the model and
+checked by code: only the ranking paragraph's words and numbers, no banned
+word, no name, 40 characters at most, ending in 「？」."""
 
 import pytest
 from conftest import make_seat
@@ -182,3 +185,81 @@ def test_a_table_not_read_is_said_at_ingest_and_at_the_servers_start(tmp_path):
     assert counts["unread"] == ["ask_pages_model.tsv line 2"]
     assert counts["model"]["not_written"] == ["ask_pages_model.tsv line 2"] and client.requests == []
     assert table(tmp_path / "ask_pages_model.tsv") == ["席\tページ\t軸", "C01"]  # Never written over.
+
+
+# --- 段2: a seat's own question on its ranking ---
+
+RANKING = "（架空）好きな景色ベスト3　1位 朝の霧　2位 秋の紅葉　3位 冬の星空"
+RANKED = [Utterance(id="A01-r", seat_id="A01", kind="adult", section="ランキング", voice="article",
+                    text=RANKING, paragraph=RANKING),
+          Utterance(id="A02-r", seat_id="A02", kind="adult", section="ランキング", voice="article",
+                    text="おすすめのパン　1位 あんぱん", paragraph="おすすめのパン　1位 あんぱん")]
+
+
+def asks(question):
+    return text_response({"question": question})
+
+
+def ranking_check(question, paragraph=RANKING):
+    gate, _ = a_gate([])
+    return asker.check_ranking(question, paragraph, gate)
+
+
+def test_a_ranking_question_made_from_the_paragraph_passes():
+    assert ranking_check("好きな景色の1位が朝の霧なのは、どうしてですか？") == ""
+
+
+def test_a_ranking_question_with_a_kanji_or_katakana_word_not_in_the_ranking_paragraph_is_not_used():
+    assert ranking_check("好きな風景の1位が朝の霧なのは、どうしてですか？") == "word_not_in_original"
+    assert ranking_check("朝の霧のポイントは、どこですか？") == "word_not_in_original"
+
+
+def test_a_ranking_question_with_a_number_not_in_the_ranking_paragraph_is_not_used():
+    assert ranking_check("好きな景色の4位は、何ですか？") == "number_not_in_original"
+
+
+def test_a_ranking_question_with_a_banned_word_is_not_used_even_when_the_paragraph_has_it():
+    assert ranking_check("おすすめのパンの1位は、どうしてあんぱんですか？", "おすすめのパン　1位 あんぱん") == "banned_word"
+
+
+def test_a_ranking_question_with_a_name_is_not_used():
+    assert ranking_check("山川さんの好きな景色の1位は、朝の霧ですか？", "山川さんの" + RANKING) == "name"
+
+
+def test_a_ranking_question_over_40_characters_or_not_ending_in_a_question_mark_is_not_used():
+    long = "好きな景色の1位が朝の霧で、2位が秋の紅葉で、3位が冬の星空なのは、どうしてなんですか？"
+    assert len(long) > 40 and ranking_check(long) == "too_long"
+    assert ranking_check("好きな景色の1位が朝の霧なのは、どうしてですか") == "no_question_mark"
+    assert ranking_check("好きな景色の1位は？\n朝の霧ですか？") == "not_one_line"
+
+
+def test_one_request_a_ranking_and_a_seat_that_failed_is_written_with_a_dash_and_not_asked_again(tmp_path):
+    gate, client = a_gate([asks("好きな景色の1位が朝の霧なのは、どうしてですか？"),
+                           asks("おすすめの1位は、あんぱんですか？")])
+    counts = one_to_one.write_tables(tmp_path, RANKED, {"A01": "adult", "A02": "adult"}, gate)
+    assert len(client.requests) == 2 and client.options == [{"timeout": 30.0, "max_retries": 0}] * 2
+    assert table(tmp_path / "ask_ranking_model.tsv") == [
+        "席\t質問", "A01\t好きな景色の1位が朝の霧なのは、どうしてですか？", "A02\t-"]
+    assert counts["model"]["ranking_made"] == 1 and counts["model"]["ranking_not_made"] == {"banned_word": 1}
+    assert one_to_one.load_tables(tmp_path)["ranking"] == {"A01": "好きな景色の1位が朝の霧なのは、どうしてですか？"}
+    assert "朝の霧" not in str(counts)  # Counts only.
+    gate, client = a_gate([])
+    counts = one_to_one.write_tables(tmp_path, RANKED, {"A01": "adult", "A02": "adult"}, gate)
+    assert client.requests == [] and counts["model"]["ranking_already"] == 2
+
+
+def test_a_ranking_the_teacher_wrote_is_not_asked_and_a_late_answer_is_asked_again(tmp_path):
+    write(tmp_path / "ask_ranking.tsv", "席\t質問\nA01\t先生の質問ですか？\nA02\t\n")
+    gate, client = a_gate([TimeoutError("late")])
+    counts = one_to_one.write_tables(tmp_path, RANKED, {"A01": "adult", "A02": "adult"}, gate)
+    assert len(client.requests) == 1 and RANKING not in client.all_sent()
+    assert counts["model"]["ranking_by_the_teacher"] == 1
+    assert counts["model"]["ranking_not_asked"] == {"api_error:TimeoutError": 1}
+    assert not (tmp_path / "ask_ranking_model.tsv").exists()
+
+
+def test_the_ingest_report_says_the_ranking_counts():
+    from pathlib import Path
+    run = (Path(one_to_one.__file__).parent / "ingest" / "run.py").read_text(encoding="utf-8")
+    assert "one to one, the model's ranking questions: made now {model['ranking_made']}" in run
+    assert "not made by reason {model['ranking_not_made']}" in run
