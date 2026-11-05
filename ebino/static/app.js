@@ -46,14 +46,90 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-async function call(path, body) {
+// wait (直し42): the kind of wait this is, when the model is waited for
+// (texts/wait_sign.tsv); then the sign in the middle of the map, should it
+// take longer than WAIT_SHOW_MS. None: no sign (a quick request).
+async function call(path, body, { wait } = {}) {
   const options = body === undefined ? {} : {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   };
-  const response = await fetch(path, options);
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || String(response.status));
-  return data;
+  const waiting = wait ? waitBegin(wait) : null;
+  try {
+    const response = await fetch(path, options);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || String(response.status));
+    return data;
+  } finally {
+    if (waiting) waitEnd(waiting);
+  }
+}
+
+// --- the sign in the middle of the map (直し42) ---
+
+// While the model is waited for, in the middle of the map's frame: a big
+// short word and one small line of what is being done, from
+// texts/wait_sign.tsv. Shown only when a wait passes WAIT_SHOW_MS; gone when
+// it comes back or fails. After WAIT_SLOW_MS the small line says it is
+// taking longer. No timer of its own ends a wait. Only where the map is
+// out; the line at the top reads out what is going on, the sign does not.
+// The seats flying to the round table (map.js) show 「集合中」.
+const WAIT_SHOW_MS = 400, WAIT_SLOW_MS = 15000;
+// Waits the student did not start and does not wait on (the AI's questions
+// after a round): shown only when nothing is on the map's middle.
+const WAIT_ASIDE = new Set(["coach"]);
+const waits = { list: [], gather: false };
+
+function waitBegin(kind) {
+  const entry = { kind, shown: false, slow: false };
+  entry.timers = [setTimeout(() => { entry.shown = true; drawWait(); }, WAIT_SHOW_MS),
+    setTimeout(() => { entry.slow = true; drawWait(); }, WAIT_SLOW_MS)];
+  waits.list.push(entry);
+  return entry;
+}
+
+function waitEnd(entry) {
+  for (const timer of entry.timers) clearTimeout(timer);
+  waits.list = waits.list.filter((other) => other !== entry);
+  drawWait();
+}
+
+// The seats are flying to the round table (map.js, motion on): 「集合中」.
+function gathering(on) {
+  waits.gather = on;
+  drawWait();
+}
+
+// Something the student reads is on the map's middle: the round's seats
+// lighting, the table and its cards, a bubble, one to one.
+function mapBusy() {
+  return state.now.reading || Boolean(document.querySelector(
+    "#map-overlay .table-label, #map-overlay .map-bubble, #map-frame.one-on"));
+}
+
+// The wait on the sign now: the seats gathering first, then the newest wait
+// shown, a wait aside only when nothing is on the map's middle.
+function waitNow() {
+  if (waits.gather) return { kind: "gather", slow: false };
+  const shown = waits.list.filter((entry) => entry.shown);
+  const mine = shown.filter((entry) => !WAIT_ASIDE.has(entry.kind));
+  if (mine.length) return mine[mine.length - 1];
+  return shown.length && !mapBusy() ? shown[shown.length - 1] : null;
+}
+
+function drawWait() {
+  const sign = $("wait-sign"), words = state.texts.wait_sign;
+  if (!sign || !words) return;
+  const now = oneScreen() ? waitNow() : null;
+  sign.hidden = !now;
+  if (now) {
+    const row = words[now.kind] || words.ask;
+    $("wait-word").textContent = row.word;
+    $("wait-line").textContent = now.slow ? words.slow.line : row.line;
+    sign.dataset.kind = now.kind;
+  }
+  // Busy for screen readers while the sign is out (the line at the top says what).
+  if (now) $("map").setAttribute("aria-busy", "true");
+  else $("map").removeAttribute("aria-busy");
 }
 
 function sourceLine(source) {
@@ -133,7 +209,7 @@ async function setup() {
   // mark, a seat's question card and the quote's card (直し26-2).
   const lent = { state, cardEntry, cardDone, setNow, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
     readBelow, shownQuotes, phrased, askSeat, answerTo, firstHelp, openParagraph, backToEveryone, oneOpen, oneAsk,
-    cardFromOne, oneThanks, bubbleOpened, foldAiSeat, pressSplit, splitLabel };
+    cardFromOne, oneThanks, bubbleOpened, gathering, foldAiSeat, pressSplit, splitLabel };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
 
@@ -155,7 +231,7 @@ async function start(lab, chosen) {
   // to the box once it is ready.
   if (opening) opening.then(() => { if (!ready) preparing(true); });
   try {
-    [data] = await Promise.all([call("/api/start", { lab }),
+    [data] = await Promise.all([call("/api/start", { lab }, { wait: "start" }),
       opening || new Promise((done) => setTimeout(done, still ? 0 : 320))]);
     ready = true;
   } catch (error) {
@@ -625,6 +701,7 @@ function setNow(changes = {}) {
   }
   if ($("now-line").textContent !== line.text) $("now-line").textContent = line.text;
   keepUnderNow();
+  drawWait();  // The sign in the middle may step back or come out now (直し42).
 }
 
 // Whatever the page scrolls to stops under the band, not behind it.
@@ -958,7 +1035,8 @@ async function sendAnswer(roundNo, role) {
   hideMessage();
   setNow({ asking: true });
   try {
-    const round = await call("/api/coach_answer", { round: roundNo, role, answer, after_notice: state.needsShown });
+    const round = await call("/api/coach_answer", { round: roundNo, role, answer, after_notice: state.needsShown },
+      { wait: "ask" });
     setNow({ asking: false });
     if (round.status === "unavailable") state.aiUnavailable = true;
     if (round.status === "ask_again" || round.status === "unavailable") {
@@ -996,7 +1074,7 @@ async function ask() {
   hideMessage();
   setNow({ asking: true });
   try {
-    const round = await call("/api/ask", { question });
+    const round = await call("/api/ask", { question }, { wait: "ask" });
     setNow({ asking: false });
     // The counts and examples shut once a question is sent; they open again.
     $("inside-fold").open = false;
@@ -1103,7 +1181,7 @@ function renderRound(round) {
 async function loadBand(roundNo, box) {
   let band;
   try {
-    band = await call("/api/coach", { round: roundNo });
+    band = await call("/api/coach", { round: roundNo }, { wait: "coach" });
   } catch (error) {
     return;  // An extra at the round's end.
   }
@@ -1229,7 +1307,7 @@ async function loadAskCard(roundNo, box) {
   button.onclick = async () => {
     button.disabled = true;
     try {
-      renderAsked(roundNo, box, await call("/api/ask_seat", { round: roundNo }));
+      renderAsked(roundNo, box, await call("/api/ask_seat", { round: roundNo }, { wait: "ask_seat" }));
     } catch (error) {
       button.disabled = false;
     }
@@ -1685,7 +1763,7 @@ async function reflectFirst(event) {
   message.hidden = false;
   let result;
   try {
-    result = await call("/api/reflect/begin", { changed, now_question: nowQuestion });
+    result = await call("/api/reflect/begin", { changed, now_question: nowQuestion }, { wait: "reflect" });
   } catch (error) {
     message.textContent = sendFailed(error);
     button.disabled = false;
@@ -1789,7 +1867,7 @@ async function pickUse(use) {
 // No ③ (or a failure): nothing is added.
 async function loadSubject() {
   try {
-    showSubject((await call("/api/subject", {})).subject);
+    showSubject((await call("/api/subject", {}, { wait: "subject" })).subject);
   } catch (error) {
     // ③ is left out; ① and ② stay as they are.
   }

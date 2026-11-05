@@ -2185,6 +2185,7 @@ const EbinoMap = (() => {
     timers = [];
     for (const flight of flights) flight.cancel();
     flights = [];
+    if (app && app.gathering) app.gathering(false);  // No 「集合中」 left over (直し42).
     sticky = null;
     roundSeats = [];
     splitsDrawn = null;
@@ -2575,6 +2576,9 @@ const EbinoMap = (() => {
     if (motion) {
       await risen.done;
       if (!still()) return;
+      // The school is up: until the seats have landed, 「集合中」 in the
+      // middle (直し42; not while they light at home, nor with motion off).
+      if (app.gathering) app.gathering(true);
     }
     // The split: a dashed line down the table's middle, between the sides.
     if (split) {
@@ -2621,7 +2625,7 @@ const EbinoMap = (() => {
       landed.push(flight.finished.then(() => token, () => token));
     });
     rescale();
-    const done = await Promise.all(landed);
+    const done = await Promise.all(landed).finally(() => { if (motion && app.gathering) app.gathering(false); });
     if (!still()) return;
     for (const flight of flights) flight.cancel();  // The transform attribute holds the spot now.
     flights = [];

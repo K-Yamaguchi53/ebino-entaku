@@ -159,6 +159,13 @@ NOW_LINE = "now_line"
 NOW_STEP_IDS = ("write", "read", "ask", "reflect")
 NOW_LINE_IDS = ("start", "preparing", "write", "asking", "reading", "table", "pressed", "card", "one", "after", "split",
                 "reflect")
+# The sign in the middle of the map while the model is waited for (直し42):
+# a short big word and one small line for each kind of wait the screen
+# names; gather, the seats flying to the round table; slow, the small line
+# after a long wait (its big word stays the wait's own, so it is empty).
+WAIT_SIGN = "wait_sign"
+WAIT_SIGN_IDS = ("start", "ask", "coach", "ask_seat", "reflect", "subject", "listen", "light", "gather", "slow")
+WAIT_SIGN_NO_WORD = ("slow",)
 START_PURPOSE = "start_purpose"
 INSIDE_HEADING = "inside_heading"
 INSIDE_COUNTS = "inside_counts"
@@ -273,7 +280,19 @@ def screen_texts() -> dict:
     texts[SEAT_ICONS] = seat_icons()
     texts[NOW_STEPS] = now_steps()
     texts[NOW_LINE] = now_lines()
+    texts[WAIT_SIGN] = wait_signs()
     return texts
+
+
+def wait_signs() -> dict[str, dict[str, str]]:
+    """{kind: {"word": the big word, "line": the small line}} (直し42).
+    A row missing or one too many, or a big word missing where one is
+    needed: ValueError."""
+    rows = {row["ID"]: row for row in load_table(WAIT_SIGN, ("ID", "大きな言葉", "小さな1行"),
+                                                 may_be_empty=("大きな言葉",))}
+    if set(rows) != set(WAIT_SIGN_IDS) or any(not rows[k]["大きな言葉"] for k in rows if k not in WAIT_SIGN_NO_WORD):
+        raise ValueError(f"{WAIT_SIGN}.tsv must have the rows {', '.join(WAIT_SIGN_IDS)}, each with its big word")
+    return {key: {"word": rows[key]["大きな言葉"], "line": rows[key]["小さな1行"]} for key in WAIT_SIGN_IDS}
 
 
 def now_steps() -> list[dict[str, str]]:

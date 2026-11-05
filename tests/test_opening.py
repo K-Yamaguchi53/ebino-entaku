@@ -37,7 +37,8 @@ def test_the_skip_button_is_the_teachers_word():
 def test_it_plays_while_start_is_waited_for_and_never_shows_the_box_before_it():
     start = _top("start")
     assert "const opening = still ? null : playOpening();" in start
-    assert 'Promise.all([call("/api/start", { lab }),\n      opening ||' in start
+    # 直し42: the wait named, for the sign in the middle of the map.
+    assert 'Promise.all([call("/api/start", { lab }, { wait: "start" }),\n      opening ||' in start
     # A failure: the opening away and the Lab buttons back, as before.
     failed = start[start.index("} catch (error) {"):start.index("throw error;")]
     assert failed.index("if (opening) endOpening(true);") < failed.index("button.disabled = false;")

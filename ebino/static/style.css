@@ -1001,7 +1001,7 @@ body.one-open #map-heading { visibility: hidden; }
 .quote, .map-bubble, .table-bubble, .table-label, .map-choices, .map-tip, .split-tag,
 .harvest, .sheet, .first-question, .lab-question, .promises, .notice-list,
 .round, .ai-band, .ai-card, .closing, .ask-seat, .split, .map-hint, .heavy-talk, .seats, #reflect,
-.ai-seat, .drawer-body, .ask textarea, .input-to, .one-bubble, .one-asks {
+.ai-seat, .drawer-body, .ask textarea, .input-to, .one-bubble, .one-asks, .wait-sign {
   word-break: auto-phrase;
   overflow-wrap: break-word;
 }
@@ -1310,6 +1310,21 @@ body.one-open #ai-seat { visibility: hidden; }
   .one-wait span:nth-child(3) { animation-delay: .4s; }
 }
 @keyframes one-wait { 40% { opacity: 1; } }
+/* 直し42: while the model is waited for, in the middle of the map's frame:
+   a night board, the big short word in Mincho and under it one small line
+   in Gothic of what is being done, then three dots. Under the bubbles (the
+   overlay comes after it), never pressed, the map seen round it; not over
+   the opening. Its place and size are set here alone. */
+.wait-sign { position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: grid; justify-items: center; gap: 6px;
+  width: max-content; max-width: min(268px, calc(100% - 32px)); padding: 16px 22px 12px; border-radius: var(--r-l);
+  background: var(--night-2); border: 1px solid var(--lamp-soft); box-shadow: 0 10px 30px var(--shadow);
+  text-align: center; pointer-events: none; }
+.wait-word { margin: 0; font-family: var(--mincho); font-weight: 700; font-size: clamp(30px, 2.6vw, 42px); line-height: 1.2;
+  letter-spacing: .12em; color: var(--lamp-bright); }
+.wait-line { margin: 0; font-family: var(--gothic); font-size: 15px; line-height: 1.6; color: var(--ink); }
+.wait-dots { display: flex; gap: 7px; margin-top: 4px; }
+.wait-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--lamp); opacity: .45; }
+.map-frame:has(.opening:not([hidden])) .wait-sign { display: none; }
 .one-bubble.not-found .voice { color: var(--paper-soft); }
 .one-card { pointer-events: auto; margin-top: 8px; min-height: 40px; padding: 4px 14px; color: var(--paper-ink); background: var(--paper-light);
   border-color: var(--paper-soft); }
@@ -1525,3 +1540,11 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
 /* The day's map no taller than leaves its button in the first screen. */
 .hk-map-box svg { max-height: 40vh; }
 .hk-said { border-radius: var(--r-l); box-shadow: 0 8px 22px var(--shadow); transition: border-color var(--step), box-shadow var(--step); }
+
+/* 直し42: the sign's one movement, the three dots in turn; with motion
+   reduced they stand still. */
+@media (prefers-reduced-motion: no-preference) {
+  .wait-dots span { animation: one-wait 1.2s ease-in-out infinite; }
+  .wait-dots span:nth-child(2) { animation-delay: .2s; }
+  .wait-dots span:nth-child(3) { animation-delay: .4s; }
+}

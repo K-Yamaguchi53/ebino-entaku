@@ -66,6 +66,14 @@
                  to the first thing pressable in the map's column. -->
             <button type="button" id="map-skip" class="map-skip"></button>
             <svg id="map-svg" role="group" aria-label="えびのの地図と席の点" xmlns="http://www.w3.org/2000/svg"></svg>
+            <!-- 直し42: in the middle of the map while the model is waited for,
+                 what is being done (texts/wait_sign.tsv). Under the bubbles,
+                 never pressed; the line at the top reads it out, not this. -->
+            <div id="wait-sign" class="wait-sign" aria-hidden="true" hidden>
+              <p id="wait-word" class="wait-word"></p>
+              <p id="wait-line" class="wait-line"></p>
+              <span class="wait-dots"><span></span><span></span><span></span></span>
+            </div>
             <div id="map-overlay" class="map-overlay"></div>
             <!-- The opening (直し30-3): over the map once a Lab is picked, a few
                  seconds; 「とばす」, Enter or Esc ends it. -->

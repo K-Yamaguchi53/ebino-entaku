@@ -48,8 +48,12 @@ const EbinoHitokoto = (() => {
     window.scrollTo(0, 0);
   }
 
+  // The steps that wait on the model, and the kind of wait each is (直し42,
+  // texts/wait_sign.tsv); the others are quick and show no sign.
+  const WAITS = { parts: "listen", choose: "listen", answer: "listen", subject_note: "subject", light: "light" };
+
   async function post(step, body = {}) {
-    return app.call(`/api/hitokoto/${step}`, body);
+    return app.call(`/api/hitokoto/${step}`, body, { wait: WAITS[step] });
   }
 
   // --- 段1: today's map ---
