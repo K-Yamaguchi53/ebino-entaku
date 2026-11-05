@@ -1317,8 +1317,15 @@ body.one-open #ai-seat { visibility: hidden; }
    the opening. Its place and size are set here alone. */
 .wait-sign { position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: grid; justify-items: center; gap: 6px;
   width: max-content; max-width: min(268px, calc(100% - 32px)); padding: 16px 22px 12px; border-radius: var(--r-l);
-  background: var(--night-2); border: 1px solid var(--lamp-soft); box-shadow: 0 10px 30px var(--shadow);
+  background: var(--night-2); border: 1px solid var(--lamp-soft);
+  /* The map darkened just round it, so the points and names at its edges
+     step back (the board itself stays solid). */
+  box-shadow: 0 0 0 10px var(--veil-thin), 0 0 48px 28px var(--veil-thin), 0 10px 30px var(--shadow);
   text-align: center; pointer-events: none; }
+/* 集合中: at the top of the frame, off the round table the seats fly to;
+   at the foot when the AI's seat is in a top corner. */
+.wait-sign[data-kind="gather"] { top: var(--sp-5); translate: -50% 0; }
+.stage[data-ai-corner^="top"] .wait-sign[data-kind="gather"] { top: auto; bottom: var(--sp-5); }
 .wait-word { margin: 0; font-family: var(--mincho); font-weight: 700; font-size: clamp(30px, 2.6vw, 42px); line-height: 1.2;
   letter-spacing: .12em; color: var(--lamp-bright); }
 .wait-line { margin: 0; font-family: var(--gothic); font-size: 15px; line-height: 1.6; color: var(--ink); }

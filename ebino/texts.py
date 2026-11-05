@@ -162,9 +162,12 @@ NOW_LINE_IDS = ("start", "preparing", "write", "asking", "reading", "table", "pr
 # The sign in the middle of the map while the model is waited for (直し42):
 # a short big word and one small line for each kind of wait the screen
 # names; gather, the seats flying to the round table; slow, the small line
-# after a long wait (its big word stays the wait's own, so it is empty).
+# after a long wait (its big word stays the wait's own, so it is empty);
+# find, moderate and speak, the steps a question's round is really at
+# (roundtable.STEPS, 直し42 段2).
 WAIT_SIGN = "wait_sign"
-WAIT_SIGN_IDS = ("start", "ask", "coach", "ask_seat", "reflect", "subject", "listen", "light", "gather", "slow")
+WAIT_SIGN_IDS = ("start", "ask", "coach", "ask_seat", "reflect", "subject", "listen", "light", "gather", "slow",
+                 "find", "moderate", "speak")
 WAIT_SIGN_NO_WORD = ("slow",)
 START_PURPOSE = "start_purpose"
 INSIDE_HEADING = "inside_heading"

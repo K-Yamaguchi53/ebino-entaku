@@ -78,19 +78,56 @@ const WAIT_SHOW_MS = 400, WAIT_SLOW_MS = 15000;
 // after a round): shown only when nothing is on the map's middle.
 const WAIT_ASIDE = new Set(["coach"]);
 const waits = { list: [], gather: false };
+// 直し42 段2: while a question's round is waited for, the step the server
+// is really at (GET /api/now_step, every WAIT_STEP_MS, not through call):
+// find, moderate, speak. A step is shown only once the server is in it;
+// none said, or the asking failed: the wait's own words.
+const WAIT_STEP_MS = 500;
+const WAIT_STEPS = new Set(["find", "moderate", "speak"]);
 
 function waitBegin(kind) {
-  const entry = { kind, shown: false, slow: false };
+  const entry = { kind, shown: false, slow: false, step: "" };
   entry.timers = [setTimeout(() => { entry.shown = true; drawWait(); }, WAIT_SHOW_MS),
     setTimeout(() => { entry.slow = true; drawWait(); }, WAIT_SLOW_MS)];
+  if (kind === "ask") entry.stop = askSteps(entry);
   waits.list.push(entry);
   return entry;
 }
 
 function waitEnd(entry) {
   for (const timer of entry.timers) clearTimeout(timer);
+  if (entry.stop) entry.stop();
   waits.list = waits.list.filter((other) => other !== entry);
   drawWait();
+}
+
+// Asks the server's step until stopped (the answer in, a failure, the page
+// left); returns the way to stop it.
+function askSteps(entry) {
+  let stopped = false, timer = null;
+  const next = async () => {
+    try {
+      const response = await fetch("/api/now_step");
+      const data = await response.json();
+      if (!stopped && response.ok && WAIT_STEPS.has(data.step) && data.step !== entry.step) {
+        entry.step = data.step;
+        drawWait();
+      }
+    } catch (error) {
+      // Not heard: the sign keeps its words, the wait goes on.
+    }
+    if (!stopped) timer = setTimeout(next, WAIT_STEP_MS);
+  };
+  timer = setTimeout(next, 0);
+  return () => {
+    stopped = true;
+    clearTimeout(timer);
+  };
+}
+
+// The page left: no step asked for after it.
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => { for (const entry of waits.list) if (entry.stop) entry.stop(); });
 }
 
 // The seats are flying to the round table (map.js, motion on): 「集合中」.
@@ -122,7 +159,7 @@ function drawWait() {
   const now = oneScreen() ? waitNow() : null;
   sign.hidden = !now;
   if (now) {
-    const row = words[now.kind] || words.ask;
+    const row = words[now.step] || words[now.kind] || words.ask;
     $("wait-word").textContent = row.word;
     $("wait-line").textContent = now.slow ? words.slow.line : row.line;
     sign.dataset.kind = now.kind;

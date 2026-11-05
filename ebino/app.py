@@ -78,6 +78,8 @@ MAP_FILES = {
 }
 MAX_BODY = 16 * 1024
 HITOKOTO = "/api/hitokoto/"  # 帰る前に、ひとこと's steps (直し38).
+# The step a round is at (直し42 段2): asked by GET, never through the lock.
+NOW_STEP = "/api/now_step"
 # Seconds a connection may sit without sending or taking bytes. Waiting for
 # the model is not counted: that happens after the request is read.
 CONNECTION_TIMEOUT = 20
@@ -100,12 +102,26 @@ class App:
         # The sitting is touched by one request at a time. setup() reads only
         # what never changes, so it does not wait here.
         self.lock = threading.Lock()
+        # The step the round in progress is at (roundtable.STEPS, "" none),
+        # for the sign in the middle of the map (直し42 段2). Its own small
+        # lock: read while a round holds the one above.
+        self.step = ""
+        self.step_lock = threading.Lock()
         if records is not None:
             gate.on_send = self._on_send
 
     def _on_send(self, role: str, request: dict) -> None:
         if self.session is not None:
             self.records.save_prompt(self.session.session_id, role, request)
+
+    def set_step(self, name: str) -> None:
+        with self.step_lock:
+            self.step = name
+
+    def now_step(self) -> dict:
+        """The step's name and nothing else; "" with no round, or no sitting."""
+        with self.step_lock:
+            return {"step": self.step}
 
     def setup(self) -> dict:
         view = self.library.map_view()  # None: no map, the seat list alone.
@@ -127,7 +143,8 @@ class App:
         }
 
     def start(self, body: dict) -> dict:
-        session = Session(self.library, self.gate, plant=self.plant, rng=self.rng, records=self.records)
+        session = Session(self.library, self.gate, plant=self.plant, rng=self.rng, records=self.records,
+                          on_step=self.set_step)
         session.set_lab(body.get("lab", ""))  # Saves the first record.
         self.session = session
         return {"purposes": session.next_purposes()}
@@ -234,6 +251,8 @@ def make_handler(app: App, port: int, timeout: float = CONNECTION_TIMEOUT):
             pass
 
         def log_request(self, code="-", size="-"):
+            if urlsplit(self.path).path == NOW_STEP:
+                return  # Asked twice a second while a round is waited for: not printed.
             print(f"{self.command} {urlsplit(self.path).path} {getattr(code, 'value', code)}")
 
         def _send(self, status: int, data: bytes, content_type: str, cache: str = "no-store") -> None:
@@ -259,6 +278,8 @@ def make_handler(app: App, port: int, timeout: float = CONNECTION_TIMEOUT):
             if not self._host_ok():
                 return self._json(HTTPStatus.FORBIDDEN, {"error": "bad_host"})
             path = urlsplit(self.path).path
+            if path == NOW_STEP:  # Not through app.handle: a round may hold its lock.
+                return self._json(HTTPStatus.OK, app.now_step())
             if path == "/api/setup":
                 return self._json(HTTPStatus.OK, app.setup())
             if path in STATIC_FILES:

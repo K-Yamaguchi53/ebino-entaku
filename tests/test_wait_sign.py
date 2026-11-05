@@ -126,12 +126,19 @@ const box = () => ({ hidden: true, textContent: "", dataset: {}, attrs: {},
   setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; } });
 const nodes = { "wait-sign": box(), "wait-word": box(), "wait-line": box(), map: box() };
 const $ = (id) => nodes[id];
-const page = { busy: false, one: true };
+const page = { busy: false, one: true, step: "", stepAsked: 0, stepFails: false };
 global.document = { querySelector: () => (page.busy ? {} : null) };
 const oneScreen = () => page.one;
 const state = { now: { reading: false }, texts: { wait_sign: %(signs)s } };
 let answer = null;
-global.fetch = () => new Promise((resolve) => { answer = resolve; });
+global.fetch = (path) => {
+  if (path === "/api/now_step") {  // 段2: the server's step, asked by itself.
+    page.stepAsked += 1;
+    if (page.stepFails) return Promise.reject(new Error("no answer"));
+    return Promise.resolve({ ok: true, json: async () => ({ step: page.step }) });
+  }
+  return new Promise((resolve) => { answer = resolve; });
+};
 const reply = (ok) => answer({ ok, status: ok ? 200 : 500, json: async () => (ok ? { fine: 1 } : { error: "x" }) });
 %(source)s
 const sign = () => (nodes["wait-sign"].hidden ? null
@@ -174,6 +181,29 @@ const sign = () => (nodes["wait-sign"].hidden ? null
   page.busy = true;
   p = call("/api/ask", { question: "q" }, { wait: "ask" });
   await advance(500); seen.askOverTable = sign(); reply(true); await p;
+  page.busy = false;
+  // 段2: the server's step, once it is in it; asked every 0.5 s while a question waits.
+  page.step = ""; page.stepAsked = 0;
+  p = call("/api/ask", { question: "q" }, { wait: "ask" });
+  await advance(500); seen.stepNone = sign();
+  page.step = "find"; await advance(500); seen.stepFind = sign();
+  page.step = "moderate"; await advance(500); seen.stepModerate = sign();
+  page.stepFails = true; await advance(1000); seen.stepFailed = sign();
+  page.stepFails = false; page.step = "speak"; await advance(500); seen.stepSpeak = sign();
+  page.step = "other"; await advance(500); seen.stepUnknown = sign();
+  seen.askedWhile = page.stepAsked;
+  reply(true); await p; await advance(0);
+  const asked = page.stepAsked;
+  await advance(3000); seen.askedAfter = page.stepAsked - asked; seen.stepBack = sign();
+  // Only a question's wait asks the server's step.
+  page.stepAsked = 0;
+  p = call("/api/ask_seat", { round: 1 }, { wait: "ask_seat" });
+  await advance(2000); seen.askSeatAsked = page.stepAsked; reply(true); await p;
+  // A failed question stops asking too.
+  p = call("/api/ask", { question: "q" }, { wait: "ask" });
+  await advance(1000); reply(false); await p.catch(() => null); await advance(0);
+  const failedAt = page.stepAsked;
+  await advance(3000); seen.askedAfterFail = page.stepAsked - failedAt;
   process.stdout.write(JSON.stringify(seen));
 })();
 """
@@ -203,12 +233,23 @@ def test_the_sign_shows_after_0_4_seconds_only_for_a_named_wait_and_goes_when_it
     assert seen["coachBehindTable"] is None and seen["coachWhileReading"] is None
     assert seen["coachBack"] is None and seen["noMap"] is None
     assert seen["askOverTable"] == ask
+    # 段2: the step the server is at, and only once it is in it.
+    assert seen["stepNone"] == ask and seen["stepFind"] == ask  # find's words are ask's draft.
+    assert seen["stepModerate"] == {"word": "考え中", "line": signs["moderate"]["line"], "busy": "true"}
+    assert seen["stepFailed"] == seen["stepModerate"]  # Not heard: the words as they were.
+    assert seen["stepSpeak"]["word"] == "整え中" and seen["stepUnknown"] == seen["stepSpeak"]
+    assert 6 <= seen["askedWhile"] <= 11  # About every 0.5 s over 4.5 s (each after the last is heard).
+    assert seen["askedAfter"] == 0 and seen["stepBack"] is None
+    assert seen["askSeatAsked"] == 0 and seen["askedAfterFail"] == 0
 
 
 def test_no_timer_of_its_own_ends_a_wait():
     # The two timers only show the sign and change its line; the request ends it.
     source = _source()
-    assert source.count("setTimeout(") == 2
+    # 段2's asking reschedules itself and is stopped with the wait.
+    assert source.count("setTimeout(") == 4
+    assert "if (!stopped) timer = setTimeout(next, WAIT_STEP_MS);" in source
+    assert 'window.addEventListener("pagehide"' in source
     assert "const WAIT_SHOW_MS = 400, WAIT_SLOW_MS = 15000;" in source
     assert "AbortController" not in source and "abort" not in source
     assert "} finally {\n    if (waiting) waitEnd(waiting);\n  }" in _top(APP, "call")
@@ -266,6 +307,10 @@ def test_its_look_is_in_the_css_never_pressed_and_never_glass():
     assert "font-family: var(--mincho);" in re.search(r"\.wait-word \{[^}]*\}", CSS).group(0)
     assert "font-family: var(--gothic);" in re.search(r"\.wait-line \{[^}]*\}", CSS).group(0)
     assert ".map-frame:has(.opening:not([hidden])) .wait-sign { display: none; }" in CSS
+    # 集合中 off the round table: at the top, at the foot when the AI's seat is at a top corner.
+    assert '.wait-sign[data-kind="gather"] { top: var(--sp-5); translate: -50% 0; }' in CSS
+    assert '.stage[data-ai-corner^="top"] .wait-sign[data-kind="gather"] { top: auto; bottom: var(--sp-5); }' in CSS
+    assert "sign.dataset.kind = now.kind;" in _top(APP, "drawWait")
     # Placed by class only: no style set from code but custom properties.
     assert ".style." not in _source().replace("style.setProperty", "")
 

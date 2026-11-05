@@ -222,6 +222,9 @@ class Session:
     one_tidied: list[dict] = field(default_factory=list)
     # The teacher's questions put to each person (直し36-3), by seat and item.
     one_rephrased: dict[str, dict[str, asker.Rephrased]] = field(default_factory=dict)
+    # Told the step a round is at (直し42 段2: roundtable.STEPS, "" none),
+    # for the screen's sign. Never kept; None: told no one.
+    on_step: object = None
     # 帰る前に、ひとこと (直し38, hitokoto.py): in place of the reflection
     # sheet unless EBINO_REFLECT=old. None until it starts.
     talk: hitokoto.Hitokoto | None = None
@@ -268,26 +271,36 @@ class Session:
         self.lab = choice
         self.save()
 
+    def _step(self, name: str) -> None:
+        """The step the round is at now (直し42 段2): a name only, "" none."""
+        if self.on_step is not None:
+            self.on_step(name)
+
     def ask(self, question: str) -> dict:
-        question = (question or "").strip()
-        if not question:
-            raise Refused("empty_question")
-        if len(question) > MAX_QUESTION_CHARS:
-            raise Refused("question_too_long")
-        result = roundtable.run(self.gate, self.library.entries, self.library.seats, self.guard,
-                                question, plant=self.plant)
-        self._speak(result)
-        self.rounds.append(result)
-        if result.card:
-            # The same question again with no seat answering: the card there is.
-            result.card = self._keep_card(result.card)
-        self.save()
-        return self.round_view(len(self.rounds))
+        self._step("")
+        try:
+            question = (question or "").strip()
+            if not question:
+                raise Refused("empty_question")
+            if len(question) > MAX_QUESTION_CHARS:
+                raise Refused("question_too_long")
+            result = roundtable.run(self.gate, self.library.entries, self.library.seats, self.guard,
+                                    question, plant=self.plant, on_step=self._step)
+            self._speak(result)
+            self.rounds.append(result)
+            if result.card:
+                # The same question again with no seat answering: the card there is.
+                result.card = self._keep_card(result.card)
+            self.save()
+            return self.round_view(len(self.rounds))
+        finally:
+            self._step("")  # Done, answered or not.
 
     def _speak(self, result: roundtable.Round) -> None:
         """The round's bubbles as spoken words, in one request (直し31-7)."""
         if not result.quotes or not config.speaker_on():
             return
+        self._step(roundtable.STEP_SPEAK)
         quotes = [{"id": q.utterance_id, "voice": q.voice, "text": q.text,
                    "paragraph": self._utterances[q.utterance_id].paragraph or q.text} for q in result.quotes]
         result.spoken = {spoken.utterance_id: spoken for spoken in speaker.speak(self.gate, quotes)}
@@ -415,9 +428,13 @@ class Session:
         answer = _line(answer, MAX_LINE_CHARS, "empty_answer")
         if self.gate.names.hits(answer):
             return {"status": roundtable.ASK_AGAIN, "message": load_text(NAME_IN_QUESTION)}
-        result = roundtable.run(self.gate, self.library.entries, self.library.seats, self.guard,
-                                answer, plant=self.plant, ai_question=asked)
-        self._speak(result)
+        # The same round as a question's: its steps are said the same way (直し42 段2).
+        try:
+            result = roundtable.run(self.gate, self.library.entries, self.library.seats, self.guard,
+                                    answer, plant=self.plant, ai_question=asked, on_step=self._step)
+            self._speak(result)
+        finally:
+            self._step("")
         self.rounds.append(result)
         if result.status != roundtable.UNAVAILABLE:  # Unavailable: the card may be answered again.
             band.answered, band.answer = role, answer

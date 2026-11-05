@@ -14,6 +14,10 @@ Three ways a round ends, kept apart (SPEC 5-1, 14-51):
     The screen shows the fixed sentence in texts/ and the reason code is
     recorded. This is not silence, so it never shows 「答えた席：0」.
 
+The steps a round goes into are said as each begins (on_step, 直し42 段2):
+find (the librarian), moderate (the moderator); the session adds speak.
+Only these names, for the screen's sign; never the question or any words.
+
 Before any of that, the question alone is checked against the gate's name
 list. A hit calls no model and makes no card: the round ends as ask_again
 with its own fixed sentence, because waiting would not help. Which word hit
@@ -36,6 +40,9 @@ SILENT = "silent"
 UNAVAILABLE = "unavailable"
 ASK_AGAIN = "ask_again"  # The question held a name; no model was called.
 REASON_NAME_IN_QUESTION = "name_in_question"
+# The steps of a round, in their order (直し42 段2): speak is the session's.
+STEP_FIND, STEP_MODERATE, STEP_SPEAK = "find", "moderate", "speak"
+STEPS = (STEP_FIND, STEP_MODERATE, STEP_SPEAK)
 
 
 @dataclass(frozen=True)
@@ -115,16 +122,19 @@ def _splits(plans, shown: dict[str, ShownQuote], gate: Gate) -> tuple[list[Split
 
 def run(
     gate: Gate, entries: list[Entry], seats: list[Seat], guard: Guard, question: str, plant: bool = False,
-    ai_question=None,
+    ai_question=None, on_step=None,
 ) -> Round:
     """ai_question (coach.Asked): the question is the student's answer to it.
     Both go to the librarian and the moderator; a silent round then makes no
-    question card (SPEC 5-1: an AI's question is not the student's)."""
+    question card (SPEC 5-1: an AI's question is not the student's).
+    on_step: called with a step's name as the round goes into it (直し42)."""
+    step = on_step or (lambda name: None)
     if gate.names.hits(question):
         return Round("", ASK_AGAIN, reason=REASON_NAME_IN_QUESTION, message=load_text(NAME_IN_QUESTION))
     asked = ai_question.text if ai_question is not None else ""
     by_id = {entry.utterance_id: entry for entry in entries}
     try:
+        step(STEP_FIND)
         found = librarian.find(gate, entries, question, asked)
         result = Round(question, SILENT, candidates=found.utterance_ids, librarian_ended=found.ended,
                        ai_question=ai_question)
@@ -134,6 +144,7 @@ def run(
             return result
         candidates = [by_id[i] for i in found.utterance_ids]
         # Only the seats that matter to these pieces (直し31-6): a shorter request.
+        step(STEP_MODERATE)
         plan = moderator.plan(gate, question, candidates, seats, asked,
                               sent=moderator.related_seats(candidates, entries, seats))
     except (GateError, ModelUnavailable) as error:
