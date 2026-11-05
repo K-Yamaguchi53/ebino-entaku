@@ -64,8 +64,9 @@ from .texts import ask_questions
 ROLE = "asker"
 # At ingest no student waits: longer than at one to one.
 INGEST_TIMEOUT_SECONDS = 30.0
-# At one to one the student waits: past this, the teacher's questions.
-ONE_TIMEOUT_SECONDS = 3.0
+# At one to one the student waits: past this, the teacher's questions
+# (直し39: as long as the spoken words'; at 3 seconds the model was late 4 times in 6).
+ONE_TIMEOUT_SECONDS = 8.0
 # An item's paragraph sent at one to one: at most this many characters.
 ITEM_CHARS = 400
 # A page's words sent: about this many characters at most.

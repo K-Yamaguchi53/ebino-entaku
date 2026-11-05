@@ -3164,7 +3164,7 @@ const EbinoMap = (() => {
       spoken: Boolean(card && card.classList.contains("spoken")) };
     const mine = one;
     // The questions, put to this person, asked for while the camera flies
-    // (直し36-3: at most three seconds; the teacher's questions past that).
+    // (直し36-3; 直し39: at most eight seconds; the teacher's questions past that).
     mine.asks = app.oneOpen(seatId).catch(() => null);
     frame.classList.add("one-on");
     // The AI's seat steps back too (直し34-3: it covered the person's feet and words).

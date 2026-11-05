@@ -591,7 +591,7 @@ class Session:
         (asker.py), each item once a sitting; then the questions to offer.
         One offered later, after a question was asked, is the teacher's
         until 「この人に聞く」 is pressed again (one request a press; with
-        every item in it, the model took longer than its 3 seconds)."""
+        every item in it, the model took longer than its limit)."""
         items = self.one_items(seat_id)
         done = self.one_rephrased.setdefault(seat_id, {})
         asked = self.one_asked.get(seat_id, [])

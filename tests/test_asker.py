@@ -9,7 +9,7 @@ Only the axes' names come back; the answer goes to the model's own table
 checked by code: only the ranking paragraph's words and numbers, no banned
 word, no name, 40 characters at most, ending in 「？」.
 段3: at one to one, the teacher's questions put to that person in one
-request (3 seconds), checked by code as the ranking's, except that its
+request (8 seconds, 直し39), checked by code as the ranking's, except that its
 words may come from the teacher's question too, a banned word stops it only
 when the teacher's question lacks it, and it is at most 1.5 times as long.
 Any that fails, and all when the model is late or cannot be used, show the
@@ -19,7 +19,7 @@ import pytest
 from conftest import make_seat
 from fake_client import FakeClient, text_response
 
-from ebino import asker, gate as gate_module, one_to_one
+from ebino import asker, gate as gate_module, one_to_one, speaker
 from ebino.gate import Gate, NameList
 from ebino.ingest.utterance import Utterance
 
@@ -274,6 +274,7 @@ def test_the_ingest_report_says_the_ranking_counts():
 # --- 段3: the teacher's questions put to the person at one to one ---
 
 import json  # noqa: E402
+import time  # noqa: E402
 import random  # noqa: E402
 
 import anthropic  # noqa: E402
@@ -351,10 +352,10 @@ def one_sitting(monkeypatch, answers):
     return session, client, kept
 
 
-def test_this_person_pressed_one_request_in_three_seconds_and_the_questions_put_to_the_person(monkeypatch):
+def test_this_person_pressed_one_request_within_the_limit_and_the_questions_put_to_the_person(monkeypatch):
     session, client, kept = one_sitting(monkeypatch, put_to_the_person)
     view = session.one_open("A01")
-    assert len(client.requests) == 1 and client.options == [{"timeout": 3.0, "max_retries": 0}]
+    assert len(client.requests) == 1 and client.options == [{"timeout": asker.ONE_TIMEOUT_SECONDS, "max_retries": 0}]
     assert client.requests[0]["model"] == "claude-haiku-5-5"
     sent = json.loads(client.requests[0]["messages"][0]["content"])
     # The questions offered now, each with its own paragraph.
@@ -396,13 +397,56 @@ def test_one_that_fails_its_check_shows_the_teachers_and_the_others_do_not(monke
     assert session.one_rephrased["A01"]["本文"].reason == "banned_word"
 
 
-def test_past_three_seconds_every_question_is_the_teachers(monkeypatch):
+def test_past_the_limit_every_question_is_the_teachers(monkeypatch):
     late = anthropic.APITimeoutError(request=httpx2.Request("POST", "https://api.invalid/v1/messages"))
     session, client, kept = one_sitting(monkeypatch, [late])
     view = session.one_open("A01")
     assert [q["rephrased"] for q in view["questions"]] == [False, False, False]
     assert view["questions"][0]["question"] == "どんな道を通って、今の仕事に就いたんですか？"
     assert {r["reason"] for r in kept.sessions[-1]["one_rephrased"]} == {"api_error:APITimeoutError"}
+
+
+class SlowClient(FakeClient):
+    """Answers after `takes` seconds, unless the request's own limit comes
+    first: then, as the SDK, a timeout, at that limit."""
+
+    def __init__(self, answers, takes):
+        super().__init__(answers)
+        self.takes = takes
+
+    def _create(self, **request):
+        limit = self._pending_options.get("timeout")
+        if limit is not None and self.takes > limit:
+            time.sleep(limit)
+            self._pending_options = {}
+            self.requests.append(request)
+            raise anthropic.APITimeoutError(request=httpx2.Request("POST", "https://api.invalid/v1/messages"))
+        time.sleep(self.takes)
+        return super()._create(**request)
+
+
+def test_the_limit_is_eight_seconds_as_the_spoken_words_and_ingest_keeps_its_own():
+    # 直し39: at 3 seconds the model was late 4 times in 6; the other waits stay.
+    assert asker.ONE_TIMEOUT_SECONDS == 8.0 == speaker.TIMEOUT_SECONDS
+    assert asker.INGEST_TIMEOUT_SECONDS == 30.0
+
+
+def test_an_answer_slower_than_the_limit_shows_the_teachers_and_one_inside_it_is_put(monkeypatch):
+    # The limit made small here: the answer comes after it, so the teacher's.
+    monkeypatch.setattr(asker, "ONE_TIMEOUT_SECONDS", 0.05)
+    session, _, kept = one_sitting(monkeypatch, put_to_the_person)
+    session.gate.client = SlowClient(put_to_the_person, takes=0.3)
+    started = time.monotonic()
+    view = session.one_open("A01")
+    assert time.monotonic() - started < 0.3  # Not kept waiting past the limit.
+    assert [q["rephrased"] for q in view["questions"]] == [False, False, False]
+    assert view["questions"][0]["question"] == "どんな道を通って、今の仕事に就いたんですか？"
+    assert {r["reason"] for r in kept.sessions[-1]["one_rephrased"]} == {"api_error:APITimeoutError"}
+    # The same answer inside the limit: put to the person.
+    monkeypatch.setattr(asker, "ONE_TIMEOUT_SECONDS", 1.0)
+    session, _, _ = one_sitting(monkeypatch, put_to_the_person)
+    session.gate.client = SlowClient(put_to_the_person, takes=0.05)
+    assert all(q["rephrased"] for q in session.one_open("A01")["questions"])
 
 
 def test_the_model_not_usable_or_turned_off_every_question_is_the_teachers(monkeypatch):
