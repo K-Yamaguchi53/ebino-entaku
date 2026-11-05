@@ -322,3 +322,58 @@ def test_the_counting_tool_says_numbers_only_and_asks_no_model(monkeypatch):
     assert "write_text" not in source and "open(" not in source
     with pytest.raises(RuntimeError):
         tool.NoModel().messages
+
+
+# --- 段2: the speaker is given the words tidied ---
+
+def _says(**lines):
+    return text_response({"lines": [{"id": key, "text": text} for key, text in lines.items()]})
+
+
+def test_the_speaker_is_given_the_words_tidied_as_the_original(monkeypatch):
+    session, client = sitting(monkeypatch, [_says()], speaker_on=True)
+    session.one_ask("C01", "向こうで")
+    sent = json.loads(client.requests[-1]["messages"][0]["content"])["quotes"]
+    assert sent == [{"id": "C01-p2", "voice": "own", "text": TIDIED["p2"]}]
+    assert "海外での生活" not in client.all_sent() and "11/3" not in client.all_sent()
+
+
+def test_spoken_words_without_the_title_pass_and_are_kept_beside_the_words_tidied(monkeypatch, tmp_path):
+    spoken = "言葉がわからなくて、最初は困ったんだ。毎日、市場で野菜を買ってたよ。友だちができたのは半年後だったな。"
+    # Checked against the page as recorded, the title's 「海外」「生活」 would be words dropped.
+    assert speaker.stop_reason(spoken, PAGES["p2"], PAGES["p2"], Gate(FakeClient([]), NameList.build(SEATS, {}))) \
+        == speaker.STOP_DROPPED
+    session, _ = sitting(monkeypatch, [_says(**{"C01-p2": spoken})], speaker_on=True, tmp_path=tmp_path)
+    answer = session.one_ask("C01", "向こうで")
+    assert answer["pieces"][0]["spoken"] == spoken and answer["pieces"][0]["text"] == TIDIED["p2"]
+    record = json.loads((tmp_path / "sessions" / f"{session.session_id}.json").read_text(encoding="utf-8"))
+    assert record["one_spoken"] == [{"utterance_id": "C01-p2", "shown": "spoken", "original": TIDIED["p2"],
+                                     "spoken": spoken, "reason": ""}]
+
+
+def test_spoken_words_with_a_word_or_a_number_not_in_the_words_tidied_stop(monkeypatch):
+    for words, reason in (("海外での生活では、言葉がわからなくて、最初は困った。毎日、市場で野菜を買った。友だちができたのは半年後。",
+                           speaker.STOP_WORD),  # 「生活」: the title's, gone.
+                          ("言葉がわからなくて、最初は困った。毎日、市場で野菜を買った。友だちができたのは3か月後。",
+                           speaker.STOP_NUMBER),
+                          ("言葉がわからなくて、最初は困った。毎日、野菜を買った。友だちができたのは半年後。",
+                           speaker.STOP_DROPPED)):  # 「市場」 left out.
+        session, _ = sitting(monkeypatch, [_says(**{"C01-p2": words})], speaker_on=True)
+        answer = session.one_ask("C01", "向こうで")
+        assert answer["pieces"][0]["spoken"] == "" and answer["pieces"][0]["text"] == TIDIED["p2"], words
+        assert session.one_spoken[-1].reason == reason, words
+
+
+def test_an_article_is_given_to_the_speaker_as_recorded(monkeypatch):
+    session, client = sitting(monkeypatch, [_says()], speaker_on=True)
+    session.one_ask("A01", "本文")
+    sent = json.loads(client.requests[-1]["messages"][0]["content"])["quotes"]
+    assert sent == [{"id": "A01-本文", "voice": "article", "text": "休みは決めて取る\n店は月曜に閉める。"}]
+
+
+def test_the_round_tables_bubbles_are_given_to_the_speaker_as_before():
+    from ebino import session as session_module
+    source = open(session_module.__file__, encoding="utf-8").read()
+    speak = source[source.index("    def _speak(self"):source.index("    def card_like(")]
+    assert 'quotes = [{"id": q.utterance_id, "voice": q.voice, "text": q.text,' in speak
+    assert "one_tidy" not in speak

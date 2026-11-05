@@ -645,7 +645,10 @@ class Session:
         slide's page tidied first (直し43): its title's line, its numbers
         and the PDF's breaks gone; a page with nothing left, or a name, not
         shown; the pages together cut at a sentence's end past ONE_CUT_CHARS.
-        The words recorded are never changed: only those shown."""
+        The words recorded are never changed: only those shown. The speaker
+        is given the words tidied as the original (段2): the title's line
+        gone is not a word dropped; stopped, past its limit or turned off,
+        the words tidied are shown, never the page as recorded."""
         shown, said, met, total = [], [], [], 0
         for piece in pieces:
             met.append(piece)
@@ -674,7 +677,9 @@ class Session:
         shown = shown[:len(said)]
         spoken = {}
         if config.speaker_on():
-            quotes = [{"id": u.id, "voice": u.voice, "text": u.text, "paragraph": u.paragraph or u.text} for u in shown]
+            quotes = [{"id": u.id, "voice": u.voice, "text": text,
+                       "paragraph": text if one_to_one.is_page(u.section) else u.paragraph or u.text}
+                      for u, text in zip(shown, said)]
             for result in speaker.speak(self.gate, quotes):
                 spoken[result.utterance_id] = result
                 self.one_spoken.append(result)
