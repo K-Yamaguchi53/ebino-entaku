@@ -13,6 +13,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .. import one_to_one
 from .article_docx import ingest_article
 from .masks import SeatMasks, load_masks
 from .pdf_chars import PdfTextStats, leftover_supplement_chars
@@ -58,9 +59,11 @@ class Report:
     short_article_pieces: int = 0
     short_article_seats: int = 0
     copied_posters: int = 0  # Read from a hand-made text copy (poster_text).
+    # One to one's tables (直し34-2): counts only, no seat, name or words.
+    ask_tables: dict = field(default_factory=dict)
 
     def lines(self) -> list[str]:
-        return [
+        lines = [
             f"seats: {self.seats}",
             f"ingested by kind: {dict(self.ingested_by_kind)}",
             f"utterances by voice: {dict(self.utterances_by_voice)}",
@@ -84,6 +87,16 @@ class Report:
             f"article-voice pieces of {SHORT_ARTICLE_CHARS} chars or less (seats): "
             f"{self.short_article_pieces} ({self.short_article_seats})",
         ]
+        if self.ask_tables:
+            t = self.ask_tables
+            lines += [
+                f"one to one, seats with pages only: {t['pages_only_seats']} (pages {t['pages']}), "
+                f"pages by axis (the teacher's table): {t['pages_by_axis']}",
+                f"one to one, ranking questions: {t['ranking_questions']} of {t['ranking_seats']}, "
+                f"none by reason: {t['ranking_without']}",
+                f"one to one, tables written to fill (the teacher's kept): {t['written']}",
+            ]
+        return lines
 
 
 def _count_poster(utterances: list[Utterance], report: Report) -> list[Utterance]:
@@ -175,6 +188,8 @@ def run(data_dir: Path) -> Report:
         json.dumps([u.to_dict() for u in utterances], ensure_ascii=False, indent=1),
         encoding="utf-8",
     )
+    # One to one's tables to fill, when not there; never over the teacher's (直し34-2).
+    report.ask_tables = one_to_one.write_tables(output, utterances, {seat.seat_id: seat.kind for seat in seats})
     return report
 
 

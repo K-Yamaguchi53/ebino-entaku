@@ -30,7 +30,9 @@ from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_S
                     load_text)
 from .gate import Gate, NameList, load_names
 from .guard import Guard
+from . import one_to_one
 from .index import Entry, build_index, load_topics, load_utterances
+from .ingest.run import OUTPUT_DIR as INGESTED_DIR
 from .ingest.scrub import normalize_for_match
 from .ingest.seats import Seat, load_seats
 from .ingest.utterance import Utterance
@@ -106,6 +108,9 @@ class Library:
     # The basin drawn as a model under the map (relief.py): None keeps the
     # flat map. The points stay where seat_map.py put them.
     relief: dict | None = None
+    # One to one's tables the teacher keeps (直し34-2): which axes a page
+    # answers, and a seat's own question on its ranking.
+    ask_tables: dict = field(default_factory=lambda: {"pages": {}, "ranking": {}})
 
     @classmethod
     def build(cls, seats, utterances, topics, show_private=False, saved_kinds=None,
@@ -139,13 +144,15 @@ class Library:
              relief_dir: Path | None = None) -> "Library":
         seats = load_seats(data_dir / "seats.tsv")
         map_data = seat_map.load_map(map_file)
-        return cls.build(seats, load_utterances(data_dir), load_topics(data_dir), show_private,
+        library = cls.build(seats, load_utterances(data_dir), load_topics(data_dir), show_private,
                          talk_kinds.load_saved(data_dir), purpose_summary.load_saved(data_dir),
                          load_names(data_dir, seats), subjects.load_catalog(data_dir),
                          coach.load_coach(data_dir, {seat.seat_id for seat in seats}),
                          map_data=map_data,
                          relief_data=(relief.load_relief((map_data.width, map_data.height), relief_dir)
                                       if map_data else None))
+        library.ask_tables = one_to_one.load_tables(data_dir / INGESTED_DIR)
+        return library
 
     def seat_view(self, seat: Seat) -> dict:
         label = seat_label(seat, self.show_private)
