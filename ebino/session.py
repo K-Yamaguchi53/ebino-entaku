@@ -31,7 +31,7 @@ from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_S
 from . import librarian, texts
 from .gate import Gate, GateError, ModelUnavailable, NameList, load_names
 from .guard import Guard
-from . import asker, hitokoto, one_tidy, one_to_one, trail
+from . import asker, directions, hitokoto, one_tidy, one_to_one, trail
 from .index import Entry, build_index, load_topics, load_utterances
 from .ingest.run import OUTPUT_DIR as INGESTED_DIR
 from .ingest.scrub import normalize_for_match
@@ -240,6 +240,10 @@ class Session:
     # questions picked: a coach's question for an earlier one is not shown.
     one_coach: dict[str, list[dict]] = field(default_factory=dict)
     one_ask_no: int = 0
+    # 行き止まりの道案内 (直し45 段4): the ways offered under each round no
+    # seat answered, by round; and the rounds a way pressed made, by round.
+    ways_offered: dict[int, list[str]] = field(default_factory=dict)
+    ways_taken: dict[int, dict] = field(default_factory=dict)
 
     def __post_init__(self):
         self._subject_counts = Counter()  # With no records (tests): this sitting's only.
@@ -279,6 +283,9 @@ class Session:
             # why not), the choices pressed, the lines, 答えない.
             record["one_coach"] = [dict(asked, seat_id=seat_id) for seat_id, found in self.one_coach.items()
                                    for asked in found]
+            # 行き止まりの道案内 (直し45 段4): the ways offered, and each pressed.
+            record["ways"] = {"offered": {str(n): list(kinds) for n, kinds in self.ways_offered.items()},
+                              "taken": [dict(way, round=n) for n, way in self.ways_taken.items()]}
             self.records.save_session(record)
 
     # --- what the student does ---
@@ -317,6 +324,9 @@ class Session:
             if result.card:
                 # The same question again with no seat answering: the card there is.
                 result.card = self._keep_card(result.card)
+                # 行き止まりの道案内 (直し45 段4): the ways on, by kind of talk.
+                self.ways_offered[len(self.rounds)] = directions.offered(
+                    self.library.closing_pieces, self.library.kind_order, self._shown_kinds())
             self.save()
             return self.round_view(len(self.rounds))
         finally:
@@ -397,6 +407,8 @@ class Session:
         result = self._round(round_no)
         if result.status != roundtable.ANSWERED:
             raise Refused("no_seat_spoke")
+        if round_no in self.ways_taken:  # A way's round (直し45 段4): no model is asked.
+            return {"round": round_no, "question": "", "words": []}
         if result.closing is None:
             counts = Counter(word.kind for r in self.rounds if r.closing for word in r.closing.words)
             result.closing = closing.run(self.gate, self.guard, result.question, result.seat_order,
@@ -438,7 +450,7 @@ class Session:
         result = self._round(round_no)
         if result.status not in (roundtable.ANSWERED, roundtable.SILENT):
             raise Refused("no_round_for_band")
-        if not self.library.coach_on:
+        if not self.library.coach_on or round_no in self.ways_taken:
             return {"round": round_no, "cards": [], "answered": ""}
         if result.band is None:
             result.band = coach.run(self.gate, self, round_no, self.library.coach_sources)
@@ -492,6 +504,8 @@ class Session:
         """The card as it stands; no model is called. Asked again after a
         mark, it may change until the student presses it."""
         result = self._answered_round(round_no)
+        if round_no in self.ways_taken:
+            return {"round": round_no, "card": None, "asked": None}
         if result.ask_seat is not None:
             return {"round": round_no, "card": None, "asked": self.asked_view(round_no)}
         card = ask_seat.plan(self, round_no)
@@ -1440,6 +1454,43 @@ class Session:
 
     # --- 今日の道すじ (直し45 段2, trail.py) ---
 
+    # --- 行き止まりの道案内 (直し45 段4, directions.py) ---
+
+    def _shown_kinds(self) -> set[str]:
+        """The kinds of talk shown to this student: a piece of it seen, or
+        its way pressed."""
+        kinds = {self.library.kind_of.get(uid, talk_kinds.NONE) for uid in self.seen_ids()}
+        return (kinds | {way["kind"] for way in self.ways_taken.values()}) - {talk_kinds.NONE}
+
+    def _way_label(self, kind: str) -> str:
+        names = {k.kind_id: k.name for k in talk_kinds.load_kinds()}
+        return texts.id_table(texts.DIRECTION_WORDS, texts.DIRECTION_WORD_IDS)["ask"].replace("{kind}", names.get(kind, ""))
+
+    def ways_view(self, round_no: int) -> list[dict]:
+        taken = {way["kind"] for way in self.ways_taken.values() if way["from_round"] == round_no}
+        return [{"kind": kind, "text": self._way_label(kind)} for kind in self.ways_offered.get(round_no, [])
+                if kind not in taken]
+
+    def take_way(self, round_no: int, kind: str) -> dict:
+        """A way pressed: up to three seats' pieces of that kind, picked by
+        code, as a round of its own (no model; no question card)."""
+        result = self._round(round_no)
+        if kind not in [way["kind"] for way in self.ways_view(round_no)]:
+            raise Refused("unknown_way")
+        picked = directions.pick(self.library.closing_pieces, [s.seat_id for s in self.library.seats], kind,
+                                 self.seen_ids(), result.question, self.guard, self.gate.names)
+        way = roundtable.Round("", roundtable.ANSWERED if picked else roundtable.SILENT,
+                               quotes=[roundtable.ShownQuote(uid, seat_id, self._utterances[uid].voice, words)
+                                       for seat_id, uid, words in picked])
+        way.guard_passed = len(picked)
+        self.rounds.append(way)
+        number = len(self.rounds)
+        self.ways_taken[number] = {"from_round": round_no, "kind": kind, "seats": [p[0] for p in picked],
+                                   "utterance_ids": [p[1] for p in picked]}
+        self._note(trail.DIRECTION, round=number, from_round=round_no, talk_kind=kind, text=self._way_label(kind))
+        self.save()
+        return self.round_view(number)
+
     def bubble_opened(self, round_no: int, utterance_id: str) -> dict:
         """A bubble at the table pressed: its seat and piece, a step of the
         trail. No model; the same bubble pressed again at once is one step."""
@@ -1577,6 +1628,11 @@ class Session:
             # The AI question this round's question answers (coach.py), or None.
             "ai_question": ({"role": result.ai_question.role, "label": coach.label(result.ai_question.role),
                              "text": result.ai_question.text} if result.ai_question else None),
+            # 行き止まりの道案内 (直し45 段4): under a round no seat answered,
+            # the ways on and the line over them; a way's own round, its words.
+            "ways": self.ways_view(round_no),
+            "ways_notice": texts.id_table(texts.DIRECTION_WORDS, texts.DIRECTION_WORD_IDS)["notice"] if result.card else "",
+            "way": self._way_label(self.ways_taken[round_no]["kind"]) if round_no in self.ways_taken else "",
         }
 
     def purpose_view(self, sample: PurposeSample) -> dict:

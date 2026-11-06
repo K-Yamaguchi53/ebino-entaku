@@ -209,6 +209,9 @@ class App:
         if path == "/api/one/free":
             return session.one_free_question(body.get("seat_id"), body.get("question", ""))
         # 今日の道すじ (直し45 段2): a bubble pressed, kept as a step; no model.
+        # 行き止まりの道案内 (直し45 段4): a way pressed; no model.
+        if path == "/api/direction":
+            return session.take_way(body.get("round"), body.get("kind", ""))
         if path == "/api/trail/opened":
             return session.bubble_opened(body.get("round"), body.get("utterance_id", ""))
         if path == "/api/ask_card":

@@ -1077,6 +1077,15 @@ body.one-open #map-heading { visibility: hidden; }
   overflow-wrap: break-word;
 }
 
+/* 行き止まりの道案内 (直し45 段4): over the box, the line and the ways. */
+.ways { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 6px; padding: 4px 12px;
+  border-left: 4px solid var(--moon-soft); background: var(--night-2); border-radius: 0 6px 6px 0; }
+.ways-notice { margin: 0; font-size: var(--fs-s); color: var(--ink); }
+.ways-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.way { min-height: 40px; padding: 4px 14px; border-radius: 999px; border: 1px solid var(--lamp-soft); background: transparent;
+  color: var(--lamp-bright); font-size: var(--fs-s); cursor: pointer; }
+.way:hover, .way:focus-visible { border-color: var(--lamp); background: var(--lamp-faint); }
+.ways, .ways-notice, .way { word-break: auto-phrase; overflow-wrap: break-word; }
 /* 今日の道すじ (直し45 段2): in the map's column, under its buttons, the
    room left over; each step a line on the left, the turn of a question in
    the lamp's colour from what was heard to the new question. The AI's

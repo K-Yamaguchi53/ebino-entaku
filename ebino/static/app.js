@@ -1259,6 +1259,38 @@ async function ask() {
   }
 }
 
+// 行き止まりの道案内 (直し45 段4): under a question no seat answered, the
+// card made and the ways on (by kind of talk, picked by code). A way pressed:
+// up to three seats' words of that kind at the table, as a round of its own.
+function showWays(round) {
+  const box = $("ways");
+  const ways = round.ways || [];
+  box.hidden = !round.ways_notice;
+  if (box.hidden) return;
+  $("ways-notice").textContent = round.ways_notice;
+  $("ways-buttons").replaceChildren(...ways.map((way) => {
+    const press = el("button", { type: "button", class: "way", text: way.text });
+    press.dataset.kind = way.kind;
+    press.addEventListener("click", () => takeWay(round.round, way.kind, press));
+    return press;
+  }));
+}
+
+async function takeWay(roundNo, kind, press) {
+  if (press.disabled) return;
+  for (const other of $("ways-buttons").children) other.disabled = true;
+  try {
+    const round = await call("/api/direction", { round: roundNo, kind });
+    press.remove();
+    renderRound(round);
+  } catch (error) {
+    showMessage(sendFailed(error));
+  } finally {
+    for (const other of $("ways-buttons").children) other.disabled = false;
+    if (!$("ways-buttons").children.length) $("ways").hidden = true;
+  }
+}
+
 function sendFailed(error) { return state.texts.send_failed.replace("{error}", error.message); }
 function showMessage(text) { $("ask-message").textContent = text; $("ask-message").hidden = false; }
 function hideMessage() { $("ask-message").hidden = true; }
@@ -1293,7 +1325,7 @@ function renderRound(round) {
       el("span", { class: "label", text: round.ai_question.label }),
       el("span", { text: round.ai_question.text })));
   }
-  box.append(el("p", { class: "round-question", text: round.question }));
+  box.append(el("p", { class: "round-question", text: round.question || round.way || "" }));
   box.append(el("p", { class: "steps",
     text: `司書が見つけた片：${round.steps.found}　番人が通した引用：${round.steps.passed}　止めた引用：${round.steps.stopped}` }));
   box.append(el("p", { class: "count", text: state.texts.answered_count.replace("{n}", round.answered_seats) }));
@@ -1315,6 +1347,7 @@ function renderRound(round) {
   box.append(...planted, loose);
   round.splits.forEach((split, index) => box.append(renderSplit(round.round, split, byId, sides[index])));
   if (round.card) box.append(el("p", { class: "card-done", text: "この問いを質問カードにしました" }));
+  if (!round.way) showWays(round);  // 行き止まりの道案内 (直し45 段4).
   $("rounds").prepend(box);
   // The keyboard goes on from the new round's question, not through the
   // map's points before it (直し25-5); the page does not jump for it.

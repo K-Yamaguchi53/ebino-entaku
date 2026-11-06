@@ -237,6 +237,10 @@ TRAIL_MARK_IDS = ("surprised", "deeper", "more")
 TRAIL_MARK_FIRST = ("more", "deeper", "surprised")
 TRAIL_MARK_WORDS = "trail_mark_words"
 TRAIL_MARK_WORD_IDS = ("lead", "note", "go", "skip", "sheet")
+# 行き止まりの道案内 (直し45 段4): the line over the ways, and a way's words
+# ({kind} is the kind's 名前 in talk_kinds.tsv). 叩き台.
+DIRECTION_WORDS = "direction_words"
+DIRECTION_WORD_IDS = ("notice", "ask")
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
