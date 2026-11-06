@@ -115,10 +115,11 @@ LOOKS = {
     # orange and yellow showing in patches among the dark green; the
     # plateau's grass gold; the peaks bare.
     "autumn": {
-        "ramp": [(0.0, (0.36, 0.26, 0.07)), (0.085, (0.32, 0.23, 0.06)), (0.12, (0.27, 0.07, 0.025)),
-                 (0.36, (0.30, 0.12, 0.03)), (0.56, (0.33, 0.22, 0.05)), (0.70, (0.33, 0.26, 0.11)),
-                 (0.86, (0.17, 0.13, 0.10)), (1.0, (0.14, 0.11, 0.09))],
-        "forest": ((0.035, 0.07, 0.03), 0.12),
+        "ramp": [(0.0, (0.36, 0.26, 0.07)), (0.085, (0.32, 0.23, 0.06)), (0.12, (0.42, 0.05, 0.015)),
+                 (0.30, (0.46, 0.10, 0.015)), (0.44, (0.50, 0.20, 0.02)), (0.58, (0.50, 0.34, 0.04)),
+                 (0.70, (0.42, 0.32, 0.11)), (0.86, (0.19, 0.13, 0.09)), (1.0, (0.15, 0.11, 0.09))],
+        "forest": ((0.035, 0.07, 0.03), 0.0),
+        "patches": (0.43, 0.50),
         "basin": ((0.36, 0.26, 0.07), 0.15),
         "side": (0.022, 0.016, 0.012),
         "lights": (("sun", 3.0, (1.0, 0.86, 0.72), (70, 0, -112)), ("rim", 0.5, (0.6, 0.68, 1.0), (70, 0, 135))),
@@ -166,8 +167,10 @@ def night_material(season="night"):
         noise.inputs["Detail"].default_value = 4.0
         nt.links.new(geometry.outputs["Position"], noise.inputs["Vector"])
         patches = nt.nodes.new("ShaderNodeMapRange")
-        patches.inputs["From Min"].default_value = 0.40
-        patches.inputs["From Max"].default_value = 0.64
+        # Where the noise turns from cedar to leaves: spring blends wide;
+        # autumn narrow and with fewer cedars, its reds kept clear.
+        patches.inputs["From Min"].default_value, patches.inputs["From Max"].default_value = \
+            look.get("patches", (0.40, 0.64))
         patches.inputs["To Min"].default_value = 1.0
         patches.inputs["To Max"].default_value = share
         nt.links.new(noise.outputs["Fac"], patches.inputs["Value"])
