@@ -127,3 +127,19 @@ def test_the_bubble_goes_over_what_to_press_under_it_or_kept_in_the_window():
     # The bubble's choices: the button lit, no bubble; nothing to press, neither.
     assert got["pressed"] == {"hidden": True, "lit": True}
     assert got["none"] == {"hidden": True, "lit": False}
+
+
+def test_the_first_screen_says_what_the_app_is_and_how_it_goes_by_the_bands_steps():
+    screen = texts.screen_texts()
+    assert "AI" in screen["start_about"] and "本人" in screen["start_about"]  # Not the person answering now.
+    assert tuple(screen["start_flow"]) == texts.NOW_STEP_IDS and all(screen["start_flow"].values())
+    box = HTML[HTML.index('<div class="start-about-box">'):]
+    assert box.index('id="start-about"') < box.index('<ol id="start-flow" class="start-flow" aria-label="すすみ方">')
+    assert HTML.index('id="start-purpose"') < HTML.index('class="start-about-box"') < HTML.index('class="promises"')
+    # The step names are the band's own (the same words light up there later).
+    filled = APP[APP.index('$("start-about").textContent'):APP.index('$("lab-question").textContent')]
+    assert "for (const step of data.texts.now_steps)" in filled and "data.texts.start_flow[step.id]" in filled
+    # Across the screen, four in a row, two rows when narrow; broken between words.
+    assert ".start-about-box { grid-column: 1 / -1;" in CSS
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in CSS
+    assert ".start-about-box, .first-look, .guide, .wait-sign {\n  word-break: auto-phrase;" in CSS

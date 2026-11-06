@@ -222,6 +222,12 @@ async function setup() {
   for (const seat of data.seats) state.seatById[seat.seat_id] = seat;
   for (const line of data.texts.start_notice) $("start-notice").append(el("li", { text: line }));
   $("start-purpose").textContent = data.texts.start_purpose;
+  $("start-about").textContent = data.texts.start_about;
+  // How it goes: the band's own steps (the same words light up there later).
+  for (const step of data.texts.now_steps) {
+    $("start-flow").append(el("li", {}, el("span", { class: "flow-step", text: step.text }),
+      el("span", { class: "flow-do", text: data.texts.start_flow[step.id] })));
+  }
   for (const step of data.texts.now_steps) {
     $("now-steps").append(el("li", { "data-step": step.id, text: step.text }));
   }

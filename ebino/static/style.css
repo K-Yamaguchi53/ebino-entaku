@@ -246,6 +246,23 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 /* --- the entrance: the seven notices on one card, then the Lab --- */
 #start { display: grid; gap: 32px 56px; align-items: start; }
+/* What the app is, and how it goes (the teacher, 11/6): across the screen,
+   the four steps in a row, an arrow between them (two rows when narrow). */
+.start-about-box { grid-column: 1 / -1; padding: 16px 20px 18px; border: 1px solid var(--lamp-soft); border-radius: 10px;
+  background: var(--night-2); }
+.start-about { margin: 0 0 14px; font-size: 17px; line-height: 1.7; color: var(--ink); }
+.start-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 30px; margin: 0; padding: 0;
+  list-style: none; }
+.start-flow li { position: relative; display: grid; align-content: start; gap: 6px; padding: 10px 14px 12px;
+  border-radius: 8px; background: var(--lamp-faint); border-top: 4px solid var(--lamp); }
+.start-flow li + li::before { content: "▶"; position: absolute; left: -24px; top: 50%; translate: 0 -50%;
+  color: var(--lamp); font-size: 16px; }
+.start-flow .flow-step { font-size: 18px; font-weight: 700; color: var(--lamp-bright); }
+.start-flow .flow-do { font-size: 15px; line-height: 1.55; color: var(--ink); }
+@media (max-width: 899px) {
+  .start-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .start-flow li:nth-child(3)::before { content: none; }
+}
 @media (min-width: 1000px) { #start { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); } }
 .promises {
   background: linear-gradient(180deg, var(--night-2), var(--night));
@@ -1023,7 +1040,7 @@ body.one-open #map-heading { visibility: hidden; }
 .quote, .map-bubble, .table-bubble, .table-label, .map-choices, .map-tip, .split-tag,
 .harvest, .sheet, .first-question, .lab-question, .promises, .notice-list,
 .round, .ai-band, .ai-card, .closing, .ask-seat, .split, .map-hint, .heavy-talk, .seats, #reflect,
-.ai-seat, .drawer-body, .ask textarea, .input-to, .one-bubble, .one-asks, .wait-sign {
+.ai-seat, .drawer-body, .ask textarea, .input-to, .one-bubble, .one-asks, .start-about-box, .first-look, .guide, .wait-sign {
   word-break: auto-phrase;
   overflow-wrap: break-word;
 }

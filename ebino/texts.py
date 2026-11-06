@@ -170,6 +170,10 @@ WAIT_SIGN_IDS = ("start", "ask", "coach", "ask_seat", "reflect", "subject", "lis
                  "find", "moderate", "speak")
 WAIT_SIGN_NO_WORD = ("slow",)
 START_PURPOSE = "start_purpose"
+# The first screen (the teacher, 11/6): what the app is, in a few lines, and
+# how it goes, step by step, one line for each step of the band at the top.
+START_ABOUT = "start_about"
+START_FLOW = "start_flow"
 INSIDE_HEADING = "inside_heading"
 INSIDE_COUNTS = "inside_counts"
 INSIDE_END = "inside_end"
@@ -214,7 +218,7 @@ SCREEN_TEXTS = (
     BACK_TO_START, BACK_TO_START_CONFIRM, BACK_TO_START_YES, BACK_TO_START_NO, REFLECT_NEEDS_ANSWER,
     OPENING_SKIP, AI_ANSWER_HINT, CARD_ALREADY,
     HARVEST_SUBJECT_QUESTION, HARVEST_SUBJECT_PICK, HARVEST_SUBJECT_NONE,
-    START_PURPOSE, INSIDE_HEADING, INSIDE_END, INSIDE_OPEN, QUESTION_EXAMPLES_LEAD, QUESTION_EXAMPLES_END,
+    START_PURPOSE, START_ABOUT, INSIDE_HEADING, INSIDE_END, INSIDE_OPEN, QUESTION_EXAMPLES_LEAD, QUESTION_EXAMPLES_END,
     SPOKEN_NOTE, SPOKEN_MARK, AI_SEAT_LABEL, AI_SEAT_NOTE, AI_SEAT_MARK, MAP_SKIP,
 )
 SCREEN_LISTS = (START_NOTICE, WORK_QUESTIONS, QUESTION_EXAMPLES)
@@ -289,6 +293,7 @@ def screen_texts() -> dict:
     texts[NOW_STEPS] = now_steps()
     texts[NOW_LINE] = now_lines()
     texts[GUIDE] = id_table(GUIDE, GUIDE_IDS)
+    texts[START_FLOW] = id_table(START_FLOW, NOW_STEP_IDS)
     texts[WAIT_SIGN] = wait_signs()
     return texts
 
