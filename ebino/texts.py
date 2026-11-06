@@ -170,8 +170,9 @@ WAIT_SIGN_IDS = ("start", "ask", "coach", "ask_seat", "reflect", "subject", "lis
                  "find", "moderate", "speak")
 WAIT_SIGN_NO_WORD = ("slow",)
 START_PURPOSE = "start_purpose"
-# The first screen (the teacher, 11/6): what the app is, in a few lines, and
-# how it goes, step by step, one line for each step of the band at the top.
+# What the app is, in a few lines, and how it goes, step by step, one line
+# for each step of the band at the top: the first look's first page (the
+# teacher, 11/6: right before whose words are in, not on the first screen).
 START_ABOUT = "start_about"
 START_FLOW = "start_flow"
 INSIDE_HEADING = "inside_heading"
@@ -206,7 +207,7 @@ BUBBLE_CHOICES_HELP = "bubble_choices_help"
 # told): the first look at whose words are in, its heading and its button;
 # and the bubble by the one thing to press now, for the states that have one.
 GUIDE = "guide"
-GUIDE_IDS = ("first_look_title", "first_look_go", "write", "table", "pressed", "answer_ai", "after")
+GUIDE_IDS = ("about_title", "about_next", "first_look_title", "first_look_go", "write", "table", "pressed", "answer_ai", "after")
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (

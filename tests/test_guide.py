@@ -33,9 +33,20 @@ def test_its_words_are_the_teachers_file_every_row_there():
     assert words["first_look_go"] and words["write"]
 
 
-def test_the_first_look_is_a_dialog_with_its_button_first():
-    assert '<dialog id="first-look" class="first-look" aria-labelledby="first-look-title">' in HTML
-    assert '<button type="button" id="first-look-go" class="first-look-go" autofocus></button>' in HTML
+def test_the_first_look_is_one_dialog_of_two_pages_what_the_app_is_then_whose_words():
+    assert '<dialog id="first-look" class="first-look" aria-labelledby="first-look-about-title">' in HTML
+    look = HTML[HTML.index('<dialog id="first-look"'):HTML.index("</dialog>")]
+    assert look.index('<section id="first-look-about" class="first-look-page">') < look.index(
+        '<section id="first-look-inside" class="first-look-page" hidden>')
+    assert '<button type="button" id="first-look-next" class="first-look-go" autofocus></button>' in look
+    assert '<button type="button" id="first-look-go" class="first-look-go"></button>' in look
+    # 次へ: the second page in place of the first, the keyboard and the name on it.
+    page = _top("firstLook")
+    assert '$("first-look-about").hidden = true;' in page and '$("first-look-inside").hidden = false;' in page
+    assert 'look.setAttribute("aria-labelledby", "first-look-title");' in page and '$("first-look-title").focus();' in page
+    # With no words in, the first page alone, its button the last one.
+    assert '$("first-look-next").textContent = body ? words.about_next : words.first_look_go;' in page
+    assert "if (!body) return done();" in page
     # The guide is never read out (the line at the top is) and never pressed.
     assert '<div id="guide" class="guide" aria-hidden="true" hidden>' in HTML
     rule = CSS[CSS.index(".guide { position: fixed;"):]
@@ -48,8 +59,8 @@ def test_the_first_look_comes_once_when_the_table_is_out_and_goes_back_to_the_co
     look = _top("firstLook")
     assert "if (state.firstLooked ||" in look and "state.firstLooked = true;" in look
     # The same words as in the map's column, moved, not copied (no id twice).
-    assert '$("first-look-body").append(body);' in look
-    assert '$("inside-fold").append(body);' in look
+    assert 'if (body) $("first-look-body").append(body);' in look
+    assert 'if (body) $("inside-fold").append(body);' in look
     assert '$("inside").classList.remove("beckon");' in look
     assert '$("question").focus({ preventScroll: true });' in look
     assert "look.showModal();" in look
@@ -129,17 +140,18 @@ def test_the_bubble_goes_over_what_to_press_under_it_or_kept_in_the_window():
     assert got["none"] == {"hidden": True, "lit": False}
 
 
-def test_the_first_screen_says_what_the_app_is_and_how_it_goes_by_the_bands_steps():
+def test_what_the_app_is_and_how_it_goes_come_right_before_whose_words_are_in():
     screen = texts.screen_texts()
     assert "AI" in screen["start_about"] and "本人" in screen["start_about"]  # Not the person answering now.
     assert tuple(screen["start_flow"]) == texts.NOW_STEP_IDS and all(screen["start_flow"].values())
-    box = HTML[HTML.index('<div class="start-about-box">'):]
-    assert box.index('id="start-about"') < box.index('<ol id="start-flow" class="start-flow" aria-label="すすみ方">')
-    assert HTML.index('id="start-purpose"') < HTML.index('class="start-about-box"') < HTML.index('class="promises"')
+    # On the first look's first page, not on the first screen (the teacher, 11/6).
+    start = HTML[HTML.index('<section id="start">'):HTML.index("</section>", HTML.index('<section id="start">'))]
+    assert "start-about" not in start and "start-flow" not in start
+    page = HTML[HTML.index('<section id="first-look-about"'):HTML.index('<section id="first-look-inside"')]
+    assert page.index('id="start-about"') < page.index('<ol id="start-flow" class="start-flow" aria-label="すすみ方">')
     # The step names are the band's own (the same words light up there later).
     filled = APP[APP.index('$("start-about").textContent'):APP.index('$("lab-question").textContent')]
     assert "for (const step of data.texts.now_steps)" in filled and "data.texts.start_flow[step.id]" in filled
-    # Across the screen, four in a row, two rows when narrow; broken between words.
-    assert ".start-about-box { grid-column: 1 / -1;" in CSS
+    # Four in a row, two rows when narrow; broken between words.
     assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in CSS
-    assert ".start-about-box, .first-look, .guide, .wait-sign {\n  word-break: auto-phrase;" in CSS
+    assert ".first-look, .guide, .wait-sign {\n  word-break: auto-phrase;" in CSS

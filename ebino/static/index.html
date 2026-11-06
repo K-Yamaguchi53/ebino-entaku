@@ -28,12 +28,6 @@
   <!-- Before starting: the seven notices and the one Lab question (SPEC 2-1). -->
   <section id="start">
     <p id="start-purpose" class="start-purpose"></p>
-    <!-- What the app is, and how it goes (the teacher, 11/6): the band's four
-         steps, each with what is done in it, in a row with arrows. -->
-    <div class="start-about-box">
-      <p id="start-about" class="start-about"></p>
-      <ol id="start-flow" class="start-flow" aria-label="すすみ方"></ol>
-    </div>
     <div class="promises"><ol id="start-notice" class="notice-list"></ol></div>
     <div class="lab-pick">
       <p id="lab-question" class="lab-question"></p>
@@ -339,14 +333,25 @@
   </section>
 </main>
 
-<!-- The first look (the teacher, 11/6): once the table is out, before the
-     first question, whose words are in comes up in the middle of the screen
-     by itself; its button (or Esc) puts it back in the map's column and the
-     keyboard goes to the box. app.js moves #inside's body in and out. -->
-<dialog id="first-look" class="first-look" aria-labelledby="first-look-title">
-  <h2 id="first-look-title" class="first-look-title"></h2>
-  <div id="first-look-body" class="first-look-body"></div>
-  <p class="first-look-row"><button type="button" id="first-look-go" class="first-look-go" autofocus></button></p>
+<!-- The first look (the teacher, 11/6): once a Lab is picked and the table
+     is out, before the first question, one window comes up by itself in the
+     middle of the screen, two pages one after the other: what the app is and
+     how it goes (the band's four steps in a row with arrows), then 次へ,
+     whose words are in. Its last button (or Esc) puts those back in the
+     map's column and the keyboard goes to the box. app.js moves #inside's
+     body in and out. -->
+<dialog id="first-look" class="first-look" aria-labelledby="first-look-about-title">
+  <section id="first-look-about" class="first-look-page">
+    <h2 id="first-look-about-title" class="first-look-title"></h2>
+    <p id="start-about" class="start-about"></p>
+    <ol id="start-flow" class="start-flow" aria-label="すすみ方"></ol>
+    <p class="first-look-row"><button type="button" id="first-look-next" class="first-look-go" autofocus></button></p>
+  </section>
+  <section id="first-look-inside" class="first-look-page" hidden>
+    <h2 id="first-look-title" class="first-look-title" tabindex="-1"></h2>
+    <div id="first-look-body" class="first-look-body"></div>
+    <p class="first-look-row"><button type="button" id="first-look-go" class="first-look-go"></button></p>
+  </section>
 </dialog>
 
 <!-- The guide (the teacher, 11/6): a bubble by the one thing to press now,

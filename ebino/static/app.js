@@ -805,19 +805,33 @@ function setupInside() {
 }
 
 // The first look (the teacher, 11/6: the students did not open it by
-// themselves): once the table is out, whose words are in comes up in the
-// middle of the screen, over everything, by itself; once only (the next
-// student starts from the page read afresh). Its button, Esc, or a question
-// example pressed puts it back in the map's column, and the keyboard goes
-// to the box.
+// themselves, and should know what the app is right before): once the
+// table is out, one window in the middle of the screen, over everything, by
+// itself, two pages: what the app is and how it goes, then (次へ) whose words
+// are in. Once only (the next student starts from the page read afresh).
+// Its last button, Esc, or a question example pressed puts whose words are
+// in back in the map's column, and the keyboard goes to the box.
 function firstLook() {
-  const look = $("first-look"), body = document.querySelector("#inside-fold .inside-body");
-  if (state.firstLooked || !state.texts.guide || $("inside").hidden || !body || typeof look.showModal !== "function") return;
+  const look = $("first-look"), words = state.texts.guide;
+  if (state.firstLooked || !words || typeof look.showModal !== "function") return;
   state.firstLooked = true;
-  $("first-look-title").textContent = state.texts.guide.first_look_title;
-  $("first-look-go").textContent = state.texts.guide.first_look_go;
+  // Whose words are in, when there are any (with none, the first page alone).
+  const body = $("inside").hidden ? null : document.querySelector("#inside-fold .inside-body");
+  $("first-look-about-title").textContent = words.about_title;
+  $("first-look-title").textContent = words.first_look_title;
+  $("first-look-go").textContent = words.first_look_go;
+  $("first-look-next").textContent = body ? words.about_next : words.first_look_go;
   $("inside-fold").open = false;
-  $("first-look-body").append(body);
+  if (body) $("first-look-body").append(body);
+  // 次へ: the second page in place of the first, the keyboard on its heading.
+  $("first-look-next").onclick = () => {
+    if (!body) return done();
+    $("first-look-about").hidden = true;
+    $("first-look-inside").hidden = false;
+    look.setAttribute("aria-labelledby", "first-look-title");
+    look.scrollTop = 0;
+    $("first-look-title").focus();
+  };
   // Every way out comes here, once (the browser's own close event does not
   // always come: Esc closes it here, not by the browser).
   let over = false;
@@ -825,7 +839,7 @@ function firstLook() {
     if (over) return;
     over = true;
     if (look.open) look.close();
-    $("inside-fold").append(body);
+    if (body) $("inside-fold").append(body);
     $("inside").classList.remove("beckon");  // Seen: the light goes for good.
     $("question").focus({ preventScroll: true });
     drawGuide();
