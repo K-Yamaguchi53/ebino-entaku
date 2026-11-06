@@ -1192,6 +1192,10 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #table > .map-source { gr
 /* An upright screen (768×1024): the map the width, its buttons under it in
    rows, the counts card under them; the drawer over the lower part. */
 @media (orientation: portrait) {
+  /* 直し45: the top line two lines high upright, whatever it says. Pressing
+     a bubble made it wrap (768 wide), the map's room shrank, the map was
+     laid out again and the bubble's choices went at once. */
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line { min-height: calc(2.9em + 12px); }
   body:has(#table:not([hidden])):has(#map:not([hidden])) { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "title heavy" "steps steps" "line line" "main main";
     grid-template-rows: auto auto auto minmax(0, 1fr); }
   body:has(#table:not([hidden])):has(#map:not([hidden])) #table { grid-template-columns: minmax(0, 1fr); }

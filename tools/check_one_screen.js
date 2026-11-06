@@ -52,6 +52,7 @@ async (page) => {
           await p.waitForTimeout(500);
           await p.keyboard.press("Escape");
           await p.waitForSelector("#table:not([hidden])");
+          await closeFirstLook(p);
           await p.waitForTimeout(700);
           if (moment === "school_zoom") {
             await p.locator(".school-count").click();
@@ -140,6 +141,17 @@ async (page) => {
   }
   return JSON.stringify(table, null, 1);
 
+  // 司会（AI）から、はじめに (the teacher, 11/6): its two pages shut once
+  // they show, as a student's 「はじめる」 would.
+  async function closeFirstLook(p) {
+    await p.waitForFunction(() => { const d = document.querySelector("#first-look"); return !d || d.open; },
+      null, { timeout: 4000 }).catch(() => {});
+    if (await p.evaluate(() => Boolean(document.querySelector("#first-look") && document.querySelector("#first-look").open))) {
+      await p.keyboard.press("Escape");
+      await p.waitForTimeout(200);
+    }
+  }
+
   // A round, one bubble marked and one opened, then 帰る前に、ひとこと (an AI's
   // question answered first, when the screen asks for one).
   async function toHitokoto(p) {
@@ -149,6 +161,7 @@ async (page) => {
     await p.waitForTimeout(500);
     await p.keyboard.press("Escape");
     await p.waitForSelector("#table:not([hidden])");
+    await closeFirstLook(p);
     await p.fill("#question", "休みの日って、みんな何してる？");
     await p.click("#ask-button");
     await p.waitForSelector(".table-bubble:not(.unplaced):not(.ai)", { timeout: 20000 });
