@@ -118,11 +118,18 @@ LOOKS = {
         "ramp": [(0.0, (0.36, 0.26, 0.07)), (0.085, (0.32, 0.23, 0.06)), (0.12, (0.42, 0.05, 0.015)),
                  (0.30, (0.46, 0.10, 0.015)), (0.44, (0.50, 0.20, 0.02)), (0.58, (0.50, 0.34, 0.04)),
                  (0.70, (0.42, 0.32, 0.11)), (0.86, (0.19, 0.13, 0.09)), (1.0, (0.15, 0.11, 0.09))],
-        "forest": ((0.035, 0.07, 0.03), 0.0),
-        "patches": (0.43, 0.50),
+        "forest": ((0.03, 0.075, 0.025), 0.0),
+        "patches": (0.33, 0.37),
+        # The crowns: about 3 units (110 m, a clump of trees) across, a
+        # few pixels in the picture; each cell one colour (where, colour),
+        # the slopes leaning to one end or the other by a wider noise.
+        "canopy": {"scale": 0.3, "bump": 0.45, "lean": (0.06, 2.4), "spread": 0.35,
+                   "colours": [(0.0, (0.04, 0.11, 0.025)), (0.24, (0.42, 0.012, 0.012)),
+                               (0.40, (0.62, 0.035, 0.012)), (0.54, (0.72, 0.17, 0.01)),
+                               (0.68, (0.82, 0.40, 0.02)), (0.86, (0.70, 0.26, 0.015))]},
         "basin": ((0.36, 0.26, 0.07), 0.15),
         "side": (0.022, 0.016, 0.012),
-        "lights": (("sun", 3.0, (1.0, 0.86, 0.72), (70, 0, -112)), ("rim", 0.5, (0.6, 0.68, 1.0), (70, 0, 135))),
+        "lights": (("sun", 3.0, (1.0, 0.93, 0.84), (70, 0, -112)), ("rim", 0.5, (0.6, 0.68, 1.0), (70, 0, 135))),
         "sky": ((0.08, 0.09, 0.14), 0.5),
     },
 }
@@ -155,6 +162,73 @@ def night_material(season="night"):
         stops.new(at).color = (*colour, 1)
     nt.links.new(by_height.outputs["Result"], ramp.inputs["Fac"])
     leaves = ramp.outputs["Color"]
+    if "canopy" in look:
+        # The trees' crowns on the wooded slopes (above the fields, below
+        # the plateau's grass): a cell each, its colour drawn from the
+        # cell's own random value, a little dome lit by the sun.
+        canopy = look["canopy"]
+        cells = nt.nodes.new("ShaderNodeTexVoronoi")
+        cells.inputs["Scale"].default_value = canopy["scale"]
+        nt.links.new(geometry.outputs["Position"], cells.inputs["Vector"])
+        random = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(cells.outputs["Color"], random.inputs[0])
+        crowns = nt.nodes.new("ShaderNodeValToRGB")
+        crowns.color_ramp.interpolation = "CONSTANT"
+        stops = crowns.color_ramp.elements
+        first, *rest = canopy["colours"]
+        stops[0].position, stops[0].color = first[0], (*first[1], 1)
+        stops[1].position, stops[1].color = rest[-1][0], (*rest[-1][1], 1)
+        for at, colour in rest[:-1]:
+            stops.new(at).color = (*colour, 1)
+        # value = 0.5 + (random - 0.5) * spread + (slope's lean - 0.5) * strength
+        lean_scale, lean = canopy["lean"]
+        spread = canopy["spread"]
+        slope_lean = nt.nodes.new("ShaderNodeTexNoise")
+        slope_lean.inputs["Scale"].default_value = lean_scale
+        slope_lean.inputs["Detail"].default_value = 2.0
+        nt.links.new(geometry.outputs["Position"], slope_lean.inputs["Vector"])
+        own = nt.nodes.new("ShaderNodeMath")
+        own.operation = "MULTIPLY_ADD"
+        own.inputs[1].default_value = spread
+        own.inputs[2].default_value = 0.5 - 0.5 * spread - 0.5 * lean
+        nt.links.new(random.outputs["X"], own.inputs[0])
+        pick = nt.nodes.new("ShaderNodeMath")
+        pick.operation = "MULTIPLY_ADD"
+        pick.use_clamp = True
+        pick.inputs[1].default_value = lean
+        nt.links.new(slope_lean.outputs["Fac"], pick.inputs[0])
+        nt.links.new(own.outputs[0], pick.inputs[2])
+        nt.links.new(pick.outputs[0], crowns.inputs["Fac"])
+        wood_from = nt.nodes.new("ShaderNodeMapRange")
+        wood_from.inputs["From Min"].default_value = 0.085
+        wood_from.inputs["From Max"].default_value = 0.11
+        nt.links.new(by_height.outputs["Result"], wood_from.inputs["Value"])
+        wood_to = nt.nodes.new("ShaderNodeMapRange")
+        wood_to.inputs["From Min"].default_value = 0.56
+        wood_to.inputs["From Max"].default_value = 0.66
+        wood_to.inputs["To Min"].default_value = 1.0
+        wood_to.inputs["To Max"].default_value = 0.0
+        nt.links.new(by_height.outputs["Result"], wood_to.inputs["Value"])
+        wood = nt.nodes.new("ShaderNodeMath")
+        wood.operation = "MULTIPLY"
+        nt.links.new(wood_from.outputs["Result"], wood.inputs[0])
+        nt.links.new(wood_to.outputs["Result"], wood.inputs[1])
+        wooded_slope = nt.nodes.new("ShaderNodeMix")
+        wooded_slope.data_type = "RGBA"
+        nt.links.new(leaves, socket(wooded_slope.inputs, "A_Color"))
+        nt.links.new(crowns.outputs["Color"], socket(wooded_slope.inputs, "B_Color"))
+        nt.links.new(wood.outputs[0], socket(wooded_slope.inputs, "Factor_Float"))
+        leaves = socket(wooded_slope.outputs, "Result_Color")
+        dome = nt.nodes.new("ShaderNodeBump")
+        dome.invert = True
+        dome.inputs["Distance"].default_value = 1.0
+        nt.links.new(cells.outputs["Distance"], dome.inputs["Height"])
+        dome_strength = nt.nodes.new("ShaderNodeMath")
+        dome_strength.operation = "MULTIPLY"
+        dome_strength.inputs[1].default_value = canopy["bump"]
+        nt.links.new(wood.outputs[0], dome_strength.inputs[0])
+        nt.links.new(dome_strength.outputs[0], dome.inputs["Strength"])
+        nt.links.new(dome.outputs["Normal"], bsdf.inputs["Normal"])
     if "forest" in look:
         # The cedars: dark green in patches over the leaves' colour, as a
         # wooded slope is (a noise over the model's place, a few hundred
