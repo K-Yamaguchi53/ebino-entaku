@@ -832,8 +832,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
    than the words (the person's words lead). width 0 / min-width 100%: a long
    one never widens its bubble; it wraps between words instead. */
 .map-bubble .kind, .table-bubble .kind, .one-bubble .kind { width: 0; min-width: 100%; margin: 0 0 2px; font-family: var(--gothic);
-  font-size: 12px; line-height: 1.4; letter-spacing: .02em; color: var(--paper-soft); }
-.one-bubble .kind { font-size: 13px; margin-bottom: 4px; }
+  font-size: 13px; font-weight: 700; line-height: 1.4; letter-spacing: .02em; color: var(--paper-soft); }
+.one-bubble .kind { font-size: 14px; margin-bottom: 4px; }
 .map-bubble .thread { position: absolute; height: 1.5px; transform-origin: 0 50%; transform: rotate(var(--a));
   background: linear-gradient(90deg, transparent, var(--lamp) 40%, var(--lamp-bright)); pointer-events: none;
   animation: thread .45s ease-out both; }
@@ -1099,14 +1099,14 @@ body.one-open #map-heading { visibility: hidden; }
 .trail-open[aria-expanded="true"]::after { rotate: -135deg; translate: 0 2px; }
 .trail-open:focus-visible { outline: var(--focus-w) solid var(--lamp); outline-offset: var(--focus-gap); }
 .trail-list { list-style: none; margin: 0; padding: 2px 2px 2px 0; min-height: 0; overflow: auto; overscroll-behavior: contain;
-  scrollbar-width: thin; scrollbar-color: var(--moon-soft) transparent; font-size: 13px; line-height: 1.5; color: var(--ink);
+  scrollbar-width: thin; scrollbar-color: var(--moon-soft) transparent; font-size: 14px; line-height: 1.5; color: var(--ink);
   word-break: auto-phrase; overflow-wrap: break-word; }
 .trail-item { position: relative; display: flex; flex-direction: column; gap: 1px; margin: 0 0 0 6px; padding: 3px 4px 7px 12px;
   border-left: 2px solid var(--moon-faint); }
 .trail-item.on-turn { border-left-color: var(--lamp); }
 .trail-item.turn-from::before, .trail-item.turn-to::before { content: ""; position: absolute; left: -6px; top: 6px; width: 10px; height: 10px;
   border-radius: 50%; background: var(--lamp); }
-.trail-small { font-size: 11px; color: var(--soft); }
+.trail-small { font-size: 12px; color: var(--soft); }
 .trail-text { color: var(--ink); }
 .trail-question .trail-text { font-weight: 700; }
 .trail-turn { align-self: flex-start; margin-bottom: 2px; padding: 0 6px; border-radius: 4px; background: var(--lamp); color: var(--night-deep);
@@ -1118,7 +1118,7 @@ body.one-open #map-heading { visibility: hidden; }
 .trail-item.trail-ai { margin-top: 2px; margin-bottom: 4px; padding: 5px 8px 6px 10px; border: 1px solid var(--ai); border-left-width: 2px;
   border-radius: 8px; background: var(--ai-deep); color: var(--ai-ink); }
 .trail-item.trail-ai.on-turn { border-left-color: var(--lamp); }
-.trail-ai .trail-ai-name { font-size: 11px; font-weight: 700; color: var(--ai); }
+.trail-ai .trail-ai-name { font-size: 12px; font-weight: 700; color: var(--ai); }
 .trail-ai .trail-text { color: var(--ai-ink); }
 .trail-answer { display: flex; flex-wrap: wrap; gap: 0 6px; color: var(--ink); }
 /* Only the room the column's other parts leave (basis 0): a long trail
@@ -1482,8 +1482,12 @@ body.one-open .input-area .ask { visibility: hidden; }
 .one-finish { border-style: dashed; color: var(--soft); }
 /* コーチ（AI） at one to one: the AI's colour and shape (as its seat, 直し32),
    its name over the question; never from the person. */
-.one-coach { display: grid; gap: 6px; padding: 8px 12px 10px; border: 1px solid var(--ai); border-radius: 12px;
-  background: var(--ai-deep); color: var(--ai-ink); box-shadow: 0 6px 16px var(--shadow); }
+.one-coach { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 12px; border: 1px solid var(--ai);
+  border-radius: 12px; background: var(--ai-deep); color: var(--ai-ink); box-shadow: 0 6px 16px var(--shadow);
+  word-break: auto-phrase; overflow-wrap: break-word; }
+/* In the band at the foot, over the hidden box (its place), growing upward. */
+#ask-form .one-coach { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; visibility: visible; }
+.one-coach input { flex: 1 1 12em; min-width: 10em; }
 .one-coach.waiting { display: flex; align-items: center; min-height: 36px; }
 .one-coach-dots { display: flex; gap: 6px; }
 .one-coach-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--ai); opacity: .5; }

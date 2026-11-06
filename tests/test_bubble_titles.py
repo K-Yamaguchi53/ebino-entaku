@@ -88,6 +88,7 @@ def test_the_screen_puts_the_line_first_small_and_never_wider_than_the_words():
     rule = CSS[CSS.index(".map-bubble .kind, .table-bubble .kind, .one-bubble .kind {"):]
     rule = rule[:rule.index("}")]
     # A long line never widens its bubble at 768: it wraps between words.
-    assert "width: 0; min-width: 100%;" in rule and "font-size: 12px;" in rule and "color: var(--paper-soft);" in rule
+    assert "width: 0; min-width: 100%;" in rule and "font-size: 13px;" in rule and "color: var(--paper-soft);" in rule
+    assert "font-size: 15px" in CSS[CSS.index(".table-bubble .voice {"):][:120]  # The words stay larger.
     words = CSS[CSS.index(".now-line, .start-purpose, .inside"):]
     assert ".table-bubble" in words[:words.index("}")] and ".one-bubble" in words[:words.index("}")]

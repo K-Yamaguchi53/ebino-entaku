@@ -1940,7 +1940,8 @@ function trailOpened(roundNo, utteranceId) {
 // AI's colour and shape with its name, never as a person's.
 function trailItem(item, words) {
   const li = el("li", { class: `trail-item trail-${item.kind}`, "data-n": String(item.n) });
-  const small = (text) => el("span", { class: "trail-small", text });
+  // A seat's title is never broken inside its （…） (as everywhere, 直し33-5).
+  const small = (text) => el("span", { class: "trail-small" }, phrased(text));
   if (item.kind === "question") {
     if (item.changed) li.append(el("span", { class: "trail-turn", text: words.changed }));
     li.append(small(words.question), el("span", { class: "trail-text", text: item.text }));

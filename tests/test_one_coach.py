@@ -196,3 +196,13 @@ def test_the_model_is_asked_outside_the_lock(monkeypatch):
     assert the_app.handle("/api/one/coach_answer", {"seat_id": "A01", "ask_no": view["ask_no"], "choice": "know",
                                                     "note": ""})["ok"]
     assert isinstance(threading.Lock(), type(the_app.lock))
+
+
+def test_the_board_is_in_the_band_at_the_foot_apart_from_the_person():
+    from ebino import app as app_module
+    static = app_module.STATIC_DIR
+    map_js = (static / "map.js").read_text(encoding="utf-8")
+    css = (static / "style.css").read_text(encoding="utf-8")
+    ask = map_js[map_js.index("  async function askCoach(mine, askNo) {"):map_js.index("  // The coach's board gone")]
+    assert '$("ask-form").append(board);' in ask and "mine.panel" not in ask
+    assert "#ask-form .one-coach { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; visibility: visible; }" in css

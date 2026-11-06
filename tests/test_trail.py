@@ -115,6 +115,7 @@ def test_the_screen_asks_for_it_and_shows_it_by_the_map():
     assert 'id="trail"' in HTML and 'id="trail-open"' in HTML and 'id="trail-list"' in HTML
     assert 'fetch("/api/trail")' in APP
     assert 'call("/api/trail/opened"' in APP
+    assert 'const small = (text) => el("span", { class: "trail-small" }, phrased(text));' in APP
     # In the column, the room left over only: a long trail never squeezes the buttons.
     assert ".map-bar .trail { flex: 1 1 0; }" in CSS
     # A low screen (1366×650): the column tighter, so every button keeps its room.

@@ -3623,8 +3623,6 @@ const EbinoMap = (() => {
     panel.setAttribute("role", "group");
     panel.setAttribute("aria-label", whoOf(seatOf(one.seatId)));
     const mine = one;
-    // コーチ（AI）'s board, when one is up or on its way, stays at the top.
-    if (mine.coach && mine.coach.node) panel.append(mine.coach.node);
     // Every item asked (直し34-5), or 「聞き終えました」 pressed (直し45 段3: at
     // any time): 「聞き終えました」 and one choice, 「ありがとうございました」;
     // pressed, the seat is thanked (its mark) and one to one closes.
@@ -3695,8 +3693,8 @@ const EbinoMap = (() => {
 
   // コーチ（AI） at one to one (直し45 段3): asked for after the person's
   // words came (never waited for: the next questions are already there); on
-  // its own small board in the AI's colour and shape with its name, at the
-  // top of the questions, never from the person or its bubble. Three dots
+  // its own small board in the AI's colour and shape with its name, in the
+  // band at the foot (the box's place), never from the person or its bubble. Three dots
   // while it comes; nothing when it does not. Answered with the teacher's
   // choices (and a line, or not), or 答えない; then on as before.
   async function askCoach(mine, askNo) {
@@ -3707,10 +3705,10 @@ const EbinoMap = (() => {
     for (let n = 0; n < 3; n++) dots.append(document.createElement("span"));
     board.append(dots);
     mine.coach = { askNo, node: board };
-    if (mine.panel && mine.panel.isConnected) {
-      mine.panel.prepend(board);
-      placeOne();
-    }
+    // In the band at the foot, where the box to write in was (hidden at one
+    // to one): apart from the person and from the questions to pick.
+    for (const old of document.querySelectorAll("#ask-form .one-coach")) old.remove();
+    $("ask-form").append(board);
     let view = null;
     try {
       view = await app.oneCoach(mine.seatId, askNo);
@@ -3845,7 +3843,10 @@ const EbinoMap = (() => {
     const [, fy] = toFrame(one.home[0], one.home[1]);
     const taken = [[left, top, width, height], [lx, py, rx - lx, fy - py]];
     const clampL = (x) => Math.max(8, Math.min(x, frameBox.width - p.width - 8));
-    const clampT = (y) => Math.max(8, Math.min(y, frameBox.height - p.height - 8));
+    // コーチ（AI）'s board at the foot may rise over the frame's foot (直し45 段3): the questions keep above it.
+    const board = document.querySelector("#ask-form .one-coach");
+    const floor = board ? Math.min(frameBox.height, board.getBoundingClientRect().top - frameBox.top) : frameBox.height;
+    const clampT = (y) => Math.max(8, Math.min(y, floor - p.height - 8));
     const spots = [[left, top + height + 10], [left, top - p.height - 10],
       [left + width + 10, top], [left - p.width - 10, top],
       // Beside the person, the other side from its words.
@@ -3863,6 +3864,7 @@ const EbinoMap = (() => {
     const { token, group, flight } = one;
     one = null;
     for (const node of overlay.querySelectorAll(".one-bubble, .one-asks")) node.remove();
+    for (const node of document.querySelectorAll("#ask-form .one-coach")) node.remove();
     if (group) group.remove();
     if (flight) flight.cancel();
     if (token) token.node.classList.remove("one-self", "stood");
