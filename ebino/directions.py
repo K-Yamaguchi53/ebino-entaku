@@ -2,7 +2,8 @@
 
 The question still becomes a question card, as before. Under it, two or
 three ways to go on, made from the kinds of talk (talk_kinds.py), never by a
-model: of the kinds this student has not been shown yet, the MAX_WAYS that
+model: of the kinds this student has not been shown yet (直し46: a kind
+shown only in a round's last word still counts as not shown), the MAX_WAYS that
 most pieces have (ties in the teacher's table order), shown in the table's
 order. No such kind: no way is offered.
 

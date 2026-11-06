@@ -1458,8 +1458,10 @@ class Session:
 
     def _shown_kinds(self) -> set[str]:
         """The kinds of talk shown to this student: a piece of it seen, or
-        its way pressed."""
-        kinds = {self.library.kind_of.get(uid, talk_kinds.NONE) for uid in self.seen_ids()}
+        its way pressed. 直し46: a piece seen only in a round's last word
+        (締めの一言) does not count; the bubbles, 「もっと聞く」 and the
+        seats' answers do."""
+        kinds = {self.library.kind_of.get(uid, talk_kinds.NONE) for uid in self._seen_but_last_words()}
         return (kinds | {way["kind"] for way in self.ways_taken.values()}) - {talk_kinds.NONE}
 
     def _way_label(self, kind: str) -> str:
@@ -1565,9 +1567,14 @@ class Session:
         rounds' last words, what 「もっと聞く」 showed and the seats' answers.
         Never shown again in a last word, a seat's answer or 「もっと聞く」."""
         closings = {w.utterance_id for r in self.rounds if r.closing for w in r.closing.words}
+        return self._seen_but_last_words() | closings
+
+    def _seen_but_last_words(self) -> set[str]:
+        """The pieces shown other than in the rounds' last words: the rounds'
+        quotes, what 「もっと聞く」 showed and the seats' answers."""
         heard = {piece_id for state in self.mores.values() for piece_id in state.shown}
         answers = {r.ask_seat.answer_id for r in self.rounds if r.ask_seat and r.ask_seat.answer_id}
-        return self.shown_ids() | closings | heard | answers
+        return self.shown_ids() | heard | answers
 
     def seconds_used(self) -> int:
         return int(time.monotonic() - self.started)

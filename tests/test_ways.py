@@ -7,7 +7,7 @@ import random
 import pytest
 from fake_client import FakeClient
 
-from ebino import app as app_module, directions, texts
+from ebino import app as app_module, closing, directions, roundtable, texts
 from ebino.gate import Gate, NameList
 from ebino.session import Library, Refused, Session
 from test_closing import ALL_SEATS, KINDS, PIECES
@@ -110,3 +110,23 @@ def test_the_screen_shows_the_ways_over_the_box():
     assert 'id="ways"' in HTML and 'id="ways-buttons"' in HTML
     assert 'call("/api/direction", { round: roundNo, kind })' in APP
     assert "if (!round.way) showWays(round);" in APP
+
+
+def test_a_kind_shown_only_in_a_last_word_is_still_offered():
+    """直し46: the kinds counted as shown are those of the bubbles (and 1対1,
+    「もっと聞く」, the seats' answers); a last word (締めの一言) alone does
+    not make its kind shown, so the way to it stays."""
+    session, _ = sitting(SILENT)
+    session.ask(NOBODY)
+    held = session.library.closing_pieces
+    seat, by_kind = next((s, k) for s, k in held.items() if k)
+    kind, pieces = next((k, p) for k, p in by_kind.items() if p and k != "none")
+    uid = pieces[0].utterance_id
+    session.rounds[0].closing = closing.Closing("shown", words=[closing.Word(seat, uid, "架空", kind)])
+    assert uid in session.seen_ids()  # Never shown again, as before.
+    assert kind not in session._shown_kinds()
+    order = session.library.kind_order
+    assert directions.offered(held, order, session._shown_kinds()) == directions.offered(held, order, set())
+    # The same piece in a bubble: its kind is shown.
+    session.rounds[0].quotes.append(roundtable.ShownQuote(uid, seat, "spoken", "架空"))
+    assert kind in session._shown_kinds()
