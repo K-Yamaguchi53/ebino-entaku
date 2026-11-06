@@ -212,7 +212,7 @@ BUBBLE_CHOICES_HELP = "bubble_choices_help"
 # told): the first look at whose words are in, its heading and its button;
 # and the bubble by the one thing to press now, for the states that have one.
 GUIDE = "guide"
-GUIDE_IDS = ("host_mark", "about_title", "roles_lead", "about_next", "first_look_title", "first_look_go", "write", "table", "pressed", "answer_ai", "after")
+GUIDE_IDS = ("host_mark", "about_title", "roles_lead", "roles_note", "about_next", "first_look_title", "first_look_go", "write", "table", "pressed", "answer_ai", "after")
 
 # 今日の道すじ (直し45 段2): the trail's words (叩き台), and the 「（AI）」 put
 # after コーチ and オブザーバー's names (coach_label.txt before its ｜).
@@ -241,6 +241,11 @@ TRAIL_MARK_WORD_IDS = ("lead", "note", "go", "skip", "sheet")
 # ({kind} is the kind's 名前 in talk_kinds.tsv). 叩き台.
 DIRECTION_WORDS = "direction_words"
 DIRECTION_WORD_IDS = ("notice", "ask")
+# コーチとオブザーバーの紹介札 (直し46, the teacher's words): what each AI
+# knows and what it does, on the host's first page; its name is the cards'
+# name with （AI） (coach.ai_label).
+AI_ROLES_INTRO = "ai_roles_intro"
+AI_ROLES_INTRO_IDS = ("coach", "observer")
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
@@ -389,6 +394,14 @@ def id_table(name: str, ids: tuple[str, ...]) -> dict[str, str]:
     if set(rows) != set(ids):
         raise ValueError(f"{name}.tsv must have the rows {', '.join(ids)}")
     return {key: rows[key] for key in ids}
+
+
+def ai_roles_intro() -> dict[str, dict[str, str]]:
+    """{role: {"knows": 知っている, "does": すること}} for coach and observer."""
+    rows = {row["ID"]: row for row in load_table(AI_ROLES_INTRO, ("ID", "知っている", "すること"))}
+    if set(rows) != set(AI_ROLES_INTRO_IDS):
+        raise ValueError(f"{AI_ROLES_INTRO}.tsv must have the rows {', '.join(AI_ROLES_INTRO_IDS)}")
+    return {key: {"knows": rows[key]["知っている"], "does": rows[key]["すること"]} for key in AI_ROLES_INTRO_IDS}
 
 
 def bubble_choices() -> dict[str, str]:

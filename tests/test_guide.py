@@ -172,18 +172,28 @@ def test_the_first_page_is_said_by_the_host_an_ai_in_the_ais_colour():
     assert r'data.texts.start_about.split("\n")' in APP
 
 
-def test_the_host_page_names_the_coach_and_the_observer_by_the_cards_own_lines():
+def test_the_host_page_has_a_card_for_the_coach_and_the_observer():
     from ebino import coach
-    # The same files as the cards; the coach only with its pieces; none with the band off.
-    assert coach.roles_shown(True, ["片"]) == [coach.label(coach.COACH), coach.label(coach.OBSERVER)]
-    assert coach.roles_shown(True, []) == [coach.label(coach.OBSERVER)]
+    # 直し46: a card each, the name as on the cards and what it knows and
+    # does (ai_roles_intro.tsv); the coach only with its pieces; none with the band off.
+    intro = texts.ai_roles_intro()
+    assert coach.roles_shown(True, ["片"]) == [
+        {"role": "coach", "name": "コーチ（AI）", **intro["coach"]},
+        {"role": "observer", "name": "オブザーバー（AI）", **intro["observer"]}]
+    assert [r["role"] for r in coach.roles_shown(True, [])] == [coach.OBSERVER]
     assert coach.roles_shown(False, ["片"]) == []
     assert coach.roles_for([]) == (coach.OBSERVER,)
-    assert "コーチ" in coach.label(coach.COACH) and "オブザーバー" in coach.label(coach.OBSERVER)
-    assert texts.screen_texts()["guide"]["roles_lead"]
+    guide = texts.screen_texts()["guide"]
+    assert guide["roles_lead"] == "円卓で人の言葉を読んだあと、この2つの AI から問いが届きます。届いた問いに、1回答えてみよう。"
+    assert guide["roles_note"] == "どちらも AI です。町の人ではありません。"
+    roles = APP[APP.index("// コーチとオブザーバー (直し46)"):APP.index("renderInside(data.inside")]
+    assert 'class: "ai-mark role-mark", "aria-hidden": "true", text: data.texts.ai_seat_mark' in roles
+    assert "role.name" in roles and "role.knows" in roles and "role.does" in roles and "｜" not in roles
+    assert '$("start-roles-note").textContent = data.texts.guide.roles_note;' in roles
     # On the first page, under the flow, hidden with none.
     page = HTML[HTML.index('<section id="first-look-about"'):HTML.index('<section id="first-look-inside"')]
     assert page.index('<ol id="start-flow"') < page.index('<div id="start-roles" class="start-roles" hidden>')
+    assert page.index('id="start-roles-list"') < page.index('id="start-roles-note"') < page.index('id="first-look-next"')
     assert '$("start-roles").hidden = !roles.length;' in APP and "data.ai_roles || []" in APP
     assert ".start-roles[hidden] { display: none; }" in CSS
     # From its heading, on a low screen too (1366×650: the heading had gone up out of sight).

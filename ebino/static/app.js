@@ -239,15 +239,19 @@ async function setup() {
   for (const step of data.texts.now_steps) {
     $("now-steps").append(el("li", { "data-step": step.id, text: step.text }));
   }
-  // コーチとオブザーバー: each card's line, its name before ｜ set apart.
+  // コーチとオブザーバー (直し46): a card for each, the AI's mark and its
+  // name as on the cards, what it knows and what it does (ai_roles_intro.tsv).
   const roles = data.ai_roles || [];
   $("start-roles").hidden = !roles.length;
   $("start-roles-lead").textContent = data.texts.guide.roles_lead;
-  for (const line of roles) {
-    const [who, ...what] = line.split("｜");
-    $("start-roles-list").append(what.length
-      ? el("li", {}, el("span", { class: "who", text: who }), el("span", { class: "what", text: what.join("｜") }))
-      : el("li", {}, el("span", { class: "who", text: line })));
+  $("start-roles-note").textContent = data.texts.guide.roles_note;
+  for (const role of roles) {
+    $("start-roles-list").append(el("li", { class: "role-card", "data-role": role.role },
+      el("p", { class: "role-head" },
+        el("span", { class: "ai-mark role-mark", "aria-hidden": "true", text: data.texts.ai_seat_mark }),
+        el("span", { class: "who", text: role.name })),
+      el("p", { class: "knows", text: role.knows }),
+      el("p", { class: "does", text: role.does })));
   }
   renderInside(data.inside || []);
   setNow();

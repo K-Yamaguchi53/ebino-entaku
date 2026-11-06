@@ -89,9 +89,12 @@ def test_both_cards_pass_and_come_in_the_fixed_order_with_their_lines():
     session, client = round_one({"observer": GOOD_OBSERVER, "coach": GOOD_COACH})
     view = session.coach_band(1)
     assert [card["role"] for card in view["cards"]] == ["coach", "observer"]
-    assert view["cards"][0] == {"role": "coach", "label": load_text(COACH_LABEL),
+    # 直し46: the short name on every card (what each does is on the host's page).
+    assert view["cards"][0] == {"role": "coach", "label": "コーチ（AI）",
                                 "badge": load_text(AI_QUESTION_BADGE), "question": GOOD_COACH}
-    assert view["cards"][1]["label"] == load_text(OBSERVER_LABEL)
+    assert view["cards"][1]["label"] == "オブザーバー（AI）"
+    assert load_text(COACH_LABEL).startswith("コーチ") and load_text(OBSERVER_LABEL).startswith("オブザーバー")
+    assert "｜" not in view["cards"][0]["label"] + view["cards"][1]["label"]
     assert view["answered"] == ""
     assert session.coach_band(1) == view and len(client.requests) == 3  # Asked once.
 
@@ -308,7 +311,7 @@ def answered_round_two(tmp_path=None, answers=ANSWERED):
 def test_an_answer_starts_the_next_round_with_the_question_and_the_answer():
     session, client, view = answered_round_two()
     assert view["round"] == 2 and view["question"] == "店を開ける人の役に立っていると思う"
-    assert view["ai_question"] == {"role": "observer", "label": load_text(OBSERVER_LABEL), "text": GOOD_OBSERVER}
+    assert view["ai_question"] == {"role": "observer", "label": "オブザーバー（AI）", "text": GOOD_OBSERVER}
     librarian = client.requests[3]["messages"][0]["content"]
     assert librarian == f"AIの問い：{GOOD_OBSERVER}\n生徒の答え：店を開ける人の役に立っていると思う"
     moderator = json.loads(client.requests[4]["messages"][0]["content"])

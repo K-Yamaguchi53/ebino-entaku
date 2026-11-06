@@ -53,7 +53,7 @@ from .prompts import ONE_COACH as ONE_COACH_PROMPT
 from .reflection import (_QUOTED, STOP_BANNED, STOP_EMPTY, STOP_NAME, STOP_QUOTE, STOP_TOO_LONG, STOP_UNBALANCED,
                          checked)
 from .texts import (AI_ABSTRACT_WORDS, AI_QUESTION_BADGE, AI_ROLE_SUFFIX, COACH_LABEL, OBSERVER_LABEL, OBSERVER_VIEW,
-                    LISTENER_AVOID, load_lines, load_text, read_table)
+                    LISTENER_AVOID, ai_roles_intro, load_lines, load_text, read_table)
 
 ROLE = "coach"  # The gate's role (MODELS, EFFORT) for both cards.
 COACH = "coach"
@@ -328,12 +328,16 @@ def roles_for(sources: list[str]) -> tuple[str, ...]:
     return tuple(role for role in CARDS if role != COACH or sources)
 
 
-def roles_shown(on: bool, sources: list[str]) -> list[str]:
-    """The cards' lines (their files, the same words as on the cards) for the
-    host's page (the teacher, 11/6): none with the band off."""
-    return [label(role) for role in roles_for(sources)] if on else []
+def roles_shown(on: bool, sources: list[str]) -> list[dict]:
+    """The AIs' cards on the host's page (the teacher, 11/6; 直し46: a card
+    for each, its name as on the cards and texts/ai_roles_intro.tsv): none
+    with the band off, the coach only with its pieces."""
+    intro = ai_roles_intro()
+    return [{"role": role, "name": ai_label(role), **intro[role]} for role in roles_for(sources)] if on else []
 
 
 def card_view(asked: Asked) -> dict:
-    return {"role": asked.role, "label": label(asked.role), "badge": load_text(AI_QUESTION_BADGE),
+    """直し46: the card's name is the short one (「コーチ（AI）」), on every
+    screen; what each does is said once, on the host's page."""
+    return {"role": asked.role, "label": ai_label(asked.role), "badge": load_text(AI_QUESTION_BADGE),
             "question": asked.text}

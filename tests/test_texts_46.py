@@ -2,6 +2,8 @@
 of the same tables are left as they were)."""
 
 
+import pytest
+
 from ebino import hitokoto, texts
 
 
@@ -25,3 +27,22 @@ def test_the_three_hitokoto_lines_and_the_ones_left_as_they_were():
     assert words["story_way"] == "頭に置いておきたい道は{*text}。"
     assert words["way_ok"] == "置いておく" and words["way_example"] == "例：農業もおもしろいかも"
     assert words["who_teacher"] == "先生の問い"
+
+
+def test_the_ais_cards_on_the_host_page_are_the_teachers_and_a_row_missing_stops(tmp_path, monkeypatch):
+    intro = texts.ai_roles_intro()
+    assert intro == {
+        "coach": {"knows": "学校の先生たちが、生徒に大事にしてほしいと思っている考え方を知っている。",
+                  "does": "→ その考え方から、あなた自身に1つ問う。"},
+        "observer": {"knows": "会社を経営する人・人を採る人・大学で研究する人の見方を知っている。",
+                     "does": "→ その見方から、あなたの考えを1つ聞く。"}}
+    lines = (texts.TEXTS_DIR / "ai_roles_intro.tsv").read_text(encoding="utf-8").splitlines()
+    (tmp_path / "ai_roles_intro.tsv").write_text("\n".join(lines[:-1]) + "\n", encoding="utf-8")
+    monkeypatch.setattr(texts, "TEXTS_DIR", tmp_path)
+    with pytest.raises(ValueError):
+        texts.ai_roles_intro()
+
+
+def test_the_guides_note_under_the_cards_is_a_row_of_its_own():
+    assert "roles_note" in texts.GUIDE_IDS
+    assert texts.id_table(texts.GUIDE, texts.GUIDE_IDS)["roles_note"] == "どちらも AI です。町の人ではありません。"

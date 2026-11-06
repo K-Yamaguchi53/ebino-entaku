@@ -267,16 +267,23 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   color: var(--lamp); font-size: 16px; }
 .start-flow .flow-step { font-size: 19px; font-weight: 700; color: var(--lamp-bright); }
 .start-flow .flow-do { font-size: 16px; line-height: 1.55; color: var(--ink); }
-/* コーチとオブザーバー: the AI's, so in its colour, as on the cards. */
-.start-roles { margin: 16px 0 0; padding: 12px 18px 14px; border: 2px solid var(--ai); border-radius: 10px;
-  background: var(--ai-deep); }
+/* コーチとオブザーバー (直し46): a card for each, the AI's, so in its colour
+   and with its mark, as the AI's seat and the coach's board; the two cards
+   the same size side by side (one over the other when narrow). */
+.start-roles { margin: 16px 0 0; }
 .start-roles[hidden] { display: none; }
-.start-roles-lead { margin: 0 0 10px; font-size: 17px; line-height: 1.6; color: var(--ai-ink); }
-.start-roles-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 16px;
+.start-roles-lead { margin: 0 0 10px; font-size: 17px; line-height: 1.6; color: var(--ink); }
+.start-roles-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px 16px;
   margin: 0; padding: 0; list-style: none; }
-.start-roles-list li { display: grid; gap: 2px; }
-.start-roles-list .who { font-size: 18px; font-weight: 700; color: var(--ai); }
-.start-roles-list .what { font-size: 16px; line-height: 1.5; color: var(--ai-ink); }
+.role-card { display: grid; align-content: start; gap: 4px; padding: 10px 16px 12px; border: 1px solid var(--ai);
+  border-radius: 10px; background: var(--ai-deep); color: var(--ai-ink); }
+.role-card p { margin: 0; }
+.role-card .role-head { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+.role-card .role-mark { width: 30px; height: 30px; font-size: 13px; }
+.role-card .who { font-size: 18px; font-weight: 700; color: var(--ai); }
+.role-card .knows, .role-card .does { font-size: 16px; line-height: 1.55; }
+.role-card .does { font-weight: 700; }
+.start-roles-note { margin: 10px 0 0; font-size: 16px; line-height: 1.5; color: var(--ai-ink); }
 @media (max-width: 899px) {
   .start-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .start-flow li:nth-child(3)::before { content: none; }
@@ -1772,8 +1779,13 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
   .start-flow li { padding: 8px 12px 10px; }
   .start-flow .flow-step { font-size: 17px; }
   .start-flow .flow-do { font-size: 15px; line-height: 1.5; }
-  .start-roles { margin-top: 10px; padding: 8px 14px 10px; }
+  .start-roles { margin-top: 10px; }
   .start-roles-lead { margin-bottom: 6px; font-size: 16px; }
+  .role-card { gap: 2px; padding: 6px 14px 8px; }
+  .role-card .role-mark { width: 26px; height: 26px; font-size: 12px; }
+  .role-card .who { font-size: 17px; }
+  .role-card .knows, .role-card .does { font-size: 15px; line-height: 1.45; }
+  .start-roles-note { margin-top: 6px; font-size: 15px; }
 }
 
 /* --- The guide (the teacher, 11/6): a bubble by the one thing to press now,

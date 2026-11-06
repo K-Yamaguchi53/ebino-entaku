@@ -13,7 +13,8 @@
 // that begins inside a word as Intl.Segmenter (ja, word) cuts the text.
 // Nothing is sent anywhere; it reads the page as it is.
 (selectors) => {
-  const DEFAULTS = [".one-asks .one-ask", ".one-bubble .voice", ".table-bubble .voice", ".table-bubble .kind", ".one-bubble .kind", ".ai-seat", ".now-line", ".wait-sign"];
+  const DEFAULTS = [".one-asks .one-ask", ".one-bubble .voice", ".table-bubble .voice", ".table-bubble .kind", ".one-bubble .kind", ".ai-seat", ".now-line", ".wait-sign",
+    ".start-roles-lead", ".role-card", ".start-roles-note"];
   if (!selectors || !selectors.length) selectors = DEFAULTS;
   const segmenter = new Intl.Segmenter("ja", { granularity: "word" });
   const found = [];

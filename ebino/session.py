@@ -1633,7 +1633,7 @@ class Session:
             "card": result.card.front() if result.card else None,
             "met_seats": self.met_seats(),
             # The AI question this round's question answers (coach.py), or None.
-            "ai_question": ({"role": result.ai_question.role, "label": coach.label(result.ai_question.role),
+            "ai_question": ({"role": result.ai_question.role, "label": coach.ai_label(result.ai_question.role),
                              "text": result.ai_question.text} if result.ai_question else None),
             # 行き止まりの道案内 (直し45 段4): under a round no seat answered,
             # the ways on and the line over them; a way's own round, its words.
