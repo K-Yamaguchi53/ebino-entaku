@@ -50,7 +50,7 @@ from .guard import check
 from .ingest.scrub import normalize_for_match
 from .prompts import COACH as COACH_PROMPT
 from .reflection import _QUOTED, checked
-from .texts import AI_QUESTION_BADGE, COACH_LABEL, OBSERVER_LABEL, OBSERVER_VIEW, load_text, read_table
+from .texts import AI_QUESTION_BADGE, AI_ROLE_SUFFIX, COACH_LABEL, OBSERVER_LABEL, OBSERVER_VIEW, load_text, read_table
 
 ROLE = "coach"  # The gate's role (MODELS, EFFORT) for both cards.
 COACH = "coach"
@@ -222,6 +222,13 @@ def run(gate: Gate, session, round_no: int, sources: list[str]) -> Band:
 
 def label(role: str) -> str:
     return load_text(LABELS[role])
+
+
+def ai_label(role: str) -> str:
+    """「コーチ（AI）」「オブザーバー（AI）」 (直し45): the name in the card's
+    line (before its ｜) and texts/ai_role_suffix.txt, put together by code;
+    coach_label.txt and observer_label.txt are not rewritten."""
+    return label(role).split("｜")[0].strip() + load_text(AI_ROLE_SUFFIX)
 
 
 def roles_for(sources: list[str]) -> tuple[str, ...]:

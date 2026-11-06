@@ -133,6 +133,15 @@
             </section>
             <div id="drawer-buttons" class="drawer-buttons"></div>
           </div>
+          <!-- 今日の道すじ (直し45 段2): the way this student went, in turn,
+               from the record (GET /api/trail). In the column where there is
+               room; at 1366×650 and upright, shut at first and opened by its
+               button over the map's side. -->
+          <section id="trail" class="trail" hidden>
+            <button type="button" id="trail-open" class="trail-open" aria-expanded="false"
+              aria-controls="trail-list"></button>
+            <ol id="trail-list" class="trail-list" hidden></ol>
+          </section>
           <!-- The map's seasons (the teacher, 11/6): 夜・春・秋, pressed, the
                picture and the ground under it change; nothing else does.
                Shown only when a season's picture is there (map.js). -->

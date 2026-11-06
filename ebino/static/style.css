@@ -1077,6 +1077,53 @@ body.one-open #map-heading { visibility: hidden; }
   overflow-wrap: break-word;
 }
 
+/* 今日の道すじ (直し45 段2): in the map's column, under its buttons, the
+   room left over; each step a line on the left, the turn of a question in
+   the lamp's colour from what was heard to the new question. The AI's
+   questions in the AI's colour and shape (直し32). */
+.trail { display: flex; flex-direction: column; gap: var(--sp-1); min-height: 0; }
+.trail-open { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 40px;
+  padding: 0 12px; border: 1px solid var(--moon-soft); border-radius: var(--r-m); background: transparent; color: var(--ink);
+  font-size: var(--fs-s); font-weight: 700; cursor: pointer; }
+.trail-open::after { content: ""; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  rotate: 45deg; translate: 0 -2px; }
+.trail-open[aria-expanded="true"]::after { rotate: -135deg; translate: 0 2px; }
+.trail-open:focus-visible { outline: var(--focus-w) solid var(--lamp); outline-offset: var(--focus-gap); }
+.trail-list { list-style: none; margin: 0; padding: 2px 2px 2px 0; min-height: 0; overflow: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--moon-soft) transparent; font-size: 13px; line-height: 1.5; color: var(--ink);
+  word-break: auto-phrase; overflow-wrap: break-word; }
+.trail-item { position: relative; display: flex; flex-direction: column; gap: 1px; margin: 0 0 0 6px; padding: 3px 4px 7px 12px;
+  border-left: 2px solid var(--moon-faint); }
+.trail-item.on-turn { border-left-color: var(--lamp); }
+.trail-item.turn-from::before, .trail-item.turn-to::before { content: ""; position: absolute; left: -6px; top: 6px; width: 10px; height: 10px;
+  border-radius: 50%; background: var(--lamp); }
+.trail-small { font-size: 11px; color: var(--soft); }
+.trail-text { color: var(--ink); }
+.trail-question .trail-text { font-weight: 700; }
+.trail-turn { align-self: flex-start; margin-bottom: 2px; padding: 0 6px; border-radius: 4px; background: var(--lamp); color: var(--night-deep);
+  font-size: 12px; font-weight: 700; }
+.trail-label { color: var(--paper-2); font-size: 12px; }
+.trail-press { all: unset; display: flex; flex-direction: column; gap: 1px; cursor: pointer; border-radius: 4px; }
+.trail-press:hover .trail-label { text-decoration: underline; }
+.trail-press:focus-visible { outline: var(--focus-w) solid var(--lamp); outline-offset: 2px; }
+.trail-item.trail-ai { margin-top: 2px; margin-bottom: 4px; padding: 5px 8px 6px 10px; border: 1px solid var(--ai); border-left-width: 2px;
+  border-radius: 8px; background: var(--ai-deep); color: var(--ai-ink); }
+.trail-item.trail-ai.on-turn { border-left-color: var(--lamp); }
+.trail-ai .trail-ai-name { font-size: 11px; font-weight: 700; color: var(--ai); }
+.trail-ai .trail-text { color: var(--ai-ink); }
+.trail-answer { display: flex; flex-wrap: wrap; gap: 0 6px; color: var(--ink); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar .trail { flex: 1 1 auto; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar .trail-open { min-height: 40px; }
+/* 1366×650 and upright: shut at first; opened, over the map's side, under
+   the top line, never over the box at the foot. */
+@media (max-height: 700px), (orientation: portrait) {
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar .trail { flex: none; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .trail-list:not([hidden]) { position: fixed; z-index: 40; right: 16px;
+    top: var(--now-h, 120px); width: min(340px, calc(100vw - 32px)); max-height: min(56vh, 460px); padding: 10px 12px;
+    overflow: auto;
+    border: 1px solid var(--moon-soft); border-radius: var(--r-l); background: var(--night-2); box-shadow: 0 14px 34px var(--shadow); }
+}
+
 /* The safety line sits in the title's row, and only while the table is out
    (直し32-1): never on the first screen; the reflection has its own. */
 .masthead .heavy-talk { display: none; }

@@ -2973,6 +2973,7 @@ const EbinoMap = (() => {
     const below = button("read", () => { closeChoices(false); app.readBelow(tableRoundNo, utteranceId, card); });
     node.append(head, read, paragraph, mark, write, below);
     if (app.bubbleOpened) app.bubbleOpened(utteranceId);  // For today's map (直し38).
+    if (app.trailOpened) app.trailOpened(tableRoundNo, utteranceId);  // 今日の道すじ (直し45 段2).
     // The first time a bubble is pressed, a line under each button says what
     // it does (直し32-4); after that the buttons alone.
     const help = app.firstHelp();

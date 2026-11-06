@@ -83,6 +83,7 @@ MAX_BODY = 16 * 1024
 HITOKOTO = "/api/hitokoto/"  # 帰る前に、ひとこと's steps (直し38).
 # The step a round is at (直し42 段2): asked by GET, never through the lock.
 NOW_STEP = "/api/now_step"
+TRAIL = "/api/trail"  # 今日の道すじ (直し45 段2), asked by GET.
 # Seconds a connection may sit without sending or taking bytes. Waiting for
 # the model is not counted: that happens after the request is read.
 CONNECTION_TIMEOUT = 20
@@ -184,6 +185,9 @@ class App:
             return session.one_thanks(body.get("seat_id"))
         if path == "/api/one/free":
             return session.one_free_question(body.get("seat_id"), body.get("question", ""))
+        # 今日の道すじ (直し45 段2): a bubble pressed, kept as a step; no model.
+        if path == "/api/trail/opened":
+            return session.bubble_opened(body.get("round"), body.get("utterance_id", ""))
         if path == "/api/ask_card":
             return session.ask_card(body.get("round"))
         if path == "/api/ask_seat":
@@ -221,6 +225,12 @@ class App:
         if path.startswith(HITOKOTO):
             return self._hitokoto(session, path[len(HITOKOTO):], body)
         raise Refused("unknown_path")
+
+    def trail(self) -> dict:
+        """今日の道すじ (直し45 段2), GET: this sitting's own steps, through
+        the one lock; no sitting, none. No model is called."""
+        with self.lock:
+            return self.session.trail_view() if self.session is not None else {"items": []}
 
     def _hitokoto(self, session: Session, step: str, body: dict) -> dict:
         """帰る前に、ひとこと (直し38): /api/hitokoto/<step>."""
@@ -289,6 +299,8 @@ def make_handler(app: App, port: int, timeout: float = CONNECTION_TIMEOUT):
                 return self._json(HTTPStatus.OK, app.now_step())
             if path == "/api/setup":
                 return self._json(HTTPStatus.OK, app.setup())
+            if path == TRAIL:
+                return self._json(HTTPStatus.OK, app.trail())
             if path in STATIC_FILES:
                 name, content_type = STATIC_FILES[path]
                 cache = FONT_CACHE if content_type == "font/woff2" else "no-store"

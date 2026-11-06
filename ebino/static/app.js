@@ -58,11 +58,16 @@ async function call(path, body, { wait } = {}) {
     const response = await fetch(path, options);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || String(response.status));
+    if (afterCall.paths.has(path)) afterCall.then();  // 今日の道すじ (直し45 段2).
     return data;
   } finally {
     if (waiting) waitEnd(waiting);
   }
 }
+
+// 今日の道すじ (直し45 段2): after these sends the trail is asked for again
+// (setupTrail fills them in).
+const afterCall = { paths: new Set(), then: () => {} };
 
 // --- the sign in the middle of the map (直し42) ---
 
@@ -253,6 +258,7 @@ async function setup() {
   }
   $("heavy-talk").textContent = data.texts.heavy_talk_notice;
   setupDrawer();
+  setupTrail();
   setTo({ kind: "all" }, { focus: false });
   $("purpose-heading").textContent = data.texts.purpose_heading;
   for (const text of data.texts.work_questions) {
@@ -265,7 +271,7 @@ async function setup() {
   // mark, a seat's question card and the quote's card (直し26-2).
   const lent = { state, cardEntry, cardDone, setNow, renderSeats, paragraph: paragraphOf, mark: markQuote, openCard: openCardFor,
     readBelow, shownQuotes, phrased, askSeat, answerTo, firstHelp, openParagraph, backToEveryone, oneOpen, oneAsk,
-    cardFromOne, oneThanks, bubbleOpened, gathering, foldAiSeat, pressSplit, splitLabel };
+    cardFromOne, oneThanks, bubbleOpened, trailOpened, gathering, foldAiSeat, pressSplit, splitLabel };
   if (data.map && window.rough) onMap((map) => map.init(data.map, data.seats, lent));
 }
 
@@ -1854,6 +1860,125 @@ function useHitokotoName(texts) {
 
 // A bubble opened (its choices, or its paragraph): the people on today's
 // map come from these too, the one opened last first.
+// --- 今日の道すじ (直し45 段2) ---
+
+// After these the trail is asked for again (GET /api/trail: the record's
+// steps, in turn; no model). Only what the student wrote or chose is on it.
+const TRAIL_AFTER = new Set(["/api/ask", "/api/coach_answer", "/api/one/ask", "/api/one/coach_answer", "/api/card",
+  "/api/more_card", "/api/direction", "/api/trail/opened"]);
+const trailView = { items: [], open: false };
+// Shut at first where the column has no room (1366×650) and upright.
+const TRAIL_SHUT_AT_FIRST = "(max-height: 700px), (orientation: portrait)";
+
+function setupTrail() {
+  const words = state.texts.trail_words;
+  if (!words) return;
+  $("trail-open").textContent = words.open;
+  Object.assign(afterCall, { paths: TRAIL_AFTER, then: refreshTrail });
+  setTrailOpen(!(window.matchMedia && window.matchMedia("(max-height: 700px), (orientation: portrait)").matches));
+  $("trail-open").addEventListener("click", () => setTrailOpen(!trailView.open));
+  window.addEventListener("resize", placeTrail);
+  $("trail").addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && trailView.open && window.matchMedia(TRAIL_SHUT_AT_FIRST).matches) {
+      event.stopPropagation();
+      setTrailOpen(false);
+      $("trail-open").focus();
+    }
+  });
+}
+
+function setTrailOpen(open) {
+  trailView.open = open;
+  $("trail-open").setAttribute("aria-expanded", String(open));
+  $("trail-list").hidden = !open;
+  placeTrail();
+  if (open) $("trail-list").scrollTop = $("trail-list").scrollHeight;  // The newest at the foot.
+}
+
+// Shut at first (1366×650, upright), opened it stands by its button: beside
+// it over the map's right edge, its foot level with the button's; upright,
+// over the button. Never over the top line or the box at the foot.
+function placeTrail() {
+  const list = $("trail-list");
+  const folded = window.matchMedia && window.matchMedia(TRAIL_SHUT_AT_FIRST).matches;
+  if (!folded || list.hidden) {
+    for (const key of ["top", "bottom", "right", "maxHeight"]) list.style[key] = "";
+    return;
+  }
+  const at = $("trail-open").getBoundingClientRect();
+  const top = $("now-line").getBoundingClientRect().bottom + 8;
+  const upright = window.matchMedia("(orientation: portrait)").matches;
+  const foot = upright ? at.top - 6 : at.bottom;
+  Object.assign(list.style, { top: "auto", bottom: `${Math.round(window.innerHeight - foot)}px`,
+    right: `${Math.round(upright ? window.innerWidth - at.right : window.innerWidth - at.left + 10)}px`,
+    maxHeight: `${Math.max(140, Math.round(foot - top))}px` });
+}
+
+async function refreshTrail() {
+  try {
+    const response = await fetch("/api/trail");
+    if (!response.ok) return;
+    trailView.items = (await response.json()).items || [];
+  } catch (error) {
+    return;  // As it was.
+  }
+  renderTrail();
+}
+
+// A bubble pressed: one step on the trail (a light request, no model).
+function trailOpened(roundNo, utteranceId) {
+  call("/api/trail/opened", { round: roundNo, utterance_id: utteranceId }).catch(() => {});
+}
+
+// One item: its small line (what it was), then the words. A question that
+// changed has 「ここで問いが変わった」 over it, and a line in the lamp's colour
+// goes back to the nearest thing heard before it. The AI's questions in the
+// AI's colour and shape with its name, never as a person's.
+function trailItem(item, words) {
+  const li = el("li", { class: `trail-item trail-${item.kind}`, "data-n": String(item.n) });
+  const small = (text) => el("span", { class: "trail-small", text });
+  if (item.kind === "question") {
+    if (item.changed) li.append(el("span", { class: "trail-turn", text: words.changed }));
+    li.append(small(words.question), el("span", { class: "trail-text", text: item.text }));
+    li.append(small(item.silent ? words.silent : item.lit.join("・")));
+  } else if (item.kind === "opened") {
+    const press = el("button", { type: "button", class: "trail-press" },
+      small(`${words.opened}　${item.who}`), item.label ? el("span", { class: "trail-label", text: item.label }) : null);
+    press.addEventListener("click", () => openParagraph(item.utterance_id, item.who, press).catch(() => {}));
+    li.append(press);
+  } else if (item.kind === "one_ask") {
+    li.append(small(`${words.one_ask}　${item.who}`), el("span", { class: "trail-text", text: item.text }));
+    if (item.label) li.append(el("span", { class: "trail-label", text: item.label }));
+  } else if (item.kind === "ai_answer" || item.kind === "one_coach") {
+    li.classList.add("trail-ai");
+    const answer = item.declined ? words.declined : [item.choice, item.answer].filter(Boolean).join("　");
+    li.append(el("span", { class: "trail-ai-name", text: item.ai_label }), el("span", { class: "trail-text", text: item.question }));
+    if (item.answered !== false) li.append(el("span", { class: "trail-answer" }, small(words.answer), el("span", { text: answer })));
+  } else if (item.kind === "card") {
+    li.append(small([words.card, item.who].filter(Boolean).join("　")), el("span", { class: "trail-text", text: item.text }));
+  } else if (item.kind === "direction") {
+    li.append(small(words.direction), el("span", { class: "trail-text", text: item.text }));
+  }
+  return li;
+}
+
+function renderTrail() {
+  const words = state.texts.trail_words, items = trailView.items;
+  if (!words) return;
+  $("trail").hidden = !items.length;
+  // Where the question changed: from the step heard to the new question.
+  const spans = items.filter((item) => item.changed && item.came_from != null).map((item) => [item.came_from, item.n]);
+  const list = $("trail-list");
+  list.replaceChildren(...items.map((item) => {
+    const li = trailItem(item, words);
+    if (spans.some(([from, to]) => item.n >= from && item.n <= to)) li.classList.add("on-turn");
+    if (spans.some(([from]) => item.n === from)) li.classList.add("turn-from");
+    if (item.changed) li.classList.add("turn-to");
+    return li;
+  }));
+  list.scrollTop = list.scrollHeight;
+}
+
 function bubbleOpened(utteranceId) {
   state.opened = state.opened.filter((id) => id !== utteranceId);
   state.opened.push(utteranceId);

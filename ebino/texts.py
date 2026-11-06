@@ -214,6 +214,13 @@ BUBBLE_CHOICES_HELP = "bubble_choices_help"
 GUIDE = "guide"
 GUIDE_IDS = ("host_mark", "about_title", "roles_lead", "about_next", "first_look_title", "first_look_go", "write", "table", "pressed", "answer_ai", "after")
 
+# 今日の道すじ (直し45 段2): the trail's words (叩き台), and the 「（AI）」 put
+# after コーチ and オブザーバー's names (coach_label.txt before its ｜).
+TRAIL_WORDS = "trail_words"
+TRAIL_WORD_IDS = ("open", "changed", "question", "silent", "opened", "one_ask", "answer", "declined", "card",
+                  "direction")
+AI_ROLE_SUFFIX = "ai_role_suffix"
+
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
     HEAVY_TALK_NOTICE, SPLIT_NOTICE, START_NOTICE, LAB_QUESTION, ANSWERED_COUNT,
@@ -301,6 +308,7 @@ def screen_texts() -> dict:
     texts[GUIDE] = id_table(GUIDE, GUIDE_IDS)
     texts[START_FLOW] = id_table(START_FLOW, NOW_STEP_IDS)
     texts[WAIT_SIGN] = wait_signs()
+    texts[TRAIL_WORDS] = id_table(TRAIL_WORDS, TRAIL_WORD_IDS)
     return texts
 
 

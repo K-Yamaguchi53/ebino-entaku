@@ -31,7 +31,7 @@ from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_S
 from . import librarian, texts
 from .gate import Gate, GateError, ModelUnavailable, NameList, load_names
 from .guard import Guard
-from . import asker, hitokoto, one_tidy, one_to_one
+from . import asker, hitokoto, one_tidy, one_to_one, trail
 from .index import Entry, build_index, load_topics, load_utterances
 from .ingest.run import OUTPUT_DIR as INGESTED_DIR
 from .ingest.scrub import normalize_for_match
@@ -231,6 +231,9 @@ class Session:
     # 帰る前に、ひとこと (直し38, hitokoto.py): in place of the reflection
     # sheet unless EBINO_REFLECT=old. None until it starts.
     talk: hitokoto.Hitokoto | None = None
+    # 今日の道すじ (直し45 段2, trail.py): every step in turn, numbered, never
+    # a clock time or a name; the screen's trail is built from it.
+    steps: list[dict] = field(default_factory=list)
 
     def __post_init__(self):
         self._subject_counts = Counter()  # With no records (tests): this sitting's only.
@@ -264,6 +267,8 @@ class Session:
             # was, the student's words (they passed the name check), the
             # ladder, the scale, what was kept and the light; no name.
             record["hitokoto"] = self.talk.record() if self.talk is not None else None
+            # 今日の道すじ (直し45 段2): the steps in turn; no name, no time.
+            record["trail"] = [dict(step) for step in self.steps]
             self.records.save_session(record)
 
     # --- what the student does ---
@@ -273,6 +278,12 @@ class Session:
             raise Refused("unknown_lab_choice")
         self.lab = choice
         self.save()
+
+    def _note(self, kind: str, **fields) -> dict:
+        """One step of 今日の道すじ (直し45 段2), numbered in turn."""
+        step = {"n": len(self.steps) + 1, "kind": kind, **fields}
+        self.steps.append(step)
+        return step
 
     def _step(self, name: str) -> None:
         """The step the round is at now (直し42 段2): a name only, "" none."""
@@ -291,6 +302,8 @@ class Session:
                                     question, plant=self.plant, on_step=self._step)
             self._speak(result)
             self.rounds.append(result)
+            if result.question and result.status in (roundtable.ANSWERED, roundtable.SILENT):
+                self._note(trail.QUESTION, round=len(self.rounds), text=result.question)
             if result.card:
                 # The same question again with no seat answering: the card there is.
                 result.card = self._keep_card(result.card)
@@ -321,6 +334,7 @@ class Session:
         if same is not None:
             return same
         self.cards.append(card)
+        self._note(trail.CARD, card_id=card.card_id, seat_id=card.seat_id, text=card.text)
         return card
 
     def write_card(self, seat_id: str, text: str) -> dict:
@@ -342,6 +356,7 @@ class Session:
         if card is None:
             raise Refused("empty_card")
         self.cards.append(card)
+        self._note(trail.CARD, card_id=card.card_id, seat_id=card.seat_id, text=card.text)
         self.save()
         return card.front() | {"again": False}
 
@@ -449,6 +464,7 @@ class Session:
         self.rounds.append(result)
         if result.status != roundtable.UNAVAILABLE:  # Unavailable: the card may be answered again.
             band.answered, band.answer = role, answer
+            self._note(trail.AI_ANSWER, round=round_no, role=role, question=asked.text, answer=answer)
             if after_notice:
                 self.ai_answered_after_notice = True
         self.save()
@@ -730,9 +746,12 @@ class Session:
         if not isinstance(item, str) or item not in found:
             raise Refused("unknown_item")
         asked = self.one_asked.setdefault(seat_id, [])
+        shown = next((q["question"] for q in self.one_view(seat_id)["questions"] if q["item"] == item), "")
         if item not in asked:
             asked.append(item)
         words = self._one_words(seat_id, found[item])
+        self._note(trail.ONE_ASK, seat_id=seat_id, item=item, question=shown,
+                   utterance_ids=[piece["utterance_id"] for piece in words["pieces"]])
         self.save()
         return {"item": item, **words, **self.one_view(seat_id)}
 
@@ -1269,6 +1288,61 @@ class Session:
         talk.stage = hitokoto.SHEET
         self.save()
         return hitokoto.sheet_view(talk)
+
+    # --- 今日の道すじ (直し45 段2, trail.py) ---
+
+    def bubble_opened(self, round_no: int, utterance_id: str) -> dict:
+        """A bubble at the table pressed: its seat and piece, a step of the
+        trail. No model; the same bubble pressed again at once is one step."""
+        quote = next((q for q in self._round(round_no).quotes if q.utterance_id == utterance_id), None)
+        if quote is None:
+            raise Refused("unknown_quote")
+        last = self.steps[-1] if self.steps else {}
+        if not (last.get("kind") == trail.OPENED and last.get("utterance_id") == utterance_id):
+            self._note(trail.OPENED, round=round_no, seat_id=quote.seat_id, utterance_id=utterance_id)
+            self.save()
+        return {"ok": True}
+
+    def trail_view(self) -> dict:
+        """The trail as the screen shows it, from this sitting's steps only;
+        no model is called. Each item: what the student wrote or chose, the
+        seat's title (its label, as everywhere), the bubble's kind line; a
+        question that changed has changed=True and from = the number of the
+        nearest step heard before it (None: nothing heard)."""
+        turned = trail.turns(self.steps)
+        items = []
+        for step in self.steps:
+            item = {"n": step["n"], "kind": step["kind"]}
+            kind = step["kind"]
+            if kind == trail.QUESTION:
+                result = self.rounds[step["round"] - 1]
+                item.update(text=step["text"], round=step["round"], silent=result.status == roundtable.SILENT,
+                            lit=[self._title(seat_id) for seat_id in result.seat_order],
+                            changed=step["n"] in turned, came_from=turned.get(step["n"]))
+            elif kind == trail.OPENED:
+                item.update(who=self._title(step["seat_id"]), label=self.kind_label(step["utterance_id"]),
+                            utterance_id=step["utterance_id"], round=step["round"])
+            elif kind == trail.ONE_ASK:
+                ids = step.get("utterance_ids") or []
+                item.update(who=self._title(step["seat_id"]), text=step["question"],
+                            label=next((self.kind_label(i) for i in ids if self.kind_label(i)), ""))
+            elif kind in (trail.AI_ANSWER, trail.ONE_COACH):
+                if not step.get("shown", True):
+                    continue
+                item.update(role=step.get("role", coach.COACH), ai_label=coach.ai_label(step.get("role", coach.COACH)),
+                            question=step["question"], answer=step.get("answer", ""),
+                            choice=step.get("choice_text", ""), declined=bool(step.get("declined")),
+                            answered=step.get("answered", True))
+            elif kind == trail.DIRECTION:
+                item.update(text=step.get("text", ""))
+            elif kind == trail.CARD:
+                item.update(who=self._title(step["seat_id"]) if step.get("seat_id") else "", text=step["text"])
+            items.append(item)
+        return {"items": items}
+
+    def _title(self, seat_id: str) -> str:
+        seat = self._seats.get(seat_id)
+        return seat_label(seat, self.library.show_private).title if seat else ""
 
     # --- what the sitting has gathered ---
 
