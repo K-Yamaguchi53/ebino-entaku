@@ -828,6 +828,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .map-bubble .who { width: 0; min-width: 100%; margin-top: 3px; font-family: var(--gothic); font-size: 13px;
   line-height: 1.5; color: var(--paper-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .map-bubble.fading { opacity: 0; }
+/* 直し45 段1: the kind of talk over a bubble's words, one small line, quieter
+   than the words (the person's words lead). width 0 / min-width 100%: a long
+   one never widens its bubble; it wraps between words instead. */
+.map-bubble .kind, .table-bubble .kind, .one-bubble .kind { width: 0; min-width: 100%; margin: 0 0 2px; font-family: var(--gothic);
+  font-size: 12px; line-height: 1.4; letter-spacing: .02em; color: var(--paper-soft); }
+.one-bubble .kind { font-size: 13px; margin-bottom: 4px; }
 .map-bubble .thread { position: absolute; height: 1.5px; transform-origin: 0 50%; transform: rotate(var(--a));
   background: linear-gradient(90deg, transparent, var(--lamp) 40%, var(--lamp-bright)); pointer-events: none;
   animation: thread .45s ease-out both; }

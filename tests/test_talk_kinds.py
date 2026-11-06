@@ -9,7 +9,7 @@ from fake_client import FakeClient, text_response
 from conftest import COMPANY, DISPLAY_NAME
 from ebino import talk_kinds
 from ebino.saved_output import load_output
-from ebino.texts import CLOSING_KIND_LABELS, load_table
+from ebino.texts import kind_labels
 from test_tagger import piece, setup
 
 
@@ -30,7 +30,7 @@ def test_the_teachers_table_has_the_kinds_in_order_and_none():
 
 
 def test_every_kind_but_none_has_a_line_for_the_screen_and_none_says_this_person():
-    labels = {row["ID"]: row["見出し"] for row in load_table(CLOSING_KIND_LABELS, ("ID", "見出し"))}
+    labels = {key: row["heading"] for key, row in kind_labels().items()}
     assert set(labels) == {k.kind_id for k in talk_kinds.load_kinds()} - {"none"}
     # Most pieces are an interviewer's article or a senior employee's words.
     assert not any("この人" in label for label in labels.values())

@@ -51,6 +51,9 @@ CLOSING_QUESTION = "closing_question"
 # kind in the round's last word (columns ID・見出し). Tables the teacher edits.
 TALK_KINDS = "talk_kinds"
 CLOSING_KIND_LABELS = "closing_kind_labels"
+# 直し45 段1: the same table's 短い見出し (may be empty: then its 見出し) is
+# the small line over a bubble at the table and at one to one.
+KIND_LABEL_COLUMNS = ("ID", "見出し", "短い見出し")
 # 「もっと聞く」: shown when the seat's section has no next piece (a press on
 # it makes a question card), and after that card is made.
 MORE_END = "more_end"
@@ -372,3 +375,15 @@ def map_around() -> dict[str, dict[str, str]]:
     if set(rows) != set(MAP_AROUND_IDS):
         raise ValueError(f"{MAP_AROUND}.tsv must have the rows {', '.join(MAP_AROUND_IDS)}")
     return {key: {"word": rows[key]["方位"], "place": rows[key]["その方向にある所"]} for key in MAP_AROUND_IDS}
+
+
+def kind_labels() -> dict[str, dict[str, str]]:
+    """{kind ID: {"heading": 見出し, "short": 短い見出し or else 見出し}} from
+    closing_kind_labels.tsv (直し45 段1). The round's last word keeps its
+    見出し; a bubble's line is the short one. No row for a kind but 「なし」
+    of talk_kinds.tsv, or a row for none: ValueError."""
+    rows = {row["ID"]: row for row in load_table(CLOSING_KIND_LABELS, KIND_LABEL_COLUMNS, may_be_empty=("短い見出し",))}
+    kinds = {row["ID"] for row in load_table(TALK_KINDS, ("ID", "名前", "説明"))} - {"none"}
+    if set(rows) != kinds:
+        raise ValueError(f"{CLOSING_KIND_LABELS}.tsv must have one row for each kind of {TALK_KINDS}.tsv but none")
+    return {key: {"heading": row["見出し"], "short": row["短い見出し"] or row["見出し"]} for key, row in rows.items()}

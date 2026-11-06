@@ -2180,7 +2180,7 @@ const EbinoMap = (() => {
     const [x, y] = spotOf(seatId);
     if (!inView(x, y)) return;
     const node = div("map-bubble");
-    node.append(div("voice", voiceOf(quote)), div("who", whoOf(seat)));
+    node.append(...kindOf(quote), div("voice", voiceOf(quote)), div("who", whoOf(seat)));
     spokenMark(node, quote);
     overlay.append(node);
     place(node, x, y, 18);
@@ -2197,6 +2197,13 @@ const EbinoMap = (() => {
     const chars = [...text];
     const cut = chars.length > BUBBLE_CHARS ? chars.slice(0, BUBBLE_CHARS).join("") + "…" : text;
     return quote.said && !quote.spoken ? `「${cut}」` : cut;
+  }
+
+  // The small line over a bubble (直し45 段1): the kind of talk of its
+  // piece, from the teacher's table (closing_kind_labels.tsv); none for
+  // 「なし」. First in the bubble, so it is read out before the words.
+  function kindOf(quote) {
+    return quote && quote.kind_label ? [div("kind", quote.kind_label)] : [];
   }
 
   function spokenMark(node, quote) {
@@ -2737,7 +2744,7 @@ const EbinoMap = (() => {
   // Pressed (or Enter or Space on it), it opens its choices (直し26-2).
   function tableBubble(seatId, quote, at, k) {
     const node = div("table-bubble unplaced");
-    node.append(div("voice", voiceOf(quote)), div("who", whoOf(seatOf(seatId))));
+    node.append(...kindOf(quote), div("voice", voiceOf(quote)), div("who", whoOf(seatOf(seatId))));
     spokenMark(node, quote);
     if (quote.spoken) node.dataset.note = (quote.source && quote.source.note) || "";
     Object.assign(node.dataset, { seat: seatId, utterance: quote.utterance_id, x: at[0], y: at[1] });
@@ -3512,7 +3519,9 @@ const EbinoMap = (() => {
     const motion = !reduced();
     const token = tokens.find((t) => t.id === seatId && !t.chair) || null;
     const home = spotOf(seatId);
+    const kindLine = card && card.querySelector(".kind");
     one = { seatId, home, token, group: null, words: card ? card.querySelector(".voice").textContent : "",
+      kind: kindLine ? kindLine.textContent : "",
       spoken: Boolean(card && card.classList.contains("spoken")) };
     const mine = one;
     // The questions, put to this person, asked for while the camera flies
@@ -3568,7 +3577,7 @@ const EbinoMap = (() => {
     if (one.spoken) bubble.append(div("spoken-mark", app.state.texts.spoken_mark));
     const voice = div("voice");
     voice.textContent = one.words;
-    bubble.append(voice, div("who", whoOf(seatOf(one.seatId))));
+    bubble.append(...kindOf({ kind_label: one.kind }), voice, div("who", whoOf(seatOf(one.seatId))));
     overlay.append(bubble);
     one.bubble = bubble;
     placeOne();
@@ -3648,7 +3657,7 @@ const EbinoMap = (() => {
         try {
           const answer = await app.oneAsk(mine.seatId, item);
           if (one !== mine) return;
-          says(answer.pieces, answer.source);
+          says(answer.pieces, answer.source, answer.kind_label);
           showAsks(answer);
           const next = overlay.querySelector(".one-asks .one-ask");
           if (next) next.focus({ preventScroll: true });
@@ -3667,9 +3676,12 @@ const EbinoMap = (() => {
   // were let through (a small mark says so), as recorded otherwise (a
   // slide's page tidied, 直し43). Each piece on a line of its own: they part
   // where a sentence ends, never run into one another.
-  function says(pieces, source) {
+  function says(pieces, source, kindLabel = "") {
     if (!one || !one.bubble) return;
     const voice = one.bubble.querySelector(".voice");
+    // Its kind's small line over the words (直し45 段1), or none.
+    for (const old of one.bubble.querySelectorAll(".kind")) old.remove();
+    voice.before(...kindOf({ kind_label: kindLabel }));
     voice.replaceChildren(...pieces.map((piece) => div("one-piece", piece.spoken || piece.text)));
     const spoken = pieces.some((piece) => piece.spoken);
     one.bubble.classList.toggle("spoken", spoken);

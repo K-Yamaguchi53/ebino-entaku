@@ -25,8 +25,8 @@ from . import (ask_seat, closing, coach, config, editor, harvest, more, purpose_
                seat_map, subjects, talk_kinds)
 from .editor import QuestionCard
 from .reflection import CHANGED_CHOICES, CHOSE_NONE, CHOSE_OWN, DIRECTION_LABELS, MAX_LINE_CHARS, Reflection
-from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_SEAT_HEADER, CLOSING_KIND_LABELS,
-                    CLOSING_QUESTION, MODEL_UNAVAILABLE, NAME_IN_QUESTION, SCHOOL_LABEL, load_optional_text, load_table,
+from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_SEAT_HEADER,
+                    CLOSING_QUESTION, MODEL_UNAVAILABLE, NAME_IN_QUESTION, SCHOOL_LABEL, load_optional_text,
                     load_text)
 from . import librarian, texts
 from .gate import Gate, GateError, ModelUnavailable, NameList, load_names
@@ -112,6 +112,9 @@ class Library:
     # One to one's tables the teacher keeps (直し34-2): which axes a page
     # answers, and a seat's own question on its ranking.
     ask_tables: dict = field(default_factory=lambda: {"pages": {}, "ranking": {}})
+    # Each piece's kind of talk (talk_kinds.py), by utterance ID: the small
+    # line over its bubble (直し45 段1). A piece not in it is 「なし」.
+    kind_of: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def build(cls, seats, utterances, topics, show_private=False, saved_kinds=None,
@@ -138,7 +141,7 @@ class Library:
                    [entry.text for entry in every_entry if entry.seat_id in coach_seats],
                    config.coach_on() if coach_on is None else coach_on,
                    map_data, seat_map.place_seats(map_data, shown_seats) if map_data else None,
-                   relief_data if map_data else None)
+                   relief_data if map_data else None, kind_of=kind_of)
 
     @classmethod
     def load(cls, data_dir: Path, show_private: bool = False, map_file: Path | None = None,
@@ -382,7 +385,7 @@ class Session:
         otherwise nothing is shown (a seat without such words says nothing).
         Each piece has the line of its kind over it, never 「この人が」: most
         pieces are an interviewer's article or a senior employee's words."""
-        labels = {row["ID"]: row["見出し"] for row in load_table(CLOSING_KIND_LABELS, ("ID", "見出し"))}
+        labels = {key: row["heading"] for key, row in texts.kind_labels().items()}
         words = []
         for word in self._round(round_no).closing.words:
             utterance = self._utterances[word.utterance_id]
@@ -393,6 +396,14 @@ class Session:
         if not words:
             return {"round": round_no, "question": "", "words": []}
         return {"round": round_no, "question": load_text(CLOSING_QUESTION), "words": words}
+
+    def kind_label(self, utterance_id: str) -> str:
+        """The small line over a bubble (直し45 段1): its kind's 短い見出し
+        (else its 見出し) from closing_kind_labels.tsv; "" for 「なし」 or a
+        piece with no kind. Code picks it: no model writes it."""
+        kind = self.library.kind_of.get(utterance_id, talk_kinds.NONE)
+        row = texts.kind_labels().get(kind) if kind != talk_kinds.NONE else None
+        return row["short"] if row else ""
 
     # --- コーチとオブザーバー (SPEC 5-1, coach.py) ---
 
@@ -491,6 +502,7 @@ class Session:
             # The person's own words, or an article's: never shown as the person speaking.
             view["label"] = load_text(ASK_ANSWER_SAID if said else ASK_ANSWER_WRITTEN)
             view["piece"] = {"utterance_id": asked.answer_id, "seat_id": asked.seat_id, "text": asked.answer_text,
+                             "kind_label": self.kind_label(asked.answer_id),
                              "ranking_title": self.library.ranking_titles.get(asked.answer_id, ""),
                              "said": said, "source": self.source(asked.seat_id, utterance)}
         elif asked.status == ask_seat.NOT_FOUND:
@@ -705,8 +717,11 @@ class Session:
             for result in speaker.speak(self.gate, quotes):
                 spoken[result.utterance_id] = result
                 self.one_spoken.append(result)
+        labels = [self.kind_label(u.id) for u in shown]
         return {"pieces": [{"utterance_id": u.id, "text": text, "spoken": spoken[u.id].spoken if u.id in spoken else "",
-                            "said": not u.note} for u, text in zip(shown, said)],
+                            "said": not u.note, "kind_label": label} for u, text, label in zip(shown, said, labels)],
+                # One line over the bubble (直し45 段1): the first piece's with a kind.
+                "kind_label": next((label for label in labels if label), ""),
                 "source": self.passage_source(seat_id, shown)}
 
     def one_ask(self, seat_id: str, item: str) -> dict:
@@ -1313,6 +1328,8 @@ class Session:
                 "text": quote.text,
                 # The same as spoken words, "" when the original is shown (直し31-7).
                 "spoken": result.spoken[quote.utterance_id].spoken if quote.utterance_id in result.spoken else "",
+                # The small line over its bubble (直し45 段1), "" for none.
+                "kind_label": self.kind_label(quote.utterance_id),
                 # A person's own words get 「」; article text gets its note instead.
                 "said": not utterance.note,
                 "source": self.source(quote.seat_id, utterance),
