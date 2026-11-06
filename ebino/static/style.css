@@ -250,6 +250,15 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
    first page: the four steps in a row, an arrow between them (two rows when
    narrow). */
 .start-about { margin: 0 0 18px; font-size: 19px; line-height: 1.75; color: var(--ink); }
+.start-about p { margin: 0; }
+.start-about p + p { margin-top: 6px; }
+/* Said by the host: its mark (the AI's colour) and name, then a bubble from it. */
+.host-head { display: flex; align-items: center; gap: 12px; }
+.host-head .host-mark { width: 52px; height: 52px; border-radius: 12px; font-size: 17px; }
+.host-says { position: relative; padding: 14px 20px; border: 2px solid var(--ai); border-radius: 12px;
+  background: var(--ai-deep); color: var(--ai-ink); }
+.host-says::before { content: ""; position: absolute; left: 18px; bottom: 100%; border: 10px solid transparent;
+  border-bottom-color: var(--ai); }
 .start-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 30px; margin: 0; padding: 0;
   list-style: none; }
 .start-flow li { position: relative; display: grid; align-content: start; gap: 6px; padding: 10px 14px 12px;

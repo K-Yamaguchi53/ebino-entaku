@@ -207,7 +207,7 @@ BUBBLE_CHOICES_HELP = "bubble_choices_help"
 # told): the first look at whose words are in, its heading and its button;
 # and the bubble by the one thing to press now, for the states that have one.
 GUIDE = "guide"
-GUIDE_IDS = ("about_title", "about_next", "first_look_title", "first_look_go", "write", "table", "pressed", "answer_ai", "after")
+GUIDE_IDS = ("host_mark", "about_title", "about_next", "first_look_title", "first_look_go", "write", "table", "pressed", "answer_ai", "after")
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (

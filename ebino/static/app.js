@@ -222,7 +222,10 @@ async function setup() {
   for (const seat of data.seats) state.seatById[seat.seat_id] = seat;
   for (const line of data.texts.start_notice) $("start-notice").append(el("li", { text: line }));
   $("start-purpose").textContent = data.texts.start_purpose;
-  $("start-about").textContent = data.texts.start_about;
+  // The host's words, a paragraph for each of its lines.
+  for (const line of data.texts.start_about.split("\n").filter((text) => text.trim())) {
+    $("start-about").append(el("p", { text: line }));
+  }
   // How it goes: the band's own steps (the same words light up there later).
   for (const step of data.texts.now_steps) {
     $("start-flow").append(el("li", {}, el("span", { class: "flow-step", text: step.text }),
@@ -817,7 +820,8 @@ function firstLook() {
   state.firstLooked = true;
   // Whose words are in, when there are any (with none, the first page alone).
   const body = $("inside").hidden ? null : document.querySelector("#inside-fold .inside-body");
-  $("first-look-about-title").textContent = words.about_title;
+  $("host-mark").textContent = words.host_mark;
+  $("host-name").textContent = words.about_title;
   $("first-look-title").textContent = words.first_look_title;
   $("first-look-go").textContent = words.first_look_go;
   $("first-look-next").textContent = body ? words.about_next : words.first_look_go;

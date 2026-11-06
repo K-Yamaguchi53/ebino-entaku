@@ -150,8 +150,23 @@ def test_what_the_app_is_and_how_it_goes_come_right_before_whose_words_are_in():
     page = HTML[HTML.index('<section id="first-look-about"'):HTML.index('<section id="first-look-inside"')]
     assert page.index('id="start-about"') < page.index('<ol id="start-flow" class="start-flow" aria-label="すすみ方">')
     # The step names are the band's own (the same words light up there later).
-    filled = APP[APP.index('$("start-about").textContent'):APP.index('$("lab-question").textContent')]
+    filled = APP[APP.index("// The host's words, a paragraph for each of its lines."):APP.index('$("lab-question").textContent')]
     assert "for (const step of data.texts.now_steps)" in filled and "data.texts.start_flow[step.id]" in filled
     # Four in a row, two rows when narrow; broken between words.
     assert "grid-template-columns: repeat(4, minmax(0, 1fr));" in CSS
     assert ".first-look, .guide, .wait-sign {\n  word-break: auto-phrase;" in CSS
+
+
+def test_the_first_page_is_said_by_the_host_an_ai_in_the_ais_colour():
+    screen = texts.screen_texts()
+    said = screen["start_about"]
+    # The host says it is an AI, and that the people are not answering now.
+    assert "司会" in said and "AI" in said and "本人がいま答えているのではありません" in said
+    assert screen["guide"]["host_mark"] and "AI" in screen["guide"]["about_title"]
+    page = HTML[HTML.index('<section id="first-look-about"'):HTML.index('<section id="first-look-inside"')]
+    assert 'class="ai-mark host-mark"' in page and 'class="start-about host-says"' in page
+    assert ".host-says { position: relative;" in CSS and "border: 2px solid var(--ai);" in CSS
+    # Stronger than .ai-mark, which comes later in the file.
+    assert ".host-head .host-mark { width: 52px; height: 52px;" in CSS
+    # A paragraph for each of its lines.
+    assert r'data.texts.start_about.split("\n")' in APP
