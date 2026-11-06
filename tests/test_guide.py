@@ -200,3 +200,59 @@ def test_the_host_page_has_a_card_for_the_coach_and_the_observer():
     assert "look.showModal();\n  look.scrollTop = 0;" in _top("firstLook")
     low = CSS[CSS.index("/* The host's page on a low screen"):]
     assert ".start-roles { margin-top: 10px;" in low[:low.index("\n}\n")]
+
+
+PLACE_AI = """
+const made = {};
+const node = (id, box) => ({ id, box, hidden: id === "guide", dataset: {}, style: { setProperty(k, v) { this[k] = v; } },
+  classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); } },
+  offsetWidth: 280, offsetHeight: 44, open: false, textContent: "",
+  getBoundingClientRect() { return this.box; } });
+const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height });
+const $ = (id) => made[id] || (made[id] = node(id, box(0, 0, 0, 0)));
+let now = "answer_ai", card = null, other = null;
+const document = { documentElement: { clientWidth: 1366, clientHeight: 650 },
+  querySelector: (q) => q.includes("#ai-seat-cards .ai-question") ? card : null,
+  querySelectorAll: (q) => q.includes("#ai-seat-cards .ai-question") ? [card, other] : [] };
+const state = { texts: { now_line: {}, guide: { answer_ai: "A" } } };
+function nowState() { return now; }
+%(source)s
+const overlaps = (g, k) => { const l = parseInt(g.style.left), t = parseInt(g.style.top);
+  return l < k.right && k.left < l + 280 && t < k.bottom && k.top < t + 44; };
+const out = {};
+// The two cards one over the other (in the map's column, or its corner),
+// or side by side (as at 1366×650 and 1920×1080).
+for (const [name, x, by] of [["column", 1100, false], ["corner", 8, false], ["row", 30, true]]) {
+  made["ai-seat-label"] = node("ai-seat-label", box(x, 100, 200, 30));
+  made["ai-seat-note"] = node("ai-seat-note", box(x, 136, 400, 20));
+  card = node("card", by ? box(x + 8, 160, 185, 110) : box(x, 186, 240, 60));
+  other = node("other", by ? box(x + 201, 160, 185, 110) : box(x, 254, 240, 60));
+  drawGuide();
+  const g = $("guide");
+  out[name] = { hidden: g.hidden, side: g.dataset.side, point: g.style["--point"],
+    over: [made["ai-seat-label"].box, made["ai-seat-note"].box, card.box, other.box].filter((k) => overlaps(g, k)).length };
+}
+// Room over the card clear of the heading and the note: over it, as before.
+made["ai-seat-label"].box = box(8, 20, 200, 30); made["ai-seat-note"].box = box(8, 56, 240, 40);
+card.box = box(8, 300, 240, 60); other.box = box(8, 368, 240, 60);
+drawGuide();
+out.room = { side: $("guide").dataset.side, top: $("guide").style.top };
+process.stdout.write(JSON.stringify(out));
+"""
+
+
+@node
+def test_the_hint_to_answer_the_ai_keeps_its_seats_heading_and_note_clear():
+    """直し46: 「AI の問いはここ。押して答えよう」 never over 「AI（町の人では
+    ありません）」 nor 「この問いは、AI が作りました。…」 nor the other AI
+    card: beside the card (left in the map's column, right in the map's
+    corner), under it with the cards side by side, over it with room."""
+    source = APP[APP.index("const GUIDE = {"):APP.index("// What it points at moves with the window")]
+    out = subprocess.run(["node", "-"], input=(PLACE_AI % {"source": source}).encode("utf-8"), capture_output=True, timeout=30)
+    assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
+    got = json.loads(out.stdout.decode("utf-8"))
+    assert got["column"] == {"hidden": False, "side": "left", "point": "22px", "over": 0}
+    assert got["corner"] == {"hidden": False, "side": "right", "point": "22px", "over": 0}
+    assert got["row"] == {"hidden": False, "side": "below", "point": "123px", "over": 0}  # 38 + 92.5 - 8, rounded as JS does.
+    assert got["room"] == {"side": "above", "top": f"{300 - 14 - 44}px"}
+    assert '.guide[data-side="right"]::after { right: 100%;' in CSS and '.guide[data-side="left"]::after { left: 100%;' in CSS

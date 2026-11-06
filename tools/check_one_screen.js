@@ -23,10 +23,19 @@
 // hk_scale, hk_keep, hk_light, hk_sheet) it reads, apart from the eight
 // above, whether the page is wider than the window, and whether the button
 // that goes on is reached by scrolling and not covered ("next button").
+// intro (直し46): 司会（AI）から、はじめに, its first page with the cards of
+// コーチ（AI） and オブザーバー（AI）: its 次へ has the keyboard (autofocus)
+// and, scrolled to inside the window if need be, is there and not covered
+// ("next button").
+// ai_hint (直し46): a bubble pressed and its choices shut, then 「AI の問い
+// はここ。押して答えよう」 up; how many of the
+// AI's seat's heading and note it is over ("hint over N"), and of the AI's
+// question cards ("hint over card N"); none up: "no hint".
 async (page) => {
   const BASE = globalThis.EBINO_BASE || "http://127.0.0.1:8851/";
   const SIZES = [[768, 1024], [1180, 820], [1366, 650], [1536, 760], [1920, 1080]];
-  const MOMENTS = ["before_question", "school_zoom", "table_out", "bubble_pressed", "one_coach", "one_asks", "one_to_one", "answering_ai"];
+  const MOMENTS = ["intro", "before_question", "school_zoom", "table_out", "bubble_pressed", "one_coach", "one_asks", "one_to_one",
+    "ai_hint", "answering_ai"];
   const HK_MOMENTS = ["hk_map", "hk_talk", "hk_ladder", "hk_scale", "hk_keep", "hk_light", "hk_sheet"];
   // The button that goes on, at each moment.
   const HK_NEXT = { hk_map: "#hk-go", hk_talk: "#hk-input button[type=submit]", hk_ladder: ".hk-options .hk-quote, .hk-picks .hk-pick, .hk-fill .hk-primary",
@@ -47,6 +56,11 @@ async (page) => {
         const errors = [];
         p.on("pageerror", (error) => errors.push(String(error)));
         try {
+          if (moment === "intro") {
+            row[moment] = await intro(p, errors);
+            await context.close();
+            continue;
+          }
           await p.goto(BASE);
           await p.waitForSelector(".lab-pick button");
           await p.locator(".lab-pick button").first().click();
@@ -89,6 +103,27 @@ async (page) => {
             await p.locator(".one-asks .one-ask").first().click();
             await p.waitForTimeout(800);
           }
+          let hint = "";
+          if (moment === "ai_hint") {
+            // It comes once a bubble was pressed and its choices shut.
+            await p.locator(".table-bubble:not(.unplaced):not(.ai)").first().click();
+            await p.waitForSelector(".map-choices");
+            await p.keyboard.press("Escape");
+            await p.waitForFunction(() => { const g = document.querySelector("#guide");
+              return g && !g.hidden && g.dataset.state === "answer_ai"; }, null, { timeout: 20000 }).catch(() => {});
+            await p.waitForTimeout(500);
+            const over = await p.evaluate(() => {
+              const g = document.querySelector("#guide");
+              if (!g || g.hidden || g.dataset.state !== "answer_ai") return null;
+              const a = g.getBoundingClientRect();
+              const hits = (nodes) => nodes.filter((n) => n && n.getClientRects().length).map((n) => n.getBoundingClientRect())
+                .filter((b) => b.width && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom).length;
+              return { head: hits([document.querySelector("#ai-seat-label"), document.querySelector("#ai-seat-note")]),
+                cards: hits([...document.querySelectorAll("#ai-seat-cards .ai-question")]) };
+            });
+            hint = !over ? "no hint" : [over.head ? `hint over ${over.head}` : "", over.cards ? `hint over card ${over.cards}` : ""]
+              .filter(Boolean).join(" ");
+          }
           if (moment === "answering_ai") {
             // The AI's seat (直し32-3) where there is one; else its card at the table.
             const seat = p.locator(".ai-seat-card button, .ai-question").first();
@@ -106,6 +141,7 @@ async (page) => {
           if (m.h > m.vh) bad.push(`tall ${m.h}>${m.vh}`);
           if (m.w > m.vw) bad.push(`wide ${m.w}>${m.vw}`);
           if (errors.length) bad.push(`errors ${errors.length}`);
+          if (hint) bad.push(hint);
           let put = "";
           if (["one_asks", "one_to_one", "one_coach"].includes(moment)) {
             const asks = await p.locator(".one-asks .one-ask").evaluateAll((els) => els.map((e) => ({
@@ -154,6 +190,25 @@ async (page) => {
       await p.keyboard.press("Escape");
       await p.waitForTimeout(200);
     }
+  }
+
+  // 直し46: the first page of 司会（AI）から、はじめに, as it opens.
+  async function intro(p, errors) {
+    await p.goto(BASE);
+    await p.waitForSelector(".lab-pick button");
+    await p.locator(".lab-pick button").first().click();
+    await p.waitForFunction(() => { const d = document.querySelector("#first-look"); return d && d.open; }, null, { timeout: 8000 });
+    await p.waitForTimeout(600);
+    const bad = [];
+    const m = await measure(p);
+    if (m.h > m.vh) bad.push(`tall ${m.h}>${m.vh}`);
+    if (m.w > m.vw) bad.push(`wide ${m.w}>${m.vw}`);
+    const roles = await p.locator("#start-roles .role-card").count();
+    if (roles !== 2) bad.push(`cards ${roles}`);
+    if (!(await p.evaluate(() => document.activeElement && document.activeElement.id === "first-look-next"))) bad.push("not focused");
+    if (!(await reached(p, "#first-look-next"))) bad.push("next button");
+    if (errors.length) bad.push(`errors ${errors.length}`);
+    return bad.length ? bad.join(" ") : "ok";
   }
 
   // A round, one bubble marked and one opened, then 帰る前に、ひとこと (an AI's

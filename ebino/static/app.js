@@ -892,7 +892,13 @@ const GUIDE = {
   one: { at: () => document.querySelector(".one-asks .one-ask:not(.one-finish)"), lit: true },
   table: { at: () => document.querySelector("#map-overlay .table-bubble:not(.unplaced)") },
   pressed: { at: () => document.querySelector('.map-choices button[data-choice="card"]'), lit: true },
-  answer_ai: { at: () => shown(document.querySelector("#ai-seat-cards .ai-question:not(:disabled)")) || shown($("ai-seat-open")) },
+  // 直し46: never over the AI's seat's heading (「AI（町の人ではありません）」)
+  // nor its note (「この問いは、AI が作りました。…」), nor over the AI's
+  // questions (the other card's words): over the card when there is room
+  // clear of them, else beside it, else under it.
+  answer_ai: { at: () => shown(document.querySelector("#ai-seat-cards .ai-question:not(:disabled)")) || shown($("ai-seat-open")),
+    clear: () => [$("ai-seat-label"), $("ai-seat-note"), ...document.querySelectorAll("#ai-seat-cards .ai-question")],
+    sides: ["above", "right", "left", "below"] },
   after: { at: () => $("to-reflect") },
 };
 
@@ -936,15 +942,27 @@ function drawGuide() {
   const box = target.getBoundingClientRect(), w = guide.offsetWidth, h = guide.offsetHeight;
   const gap = 14, edge = 8, vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  const side = box.top - gap - h >= edge ? "above" : "below";
-  const top = side === "above" ? box.top - gap - h : Math.min(box.bottom + gap, vh - h - edge);
-  const left = clamp(box.left + box.width / 2 - w / 2, edge, vw - w - edge);
-  guide.dataset.side = side;
-  guide.style.left = `${Math.round(left)}px`;
-  guide.style.top = `${Math.round(top)}px`;
+  // Each side in turn (over it, else under it, unless the state says
+  // otherwise): the first inside the window and clear of what the state
+  // keeps clear (直し46); none such, over it when there is room, else under.
+  const keep = ((spec.clear && spec.clear()) || []).map(shown).filter(Boolean).map((n) => n.getBoundingClientRect());
+  const at = (side) => side === "above" || side === "below"
+    ? { side, top: side === "above" ? box.top - gap - h : Math.min(box.bottom + gap, vh - h - edge),
+        left: clamp(box.left + box.width / 2 - w / 2, edge, vw - w - edge) }
+    : { side, top: clamp(box.top + box.height / 2 - h / 2, edge, vh - h - edge),
+        left: side === "right" ? box.right + gap : box.left - gap - w };
+  const fits = (p) => p.top >= edge && p.top + h <= vh - edge && p.left >= edge && p.left + w <= vw - edge
+    && !keep.some((k) => p.left < k.right && k.left < p.left + w && p.top < k.bottom && k.top < p.top + h);
+  const place = (spec.sides || ["above", "below"]).map(at).find(fits)
+    || at(box.top - gap - h >= edge ? "above" : "below");
+  guide.dataset.side = place.side;
+  guide.style.left = `${Math.round(place.left)}px`;
+  guide.style.top = `${Math.round(place.top)}px`;
   // The bubble's point at what it points at, even when the bubble is kept
-  // inside the window.
-  guide.style.setProperty("--point", `${Math.round(clamp(box.left + box.width / 2 - left, 16, w - 16))}px`);
+  // inside the window: along its foot or head, or its side.
+  guide.style.setProperty("--point", place.side === "above" || place.side === "below"
+    ? `${Math.round(clamp(box.left + box.width / 2 - place.left, 16, w - 16))}px`
+    : `${Math.round(clamp(box.top + box.height / 2 - place.top, 16, h - 16))}px`);
 }
 // What it points at moves with the window, the map and its bubbles: kept by it.
 window.addEventListener("resize", drawGuide);

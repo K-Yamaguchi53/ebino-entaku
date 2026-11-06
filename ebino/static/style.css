@@ -1798,6 +1798,9 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
 .guide::after { content: ""; position: absolute; width: 0; height: 0; border: 10px solid transparent; }
 .guide[data-side="above"]::after { top: 100%; left: calc(var(--point) - 10px); border-top-color: var(--lamp); }
 .guide[data-side="below"]::after { bottom: 100%; left: calc(var(--point) - 10px); border-bottom-color: var(--lamp); }
+/* 直し46: beside it (the AI's question, its seat's heading and note kept clear). */
+.guide[data-side="right"]::after { right: 100%; top: calc(var(--point) - 10px); border-right-color: var(--lamp); }
+.guide[data-side="left"]::after { left: 100%; top: calc(var(--point) - 10px); border-left-color: var(--lamp); }
 /* The bubble's choices: the one to press lit itself, no bubble over the card. */
 .map-choices button.guide-here { outline: 3px solid var(--lamp); outline-offset: 2px; font-weight: 700;
   color: var(--lamp-bright); background: var(--lamp-faint); }
