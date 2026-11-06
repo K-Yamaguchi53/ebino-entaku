@@ -49,8 +49,11 @@ from .gate import Gate, GateError, ModelUnavailable, json_answer, json_request
 from .guard import check
 from .ingest.scrub import normalize_for_match
 from .prompts import COACH as COACH_PROMPT
-from .reflection import _QUOTED, checked
-from .texts import AI_QUESTION_BADGE, AI_ROLE_SUFFIX, COACH_LABEL, OBSERVER_LABEL, OBSERVER_VIEW, load_text, read_table
+from .prompts import ONE_COACH as ONE_COACH_PROMPT
+from .reflection import (_QUOTED, STOP_BANNED, STOP_EMPTY, STOP_NAME, STOP_QUOTE, STOP_TOO_LONG, STOP_UNBALANCED,
+                         checked)
+from .texts import (AI_ABSTRACT_WORDS, AI_QUESTION_BADGE, AI_ROLE_SUFFIX, COACH_LABEL, OBSERVER_LABEL, OBSERVER_VIEW,
+                    LISTENER_AVOID, load_lines, load_text, read_table)
 
 ROLE = "coach"  # The gate's role (MODELS, EFFORT) for both cards.
 COACH = "coach"
@@ -177,6 +180,94 @@ def stop_reason(text: str, record: Record, gate: Gate) -> str:
     if _DIGIT.search(normalize_for_match(outside)):
         return STOP_NUMBER
     return ""
+
+
+# --- コーチ（AI） at one to one (直し45 段3) ---
+# After a person's words came out for a question picked at one to one: one
+# short question to the student about them, outward (to the person, to
+# others) and inward (to the student) in turn, at most ONE_MAX with one
+# person. The model reads the student's record as the band does, the words
+# just shown and this one to one's questions and answers; never the Lab, the
+# subjects or a name. Checked as the band's are (stop_reason, MAX_CHARS
+# unchanged), and here only, by code as well: at most AI_QUESTION_MAX_CHARS,
+# none of the abstract words (texts/ai_abstract_words.txt) and none of the
+# words of home, money or health (texts/listener_avoid.txt) outside 「」.
+# The choices to answer with are the teacher's table (texts/
+# one_coach_choices.tsv), never the model's. The wait is its own, shorter
+# than the band's: the next question is already on screen.
+AI_QUESTION_MAX_CHARS = 30
+ONE_TIMEOUT_SECONDS = 12.0
+ONE_MAX = 3
+OUTSIDE = "outside"
+INSIDE = "inside"
+STOP_ONE_TOO_LONG = "one_too_long"
+STOP_ABSTRACT = "abstract_word"
+STOP_AVOID = "avoid_word"
+ONE_SHOWN = "shown"
+ONE_STOPPED = "stopped"
+ONE_UNAVAILABLE = "unavailable"
+ONE_DROPPED = "dropped"  # The student picked the next question first: not shown.
+# Stops by a check, apart from the model failing or being too slow.
+ONE_STOPS = (STOP_EMPTY, STOP_TOO_LONG, STOP_NAME, STOP_UNBALANCED, STOP_BANNED, STOP_QUOTE, STOP_LURE, STOP_NOT_ONE_QUESTION,
+             STOP_NUMBER, STOP_MISSING, STOP_ONE_TOO_LONG, STOP_ABSTRACT, STOP_AVOID)
+ONE_SCHEMA = {
+    "type": "object",
+    "properties": {"question": {"type": "string"}},
+    "required": ["question"],
+    "additionalProperties": False,
+}
+
+
+class OneRecord(Record):
+    """The band's record up to the last round, with the words just shown at
+    one to one (「」 may hold one of their sentences, as a quote's) and this
+    one to one's earlier answers (the student's own words)."""
+
+    def __init__(self, session, words: list[str], answers: list[dict]):
+        super().__init__(session, len(session.rounds))
+        self.words = list(words)
+        self.answers = [dict(answer) for answer in answers]
+        self.quote_texts += self.words
+        self.own_words += [answer["note"] for answer in answers if answer.get("note")]
+
+
+def next_direction(asked: list[str]) -> str:
+    """Outward first; then never the same way twice in a row."""
+    return INSIDE if asked and asked[-1] == OUTSIDE else OUTSIDE
+
+
+def one_stop_reason(text: str, record: OneRecord, gate: Gate) -> str:
+    """"" when the question may be shown at one to one, else a reason code:
+    the band's checks first, then this one's own."""
+    reason = stop_reason(text, record, gate)
+    if reason:
+        return reason
+    text = text.strip()
+    if len(text) > AI_QUESTION_MAX_CHARS:
+        return STOP_ONE_TOO_LONG
+    body = normalize_for_match(_QUOTED.sub("", text))
+    if any(normalize_for_match(word) in body for word in load_lines(AI_ABSTRACT_WORDS)):
+        return STOP_ABSTRACT
+    if any(normalize_for_match(word) in body for word in load_lines(LISTENER_AVOID)):
+        return STOP_AVOID
+    return ""
+
+
+def one_request(record: OneRecord, direction: str) -> dict:
+    system = ONE_COACH_PROMPT.format(abstract="・".join(load_lines(AI_ABSTRACT_WORDS)), banned="・".join(BANNED_WORDS))
+    data = {"direction": direction, "words": record.words, "answers": record.answers, "rounds": record.rounds}
+    return json_request(ROLE, system, json.dumps(data, ensure_ascii=False), ONE_SCHEMA, max_tokens=1000)
+
+
+def one_send(gate: Gate, request: dict) -> tuple[str, str]:
+    """(the model's question, "") or ("", the failure code). No retry; past
+    ONE_TIMEOUT_SECONDS, nothing."""
+    try:
+        answer = json_answer(gate.send(ROLE, request, timeout=ONE_TIMEOUT_SECONDS))
+    except (GateError, ModelUnavailable) as error:
+        return "", str(error) or ONE_UNAVAILABLE
+    text = answer.get("question") if isinstance(answer, dict) else None
+    return (text, "") if isinstance(text, str) else ("", STOP_MISSING)
 
 
 def schema(roles: tuple[str, ...]) -> dict:

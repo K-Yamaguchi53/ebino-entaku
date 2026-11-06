@@ -234,6 +234,12 @@ class Session:
     # 今日の道すじ (直し45 段2, trail.py): every step in turn, numbered, never
     # a clock time or a name; the screen's trail is built from it.
     steps: list[dict] = field(default_factory=list)
+    # コーチ（AI） at one to one (直し45 段3): each question asked for, by
+    # seat, in turn: its way, what came of it, the words shown, the student's
+    # choice and line (or 答えない); no name, no time. one_ask_no counts the
+    # questions picked: a coach's question for an earlier one is not shown.
+    one_coach: dict[str, list[dict]] = field(default_factory=dict)
+    one_ask_no: int = 0
 
     def __post_init__(self):
         self._subject_counts = Counter()  # With no records (tests): this sitting's only.
@@ -269,6 +275,10 @@ class Session:
             record["hitokoto"] = self.talk.record() if self.talk is not None else None
             # 今日の道すじ (直し45 段2): the steps in turn; no name, no time.
             record["trail"] = [dict(step) for step in self.steps]
+            # コーチ（AI） at one to one (直し45 段3): its questions (shown or
+            # why not), the choices pressed, the lines, 答えない.
+            record["one_coach"] = [dict(asked, seat_id=seat_id) for seat_id, found in self.one_coach.items()
+                                   for asked in found]
             self.records.save_session(record)
 
     # --- what the student does ---
@@ -752,15 +762,96 @@ class Session:
         words = self._one_words(seat_id, found[item])
         self._note(trail.ONE_ASK, seat_id=seat_id, item=item, question=shown,
                    utterance_ids=[piece["utterance_id"] for piece in words["pieces"]])
+        # The coach's question for these words is asked for after this answer
+        # (/api/one/coach), never before: the next questions come at once.
+        self.one_ask_no += 1
+        self._one_words_shown = (seat_id, self.one_ask_no, [piece["text"] for piece in words["pieces"]])
         self.save()
-        return {"item": item, **words, **self.one_view(seat_id)}
+        coach_next = bool(words["pieces"]) and self.library.coach_on and self._one_coach_left(seat_id)
+        return {"item": item, **words, **self.one_view(seat_id),
+                "coach": {"ask_no": self.one_ask_no} if coach_next else None}
+
+    # --- コーチ（AI） at one to one (直し45 段3, coach.py) ---
+
+    def _one_coach_left(self, seat_id: str) -> bool:
+        shown = [a for a in self.one_coach.get(seat_id, []) if a["status"] == coach.ONE_SHOWN]
+        return len(shown) < coach.ONE_MAX
+
+    def one_coach_plan(self, seat_id, ask_no) -> dict | None:
+        """What to ask the model for the words just shown, or None (another
+        question was picked since, three were shown, or the band is off).
+        Taken under the app's lock; the model is asked outside it."""
+        last = getattr(self, "_one_words_shown", None)
+        if last is None or last[0] != seat_id or last[1] != ask_no or not isinstance(ask_no, int):
+            return None
+        if not self.library.coach_on or not self._one_coach_left(seat_id):
+            return None
+        found = self.one_coach.setdefault(seat_id, [])
+        direction = coach.next_direction([a["direction"] for a in found if a["status"] == coach.ONE_SHOWN])
+        answers = [{"question": a["question"], "choice": a.get("choice_text", ""), "note": a.get("note", ""),
+                    "declined": a.get("declined", False)} for a in found if a["status"] == coach.ONE_SHOWN]
+        record = coach.OneRecord(self, last[2], answers)
+        return {"seat_id": seat_id, "ask_no": ask_no, "direction": direction, "record": record,
+                "request": coach.one_request(record, direction)}
+
+    def one_coach_done(self, plan: dict, text: str, reason: str) -> dict:
+        """The model's question, checked, kept and shown; or nothing. Picked
+        past (another question since): not shown, kept as 「出さなかった」."""
+        seat_id, ask_no = plan["seat_id"], plan["ask_no"]
+        asked = {"ask_no": ask_no, "direction": plan["direction"], "status": "", "reason": reason, "question": ""}
+        if not reason:
+            reason = coach.one_stop_reason(text, plan["record"], self.gate)
+            asked["reason"] = reason
+        if self.one_ask_no != ask_no:
+            asked["status"] = coach.ONE_DROPPED
+        elif reason:
+            asked["status"] = coach.ONE_UNAVAILABLE if reason not in coach.ONE_STOPS else coach.ONE_STOPPED
+        else:
+            asked.update(status=coach.ONE_SHOWN, question=text.strip(), answered=False)
+            step = self._note(trail.ONE_COACH, seat_id=seat_id, role=coach.COACH, question=asked["question"],
+                              answered=False)
+            asked["step"] = step["n"]
+        self.one_coach.setdefault(seat_id, []).append(asked)
+        self.save()
+        return self.one_coach_view(seat_id, asked)
+
+    def one_coach_view(self, seat_id: str, asked: dict) -> dict:
+        if asked["status"] != coach.ONE_SHOWN:
+            return {"seat_id": seat_id, "ask_no": asked["ask_no"], "question": ""}
+        return {"seat_id": seat_id, "ask_no": asked["ask_no"], "question": asked["question"],
+                "label": coach.ai_label(coach.COACH), "badge": load_text(texts.AI_QUESTION_BADGE),
+                "choices": [{"id": key, "text": text} for key, text in
+                            texts.id_table(texts.ONE_COACH_CHOICES, texts.ONE_COACH_CHOICE_IDS).items()]}
+
+    def one_coach_answer(self, seat_id, ask_no, choice, note, declined: bool = False) -> dict:
+        """A choice from the teacher's table and a line (both may be empty),
+        or 答えない: kept with the question. Once a question."""
+        asked = next((a for a in self.one_coach.get(seat_id, []) if isinstance(seat_id, str)
+                      and a["ask_no"] == ask_no and a["status"] == coach.ONE_SHOWN), None)
+        if asked is None or asked.get("answered"):
+            raise Refused("no_coach_question")
+        choices = texts.id_table(texts.ONE_COACH_CHOICES, texts.ONE_COACH_CHOICE_IDS)
+        choice = choice if isinstance(choice, str) else ""
+        if choice and choice not in choices:
+            raise Refused("unknown_choice")
+        note = "" if declined else _line(note, MAX_LINE_CHARS, "", required=False)
+        named = self._named(note)
+        if named:
+            return named
+        asked.update(answered=True, declined=bool(declined), choice="" if declined else choice,
+                     choice_text="" if declined else choices.get(choice, ""), note=note)
+        step = next((s for s in self.steps if s["n"] == asked.get("step")), None)
+        if step is not None:
+            step.update(answered=True, declined=asked["declined"], choice_text=asked["choice_text"], answer=note)
+        self.save()
+        return {"ok": True}
 
     def one_thanks(self, seat_id: str) -> dict:
-        """「ありがとうございました」, once every item was asked: the seat is
-        kept as thanked (its mark on the map), and one to one ends."""
+        """「ありがとうございました」 after 「聞き終えました」, pressed at any time
+        (直し45 段3: with no box to write in, one to one would otherwise go
+        on until every item was asked): the seat is kept as thanked (its mark
+        on the map), and one to one ends."""
         self._one_seat(seat_id)
-        if not self.one_view(seat_id)["done"]:
-            raise Refused("not_done")
         if seat_id not in self.one_thanked:
             self.one_thanked.append(seat_id)
         self.save()

@@ -220,6 +220,15 @@ TRAIL_WORDS = "trail_words"
 TRAIL_WORD_IDS = ("open", "changed", "question", "silent", "opened", "one_ask", "answer", "declined", "card",
                   "direction")
 AI_ROLE_SUFFIX = "ai_role_suffix"
+# コーチ（AI） at one to one (直し45 段3): the words its questions may not use
+# (checked by code there only), the choices to answer with and the board's
+# words (叩き台); the words of home, money and health are the listener's.
+AI_ABSTRACT_WORDS = "ai_abstract_words"
+ONE_COACH_CHOICES = "one_coach_choices"
+ONE_COACH_CHOICE_IDS = ("know", "differ", "new", "unsure")
+ONE_COACH_WORDS = "one_coach_words"
+ONE_COACH_WORD_IDS = ("decline", "note", "send")
+LISTENER_AVOID = "listener_avoid"
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
@@ -309,6 +318,7 @@ def screen_texts() -> dict:
     texts[START_FLOW] = id_table(START_FLOW, NOW_STEP_IDS)
     texts[WAIT_SIGN] = wait_signs()
     texts[TRAIL_WORDS] = id_table(TRAIL_WORDS, TRAIL_WORD_IDS)
+    texts[ONE_COACH_WORDS] = id_table(ONE_COACH_WORDS, ONE_COACH_WORD_IDS)
     return texts
 
 

@@ -296,7 +296,7 @@ def test_stopped_past_the_limit_or_turned_off_the_tidied_words_are_shown(monkeyp
 # --- the screen ---
 
 def test_the_bubble_parts_its_pieces_where_a_sentence_ends():
-    says = MAP[MAP.index("  function says(pieces, source"):MAP.index("  function oneAnswer(")]
+    says = MAP[MAP.index("  function says(pieces, source"):MAP.index("  // The person's words by its head, on the side with room")]
     assert 'voice.replaceChildren(...pieces.map((piece) => div("one-piece", piece.spoken || piece.text)));' in says
     assert '.join("")' not in says
     assert ".one-bubble .voice .one-piece { display: block; white-space: pre-line; }" in CSS

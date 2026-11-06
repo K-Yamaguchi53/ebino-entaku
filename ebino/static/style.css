@@ -1459,6 +1459,34 @@ body.one-open #ai-seat { visibility: hidden; }
   border-color: var(--paper-soft); }
 /* 聞き終えました and the thanks (直し34-5); a seat thanked keeps a ring on the map. */
 .one-done { padding: 4px 2px; color: var(--paper-light); font-size: 15px; }
+/* 直し45 段3: no box at one to one (the questions to pick only); hidden, not
+   taken away, so the map's room stays as it is. */
+body.one-open .input-area .ask { visibility: hidden; }
+.one-finish { border-style: dashed; color: var(--soft); }
+/* コーチ（AI） at one to one: the AI's colour and shape (as its seat, 直し32),
+   its name over the question; never from the person. */
+.one-coach { display: grid; gap: 6px; padding: 8px 12px 10px; border: 1px solid var(--ai); border-radius: 12px;
+  background: var(--ai-deep); color: var(--ai-ink); box-shadow: 0 6px 16px var(--shadow); }
+.one-coach.waiting { display: flex; align-items: center; min-height: 36px; }
+.one-coach-dots { display: flex; gap: 6px; }
+.one-coach-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--ai); opacity: .5; }
+@media (prefers-reduced-motion: no-preference) {
+  .one-coach-dots span { animation: one-wait 1.2s ease-in-out infinite; }
+  .one-coach-dots span:nth-child(2) { animation-delay: .2s; }
+  .one-coach-dots span:nth-child(3) { animation-delay: .4s; }
+}
+.one-coach-head { display: flex; align-items: center; gap: 6px; }
+.one-coach-name { font-size: 13px; font-weight: 700; color: var(--ai); }
+.one-coach-question { font-size: 16px; line-height: 1.6; color: var(--ai-ink); }
+.one-coach-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.one-coach-choice, .one-coach-decline { min-height: 40px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--ai);
+  background: transparent; color: var(--ai-ink); font-size: 14px; cursor: pointer; }
+.one-coach-choice:hover, .one-coach-choice:focus-visible { background: color-mix(in srgb, var(--ai) 22%, transparent); }
+.one-coach-decline { border-style: dashed; color: var(--soft); border-color: var(--moon-soft); }
+.one-coach input { min-height: 36px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--moon-soft);
+  background: var(--night); color: var(--ink); font-size: 14px; }
+.one-coach-message { font-size: 13px; color: var(--warn); }
+.one-coach.busy button { opacity: .6; }
 .one-thanks { border-color: var(--lamp); }
 .pt.thanked .halo { opacity: 1; stroke: var(--lamp); stroke-width: 2.4; fill-opacity: .35; }
 /* The empty chairs out of the way at one to one: not seen, not reached by Tab (直し34-5). */

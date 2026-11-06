@@ -17,6 +17,7 @@ from ebino.session import Library, Session
 STATIC = app_module.STATIC_DIR
 MAP = (STATIC / "map.js").read_text(encoding="utf-8")
 APP = (STATIC / "app.js").read_text(encoding="utf-8")
+CSS = (STATIC / "style.css").read_text(encoding="utf-8")
 
 
 def _body(source, name):
@@ -55,15 +56,15 @@ def test_the_words_of_one_to_one_are_the_teachers_and_in_texts():
         assert word not in code
 
 
-def test_the_questions_are_buttons_and_a_written_one_goes_to_free():
+def test_the_questions_are_buttons_and_no_question_is_written_at_one_to_one():
+    # 直し45 段3: the box that went to /api/one/free is off the screen; the
+    # server's side stays (above), so it may come back.
     asks = _body(MAP, "function showAsks(")
     assert 'document.createElement("button")' in asks and "view.questions" in asks
     assert "app.oneAsk(mine.seatId, item)" in asks
-    answer = _body(MAP, "function oneAnswer(")
-    assert "app.state.texts.one_words.not_found" in answer and "app.state.texts.one_words.to_card" in answer
-    assert "app.cardFromOne(mine.seatId, question)" in answer
-    assert 'if (state.to.kind === "seat" && state.now.one) return sendOne(state.to.seatId);' in APP
-    assert 'call("/api/one/free"' in _body(APP, "async function sendOne(")
+    assert "function oneAnswer(" not in MAP and "sendOne" not in APP and "/api/one/free" not in APP
+    assert "if (state.now.one) return;" in APP
+    assert "body.one-open .input-area .ask { visibility: hidden; }" in CSS
 
 
 def test_done_shows_the_teachers_line_and_one_choice_that_thanks_and_closes(the_app):

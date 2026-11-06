@@ -122,11 +122,12 @@ def test_a_written_question_is_looked_for_in_this_seats_words_only(sitting, monk
         s.one_free_question("A01", "")
 
 
-def test_thanks_only_once_every_item_was_asked_and_kept(sitting):
-    # 直し34-5: 「聞き終えました」 and the one choice 「ありがとうございました」.
+def test_thanks_once_and_kept(sitting):
+    # 直し34-5: 「聞き終えました」 and the one choice 「ありがとうございました」;
+    # 直し45 段3: pressed at any time (tests/test_one_coach.py).
     s, kept = sitting
     with pytest.raises(Refused):
-        s.one_thanks("P01")  # Not every item asked yet.
+        s.one_thanks("X99")  # No such seat.
     for item in ("目的", "結果"):
         s.one_ask("P01", item)
     assert s.one_view("P01")["done"]

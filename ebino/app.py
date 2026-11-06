@@ -158,8 +158,28 @@ class App:
         return {"purposes": session.next_purposes()}
 
     def handle(self, path: str, body: dict) -> dict:
+        if path == "/api/one/coach":
+            return self.one_coach(body)
         with self.lock:
             return self._handle(path, body)
+
+    def one_coach(self, body: dict) -> dict:
+        """コーチ（AI） at one to one (直し45 段3): planned under the lock, the
+        model asked outside it (at most coach.ONE_TIMEOUT_SECONDS), so the
+        next question picked never waits for it; kept under the lock again,
+        and not shown when another question was picked meanwhile."""
+        with self.lock:
+            session = self.session
+            if session is None:
+                raise Refused("no_session")
+            plan = session.one_coach_plan(body.get("seat_id"), body.get("ask_no"))
+        if plan is None:
+            return {"seat_id": body.get("seat_id"), "ask_no": body.get("ask_no"), "question": ""}
+        text, reason = coach.one_send(self.gate, plan["request"])
+        with self.lock:
+            if self.session is not session:
+                return {"seat_id": plan["seat_id"], "ask_no": plan["ask_no"], "question": ""}
+            return session.one_coach_done(plan, text, reason)
 
     def _handle(self, path: str, body: dict) -> dict:
         if path == "/api/start":
@@ -183,6 +203,9 @@ class App:
             return session.one_ask(body.get("seat_id"), body.get("item"))
         if path == "/api/one/thanks":
             return session.one_thanks(body.get("seat_id"))
+        if path == "/api/one/coach_answer":
+            return session.one_coach_answer(body.get("seat_id"), body.get("ask_no"), body.get("choice", ""),
+                                            body.get("note", ""), declined=body.get("declined") is True)
         if path == "/api/one/free":
             return session.one_free_question(body.get("seat_id"), body.get("question", ""))
         # 今日の道すじ (直し45 段2): a bubble pressed, kept as a step; no model.

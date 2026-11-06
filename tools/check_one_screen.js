@@ -9,7 +9,8 @@
 // wider) than the window. Only the drawer and long boxes may scroll inside
 // themselves. It returns a table: size -> moment -> "ok" or the overflow.
 // one_to_one (直し34-6): the person stood up and a question picked;
-// writing_to_seat is now the box written in at one to one.
+// one_coach (直し45 段3, in place of writing_to_seat: no box at one to
+// one): a question picked and コーチ（AI）'s board over the next ones.
 // school_zoom (直し35-6): the seniors' count pressed, the camera near the
 // school with the seniors at its windows; table_out is the meeting round
 // the risen school.
@@ -25,7 +26,7 @@
 async (page) => {
   const BASE = globalThis.EBINO_BASE || "http://127.0.0.1:8851/";
   const SIZES = [[768, 1024], [1180, 820], [1366, 650], [1536, 760], [1920, 1080]];
-  const MOMENTS = ["before_question", "school_zoom", "table_out", "bubble_pressed", "writing_to_seat", "one_asks", "one_to_one", "answering_ai"];
+  const MOMENTS = ["before_question", "school_zoom", "table_out", "bubble_pressed", "one_coach", "one_asks", "one_to_one", "answering_ai"];
   const HK_MOMENTS = ["hk_map", "hk_talk", "hk_ladder", "hk_scale", "hk_keep", "hk_light", "hk_sheet"];
   // The button that goes on, at each moment.
   const HK_NEXT = { hk_map: "#hk-go", hk_talk: "#hk-input button[type=submit]", hk_ladder: ".hk-options .hk-quote, .hk-picks .hk-pick, .hk-fill .hk-primary",
@@ -64,15 +65,18 @@ async (page) => {
             await p.waitForSelector(".table-bubble:not(.unplaced):not(.ai)", { timeout: 20000 });
             await p.waitForTimeout(reduce ? 600 : 1500);
           }
-          if (["bubble_pressed", "writing_to_seat", "one_asks", "one_to_one"].includes(moment)) {
+          if (["bubble_pressed", "one_coach", "one_asks", "one_to_one"].includes(moment)) {
             await p.locator(".table-bubble:not(.unplaced):not(.ai)").first().click();
             await p.waitForSelector(".map-choices");
           }
-          if (moment === "writing_to_seat") {
+          if (moment === "one_coach") {
+            // 直し45 段3: no box at one to one; a question picked, then
+            // コーチ（AI）'s board over the next ones (when one comes).
             await p.locator('.map-choices button[data-choice="card"]').click();
-            await p.waitForTimeout(300);
-            await p.focus("#question");
-            await p.keyboard.type("休みの日に、店のことを考えますか？");
+            await p.waitForSelector(".one-asks .one-ask", { timeout: 15000 });
+            await p.locator(".one-asks .one-ask:not(.one-finish)").first().click();
+            await p.waitForSelector(".one-coach:not(.waiting)", { timeout: 15000 }).catch(() => {});
+            await p.waitForTimeout(500);
           }
           if (moment === "one_asks") {
             await p.locator('.map-choices button[data-choice="card"]').click();
@@ -103,7 +107,7 @@ async (page) => {
           if (m.w > m.vw) bad.push(`wide ${m.w}>${m.vw}`);
           if (errors.length) bad.push(`errors ${errors.length}`);
           let put = "";
-          if (["one_asks", "one_to_one"].includes(moment)) {
+          if (["one_asks", "one_to_one", "one_coach"].includes(moment)) {
             const asks = await p.locator(".one-asks .one-ask").evaluateAll((els) => els.map((e) => ({
               cut: e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1, put: e.dataset.rephrased === "1" })));
             if (asks.some((a) => a.cut)) bad.push("clipped");

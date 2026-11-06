@@ -166,7 +166,8 @@ def test_every_way_to_write_goes_to_the_one_box():
     assert "askSeat(seatId);" in _top("openCardFor")
     assert "answerTo(roundNo, role)" in _top("answerEntry")
     # From a card at the table, one to one (直し34-3), which writes to that seat.
-    assert 'button("card", () => openOne(seatId, card))' in MAP and "app.askSeat(seatId);  // The box at the foot" in MAP
+    # 直し45 段3: one to one has no box to write in; the questions to pick only.
+    assert 'button("card", () => openOne(seatId, card))' in MAP and "app.askSeat(seatId);  // The box at the foot" not in MAP
     assert "answerTo(roundNo, card.role);" in _top("renderAiSeat")  # The AI's seat (直し32-3).
     assert "app.askSeat(seatId);" in MAP[MAP.index("function press("):]
     assert "function answerForm" not in APP and "putUnderLine" not in APP and "keptDraft" not in APP

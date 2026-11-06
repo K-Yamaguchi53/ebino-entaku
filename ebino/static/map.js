@@ -3534,7 +3534,7 @@ const EbinoMap = (() => {
     document.body.classList.add("one-open");
     $("map-back").textContent = app.state.texts.one_words.back;
     app.setNow({ one: true });
-    app.askSeat(seatId);  // The box at the foot writes to this person.
+    // 直し45 段3: no box to write in at one to one; the questions to pick only.
     if (token) token.node.classList.add("one-self");
     // Back home first.
     if (token && motion) {
@@ -3623,9 +3623,11 @@ const EbinoMap = (() => {
     panel.setAttribute("role", "group");
     panel.setAttribute("aria-label", whoOf(seatOf(one.seatId)));
     const mine = one;
-    // Every item asked (直し34-5): 「聞き終えました」 and one choice,
-    // 「ありがとうございました」; pressed, the seat is thanked (its mark) and
-    // one to one closes.
+    // コーチ（AI）'s board, when one is up or on its way, stays at the top.
+    if (mine.coach && mine.coach.node) panel.append(mine.coach.node);
+    // Every item asked (直し34-5), or 「聞き終えました」 pressed (直し45 段3: at
+    // any time): 「聞き終えました」 and one choice, 「ありがとうございました」;
+    // pressed, the seat is thanked (its mark) and one to one closes.
     if (view.done) {
       panel.append(div("one-done", app.state.texts.one_words.done));
       const thanks = document.createElement("button");
@@ -3645,7 +3647,8 @@ const EbinoMap = (() => {
       });
       panel.append(thanks);
     }
-    for (const { item, question, rephrased } of view.questions) {
+    const left = view.done ? [] : view.questions;
+    for (const { item, question, rephrased } of left) {
       const ask = document.createElement("button");
       ask.type = "button";
       ask.className = "one-ask";
@@ -3655,12 +3658,15 @@ const EbinoMap = (() => {
       ask.addEventListener("click", async () => {
         if (panel.classList.contains("busy")) return;
         panel.classList.add("busy");
+        dropCoach(mine);  // Picked first: the coach's question for the last words is not shown.
         try {
           const answer = await app.oneAsk(mine.seatId, item);
           if (one !== mine) return;
           says(answer.pieces, answer.source, answer.kind_label);
+          // The next questions at once; the coach's question after, if it comes.
+          if (answer.coach) askCoach(mine, answer.coach.ask_no);
           showAsks(answer);
-          const next = overlay.querySelector(".one-asks .one-ask");
+          const next = overlay.querySelector(".one-asks .one-ask:not(.one-finish)");
           if (next) next.focus({ preventScroll: true });
         } catch (error) {
           panel.classList.remove("busy");
@@ -3668,9 +3674,113 @@ const EbinoMap = (() => {
       });
       panel.append(ask);
     }
+    // 「聞き終えました」 at any time (直し45 段3): then 「ありがとうございました」.
+    if (!view.done) {
+      const finish = document.createElement("button");
+      finish.type = "button";
+      finish.className = "one-ask one-finish";
+      finish.textContent = app.state.texts.one_words.done;
+      finish.addEventListener("click", () => {
+        dropCoach(mine);
+        showAsks({ ...view, done: true, questions: [] });
+        const thanks = overlay.querySelector(".one-asks .one-thanks");
+        if (thanks) thanks.focus({ preventScroll: true });
+      });
+      panel.append(finish);
+    }
     overlay.append(panel);
     one.panel = panel;
     placeOne();
+  }
+
+  // コーチ（AI） at one to one (直し45 段3): asked for after the person's
+  // words came (never waited for: the next questions are already there); on
+  // its own small board in the AI's colour and shape with its name, at the
+  // top of the questions, never from the person or its bubble. Three dots
+  // while it comes; nothing when it does not. Answered with the teacher's
+  // choices (and a line, or not), or 答えない; then on as before.
+  async function askCoach(mine, askNo) {
+    const words = app.state.texts.one_coach_words;
+    const board = div("one-coach waiting");
+    board.setAttribute("aria-busy", "true");
+    const dots = div("one-coach-dots");
+    for (let n = 0; n < 3; n++) dots.append(document.createElement("span"));
+    board.append(dots);
+    mine.coach = { askNo, node: board };
+    if (mine.panel && mine.panel.isConnected) {
+      mine.panel.prepend(board);
+      placeOne();
+    }
+    let view = null;
+    try {
+      view = await app.oneCoach(mine.seatId, askNo);
+    } catch (error) {
+      view = null;
+    }
+    if (one !== mine || !mine.coach || mine.coach.askNo !== askNo) return;  // Moved on.
+    if (!view || !view.question) return dropCoach(mine);
+    board.classList.remove("waiting");
+    board.removeAttribute("aria-busy");
+    board.setAttribute("role", "group");
+    const head = div("one-coach-head");
+    head.append(div("ai-mark", app.state.texts.ai_seat_mark), div("one-coach-name", view.label));
+    head.firstChild.setAttribute("aria-hidden", "true");
+    const question = div("one-coach-question", view.question);
+    question.id = `one-coach-q-${askNo}`;
+    board.setAttribute("aria-labelledby", question.id);
+    const note = document.createElement("input");
+    note.type = "text";
+    note.maxLength = 120;
+    note.autocomplete = "off";
+    note.placeholder = words.note;
+    note.setAttribute("aria-label", words.note);
+    const said = div("one-coach-message");
+    said.hidden = true;
+    const choices = div("one-coach-choices");
+    const send = async (body) => {
+      if (board.classList.contains("busy")) return;
+      board.classList.add("busy");
+      try {
+        const done = await app.oneCoachAnswer(mine.seatId, askNo, body);
+        if (done.status === "ask_again") {
+          said.textContent = done.message;
+          said.hidden = false;
+          return;
+        }
+        dropCoach(mine);
+        const next = overlay.querySelector(".one-asks .one-ask");
+        if (next) next.focus({ preventScroll: true });
+      } catch (error) {
+        // As it was: it may be pressed again.
+      } finally {
+        board.classList.remove("busy");
+      }
+    };
+    for (const { id, text } of view.choices) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "one-coach-choice";
+      button.dataset.choice = id;
+      button.textContent = text;
+      button.addEventListener("click", () => send({ choice: id, note: note.value }));
+      choices.append(button);
+    }
+    const decline = document.createElement("button");
+    decline.type = "button";
+    decline.className = "one-coach-decline";
+    decline.textContent = words.decline;
+    decline.addEventListener("click", () => send({ declined: true }));
+    choices.append(decline);
+    board.replaceChildren(head, question, choices, note, said);
+    placeOne();
+  }
+
+  // The coach's board gone (answered, not come, or another question picked).
+  function dropCoach(mine) {
+    if (!mine || !mine.coach) return;
+    if (mine.coach.node) mine.coach.node.remove();
+    mine.coach = null;
+    if (one === mine) placeOne();
   }
 
   // Its words in its bubble: the item's pieces, as spoken words where they
@@ -3693,40 +3803,6 @@ const EbinoMap = (() => {
     one.bubble.classList.remove("not-found");
     for (const old of overlay.querySelectorAll(".one-card")) old.remove();  // Its words now, no card to make.
     placeOne();
-  }
-
-  // A question written (app.sendOne): found, its words; not, the teacher's
-  // line and 「質問カードにする」, which makes it a card to the person.
-  function oneAnswer(answer, question) {
-    if (!one) return;
-    if (answer.found) {
-      says(answer.pieces, answer.source);
-    } else {
-      one.bubble.querySelector(".voice").textContent = app.state.texts.one_words.not_found;
-      // Only who it is: no words of theirs, so no source and no spoken mark.
-      one.bubble.querySelector(".who").textContent = whoOf(seatOf(one.seatId));
-      one.bubble.classList.remove("spoken");
-      const mark = one.bubble.querySelector(".spoken-mark");
-      if (mark) mark.remove();
-      one.bubble.classList.add("not-found");
-      const mine = one;
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = "one-card";
-      card.textContent = app.state.texts.one_words.to_card;
-      card.addEventListener("click", async () => {
-        card.disabled = true;
-        try {
-          await app.cardFromOne(mine.seatId, question);
-          card.remove();
-        } catch (error) {
-          card.disabled = false;
-        }
-      });
-      for (const old of overlay.querySelectorAll(".one-card")) old.remove();
-      one.bubble.append(card);
-    }
-    showAsks(answer);
   }
 
   // The person's words by its head, on the side with room (right first),
@@ -3828,5 +3904,5 @@ const EbinoMap = (() => {
     relayout();
   }
 
-  return { init, show, round, refresh, marked, markOf, layoutAgain, oneAnswer, asked };
+  return { init, show, round, refresh, marked, markOf, layoutAgain, asked };
 })();
