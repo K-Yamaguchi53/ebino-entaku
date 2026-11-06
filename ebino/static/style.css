@@ -169,11 +169,11 @@ body:has(#start[hidden]) .masthead h1 { font-size: 36px; letter-spacing: .12em; 
    on a faint lamp ground; each time it changes, lit once (not with motion
    reduced). */
 .now-line { margin: 4px 0 0; padding: 6px 14px; border-left: 6px solid var(--lamp); background: var(--lamp-faint);
-  border-radius: 0 6px 6px 0; font-size: 21px; font-weight: 700; line-height: 1.5; color: var(--lamp-bright); }
+  border-radius: 0 6px 6px 0; font-size: 26px; font-weight: 700; line-height: 1.45; color: var(--lamp-bright); }
 @media (max-height: 720px) {
   .now { padding: 4px 16px 6px; }
   .now-steps { font-size: 13px; }
-  .now-line { margin-top: 2px; padding: 3px 12px; font-size: 18px; }
+  .now-line { margin-top: 2px; padding: 3px 12px; font-size: 22px; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .now-line.fresh { animation: now-fresh 1.4s ease-out 1; }
@@ -1569,6 +1569,56 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
 /* The day's map no taller than leaves its button in the first screen. */
 .hk-map-box svg { max-height: 40vh; }
 .hk-said { border-radius: var(--r-l); box-shadow: 0 8px 22px var(--shadow); transition: border-color var(--step), box-shadow var(--step); }
+
+/* --- The first look (the teacher, 11/6): whose words are in, in the middle
+   of the screen by itself before the first question; the map dim behind. --- */
+.first-look { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 22px 28px 20px;
+  border: 2px solid var(--lamp); border-radius: 12px; background: var(--night-2); color: var(--ink);
+  box-shadow: 0 18px 60px var(--shadow); overflow: auto; }
+.first-look::backdrop { background: var(--veil); }
+.first-look-title { margin: 0 0 14px; font-family: var(--mincho); font-size: 28px; line-height: 1.4; color: var(--lamp-bright); }
+.first-look-body .inside-body { display: grid; gap: 14px 36px; }
+@media (min-width: 900px) { .first-look-body .inside-body { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+.first-look-body .inside-heading { font-size: 20px; }
+.first-look-body .inside-counts .label { font-size: 16px; }
+.first-look-body .inside-counts .number { font-size: 40px; }
+.first-look-body .inside-end, .first-look-body .examples-lead, .first-look-body .examples-list,
+.first-look-body .examples-end { font-size: 17px; }
+.first-look-row { margin: 18px 0 0; text-align: center; }
+.first-look-go { min-height: 56px; padding: 0 32px; border: 0; border-radius: 28px; background: var(--lamp);
+  color: var(--night); font-size: 22px; font-weight: 700; cursor: pointer; }
+.first-look-go:hover { background: var(--lamp-bright); }
+.first-look-go:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+@media (max-height: 720px) {
+  .first-look { padding: 14px 22px 14px; }
+  .first-look-title { font-size: 23px; margin-bottom: 8px; }
+  .first-look-body .inside-counts .number { font-size: 32px; }
+  .first-look-row { margin-top: 10px; }
+}
+
+/* --- The guide (the teacher, 11/6): a bubble by the one thing to press now,
+   pointing at it; never pressed, never over the dialogs. --var(--point) is
+   where along its side its point is. --- */
+.guide { position: fixed; z-index: 45; max-width: min(320px, calc(100vw - 16px)); padding: 8px 16px;
+  border-radius: 10px; background: var(--lamp); color: var(--night); font-size: 20px; font-weight: 700;
+  line-height: 1.4; pointer-events: none; box-shadow: 0 6px 18px var(--shadow); --point: 50%; }
+.guide[hidden] { display: none; }
+.guide::after { content: ""; position: absolute; width: 0; height: 0; border: 10px solid transparent; }
+.guide[data-side="above"]::after { top: 100%; left: calc(var(--point) - 10px); border-top-color: var(--lamp); }
+.guide[data-side="below"]::after { bottom: 100%; left: calc(var(--point) - 10px); border-bottom-color: var(--lamp); }
+/* The bubble's choices: the one to press lit itself, no bubble over the card. */
+.map-choices button.guide-here { outline: 3px solid var(--lamp); outline-offset: 2px; font-weight: 700;
+  color: var(--lamp-bright); background: var(--lamp-faint); }
+@media (max-height: 720px) { .guide { font-size: 18px; padding: 6px 14px; } }
+@media (prefers-reduced-motion: no-preference) {
+  .guide.fresh { animation: guide-fresh 1.4s ease-out 1; }
+  .map-choices button.guide-here { animation: guide-fresh 1.4s ease-out 1; }
+}
+@keyframes guide-fresh {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--lamp) 80%, transparent), 0 6px 18px var(--shadow); }
+  to { box-shadow: 0 0 0 16px transparent, 0 6px 18px var(--shadow); }
+}
+@media print { .guide, .first-look { display: none !important; } }
 
 /* 直し42: the sign's one movement, the three dots in turn; with motion
    reduced they stand still. */

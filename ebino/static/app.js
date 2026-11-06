@@ -291,6 +291,7 @@ async function start(lab, chosen) {
   onMap((map) => map.show());  // Draws the rim and the river once the map is on screen.
   renderPurposes(data.purposes);
   $("question").focus();
+  firstLook();
 }
 
 // Waiting for /api/start with the table out (直し32-5): the box and its
@@ -747,6 +748,7 @@ function setNow(changes = {}) {
   }
   keepUnderNow();
   drawWait();  // The sign in the middle may step back or come out now (直し42).
+  drawGuide();
 }
 
 // Whatever the page scrolls to stops under the band, not behind it.
@@ -795,6 +797,112 @@ function setupInside() {
   });
   $("inside").classList.add("beckon");
 }
+
+// The first look (the teacher, 11/6: the students did not open it by
+// themselves): once the table is out, whose words are in comes up in the
+// middle of the screen, over everything, by itself; once only (the next
+// student starts from the page read afresh). Its button, Esc, or a question
+// example pressed puts it back in the map's column, and the keyboard goes
+// to the box.
+function firstLook() {
+  const look = $("first-look"), body = document.querySelector("#inside-fold .inside-body");
+  if (state.firstLooked || !state.texts.guide || $("inside").hidden || !body || typeof look.showModal !== "function") return;
+  state.firstLooked = true;
+  $("first-look-title").textContent = state.texts.guide.first_look_title;
+  $("first-look-go").textContent = state.texts.guide.first_look_go;
+  $("inside-fold").open = false;
+  $("first-look-body").append(body);
+  // Every way out comes here, once (the browser's own close event does not
+  // always come: Esc closes it here, not by the browser).
+  let over = false;
+  const done = () => {
+    if (over) return;
+    over = true;
+    if (look.open) look.close();
+    $("inside-fold").append(body);
+    $("inside").classList.remove("beckon");  // Seen: the light goes for good.
+    $("question").focus({ preventScroll: true });
+    drawGuide();
+  };
+  look.addEventListener("cancel", (event) => { event.preventDefault(); done(); });
+  look.addEventListener("close", done);
+  $("first-look-go").onclick = done;
+  // An example pressed fills the box (fill); then the box is what is next.
+  look.addEventListener("click", (event) => {
+    if (event.target.closest("#work-questions button")) done();
+  });
+  look.showModal();
+  drawGuide();
+}
+
+// --- the guide (the teacher, 11/6) ---
+
+// For each state with one thing to press: where it is (null: not on screen
+// now), whose words the bubble says, or lit: the thing itself lit instead
+// (the bubble's choices, so no bubble covers the card being read).
+const GUIDE = {
+  write: { at: () => $("question") },
+  card: { at: () => $("question"), words: "write" },
+  one: { at: () => $("question"), words: "write" },
+  table: { at: () => document.querySelector("#map-overlay .table-bubble:not(.unplaced)") },
+  pressed: { at: () => document.querySelector('.map-choices button[data-choice="card"]'), lit: true },
+  answer_ai: { at: () => shown(document.querySelector("#ai-seat-cards .ai-question:not(:disabled)")) || shown($("ai-seat-open")) },
+  after: { at: () => $("to-reflect") },
+};
+
+// node if it is on screen (a box of its own), else null.
+function shown(node) {
+  if (!node) return null;
+  const box = node.getBoundingClientRect();
+  return box.width && box.height ? node : null;
+}
+
+function guideState() {
+  return state.texts && state.texts.now_line ? nowState() : "";
+}
+
+// The bubble by what to press now, pointing at it: over it, or under it
+// when there is no room over it. Hidden while nothing is to be pressed,
+// while the first look is up, or with no words for it. Never pressed
+// (pointer-events: none); lit once each time it says something new (not
+// with motion reduced).
+function drawGuide() {
+  const guide = $("guide"), words = state.texts && state.texts.guide;
+  const now = guideState();
+  const spec = GUIDE[now];
+  const target = spec && shown(spec.at());
+  const lit = spec && spec.lit ? target : null;
+  for (const node of document.querySelectorAll(".guide-here")) if (node !== lit) node.classList.remove("guide-here");
+  if (lit) lit.classList.add("guide-here");
+  if (!words || !target || lit || $("first-look").open) {
+    guide.hidden = true;
+    guide.dataset.state = "";
+    return;
+  }
+  if (guide.dataset.state !== now) {
+    $("guide-text").textContent = words[spec.words || now];
+    guide.dataset.state = now;
+    guide.classList.remove("fresh");
+    void guide.offsetWidth;
+    guide.classList.add("fresh");
+  }
+  guide.hidden = false;
+  const box = target.getBoundingClientRect(), w = guide.offsetWidth, h = guide.offsetHeight;
+  const gap = 14, edge = 8, vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const side = box.top - gap - h >= edge ? "above" : "below";
+  const top = side === "above" ? box.top - gap - h : Math.min(box.bottom + gap, vh - h - edge);
+  const left = clamp(box.left + box.width / 2 - w / 2, edge, vw - w - edge);
+  guide.dataset.side = side;
+  guide.style.left = `${Math.round(left)}px`;
+  guide.style.top = `${Math.round(top)}px`;
+  // The bubble's point at what it points at, even when the bubble is kept
+  // inside the window.
+  guide.style.setProperty("--point", `${Math.round(clamp(box.left + box.width / 2 - left, 16, w - 16))}px`);
+}
+// What it points at moves with the window, the map and its bubbles: kept by it.
+window.addEventListener("resize", drawGuide);
+setInterval(() => { if (!$("guide").hidden || GUIDE[guideState()]) drawGuide(); }, 400);
 
 // --- the drawer (直し32-1) ---
 

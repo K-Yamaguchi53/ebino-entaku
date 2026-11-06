@@ -198,6 +198,11 @@ MAP_SKIP = "map_skip"
 BUBBLE_CHOICE_IDS = ("paragraph", "mark", "card", "read")
 # Under each of them, the first time a student presses a bubble (直し32-4).
 BUBBLE_CHOICES_HELP = "bubble_choices_help"
+# The guide (the teacher, 11/6: the students could not go on without being
+# told): the first look at whose words are in, its heading and its button;
+# and the bubble by the one thing to press now, for the states that have one.
+GUIDE = "guide"
+GUIDE_IDS = ("first_look_title", "first_look_go", "write", "table", "pressed", "answer_ai", "after")
 
 # Everything the screen shows from texts/, sent to it once.
 SCREEN_TEXTS = (
@@ -283,6 +288,7 @@ def screen_texts() -> dict:
     texts[SEAT_ICONS] = seat_icons()
     texts[NOW_STEPS] = now_steps()
     texts[NOW_LINE] = now_lines()
+    texts[GUIDE] = id_table(GUIDE, GUIDE_IDS)
     texts[WAIT_SIGN] = wait_signs()
     return texts
 

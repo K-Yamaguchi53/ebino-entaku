@@ -94,7 +94,7 @@ const state = { now: { preparing: false } };
 const seen = [];
 function setNow(changes = {}) { Object.assign(state.now, changes); seen.push(state.now.preparing ? "preparing" : "other"); }
 globalThis.window = { matchMedia: () => ({ matches: false }) };
-let endOpening = () => {}, onMap = () => {}, renderPurposes = () => {}, placeInside = () => {};
+let endOpening = () => {}, onMap = () => {}, renderPurposes = () => {}, placeInside = () => {}, firstLook = () => {};
 let finish;
 const playOpening = () => new Promise((done) => { finish = done; });
 let reply;

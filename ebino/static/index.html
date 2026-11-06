@@ -333,6 +333,20 @@
   </section>
 </main>
 
+<!-- The first look (the teacher, 11/6): once the table is out, before the
+     first question, whose words are in comes up in the middle of the screen
+     by itself; its button (or Esc) puts it back in the map's column and the
+     keyboard goes to the box. app.js moves #inside's body in and out. -->
+<dialog id="first-look" class="first-look" aria-labelledby="first-look-title">
+  <h2 id="first-look-title" class="first-look-title"></h2>
+  <div id="first-look-body" class="first-look-body"></div>
+  <p class="first-look-row"><button type="button" id="first-look-go" class="first-look-go" autofocus></button></p>
+</dialog>
+
+<!-- The guide (the teacher, 11/6): a bubble by the one thing to press now,
+     pointing at it. Never pressed; the line at the top reads it out. -->
+<div id="guide" class="guide" aria-hidden="true" hidden><span id="guide-text"></span></div>
+
 <script src="/rough.js"></script>
 <script src="/person.js"></script>
 <script src="/map.js"></script>
