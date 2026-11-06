@@ -1121,7 +1121,9 @@ body.one-open #map-heading { visibility: hidden; }
 .trail-ai .trail-ai-name { font-size: 11px; font-weight: 700; color: var(--ai); }
 .trail-ai .trail-text { color: var(--ai-ink); }
 .trail-answer { display: flex; flex-wrap: wrap; gap: 0 6px; color: var(--ink); }
-body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar .trail { flex: 1 1 auto; }
+/* Only the room the column's other parts leave (basis 0): a long trail
+   scrolls inside itself, never squeezing the buttons over one another. */
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar .trail { flex: 1 1 0; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar .trail-open { min-height: 40px; }
 /* 1366×650 and upright: shut at first; opened, over the map's side, under
    the top line, never over the box at the foot. */
@@ -1244,8 +1246,14 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .input-area .message, bod
   max-width: none; text-align: left; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .map-met { white-space: nowrap; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #table > .map-source { grid-column: 1 / -1; grid-row: 3; margin: -4px 0 0; font-size: .6rem; line-height: 1.3; }
-/* A low screen (1366×650): the box one line shorter. */
+/* A low screen (1366×650): the box one line shorter. 直し45: the map's
+   column a little tighter, so 今日の道すじ's button and the line over the
+   box when no one answered still leave room for every button. */
 @media (max-height: 700px) {
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar { gap: 6px; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar .drawer-button,
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar .trail-open { min-height: 34px; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-bar #inside summary { min-height: 38px; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .masthead h1 { font-size: 18px; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line { margin: 2px 0 6px; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .ask textarea { height: calc(var(--rule) + 16px); }

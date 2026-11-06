@@ -115,5 +115,11 @@ def test_the_screen_asks_for_it_and_shows_it_by_the_map():
     assert 'id="trail"' in HTML and 'id="trail-open"' in HTML and 'id="trail-list"' in HTML
     assert 'fetch("/api/trail")' in APP
     assert 'call("/api/trail/opened"' in APP
+    # In the column, the room left over only: a long trail never squeezes the buttons.
+    assert ".map-bar .trail { flex: 1 1 0; }" in CSS
+    # A low screen (1366×650): the column tighter, so every button keeps its room.
+    low = CSS[CSS.index("/* A low screen (1366×650): the box one line shorter."):]
+    low = low[:low.index("\n}\n")]
+    assert ".map-bar { gap: 6px; }" in low and ".map-bar .trail-open { min-height: 34px; }" in low
     # Shut at first where there is no room (1366×650 and upright), open elsewhere.
     assert 'matchMedia("(max-height: 700px), (orientation: portrait)")' in APP
