@@ -75,6 +75,9 @@ MAP_FILES = {
     # The same picture mirrored, blurred and darkened, laid round it so the
     # frame has no empty black (直し41の続き; tools/make_relief_blur.py).
     "/relief_blur.webp": (relief.RELIEF_DIR / "relief_blur.webp", "image/webp"),
+    # The seasons at dusk and their grounds (the teacher, 11/6).
+    **{f"/{name}": (relief.RELIEF_DIR / name, "image/webp")
+       for season in relief.SEASONS for name in relief.season_files(season)},
 }
 MAX_BODY = 16 * 1024
 HITOKOTO = "/api/hitokoto/"  # 帰る前に、ひとこと's steps (直し38).

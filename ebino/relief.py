@@ -13,6 +13,12 @@ them onto the picture by itself. When any of the three is missing, cannot be
 read, or does not fit the map, there is no picture and the screen keeps the
 flat map (and with no map, the seat list): the app still starts. Nothing here
 holds a seat's words.
+
+The seasons (the teacher, 11/6): the same model at dusk in spring and in
+autumn, mapdata/relief_<season>.webp with its blurred ground
+relief_blur_<season>.webp (tools/render_relief.py, tools/make_relief_blur.py),
+switched on the screen. Each is offered only when both files are there and
+the picture is the night's size (the same camera): else the night alone.
 """
 
 import json
@@ -24,7 +30,31 @@ IMAGE = "relief.webp"
 PROJECTION = "relief_projection.json"
 HEIGHTS = "relief_heights.json"
 IMAGE_PATH = "/relief.webp"  # Where the screen asks for the picture.
+BLUR_PATH = "/relief_blur.webp"  # The night's ground round it (make_relief_blur.py).
 MAX_IMAGE_BYTES = 1_000_000
+SEASONS = ("spring", "autumn")  # Besides the night, in the switch's order.
+
+
+def season_files(season: str) -> tuple[str, str]:
+    """The season's picture and its ground, as named in mapdata/ and served."""
+    return f"relief_{season}.webp", f"relief_blur_{season}.webp"
+
+
+def looks(folder: Path, size: tuple[int, int]) -> list[dict]:
+    """The pictures the screen may switch between: the night first, then
+    each season whose two files are there and whose picture is the night's
+    size (a season that is not is left out, never shown misplaced)."""
+    found = [{"id": "night", "image": IMAGE_PATH, "blur": BLUR_PATH}]
+    for season in SEASONS:
+        image, blur = season_files(season)
+        try:
+            data = (folder / image).read_bytes()
+            if not (folder / blur).is_file() or len(data) > MAX_IMAGE_BYTES or webp_size(data) != size:
+                continue
+        except (OSError, ValueError):
+            continue
+        found.append({"id": season, "image": f"/{image}", "blur": f"/{blur}"})
+    return found
 
 
 def _number(value) -> float:
@@ -83,8 +113,10 @@ def load_relief(viewbox: tuple[float, float], folder: Path | None = None) -> dic
     map is shown, and the app starts all the same."""
     folder = folder or RELIEF_DIR
     try:
-        return parse_relief((folder / IMAGE).read_bytes(),
+        data = parse_relief((folder / IMAGE).read_bytes(),
                             json.loads((folder / PROJECTION).read_text(encoding="utf-8")),
                             json.loads((folder / HEIGHTS).read_text(encoding="utf-8")), viewbox)
     except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError):
         return None
+    data["looks"] = looks(folder, tuple(data["res"]))
+    return data

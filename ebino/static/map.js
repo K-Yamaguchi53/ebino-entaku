@@ -190,6 +190,9 @@ const EbinoMap = (() => {
   // and darkened (tools/make_relief_blur.py), three times as wide and as
   // tall, the picture in its middle: no empty black in the frame.
   const BLUR_IMAGE = "/relief_blur.webp";
+  // The map's seasons (the teacher, 11/6): which one opens by the month
+  // (3-5 spring, 9-11 autumn, else the night), when its picture is there.
+  const SEASON_MONTHS = { spring: [3, 4, 5], autumn: [9, 10, 11] };
   // Where the picture melts into it ([where, shown]): its see-through or
   // black margin hidden, the land shown a little further in.
   const RELIEF_FADE_X = [[0, 0], [0.016, 0], [0.04, 1], [0.96, 1], [0.984, 0], [1, 0]];
@@ -209,6 +212,8 @@ const EbinoMap = (() => {
   let lastSeats = [];  // The seats as last drawn, to draw them again (直し33-2).
   let yardPicture = null;  // The school's large picture once it has loaded (直し33-2).
   let view = null;  // How the map's (x, y) reach the drawing (flatView, reliefView).
+  let look = null;  // The picture shown, night or a season: { id, image, blur }.
+  let lookNodes = null;  // The picture's and the ground's <image>, to switch them.
   let vb = null;  // The part of the drawing on screen.
   let splitLayer, tableLayer, schoolGroup = null;
   const points = {};  // Seat ID -> { node, seat, at() }.
@@ -348,13 +353,20 @@ const EbinoMap = (() => {
     svg = $("map-svg");
     overlay = $("map-overlay");
     frame = $("map-frame");
+    look = map.relief ? startLook() : null;
     controls();
     const go = () => {
       if (!map.relief) return build(seats, false);
-      const picture = new Image();
-      picture.onload = () => build(seats, true);
-      picture.onerror = () => build(seats, false);
-      picture.src = map.relief.image;
+      // A season's picture that will not load: the night's; the night's
+      // that will not: the flat map.
+      const night = looksOf()[0];
+      const tryLook = (one) => {
+        const picture = new Image();
+        picture.onload = () => { showLook(one.id); build(seats, true); };
+        picture.onerror = () => (one === night ? build(seats, false) : tryLook(night));
+        picture.src = one.image;
+      };
+      tryLook(look);
     };
     // The school's large picture first (直し33-2): the seats on it are put
     // from it. Not loaded (none, or it fails): the plain yard.
@@ -503,8 +515,9 @@ const EbinoMap = (() => {
 
     if (view.relief) {
       const blur = layer("relief-blur");
-      blur.append(svgEl("image", { href: BLUR_IMAGE, x: ox - base.W, y: oy - base.H, width: 3 * base.W, height: 3 * base.H,
-        preserveAspectRatio: "none" }));
+      const ground = svgEl("image", { href: look.blur, x: ox - base.W, y: oy - base.H, width: 3 * base.W, height: 3 * base.H,
+        preserveAspectRatio: "none" });
+      blur.append(ground);
       const image = layer("relief-image");
       // Its edges (the render's margin, see-through or black) melt into the
       // ground under it: two still masks, across and down (no blur here).
@@ -520,9 +533,12 @@ const EbinoMap = (() => {
       fade("relief-fade-y", false, RELIEF_FADE_Y);
       image.append(defs);
       const faded = svgEl("g", { mask: "url(#relief-fade-y)" });
-      faded.append(svgEl("image", { href: map.relief.image, x: ox, y: oy, width: base.W, height: base.H, mask: "url(#relief-fade-x)" }));
+      const picture = svgEl("image", { href: look.image, x: ox, y: oy, width: base.W, height: base.H, mask: "url(#relief-fade-x)" });
+      faded.append(picture);
       image.append(faded);
+      lookNodes = { picture, ground };
     }
+    $("map-season").hidden = !view.relief || looksOf().length < 2;
     const fill = layer("basin-fill");
     const rimLine = view.relief ? dense(map.boundary, true).map(([x, y]) => P(x, y, 1)) : map.boundary.map(([x, y]) => P(x, y));
     fill.append(svgEl("polygon", { points: rimLine.map((p) => p.join(",")).join(" ") }));
@@ -1335,8 +1351,53 @@ const EbinoMap = (() => {
     soon = setTimeout(() => { frame.classList.remove("moving"); relayout(); }, 140);
   }
 
+  // The pictures there are: the night, then each season's (relief.py).
+  function looksOf() {
+    return (map.relief && map.relief.looks) || [{ id: "night", image: map.relief.image, blur: BLUR_IMAGE }];
+  }
+
+  // The season by today's month when its picture is there; else the night.
+  function startLook() {
+    const month = new Date().getMonth() + 1;
+    const all = looksOf();
+    const season = Object.keys(SEASON_MONTHS).find((id) => SEASON_MONTHS[id].includes(month));
+    return all.find((one) => one.id === season) || all[0];
+  }
+
+  // 夜・春・秋 (the teacher, 11/6): only the picture and its ground change,
+  // where they are; the points, the words and the view stay as they were.
+  function seasonButtons() {
+    const words = app.state.texts.map_buttons;
+    const band = $("map-season");
+    band.setAttribute("aria-label", words.seasons.label);
+    for (const one of looksOf()) {
+      const key = `season_${one.id}`;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.look = one.id;
+      button.textContent = words[key].text;
+      if (words[key].label !== words[key].text) button.setAttribute("aria-label", words[key].label);
+      button.addEventListener("click", () => showLook(one.id));
+      band.append(button);
+    }
+    showLook(look.id);
+  }
+
+  function showLook(id) {
+    look = looksOf().find((one) => one.id === id) || look;
+    frame.dataset.look = look.id;  // The place names' halo (style.css).
+    if (lookNodes) {
+      lookNodes.picture.setAttribute("href", look.image);
+      lookNodes.ground.setAttribute("href", look.blur);
+    }
+    for (const button of $("map-season").querySelectorAll("button")) {
+      button.setAttribute("aria-pressed", String(button.dataset.look === look.id));
+    }
+  }
+
   // The buttons, the wheel, a drag and a two-finger pinch.
   function controls() {
+    if (map.relief) seasonButtons();
     const words = app.state.texts.map_buttons;
     for (const [id, key] of [["map-back", "back"], ["map-zoom-in", "zoom_in"], ["map-zoom-out", "zoom_out"],
       ["map-zoom-all", "zoom_all"]]) {

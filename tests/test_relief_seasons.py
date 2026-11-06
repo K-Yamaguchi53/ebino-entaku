@@ -1,0 +1,171 @@
+"""The map's seasons (the teacher, 11/6): beside the night, the same model at
+dusk in spring and in autumn, switched on the screen by 夜・春・秋. Only the
+picture and the ground under it change; a season is offered only when both
+its files are there and its picture is the night's size (the same camera)."""
+
+import json
+import re
+import shutil
+import subprocess
+import threading
+from pathlib import Path
+
+import pytest
+
+from ebino import app as app_module
+from ebino import relief, texts
+from ebino.app import App, make_server
+from ebino.gate import Gate, NameList
+from fake_client import FakeClient
+from test_relief import VIEWBOX, copy_relief, library, load_relief, request
+
+REPO = Path(__file__).resolve().parents[1]
+node = pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+SCRIPT = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
+CSS = (app_module.STATIC_DIR / "style.css").read_text(encoding="utf-8")
+HTML = (app_module.STATIC_DIR / "index.html").read_text(encoding="utf-8")
+RENDER = (REPO / "tools" / "render_relief.py").read_text(encoding="utf-8")
+
+
+def _inner(name):
+    start = SCRIPT.index(f"function {name}(")
+    return SCRIPT[start:SCRIPT.index("\n  }\n", start) + 5]
+
+
+def _with_season(folder, season, image_from=relief.IMAGE):
+    image, blur = relief.season_files(season)
+    shutil.copy(folder / image_from, folder / image)
+    shutil.copy(relief.RELIEF_DIR / "relief_blur.webp", folder / blur)
+
+
+def test_the_repo_has_spring_and_autumn_after_the_night():
+    data = load_relief(VIEWBOX)
+    ids = [look["id"] for look in data["looks"]]
+    assert ids == ["night", "spring", "autumn"]
+    assert data["looks"][0] == {"id": "night", "image": "/relief.webp", "blur": "/relief_blur.webp"}
+    for season in relief.SEASONS:
+        image, blur = relief.season_files(season)
+        assert (relief.RELIEF_DIR / image).stat().st_size < 400_000
+        assert (relief.RELIEF_DIR / blur).stat().st_size < 200 * 1024  # More colour than the night's.
+
+
+def test_a_season_missing_a_file_or_of_another_size_is_left_out(tmp_path):
+    folder = copy_relief(tmp_path)
+    assert [look["id"] for look in load_relief(VIEWBOX, folder)["looks"]] == ["night"]
+    _with_season(folder, "autumn")
+    assert [look["id"] for look in load_relief(VIEWBOX, folder)["looks"]] == ["night", "autumn"]
+    (folder / relief.season_files("autumn")[1]).unlink()  # No ground: not offered.
+    assert [look["id"] for look in load_relief(VIEWBOX, folder)["looks"]] == ["night"]
+    # Another size is another camera: never laid misplaced.
+    shutil.copy(relief.RELIEF_DIR / "relief_blur.webp", folder / "other.webp")
+    _with_season(folder, "spring", image_from="other.webp")
+    assert [look["id"] for look in load_relief(VIEWBOX, folder)["looks"]] == ["night"]
+    (folder / relief.season_files("spring")[0]).write_bytes(b"not a picture")
+    assert [look["id"] for look in load_relief(VIEWBOX, folder)["looks"]] == ["night"]
+
+
+@pytest.fixture
+def server():
+    the_app = App(library(load_relief(VIEWBOX)), Gate(FakeClient([]), NameList.build([], {})))
+    srv = make_server(the_app, 0, timeout=1)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield srv
+    srv.shutdown()
+    srv.server_close()
+
+
+def test_the_seasons_files_are_served_by_name_from_mapdata(server):
+    for season in relief.SEASONS:
+        for name in relief.season_files(season):
+            status, body = request(server, "GET", f"/{name}")
+            assert status == 200 and body == (relief.RELIEF_DIR / name).read_bytes()
+            assert app_module.MAP_FILES[f"/{name}"][1] == "image/webp"
+            assert request(server, "GET", f"/mapdata/{name}")[0] == 404
+    assert request(server, "GET", "/relief_winter.webp")[0] == 404
+
+
+def test_the_switchs_words_are_the_teachers_table():
+    words = texts.map_buttons()
+    assert [words[key]["text"] for key in ("season_night", "season_spring", "season_autumn")] == ["夜", "春", "秋"]
+    assert words["seasons"]["label"]  # The band's name, read aloud.
+
+
+def test_it_opens_on_the_months_season_and_switches_only_the_two_pictures():
+    assert "const SEASON_MONTHS = { spring: [3, 4, 5], autumn: [9, 10, 11] };" in SCRIPT
+    start = _inner("startLook")
+    assert "new Date().getMonth() + 1" in start and "|| all[0]" in start  # Else the night.
+    show = _inner("showLook")
+    assert show.count("setAttribute(\"href\"") == 2
+    assert "lookNodes.picture" in show and "lookNodes.ground" in show
+    # Nothing else is redrawn: no draw, no move, no relayout.
+    assert not re.search(r"\b(draw|build|moveTo|relayout)\(", show)
+    assert 'aria-pressed", String(button.dataset.look === look.id)' in show
+    draw = _inner("draw")
+    assert "href: look.blur" in draw and "href: look.image" in draw
+    assert '$("map-season").hidden = !view.relief || looksOf().length < 2;' in draw
+    # A season that will not load falls back to the night, then the flat map.
+    init = _inner("init")
+    assert "picture.src = one.image;" in init and "tryLook(look);" in init
+    assert "picture.onerror = () => (one === night ? build(seats, false) : tryLook(night));" in init
+
+
+def test_the_band_sits_with_the_zoom_and_shows_the_season_lit():
+    assert HTML.index('id="map-season"') < HTML.index('id="map-zoom-in"')
+    assert 'id="map-season" class="map-zoom map-season" role="group" hidden' in HTML
+    assert ".map-season[hidden] { display: none; }" in CSS
+    assert '.map-bar .map-season button[aria-pressed="true"] { color: var(--lamp-bright);' in CSS
+    # Over a season's lighter land the place names keep a whole halo.
+    assert "frame.dataset.look = look.id;" in _inner("showLook")
+    assert ('.map-frame[data-look="spring"] .place-names text, .map-frame[data-look="autumn"] .place-names text '
+            '{ stroke: var(--night); }') in CSS
+    # Not on the flat map, whose frame has no look.
+    assert ':not([data-look' not in CSS
+
+
+def test_the_night_is_drawn_as_it_was_and_a_season_keeps_its_camera():
+    # The night's colours and lights, unchanged (直し31-4).
+    assert '"ramp": [(0.0, (0.035, 0.065, 0.12)), (0.35, (0.075, 0.12, 0.19)), (1.0, (0.20, 0.25, 0.34))]' in RENDER
+    assert '"lights": (("moon", 1.15, (0.72, 0.80, 1.0), (62, 0, -118)), ("rim", 0.35, (1.0, 0.86, 0.6), (70, 0, 135)))' in RENDER
+    # A season never writes the projection; one drawn by another camera is removed.
+    assert "if season == \"night\":\n        OUT_PROJECTION.write_text(written" in RENDER
+    assert "out_image.unlink()" in RENDER
+
+
+_MONTHS = """
+const BLUR_IMAGE = "/relief_blur.webp";
+%(months)s
+let map = { relief: { image: "/relief.webp", looks: %(looks)s } };
+%(looksOf)s
+%(startLook)s
+const RealDate = Date;
+const out = [];
+for (let month = 0; month < 12; month++) {
+  globalThis.Date = class extends RealDate { constructor() { super(2026, month, 15); } };
+  out.push(startLook().id);
+  globalThis.Date = RealDate;
+}
+process.stdout.write(JSON.stringify(out));
+"""
+
+
+def _opening(looks):
+    months = re.search(r"^  const SEASON_MONTHS = .*$", SCRIPT, re.M).group(0)
+    program = _MONTHS % {"months": months, "looks": json.dumps(looks), "looksOf": _inner("looksOf"),
+                         "startLook": _inner("startLook")}
+    done = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=30)
+    assert done.returncode == 0, done.stderr.decode("utf-8", "replace")
+    return json.loads(done.stdout)
+
+
+@node
+def test_each_month_opens_on_its_season_and_the_night_when_it_has_none():
+    night = {"id": "night", "image": "/relief.webp", "blur": "/relief_blur.webp"}
+    spring = {"id": "spring", "image": "/relief_spring.webp", "blur": "/relief_blur_spring.webp"}
+    autumn = {"id": "autumn", "image": "/relief_autumn.webp", "blur": "/relief_blur_autumn.webp"}
+    # January to December, as the teacher's switch is meant: spring in March
+    # to May, autumn in September to November, the night in the rest.
+    assert _opening([night, spring, autumn]) == ["night", "night", "spring", "spring", "spring", "night",
+                                                 "night", "night", "autumn", "autumn", "autumn", "night"]
+    # A season whose picture is not there opens on the night.
+    assert _opening([night, autumn]) == ["night"] * 8 + ["autumn"] * 3 + ["night"]
+    assert _opening([night]) == ["night"] * 12

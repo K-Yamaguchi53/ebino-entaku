@@ -1008,6 +1008,14 @@ body.one-open #map-heading { visibility: hidden; }
 .map-bar .map-zoom button + button { border-left: 1px solid var(--faint); }
 .map-bar .map-zoom button:hover { background: var(--night-3); }
 .map-bar .map-zoom button:focus-visible { outline-offset: calc(-1 * var(--focus-w)); }
+/* The map's seasons (the teacher, 11/6): a band like the zoom's, the season
+   shown lit as a pressed drawer is. */
+.map-season[hidden] { display: none; }
+.map-season + .map-zoom { margin-left: 0; }
+.map-bar .map-season button[aria-pressed="true"] { color: var(--lamp-bright); background: color-mix(in srgb, var(--lamp) 22%, transparent); }
+/* Over a season's lighter land, the place names' halo whole, the night's own
+   colour (their contrast with the land under them fell to 3.6:1 without it). */
+.map-frame[data-look="spring"] .place-names text, .map-frame[data-look="autumn"] .place-names text { stroke: var(--night); }
 /* The met count and the sources. */
 .map-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 16px;
   border-top: 1px solid var(--moon-faint); padding: 4px 2px 0; }

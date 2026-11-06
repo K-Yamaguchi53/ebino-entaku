@@ -124,7 +124,9 @@ INPUT_SEND = "input_send"
 INPUT_SEND_IDS = ("all", "seat", "ai")
 INPUT_DONE = "input_done"
 INPUT_DONE_IDS = ("seat", "ai", "split")
-MAP_BUTTON_IDS = ("back", "zoom_in", "zoom_out", "zoom_all")
+MAP_BUTTON_IDS = ("back", "zoom_in", "zoom_out", "zoom_all",
+                  # The map's seasons (the teacher, 11/6): the band's name, then each.
+                  "seasons", "season_night", "season_spring", "season_autumn")
 # Round the map (map.js): the word on the mark that points north (the north
 # row's 方位), and by each of the map's four sides what lies that way.
 # Columns ID・方位・その方向にある所.

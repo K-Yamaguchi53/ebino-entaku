@@ -1,7 +1,15 @@
 """Draw the basin as a model in the night, seen from the south, north up (SPEC 14-66, 直し31-4).
 Run in Blender, after tools/fetch_copernicus_dem.py:
 
-    blender -b --python tools/render_relief.py -- WORK_DIR [WIDTH_PX] [SAMPLES]
+    blender -b --python tools/render_relief.py -- WORK_DIR [WIDTH_PX] [SAMPLES] [SEASON]
+
+SEASON is night (the default), spring or autumn (the teacher, 11/6: the
+basin's seasons, switched on the screen). Spring and autumn are the same
+model and camera at dusk, coloured by height only: the paddies on the
+basin's floor, the forests on the slopes, the plateau and the peaks. There
+is no map of fields and forests here, so the colours are likely ones, not
+the land as it is. They are written as mapdata/relief_<season>.webp; the
+projection stays the night's (the same camera: checked, not written).
 
 WORK_DIR holds heights.npy and basin_mask.npy (outside the repo); the full
 picture is drawn there too (relief.png). Written to the repo:
@@ -30,6 +38,7 @@ from mathutils import Euler, Vector
 
 REPO_DIR = Path(__file__).resolve().parent.parent
 OUT_IMAGE = REPO_DIR / "mapdata" / "relief.webp"
+SEASONS = ("night", "spring", "autumn")
 OUT_PROJECTION = REPO_DIR / "mapdata" / "relief_projection.json"
 
 BASE_M, M_PER_UNIT, EXAG = 140.0, 33.4225, 2.2
@@ -74,9 +83,54 @@ def terrain(heights, mask):
     return mesh, verts
 
 
-def night_material():
-    """Colour by height, the basin's floor a little warmer, the sides dark."""
-    material = bpy.data.materials.new("night")
+# Each season: the colours by height (where, linear RGB) from the basin's
+# floor (0) to 1700 m (1); the basin's floor mixed toward its own colour by
+# how much; the steep sides' dark; the lights (name, energy, colour, angles);
+# the sky (colour, strength). The night is as it was (直し31-4).
+# Heights at a glance: the floor about 230 m (0.06), the hills round it 400
+# to 800 m (0.17 to 0.42), the Ebino plateau about 1200 m (0.68), the
+# Kirishima peaks to 1700 m (1).
+LOOKS = {
+    "night": {
+        "ramp": [(0.0, (0.035, 0.065, 0.12)), (0.35, (0.075, 0.12, 0.19)), (1.0, (0.20, 0.25, 0.34))],
+        "basin": ((0.13, 0.14, 0.17), 0.25),
+        "side": (0.012, 0.02, 0.035),
+        "lights": (("moon", 1.15, (0.72, 0.80, 1.0), (62, 0, -118)), ("rim", 0.35, (1.0, 0.86, 0.6), (70, 0, 135))),
+        "sky": ((0.012, 0.022, 0.045), 0.22),
+    },
+    # Spring at dusk. The floor's fields (below about 290 m) young green;
+    # above, the slopes' fresh green with the dark of cedars and evergreens
+    # in patches (most of a Kyushu hillside); the peaks pink (ミヤマキリシマ).
+    "spring": {
+        "ramp": [(0.0, (0.17, 0.23, 0.07)), (0.085, (0.15, 0.21, 0.06)), (0.12, (0.11, 0.21, 0.05)),
+                 (0.60, (0.12, 0.22, 0.05)), (0.72, (0.14, 0.20, 0.07)), (0.84, (0.30, 0.12, 0.19)),
+                 (1.0, (0.20, 0.13, 0.14))],
+        "forest": ((0.035, 0.075, 0.035), 0.12),
+        "basin": ((0.17, 0.23, 0.07), 0.15),
+        "side": (0.018, 0.022, 0.02),
+        "lights": (("sun", 3.0, (1.0, 0.88, 0.76), (70, 0, -112)), ("rim", 0.5, (0.6, 0.68, 1.0), (70, 0, 135))),
+        "sky": ((0.08, 0.09, 0.14), 0.5),
+    },
+    # Autumn at dusk. The floor's rice golden; above, the slopes' red,
+    # orange and yellow showing in patches among the dark green; the
+    # plateau's grass gold; the peaks bare.
+    "autumn": {
+        "ramp": [(0.0, (0.36, 0.26, 0.07)), (0.085, (0.32, 0.23, 0.06)), (0.12, (0.27, 0.07, 0.025)),
+                 (0.36, (0.30, 0.12, 0.03)), (0.56, (0.33, 0.22, 0.05)), (0.70, (0.33, 0.26, 0.11)),
+                 (0.86, (0.17, 0.13, 0.10)), (1.0, (0.14, 0.11, 0.09))],
+        "forest": ((0.035, 0.07, 0.03), 0.12),
+        "basin": ((0.36, 0.26, 0.07), 0.15),
+        "side": (0.022, 0.016, 0.012),
+        "lights": (("sun", 3.0, (1.0, 0.86, 0.72), (70, 0, -112)), ("rim", 0.5, (0.6, 0.68, 1.0), (70, 0, 135))),
+        "sky": ((0.08, 0.09, 0.14), 0.5),
+    },
+}
+
+
+def night_material(season="night"):
+    """Colour by height, the basin's floor its own colour, the sides dark."""
+    look = LOOKS[season]
+    material = bpy.data.materials.new(season)
     material.use_nodes = True
     nt = material.node_tree
     for node in list(nt.nodes):
@@ -93,20 +147,55 @@ def night_material():
     nt.links.new(position.outputs["Z"], by_height.inputs["Value"])
     ramp = nt.nodes.new("ShaderNodeValToRGB")
     stops = ramp.color_ramp.elements
-    stops[0].position, stops[0].color = 0.0, (0.035, 0.065, 0.12, 1)
-    stops[1].position, stops[1].color = 1.0, (0.20, 0.25, 0.34, 1)
-    stops.new(0.35).color = (0.075, 0.12, 0.19, 1)
+    first, *middle, last = look["ramp"]
+    stops[0].position, stops[0].color = first[0], (*first[1], 1)
+    stops[1].position, stops[1].color = last[0], (*last[1], 1)
+    for at, colour in middle:
+        stops.new(at).color = (*colour, 1)
     nt.links.new(by_height.outputs["Result"], ramp.inputs["Fac"])
+    leaves = ramp.outputs["Color"]
+    if "forest" in look:
+        # The cedars: dark green in patches over the leaves' colour, as a
+        # wooded slope is (a noise over the model's place, a few hundred
+        # metres across; the same seedless pattern every time): where the
+        # noise is low all cedar, where it is high the leaves with only
+        # `share` of cedar; none on the floor's fields (below 0.085).
+        cedar, share = look["forest"]
+        noise = nt.nodes.new("ShaderNodeTexNoise")
+        noise.inputs["Scale"].default_value = 0.045
+        noise.inputs["Detail"].default_value = 4.0
+        nt.links.new(geometry.outputs["Position"], noise.inputs["Vector"])
+        patches = nt.nodes.new("ShaderNodeMapRange")
+        patches.inputs["From Min"].default_value = 0.40
+        patches.inputs["From Max"].default_value = 0.64
+        patches.inputs["To Min"].default_value = 1.0
+        patches.inputs["To Max"].default_value = share
+        nt.links.new(noise.outputs["Fac"], patches.inputs["Value"])
+        above_fields = nt.nodes.new("ShaderNodeMapRange")
+        above_fields.inputs["From Min"].default_value = 0.085
+        above_fields.inputs["From Max"].default_value = 0.12
+        nt.links.new(by_height.outputs["Result"], above_fields.inputs["Value"])
+        only_above = nt.nodes.new("ShaderNodeMath")
+        only_above.operation = "MULTIPLY"
+        nt.links.new(patches.outputs["Result"], only_above.inputs[0])
+        nt.links.new(above_fields.outputs["Result"], only_above.inputs[1])
+        wooded = nt.nodes.new("ShaderNodeMix")
+        wooded.data_type = "RGBA"
+        socket(wooded.inputs, "B_Color").default_value = (*cedar, 1)
+        nt.links.new(leaves, socket(wooded.inputs, "A_Color"))
+        nt.links.new(only_above.outputs[0], socket(wooded.inputs, "Factor_Float"))
+        leaves = socket(wooded.outputs, "Result_Color")
 
     basin = nt.nodes.new("ShaderNodeAttribute")
     basin.attribute_name = "basin"
     warm = nt.nodes.new("ShaderNodeMix")
     warm.data_type = "RGBA"
-    socket(warm.inputs, "B_Color").default_value = (0.13, 0.14, 0.17, 1)
-    nt.links.new(ramp.outputs["Color"], socket(warm.inputs, "A_Color"))
+    floor, floor_share = look["basin"]
+    socket(warm.inputs, "B_Color").default_value = (*floor, 1)
+    nt.links.new(leaves, socket(warm.inputs, "A_Color"))
     how_warm = nt.nodes.new("ShaderNodeMath")
     how_warm.operation = "MULTIPLY"
-    how_warm.inputs[1].default_value = 0.25
+    how_warm.inputs[1].default_value = floor_share
     nt.links.new(basin.outputs["Fac"], how_warm.inputs[0])
     nt.links.new(how_warm.outputs[0], socket(warm.inputs, "Factor_Float"))
 
@@ -118,7 +207,7 @@ def night_material():
     nt.links.new(normal.outputs["Z"], facing_up.inputs["Value"])
     dark = nt.nodes.new("ShaderNodeMix")
     dark.data_type = "RGBA"
-    socket(dark.inputs, "A_Color").default_value = (0.012, 0.02, 0.035, 1)
+    socket(dark.inputs, "A_Color").default_value = (*look["side"], 1)
     nt.links.new(facing_up.outputs["Result"], socket(dark.inputs, "Factor_Float"))
     nt.links.new(socket(warm.outputs, "Result_Color"), socket(dark.inputs, "B_Color"))
     nt.links.new(socket(dark.outputs, "Result_Color"), bsdf.inputs["Base Color"])
@@ -126,23 +215,24 @@ def night_material():
     return material
 
 
-def lights(scene):
-    """The moon from the north-west (the screen's upper left) and bluish; a
-    weaker warm rim from the north-east (the upper right), never from the
-    front, so no slope is lit from below; a faint night sky."""
-    for name, energy, colour, angles in (("moon", 1.15, (0.72, 0.80, 1.0), (62, 0, -118)),
-                                         ("rim", 0.35, (1.0, 0.86, 0.6), (70, 0, 135))):
+def lights(scene, season="night"):
+    """The moon (at dusk, a low warm sun) from the north-west (the screen's
+    upper left); a weaker rim from the north-east (the upper right), never
+    from the front, so no slope is lit from below; a faint sky."""
+    look = LOOKS[season]
+    for name, energy, colour, angles in look["lights"]:
         light = bpy.data.lights.new(name, "SUN")
         light.energy, light.color = energy, colour
         light.angle = math.radians(1.5)
         sun = bpy.data.objects.new(name, light)
         sun.rotation_euler = Euler(tuple(math.radians(a) for a in angles))
         scene.collection.objects.link(sun)
-    world = bpy.data.worlds.new("night")
+    world = bpy.data.worlds.new(season)
     world.use_nodes = True
     background = world.node_tree.nodes["Background"]
-    background.inputs["Color"].default_value = (0.012, 0.022, 0.045, 1)
-    background.inputs["Strength"].default_value = 0.22
+    sky, strength = look["sky"]
+    background.inputs["Color"].default_value = (*sky, 1)
+    background.inputs["Strength"].default_value = strength
     scene.world = world
 
 
@@ -181,8 +271,14 @@ def camera(scene, verts, width_px):
 def main() -> int:
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     if not argv:
-        print("usage: blender -b --python tools/render_relief.py -- WORK_DIR [WIDTH_PX] [SAMPLES]", file=sys.stderr)
+        print("usage: blender -b --python tools/render_relief.py -- WORK_DIR [WIDTH_PX] [SAMPLES] [SEASON]",
+              file=sys.stderr)
         return 2
+    season = argv[3] if len(argv) > 3 else "night"
+    if season not in SEASONS:
+        print(f"SEASON is one of {', '.join(SEASONS)}", file=sys.stderr)
+        return 2
+    out_image = OUT_IMAGE if season == "night" else OUT_IMAGE.with_name(f"relief_{season}.webp")
     work = Path(argv[0]).resolve()
     width_px = int(argv[1]) if len(argv) > 1 else 2400
     samples = int(argv[2]) if len(argv) > 2 else 32
@@ -195,8 +291,8 @@ def main() -> int:
     mesh, verts = terrain(heights, mask)
     block = bpy.data.objects.new("terrain", mesh)
     scene.collection.objects.link(block)
-    block.data.materials.append(night_material())
-    lights(scene)
+    block.data.materials.append(night_material(season))
+    lights(scene, season)
     projection = camera(scene, verts, width_px)
 
     scene.render.engine = "CYCLES"
@@ -206,19 +302,26 @@ def main() -> int:
     scene.render.film_transparent = True
     settings = scene.render.image_settings
     settings.file_format, settings.color_mode = "PNG", "RGBA"
-    scene.render.filepath = str(work / "relief.png")
+    scene.render.filepath = str(work / ("relief.png" if season == "night" else f"relief_{season}.png"))
     built = time.monotonic()
     bpy.ops.render.render(write_still=True)
     drawn = time.monotonic()
 
     # The repo gets the small WebP, never the PNG.
     settings.file_format, settings.color_mode, settings.quality = "WEBP", "RGBA", WEBP_QUALITY
-    bpy.data.images["Render Result"].save_render(str(OUT_IMAGE), scene=scene)
-    OUT_PROJECTION.write_text(json.dumps(projection, indent=1) + "\n", encoding="utf-8")
-    print(f"picture {projection['res'][0]} x {projection['res'][1]}  samples {samples}")
+    bpy.data.images["Render Result"].save_render(str(out_image), scene=scene)
+    written = json.dumps(projection, indent=1) + "\n"
+    if season == "night":
+        OUT_PROJECTION.write_text(written, encoding="utf-8")
+    elif OUT_PROJECTION.read_text(encoding="utf-8") != written:
+        # The seasons are laid where the night is: another camera is not one.
+        print("the projection is not the night's: draw the night first", file=sys.stderr)
+        out_image.unlink()
+        return 1
+    print(f"{season}: picture {projection['res'][0]} x {projection['res'][1]}  samples {samples}")
     print(f"seconds: scene {built - started:.1f}  render {drawn - built:.1f}  all {time.monotonic() - started:.1f}")
-    print(f"wrote {OUT_IMAGE.relative_to(REPO_DIR)} ({OUT_IMAGE.stat().st_size} bytes) and "
-          f"{OUT_PROJECTION.relative_to(REPO_DIR)}")
+    print(f"wrote {out_image.relative_to(REPO_DIR)} ({out_image.stat().st_size} bytes)"
+          + (f" and {OUT_PROJECTION.relative_to(REPO_DIR)}" if season == "night" else ""))
     return 0
 
 

@@ -5,7 +5,8 @@ colour, saved as mapdata/relief_blur.webp. The screen lays it under the
 picture, as large as it, so the frame has no empty black round the map; it
 is made here once, not blurred on the screen (Chromebooks are slow at it).
 
-    python tools/make_relief_blur.py
+    python tools/make_relief_blur.py            # the night's
+    python tools/make_relief_blur.py autumn     # a season's (relief_blur_autumn.webp)
 
 Reads and writes mapdata/ only; nothing is fetched.
 """
@@ -53,5 +54,8 @@ def make(source: Path = SOURCE, out: Path = OUT) -> Path:
 
 
 if __name__ == "__main__":
-    made = make()
+    import sys
+    season = sys.argv[1] if len(sys.argv) > 1 else ""
+    made = (make(MAPDATA / f"relief_{season}.webp", MAPDATA / f"relief_blur_{season}.webp")
+            if season else make())
     print(f"{made.name} {made.stat().st_size} bytes")

@@ -133,7 +133,11 @@ def test_a_missing_or_broken_file_gives_the_flat_map(tmp_path, broken):
 
 
 def test_the_copied_files_give_the_picture(tmp_path):
-    assert load_relief(VIEWBOX, copy_relief(tmp_path)) == load_relief(VIEWBOX)
+    copied, kept = load_relief(VIEWBOX, copy_relief(tmp_path)), load_relief(VIEWBOX)
+    # The three files alone: the same picture, the night only (the seasons'
+    # files were not copied; test_relief_seasons.py).
+    assert copied.pop("looks") == kept.pop("looks")[:1]
+    assert copied == kept
 
 
 def test_no_map_means_no_picture_either_and_the_seat_list_alone():
@@ -189,7 +193,7 @@ def test_setup_gives_the_picture_with_the_map_and_no_seat_words():
     setup = setup_of(lib)
     picture = setup["map"]["relief"]
     assert picture["image"] == "/relief.webp" and picture["source"] == SOURCE
-    assert set(picture) == {"image", "res", "px", "py", "z", "step", "rows", "source"}
+    assert set(picture) == {"image", "res", "px", "py", "z", "step", "rows", "source", "looks"}
     sent = json.dumps(picture, ensure_ascii=False)
     for word in (COMPANY, DISPLAY_NAME, "はるかぜ", "山川", "会社名", "表示名", "S01", "P01", "先輩"):
         assert word not in sent
@@ -286,7 +290,7 @@ def test_no_year_on_the_screen_or_in_the_readme_but_the_fixed_source_line():
 def test_the_map_buttons_words_come_from_texts():
     from ebino.texts import map_buttons, screen_texts
     words = map_buttons()
-    assert list(words) == ["back", "zoom_in", "zoom_out", "zoom_all"]
+    assert list(words) == ["back", "zoom_in", "zoom_out", "zoom_all", "seasons", "season_night", "season_spring", "season_autumn"]
     assert words["back"] == {"text": "地図にもどす", "label": "地図にもどす"}
     assert words["zoom_in"]["text"] == "＋" and words["zoom_in"]["label"]
     assert screen_texts()["map_buttons"] == words
@@ -402,7 +406,8 @@ def test_with_motion_reduced_the_seats_are_at_the_table_at_once():
 
 def test_the_screen_moves_points_on_the_screen_only_and_keeps_its_fallbacks():
     script = (app_module.STATIC_DIR / "map.js").read_text(encoding="utf-8")
-    assert "picture.onerror = () => build(seats, false)" in script  # A picture that does not load: flat.
+    # A picture that does not load: a season's, the night's; the night's, flat.
+    assert "picture.onerror = () => (one === night ? build(seats, false) : tryLook(night));" in script
     assert "if (withRelief) return build(seats, false);" in script  # One that fails to draw: flat.
     assert "reduced()" in script and "prefers-reduced-motion" in script
     app_js = (app_module.STATIC_DIR / "app.js").read_text(encoding="utf-8")
