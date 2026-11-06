@@ -1563,6 +1563,26 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
 .hk-card .hk-q { margin: 0; font-size: 17px; }
 .hk-card .hk-q + .hk-q { margin-top: 4px; }
 .hk-who { display: block; margin-bottom: 2px; font-size: 12px; letter-spacing: .06em; }
+/* 直し45 段5: the trail and its three marks, before today's map. */
+#hk-map.marking > :not(.hk-marks) { display: none; }
+.hk-marks { display: grid; gap: 12px; }
+.hk-mark-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.hk-mark-item { display: grid; gap: 4px; padding: 8px 12px; border-left: 3px solid var(--moon-faint); border-radius: 0 8px 8px 0;
+  background: var(--night-2); word-break: auto-phrase; overflow-wrap: break-word; }
+.hk-mark-item.marked { border-left-color: var(--lamp); }
+.hk-mark-small { font-size: 12px; color: var(--soft); }
+.hk-mark-text { font-size: 16px; color: var(--ink); }
+.hk-mark-ai { justify-self: start; padding: 0 8px; border-radius: 999px; border: 1px solid var(--ai); color: var(--ai); font-size: 12px; }
+.hk-mark-item.hk-mark-ai_answer, .hk-mark-item.hk-mark-one_coach { background: var(--ai-deep); }
+.hk-mark-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.hk-mark { min-height: 40px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--moon-soft); background: transparent;
+  color: var(--ink); font-size: 14px; cursor: pointer; }
+.hk-mark[aria-pressed="true"] { border-color: var(--lamp); background: var(--lamp-faint); color: var(--lamp-bright); font-weight: 700; }
+.hk-mark-note { min-height: 40px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--moon-soft); background: var(--night);
+  color: var(--ink); font-size: 15px; }
+.hk-marked { margin: 12px 0; }
+.hk-marked-line { margin: 4px 0 0; }
+.hk-marked-note { margin: 0 0 4px 1em; }
 .hk-card.ai { align-self: flex-start; background: var(--ai-deep); color: var(--ai-ink); border: 1px solid var(--ai); }
 .hk-card.ai .hk-who { color: var(--ai); }
 .hk-card.ai.waiting .hk-q { color: var(--soft); }

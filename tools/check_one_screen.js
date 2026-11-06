@@ -189,6 +189,12 @@ async (page) => {
       await p.waitForTimeout(2500);
       await p.click("#to-reflect");
     }
+    // 直し45 段5: the trail and its marks first; one mark, then 次へ.
+    await p.waitForSelector("#hitokoto:not([hidden]) .hk-marks .hk-mark, #hitokoto:not([hidden]) #hk-cards .hk-said", { timeout: 15000 });
+    if (await p.locator(".hk-marks .hk-mark").count()) {
+      await p.locator(".hk-marks .hk-mark").first().click();
+      await p.locator(".hk-marks .hk-primary").click();
+    }
     await p.waitForSelector("#hitokoto:not([hidden]) #hk-cards .hk-said", { timeout: 15000 });
   }
 

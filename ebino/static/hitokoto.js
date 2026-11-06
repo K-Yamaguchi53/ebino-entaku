@@ -81,11 +81,17 @@ const EbinoHitokoto = (() => {
     $("hk-print-side").textContent = W.print_side;
     show("map");
     app.setNow();
+    // 直し45 段5: first today's trail, and the three marks (each optional).
+    const marks = await markTrail();
     try {
-      view = await post("begin", { opened: app.state.opened || [] });
+      view = await post("begin", { opened: app.state.opened || [], marks });
     } catch (error) {
       $("hk-first").textContent = app.sendFailed(error);
       return;
+    }
+    if (view.status === "ask_again") {  // A name in a line: the trail again.
+      $("hk-first").textContent = view.message;
+      return open(lent);
     }
     $("hk-first").textContent = view.first_question;
     drawMap();
@@ -104,6 +110,97 @@ const EbinoHitokoto = (() => {
     } catch (error) {
       // No parts: the whole cards stay to press.
     }
+  }
+
+  // --- 直し45 段5: the trail, and the three marks ---
+
+  // Today's trail (GET /api/trail, the same as by the map), each step with
+  // the three marks to press, each optional: one mark a step and one step a
+  // mark (pressed on another step, it moves there). A step marked gets a
+  // line to write, empty or not. 次へ sends the marks, とばす none. No trail:
+  // straight on, as before.
+  async function markTrail() {
+    let items = [];
+    try {
+      const response = await fetch("/api/trail");
+      if (response.ok) items = (await response.json()).items || [];
+    } catch (error) {
+      items = [];
+    }
+    if (!items.length) return [];
+    const M = app.state.hitokoto.marks, MW = app.state.hitokoto.mark_words;
+    const part = $("hk-map");
+    part.classList.add("marking");
+    const box = el("section", "hk-marks");
+    box.append(el("p", "hk-lead", MW.lead));
+    const list = el("ol", "hk-mark-list");
+    const chosen = {};  // mark -> n
+    const rows = items.map((item) => {
+      const li = el("li", `hk-mark-item hk-mark-${item.kind}`);
+      li.dataset.n = String(item.n);
+      li.append(...markLines(item));
+      const buttons = el("div", "hk-mark-buttons");
+      buttons.setAttribute("role", "group");
+      for (const [key, label] of Object.entries(M)) {
+        const press = button("hk-mark", label, () => {
+          const was = chosen[key];
+          for (const [other, n] of Object.entries(chosen)) if (n === item.n && other !== key) delete chosen[other];
+          if (was === item.n) delete chosen[key];
+          else chosen[key] = item.n;
+          redraw();
+        });
+        press.dataset.mark = key;
+        press.setAttribute("aria-pressed", "false");
+        buttons.append(press);
+      }
+      const note = el("input", "hk-mark-note");
+      Object.assign(note, { type: "text", maxLength: 120, placeholder: MW.note, autocomplete: "off" });
+      note.setAttribute("aria-label", MW.note);
+      note.hidden = true;
+      li.append(buttons, note);
+      list.append(li);
+      return { item, li, note };
+    });
+    const redraw = () => {
+      for (const { item, li, note } of rows) {
+        const on = Object.entries(chosen).find(([, n]) => n === item.n);
+        for (const press of li.querySelectorAll(".hk-mark")) {
+          press.setAttribute("aria-pressed", String(Boolean(on && on[0] === press.dataset.mark)));
+        }
+        li.classList.toggle("marked", Boolean(on));
+        note.hidden = !on;
+      }
+    };
+    const go = button("hk-primary", MW.go);
+    const skip = button("quiet", MW.skip);
+    const row = el("div", "hk-row");
+    row.append(go, skip);
+    box.append(list, row);
+    part.prepend(box);
+    go.focus({ preventScroll: true });
+    const marks = await new Promise((done) => {
+      go.addEventListener("click", () => done(Object.entries(chosen).map(([mark, n]) => ({
+        mark, n, note: rows.find((r) => r.item.n === n).note.value.trim() }))));
+      skip.addEventListener("click", () => done([]));
+    });
+    box.remove();
+    part.classList.remove("marking");
+    return marks;
+  }
+
+  // A step in words: what it was (small), then the student's words or whose
+  // words; an AI's question in the AI's colour with its name.
+  function markLines(item) {
+    const T = app.state.texts.trail_words;
+    const small = (text) => el("span", "hk-mark-small", text);
+    const text = (words) => el("span", "hk-mark-text", words);
+    if (item.kind === "question") return [small(T.question), text(item.text)];
+    if (item.kind === "opened") return [small(`${T.opened}　${item.who}`), text(item.label || item.who)];
+    if (item.kind === "one_ask") return [small(`${T.one_ask}　${item.who}`), text(item.text)];
+    if (item.kind === "card") return [small(T.card), text(item.text)];
+    if (item.kind === "direction") return [small(T.direction), text(item.text)];
+    const answer = item.declined ? T.declined : [item.choice, item.answer].filter(Boolean).join("　");
+    return [el("span", "hk-mark-ai", item.ai_label), text(item.question), small(`${T.answer}　${answer}`)];
   }
 
   function markStep(step) {
@@ -194,6 +291,14 @@ const EbinoHitokoto = (() => {
     });
     $("hk-go").disabled = true;
     picked = null;
+    // 直し45 段5: the step marked first is where the first word is looked
+    // for: its person's lit part, else the whole card, already pressed.
+    if (Number.isInteger(view.start) && view.people[view.start]) {
+      const part = parts[String(view.start)] || "";
+      const cards = box.children[view.start];
+      const node = cards && (part ? cards.querySelector(".hk-kw") : cards);
+      if (node) pick(view.start, part, node);
+    }
   }
 
   function pick(index, part, node) {
@@ -232,10 +337,14 @@ const EbinoHitokoto = (() => {
 
   // --- 段2・段3: the listener's questions, the ladder, the scale ---
 
-  // One card in the talk: the listener (AI), the teacher's question, or the student.
+  // One card in the talk: the listener (AI), the teacher's question, or the
+  // student. 直し45 段5: the AI's questions as コーチ（AI） (① and ②) and the
+  // scale's next one as オブザーバー（AI） (③), in the AI's colour and shape.
   function say(who, text, extra, cls = "") {
-    const card = el("div", `hk-card ${who} ${cls}`.trim());
-    card.append(el("span", "hk-who", { ai: W.who_ai, teacher: W.who_teacher, me: W.who_me }[who]));
+    const ai = who === "ai" || who === "observer";
+    const card = el("div", `hk-card ${ai ? "ai" : who} ${cls}`.trim());
+    card.append(el("span", "hk-who", { ai: app.state.hitokoto.who_coach, observer: app.state.hitokoto.who_observer,
+      teacher: W.who_teacher, me: W.who_me }[who]));
     if (text) card.append(el("p", "hk-q", text));
     if (extra) card.append(extra);
     $("hk-log").append(card);
@@ -448,7 +557,7 @@ const EbinoHitokoto = (() => {
       }
       busy = false;
       say("me", fill(W.scale_me, { n: range.value }));
-      say("teacher", result.question);
+      say("observer", result.question);
       lineBox("forward", { send: W.send, skip: W.skip }, () => askWay());
     });
     box.append(now, range, ticks, ok);
@@ -734,7 +843,20 @@ const EbinoHitokoto = (() => {
     const arrow = el("p", "hk-arrow", "→");
     arrow.setAttribute("aria-hidden", "true");
     questions.append(first, arrow, now);
-    box.append(questions, el("p", "hk-label", W.sheet_story));
+    box.append(questions);
+    // 直し45 段5: the steps marked on the trail, with the student's line.
+    if (sheet.marks && sheet.marks.length) {
+      const marked = el("div", "hk-marked");
+      marked.append(el("p", "hk-label", app.state.hitokoto.mark_words.sheet));
+      for (const mark of sheet.marks) {
+        const line = el("p", "hk-marked-line");
+        line.append(el("b", "", mark.label), "　", mark.text);
+        marked.append(line);
+        if (mark.note) marked.append(el("p", "hk-marked-note", `「${mark.note}」`));
+      }
+      box.append(marked);
+    }
+    box.append(el("p", "hk-label", W.sheet_story));
     const story = el("p", "hk-story");
     for (const part of sheet.story) story.append(part.strong ? el("b", "", part.text) : part.text);
     box.append(story);

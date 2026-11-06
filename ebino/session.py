@@ -1084,9 +1084,13 @@ class Session:
             return {"status": roundtable.ASK_AGAIN, "message": load_text(NAME_IN_QUESTION)}
         return None
 
-    def hitokoto_begin(self, opened) -> dict:
+    def hitokoto_begin(self, opened, marks=None) -> dict:
         """Today's map: the people on it, the split between two of them, the
-        counts. opened: the bubbles the student opened, in that order."""
+        counts. opened: the bubbles the student opened, in that order.
+        marks (直し45 段5): the trail's steps marked first, each optional,
+        at most one mark a step and one step a mark, each with a line or
+        none. The first word is looked for at the step marked もっと聞きたかった,
+        else 問いが深まった, else いちばんおどろいた, where it is a person's words."""
         if config.reflect_old():
             raise Refused("reflect_old")
         if not any(r.status in (roundtable.ANSWERED, roundtable.SILENT) for r in self.rounds):
@@ -1094,7 +1098,11 @@ class Session:
         if self.talk is not None:
             raise Refused("hitokoto_started")
         opened = [uid for uid in opened if isinstance(uid, str)] if isinstance(opened, list) else []
-        self.talk = hitokoto.begin(self, opened, _sheet_heading)
+        kept = self._trail_marks(marks)
+        if isinstance(kept, dict):  # A name in a line: asked again, nothing kept.
+            return kept
+        self.talk = hitokoto.begin(self, opened, _sheet_heading, self._mark_start(kept))
+        self.talk.marks = kept
         self.save()
         talk = self.talk
         view = talk.map_view()
@@ -1128,6 +1136,56 @@ class Session:
         asked = hitokoto.ask_listener(self.gate, self, talk, hitokoto.REACTION)
         self.save()
         return {"next": "ask", "question": asked.text, "omakase": bool(omakase), "person": person, "part": part}
+
+    def _trail_marks(self, marks):
+        """The marks checked: [{"n", "mark", "note", "label", "text"}], or
+        the ask-again view when a line holds a name."""
+        if marks is None:
+            return []
+        if not isinstance(marks, list):
+            raise Refused("unknown_mark")
+        items = {item["n"]: item for item in self.trail_view()["items"]}
+        labels = texts.id_table(texts.TRAIL_MARKS, texts.TRAIL_MARK_IDS)
+        kept, seen_n, seen_mark = [], set(), set()
+        for mark in marks:
+            n = mark.get("n") if isinstance(mark, dict) else None
+            kind = mark.get("mark") if isinstance(mark, dict) else None
+            if not isinstance(n, int) or isinstance(n, bool) or n not in items or kind not in labels \
+                    or n in seen_n or kind in seen_mark:
+                raise Refused("unknown_mark")
+            note = _line(mark.get("note", ""), hitokoto.MAX_LINE, "", required=False)
+            named = self._named(note)
+            if named:
+                return named
+            seen_n.add(n)
+            seen_mark.add(kind)
+            kept.append({"n": n, "mark": kind, "note": note, "label": labels[kind], "text": self._mark_text(items[n])})
+        return sorted(kept, key=lambda m: m["n"])
+
+    def _mark_text(self, item: dict) -> str:
+        """A marked step in a line for the sheet: the student's words, or whose
+        words and their kind; an AI's question with the answer."""
+        if item["kind"] in (trail.AI_ANSWER, trail.ONE_COACH):
+            return "　".join(filter(None, [item["question"], item.get("choice", ""), item.get("answer", "")]))
+        if item["kind"] == trail.OPENED:
+            return "　".join(filter(None, [item["who"], item["label"]]))
+        if item["kind"] == trail.ONE_ASK:
+            return "　".join(filter(None, [item["who"], item["text"]]))
+        return item.get("text", "")
+
+    def _mark_start(self, kept: list[dict]) -> tuple[str, str] | None:
+        """(seat, piece) of the step the first word is looked for at: by the
+        marks' order (TRAIL_MARK_FIRST), a bubble pressed or a question at
+        one to one only (a person's words). None: the map as before."""
+        steps = {step["n"]: step for step in self.steps}
+        for kind in texts.TRAIL_MARK_FIRST:
+            mark = next((m for m in kept if m["mark"] == kind), None)
+            step = steps.get(mark["n"]) if mark else None
+            if step and step["kind"] == trail.OPENED:
+                return step["seat_id"], step["utterance_id"]
+            if step and step["kind"] == trail.ONE_ASK and step.get("utterance_ids"):
+                return step["seat_id"], step["utterance_ids"][0]
+        return None
 
     def _ladder_or_scale(self, talk: hitokoto.Hitokoto) -> dict:
         """Two 「わからない」 in a row: the ladder (once a sitting), else the scale."""

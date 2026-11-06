@@ -259,7 +259,7 @@ class App:
         """帰る前に、ひとこと (直し38): /api/hitokoto/<step>."""
         skip = body.get("skip") is True
         steps = {
-            "begin": lambda: session.hitokoto_begin(body.get("opened")),
+            "begin": lambda: session.hitokoto_begin(body.get("opened"), body.get("marks")),
             "parts": session.hitokoto_parts,
             "choose": lambda: session.hitokoto_choose(body.get("person"), body.get("part", ""),
                                                       omakase=body.get("omakase") is True),

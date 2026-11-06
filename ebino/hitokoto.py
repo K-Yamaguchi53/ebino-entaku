@@ -97,6 +97,7 @@ GREY_SLOTS = ((150, 120), (420, 110), (470, 160), (260, 250), (360, 260), (120, 
 WHY_MARK = "mark"  # How a person came onto the map.
 WHY_ONE = "one"
 WHY_BUBBLE = "bubble"
+WHY_TRAIL = "trail"  # A step marked on the trail (直し45 段5): first on the map.
 
 # Stops (reason codes, never the words).
 STOP_LURE = "lure_form"
@@ -163,8 +164,14 @@ def force_sentences() -> dict[int, str]:
 
 
 def screen_words() -> dict:
-    """What the screen is sent once, with the forces' names."""
-    return {"words": words(), "kinds": KIND_LABELS}
+    """What the screen is sent once, with the forces' names; 直し45 段5: the
+    marks on the trail and their words, and whose card each question is in
+    (コーチ（AI） for ① and ②, オブザーバー（AI） for ③)."""
+    from . import coach, texts
+    return {"words": words(), "kinds": KIND_LABELS,
+            "marks": texts.id_table(texts.TRAIL_MARKS, texts.TRAIL_MARK_IDS),
+            "mark_words": texts.id_table(texts.TRAIL_MARK_WORDS, texts.TRAIL_MARK_WORD_IDS),
+            "who_coach": coach.ai_label(coach.COACH), "who_observer": coach.ai_label(coach.OBSERVER)}
 
 
 def is_blank(text: str) -> bool:
@@ -274,6 +281,10 @@ class Hitokoto:
     meet_use: str = ""
     light: Light | None = None
     now_question: str = ""
+    # The trail's marks (直し45 段5): [{"n", "mark", "note", "label", "text"}],
+    # and the person on the map the first word is looked for at (None: none).
+    marks: list[dict] = field(default_factory=list)
+    start: int | None = None
     # From the rounds (直し40-2): the questions sent with 「聞く」 after the
     # first that are not a split's heading; the first of them sent after a
     # split was pressed; whether a heading was sent as it was after one was;
@@ -288,7 +299,7 @@ class Hitokoto:
     def map_view(self) -> dict:
         return {"first_question": self.first_question, "people": [p.view() for p in self.people],
                 "split": self.split, "grey": [list(xy) for xy in self.grey], "counts": self.counts,
-                "stage": self.stage}
+                "stage": self.stage, "start": self.start}
 
     def question_count(self) -> int:
         return sum(1 for a in self.asked if a.step != "forward")
@@ -321,16 +332,19 @@ class Hitokoto:
                        "reason": light.reason, "seconds": light.seconds} if light else None),
             "now_question": self.now_question,
             "stage": self.stage,
+            # 直し45 段5: which step of the trail got which mark, and the line.
+            "marks": [{"n": m["n"], "mark": m["mark"], "note": m["note"]} for m in self.marks],
         }
 
 
 # --- who is on the map ---
 
-def pick_people(session, opened: list[str]) -> list[Person]:
+def pick_people(session, opened: list[str], first: tuple[str, str] | None = None) -> list[Person]:
     """Up to MAX_PEOPLE: the words marked, then one to one, then the bubbles
     opened; within each, the one read last first. Each with one card of
     words: the mark, else a bubble opened, else (one to one only) the first
-    piece of the item asked last there."""
+    piece of the item asked last there. first (直し45 段5): (seat, piece) of
+    the step marked on the trail, put first with that piece."""
     shown = {q.utterance_id: q for r in session.rounds for q in r.quotes}
     opened = [uid for uid in dict.fromkeys(opened) if uid in shown]
     marks = [(seat_id, uid) for seat_id, uid in session.marks.items() if uid in shown]
@@ -344,6 +358,12 @@ def pick_people(session, opened: list[str]) -> list[Person]:
         last_opened[shown[uid].seat_id] = uid
     seats = {seat.seat_id: seat for seat in session.library.seats}
     people: list[Person] = []
+    if first and first[0] in seats and first[1] in session._utterances:
+        seat_id, uid = first
+        utterance = session._utterances[uid]
+        text = shown[uid].text if uid in shown else utterance.text
+        seat = seats[seat_id]
+        people.append(Person(seat_id, seat.title, seat.kind, uid, text, not utterance.note, utterance.note, WHY_TRAIL))
     for seat_id, why in order:
         if len(people) >= MAX_PEOPLE or seat_id not in seats or any(p.seat_id == seat_id for p in people):
             continue
@@ -411,13 +431,15 @@ def split_questions(session) -> dict:
             "heading_sent": any(q in headings for q in after), "last": mine[-1] if mine else ""}
 
 
-def begin(session, opened: list[str], sheet_heading) -> Hitokoto:
+def begin(session, opened: list[str], sheet_heading, start: tuple[str, str] | None = None) -> Hitokoto:
     first = next((r.question for r in session.rounds if r.question), "")
     talk = Hitokoto(first)
     asked = split_questions(session)
     talk.own_questions, talk.rewritten = asked["own"], asked["rewritten"]
     talk.heading_sent, talk.last_question = asked["heading_sent"], asked["last"] or first
-    talk.people = pick_people(session, opened)
+    talk.people = pick_people(session, opened, start)
+    if start and talk.people and talk.people[0].why == WHY_TRAIL:
+        talk.start = 0
     talk.split = find_split(session, talk.people, sheet_heading)
     place(talk.people, talk.split)
     on_map = {p.seat_id for p in talk.people}
@@ -762,4 +784,6 @@ def sheet_view(talk: Hitokoto) -> dict:
     light = talk.light
     now = talk.now_question if talk.now_question and talk.now_question != talk.first_question else ""
     return {"first_question": talk.first_question, "now_question": now, "story": story(talk),
-            "light": {"quote": light.quote, "why": light.why} if light else None, "next_step": next_step(talk)}
+            "light": {"quote": light.quote, "why": light.why} if light else None, "next_step": next_step(talk),
+            # 直し45 段5: the steps marked on the trail, with the student's line.
+            "marks": [{"label": m["label"], "text": m["text"], "note": m["note"]} for m in talk.marks]}
