@@ -204,21 +204,27 @@ def test_the_host_page_has_a_card_for_the_coach_and_the_observer():
 
 PLACE_AI = """
 const made = {};
-const node = (id, box) => ({ id, box, hidden: id === "guide", dataset: {}, style: { setProperty(k, v) { this[k] = v; } },
-  classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); } },
-  offsetWidth: 280, offsetHeight: 44, open: false, textContent: "",
-  getBoundingClientRect() { return this.box; } });
+const node = (id, box, cls) => ({ id, box, hidden: id === "guide", dataset: {}, style: { setProperty(k, v) { this[k] = v; } },
+  classList: { set: new Set(cls ? [cls] : []), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); },
+    toggle(c, on) { if (on) this.set.add(c); else this.set.delete(c); }, contains(c) { return this.set.has(c); } },
+  get offsetWidth() { return this.classList.set.has("narrow") ? 220 : 280; },
+  get offsetHeight() { return this.classList.set.has("narrow") ? 70 : 44; }, open: false, textContent: "",
+  replaceChildren(x) { this.textContent = x.phrased; }, getBoundingClientRect() { return this.box; } });
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height });
 const $ = (id) => made[id] || (made[id] = node(id, box(0, 0, 0, 0)));
-let now = "answer_ai", card = null, other = null;
-const document = { documentElement: { clientWidth: 1366, clientHeight: 650 },
+let now = "answer_ai", card = null, other = null, bubbles = [];
+const view = { clientWidth: 1366, clientHeight: 650 };
+const document = { documentElement: view,
   querySelector: (q) => q.includes("#ai-seat-cards .ai-question") ? card : null,
-  querySelectorAll: (q) => q.includes("#ai-seat-cards .ai-question") ? [card, other] : [] };
+  querySelectorAll: (q) => q.includes("#ai-seat-cards .ai-question") ? [card, other] : q.includes(".table-bubble") ? bubbles : [] };
 const state = { texts: { now_line: {}, guide: { answer_ai: "A" } } };
 function nowState() { return now; }
+function phrased(text) { return { phrased: text }; }
 %(source)s
-const overlaps = (g, k) => { const l = parseInt(g.style.left), t = parseInt(g.style.top);
-  return l < k.right && k.left < l + 280 && t < k.bottom && k.top < t + 44; };
+const area = (g, k) => { const l = parseInt(g.style.left), t = parseInt(g.style.top);
+  return Math.max(0, Math.min(l + g.offsetWidth, k.right) - Math.max(l, k.left))
+    * Math.max(0, Math.min(t + g.offsetHeight, k.bottom) - Math.max(t, k.top)); };
+const overlaps = (g, k) => area(g, k) > 0;
 const out = {};
 // The two cards one over the other (in the map's column, or its corner),
 // or side by side (as at 1366×650 and 1920×1080).
@@ -232,11 +238,39 @@ for (const [name, x, by] of [["column", 1100, false], ["corner", 8, false], ["ro
   out[name] = { hidden: g.hidden, side: g.dataset.side, point: g.style["--point"],
     over: [made["ai-seat-label"].box, made["ai-seat-note"].box, card.box, other.box].filter((k) => overlaps(g, k)).length };
 }
+out.text = $("guide-text").textContent;
 // Room over the card clear of the heading and the note: over it, as before.
 made["ai-seat-label"].box = box(8, 20, 200, 30); made["ai-seat-note"].box = box(8, 56, 240, 40);
 card.box = box(8, 300, 240, 60); other.box = box(8, 368, 240, 60);
 drawGuide();
 out.room = { side: $("guide").dataset.side, top: $("guide").style.top };
+// As at 768×1024: the seat over the map's corner, the bubble pressed right
+// under the card; nowhere clear of it, so slid along the card as far as its
+// point stays on it, over the least of the pressed bubble.
+view.clientWidth = 768; view.clientHeight = 1024;
+made["ai-seat-label"].box = box(25, 180, 240, 30); made["ai-seat-note"].box = box(25, 215, 400, 20);
+card.box = box(35, 238, 185, 104); other.box = box(229, 238, 186, 104);
+const pressed = node("pressed", box(20, 345, 220, 110), "marked");
+bubbles = [pressed, node("b1", box(500, 210, 190, 108)), node("b2", box(528, 403, 220, 100)), node("b3", box(37, 458, 220, 110))];
+drawGuide();
+{ const g = $("guide"), l = parseInt(g.style.left);
+  out.pressed = { side: g.dataset.side, left: g.style.left, narrow: g.classList.set.has("narrow"),
+    kept: [made["ai-seat-label"].box, made["ai-seat-note"].box, card.box, other.box].filter((k) => overlaps(g, k)).length,
+    on_pressed: area(g, pressed.box), on_others: bubbles.slice(1).filter((b) => overlaps(g, b.box)).length,
+    tip: l + parseInt(g.style["--point"]) }; }
+// Clear of the bubbles when it can be: slid along under the card.
+bubbles = [node("p2", box(20, 345, 120, 110), "marked")];
+drawGuide();
+out.slid = { side: $("guide").dataset.side, on: area($("guide"), bubbles[0].box) };
+// As at 900×800: the seat low by the map's left, its card cut off by the
+// window's foot; wide, no side is clear: narrower, by its left.
+view.clientWidth = 900; view.clientHeight = 800; bubbles = [];
+made["ai-seat-label"].box = box(290, 505, 300, 30); made["ai-seat-note"].box = box(290, 540, 360, 40);
+card.box = box(280, 590, 170, 200); other.box = box(458, 590, 170, 200);
+drawGuide();
+{ const g = $("guide");
+  out.narrow = { side: g.dataset.side, narrow: g.classList.set.has("narrow"),
+    kept: [made["ai-seat-label"].box, made["ai-seat-note"].box, card.box, other.box].filter((k) => overlaps(g, k)).length }; }
 process.stdout.write(JSON.stringify(out));
 """
 
@@ -246,7 +280,10 @@ def test_the_hint_to_answer_the_ai_keeps_its_seats_heading_and_note_clear():
     """直し46: 「AI の問いはここ。押して答えよう」 never over 「AI（町の人では
     ありません）」 nor 「この問いは、AI が作りました。…」 nor the other AI
     card: beside the card (left in the map's column, right in the map's
-    corner), under it with the cards side by side, over it with room."""
+    corner), under it with the cards side by side, over it with room; under
+    it slid along it over the least of the bubble pressed (768×1024, after
+    the screen check's 差し戻し); narrower by it when no side is clear wide
+    (900×800)."""
     source = APP[APP.index("const GUIDE = {"):APP.index("// What it points at moves with the window")]
     out = subprocess.run(["node", "-"], input=(PLACE_AI % {"source": source}).encode("utf-8"), capture_output=True, timeout=30)
     assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
@@ -254,5 +291,15 @@ def test_the_hint_to_answer_the_ai_keeps_its_seats_heading_and_note_clear():
     assert got["column"] == {"hidden": False, "side": "left", "point": "22px", "over": 0}
     assert got["corner"] == {"hidden": False, "side": "right", "point": "22px", "over": 0}
     assert got["row"] == {"hidden": False, "side": "below", "point": "123px", "over": 0}  # 38 + 92.5 - 8, rounded as JS does.
+    assert got["text"] == "A"  # Broken between phrases (phrased).
     assert got["room"] == {"side": "above", "top": f"{300 - 14 - 44}px"}
+    # 768×1024: never over the heading, the note or the cards; under the card,
+    # slid to its right end (its point still on it: 35 + 185 - 28 at most).
+    p = got["pressed"]
+    assert p["side"] == "below" and p["kept"] == 0 and p["on_others"] == 0 and not p["narrow"]
+    assert p["left"] == "191px" and p["on_pressed"] == (240 - 191) * 44  # was 220 × 44 in the middle.
+    assert 35 < p["tip"] <= 35 + 185
+    assert got["slid"] == {"side": "below", "on": 0}
+    assert got["narrow"] == {"side": "left", "narrow": True, "kept": 0}
+    assert ".guide.narrow { max-width: min(11em, calc(100vw - 16px)); }" in CSS
     assert '.guide[data-side="right"]::after { right: 100%;' in CSS and '.guide[data-side="left"]::after { left: 100%;' in CSS

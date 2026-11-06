@@ -1801,6 +1801,8 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
 /* 直し46: beside it (the AI's question, its seat's heading and note kept clear). */
 .guide[data-side="right"]::after { right: 100%; top: calc(var(--point) - 10px); border-right-color: var(--lamp); }
 .guide[data-side="left"]::after { left: 100%; top: calc(var(--point) - 10px); border-left-color: var(--lamp); }
+/* 直し46: narrower, broken between phrases, where nothing else is clear. */
+.guide.narrow { max-width: min(11em, calc(100vw - 16px)); }
 /* The bubble's choices: the one to press lit itself, no bubble over the card. */
 .map-choices button.guide-here { outline: 3px solid var(--lamp); outline-offset: 2px; font-weight: 700;
   color: var(--lamp-bright); background: var(--lamp-faint); }

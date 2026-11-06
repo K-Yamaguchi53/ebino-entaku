@@ -895,9 +895,12 @@ const GUIDE = {
   // 直し46: never over the AI's seat's heading (「AI（町の人ではありません）」)
   // nor its note (「この問いは、AI が作りました。…」), nor over the AI's
   // questions (the other card's words): over the card when there is room
-  // clear of them, else beside it, else under it.
+  // clear of them, else beside it, else under it; slid along the card, and
+  // over as little of the people's bubbles as it can (the one pressed, the
+  // one being read, least of all); narrower when nothing else is clear.
   answer_ai: { at: () => shown(document.querySelector("#ai-seat-cards .ai-question:not(:disabled)")) || shown($("ai-seat-open")),
     clear: () => [$("ai-seat-label"), $("ai-seat-note"), ...document.querySelectorAll("#ai-seat-cards .ai-question")],
+    spare: () => [...document.querySelectorAll("#map-overlay .table-bubble:not(.unplaced):not(.ai)")],
     sides: ["above", "right", "left", "below"] },
   after: { at: () => $("to-reflect") },
 };
@@ -932,37 +935,85 @@ function drawGuide() {
     return;
   }
   if (guide.dataset.state !== now) {
-    $("guide-text").textContent = words[spec.words || now];
+    // Broken between phrases where it may be made narrower (直し46).
+    if (spec.clear) $("guide-text").replaceChildren(phrased(words[spec.words || now]));
+    else $("guide-text").textContent = words[spec.words || now];
     guide.dataset.state = now;
     guide.classList.remove("fresh");
     void guide.offsetWidth;
     guide.classList.add("fresh");
   }
   guide.hidden = false;
-  const box = target.getBoundingClientRect(), w = guide.offsetWidth, h = guide.offsetHeight;
+  const box = target.getBoundingClientRect();
   const gap = 14, edge = 8, vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  // Each side in turn (over it, else under it, unless the state says
-  // otherwise): the first inside the window and clear of what the state
-  // keeps clear (直し46); none such, over it when there is room, else under.
-  const keep = ((spec.clear && spec.clear()) || []).map(shown).filter(Boolean).map((n) => n.getBoundingClientRect());
-  const at = (side) => side === "above" || side === "below"
-    ? { side, top: side === "above" ? box.top - gap - h : Math.min(box.bottom + gap, vh - h - edge),
-        left: clamp(box.left + box.width / 2 - w / 2, edge, vw - w - edge) }
-    : { side, top: clamp(box.top + box.height / 2 - h / 2, edge, vh - h - edge),
-        left: side === "right" ? box.right + gap : box.left - gap - w };
-  const fits = (p) => p.top >= edge && p.top + h <= vh - edge && p.left >= edge && p.left + w <= vw - edge
-    && !keep.some((k) => p.left < k.right && k.left < p.left + w && p.top < k.bottom && k.top < p.top + h);
-  const place = (spec.sides || ["above", "below"]).map(at).find(fits)
-    || at(box.top - gap - h >= edge ? "above" : "below");
+  // Over it when there is room, else under it; a state that keeps things
+  // clear (直し46) has its bubble placed by guideSpot.
+  guide.classList.remove("narrow");
+  const wide = spec.clear && guideSpot(spec, box, true);
+  const narrow = spec.clear && (!wide || wide.cost > 0) && guideSpot(spec, box, false);
+  const spot = narrow && (!wide || narrow.cost < wide.cost) ? narrow : wide;
+  if (spot === narrow && narrow) guide.classList.add("narrow");
+  else guide.classList.remove("narrow");
+  const place = spot || (() => {
+    guide.classList.remove("narrow");
+    const w = guide.offsetWidth, h = guide.offsetHeight;
+    const side = box.top - gap - h >= edge ? "above" : "below";
+    return { side, w, h, top: side === "above" ? box.top - gap - h : Math.min(box.bottom + gap, vh - h - edge),
+      left: clamp(box.left + box.width / 2 - w / 2, edge, vw - w - edge) };
+  })();
   guide.dataset.side = place.side;
   guide.style.left = `${Math.round(place.left)}px`;
   guide.style.top = `${Math.round(place.top)}px`;
   // The bubble's point at what it points at, even when the bubble is kept
   // inside the window: along its foot or head, or its side.
   guide.style.setProperty("--point", place.side === "above" || place.side === "below"
-    ? `${Math.round(clamp(box.left + box.width / 2 - place.left, 16, w - 16))}px`
-    : `${Math.round(clamp(box.top + box.height / 2 - place.top, 16, h - 16))}px`);
+    ? `${Math.round(clamp(box.left + box.width / 2 - place.left, 16, place.w - 16))}px`
+    : `${Math.round(clamp(box.top + box.height / 2 - place.top, 16, place.h - 16))}px`);
+}
+
+// 直し46: where the bubble goes for a state that keeps things clear. Each of
+// the state's sides in turn, at the middle of what it points at and then
+// slid along it (its point still on it), inside the window and over none
+// of what is kept clear; of those, the first over none of the spared (the
+// people's bubbles), else the one over least of them (the one marked, or
+// pressed and still holding the keyboard, counts four times), with how
+// much it is over (cost). None such: null. drawGuide tries it narrower too
+// when wide it is over some, or nowhere is clear, and keeps the one over less.
+function guideSpot(spec, box, wide) {
+  const guide = $("guide");
+  guide.classList.toggle("narrow", !wide);
+  const w = guide.offsetWidth, h = guide.offsetHeight;
+  const gap = 14, edge = 8, step = 8, vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const boxes = (nodes) => (nodes || []).map(shown).filter(Boolean)
+    .map((n) => ({ rect: n.getBoundingClientRect(),
+      weight: n.classList && (n.classList.contains("marked") || n === document.activeElement) ? 4 : 1 }));
+  const keep = boxes(spec.clear()), spare = boxes(spec.spare && spec.spare());
+  const over = (p, k) => Math.max(0, Math.min(p.left + w, k.right) - Math.max(p.left, k.left))
+    * Math.max(0, Math.min(p.top + h, k.bottom) - Math.max(p.top, k.top));
+  const spots = [];
+  for (const side of spec.sides || ["above", "below"]) {
+    const across = side === "above" || side === "below";
+    const mid = across ? clamp(box.left + box.width / 2 - w / 2, edge, vw - w - edge)
+      : clamp(box.top + box.height / 2 - h / 2, edge, vh - h - edge);
+    const [lo, hi] = across ? [box.left + 12 - (w - 16), box.right - 28] : [box.top + 12 - (h - 16), box.bottom - 28];
+    const slides = [mid];
+    for (let v = Math.ceil(lo); v <= hi; v += step) slides.push(v);
+    for (const v of slides) {
+      spots.push(across ? { side, w, h, left: v, top: side === "above" ? box.top - gap - h : box.bottom + gap }
+        : { side, w, h, top: v, left: side === "right" ? box.right + gap : box.left - gap - w });
+    }
+  }
+  let best = null, least = Infinity;
+  for (const p of spots) {
+    if (p.top < edge || p.top + h > vh - edge || p.left < edge || p.left + w > vw - edge) continue;
+    if (keep.some((k) => over(p, k.rect) > 0)) continue;
+    const cost = spare.reduce((sum, k) => sum + over(p, k.rect) * k.weight, 0);
+    if (cost === 0) return { ...p, cost };
+    if (cost < least) [best, least] = [{ ...p, cost }, cost];
+  }
+  return best;
 }
 // What it points at moves with the window, the map and its bubbles: kept by it.
 window.addEventListener("resize", drawGuide);
