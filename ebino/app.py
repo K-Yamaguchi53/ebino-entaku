@@ -29,7 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from . import hitokoto, inside, relief
+from . import coach, hitokoto, inside, relief
 from .config import PlaceError, data_dir, load_env_file, records_dir, reflect_old
 from .gate import Gate, load_names
 from .records import Records
@@ -136,6 +136,10 @@ class App:
             "map": view,
             # Whose words are in the app, as counts from the seat table (直し31-5).
             "inside": inside.view(self.library.seats),
+            # The AI's questions at the end of a round, for the host's page:
+            # the cards' own lines, the coach only with its pieces, none
+            # with the band off (the teacher, 11/6).
+            "ai_roles": coach.roles_shown(self.library.coach_on, self.library.coach_sources),
             # Which reflection (直し38): 帰る前に、ひとこと, or the sheet as
             # before when EBINO_REFLECT=old; and the new one's words.
             "reflect": "old" if reflect_old() else "hitokoto",

@@ -234,6 +234,16 @@ async function setup() {
   for (const step of data.texts.now_steps) {
     $("now-steps").append(el("li", { "data-step": step.id, text: step.text }));
   }
+  // コーチとオブザーバー: each card's line, its name before ｜ set apart.
+  const roles = data.ai_roles || [];
+  $("start-roles").hidden = !roles.length;
+  $("start-roles-lead").textContent = data.texts.guide.roles_lead;
+  for (const line of roles) {
+    const [who, ...what] = line.split("｜");
+    $("start-roles-list").append(what.length
+      ? el("li", {}, el("span", { class: "who", text: who }), el("span", { class: "what", text: what.join("｜") }))
+      : el("li", {}, el("span", { class: "who", text: line })));
+  }
   renderInside(data.inside || []);
   setNow();
   $("lab-question").textContent = data.texts.lab_question;
@@ -856,6 +866,7 @@ function firstLook() {
     if (event.target.closest("#work-questions button")) done();
   });
   look.showModal();
+  look.scrollTop = 0;  // From its heading, the button focused or not.
   drawGuide();
 }
 

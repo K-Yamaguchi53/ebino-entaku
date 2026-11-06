@@ -199,7 +199,7 @@ def request_for(record: Record, sources: list[str], roles: tuple[str, ...]) -> d
 
 
 def run(gate: Gate, session, round_no: int, sources: list[str]) -> Band:
-    roles = tuple(role for role in CARDS if role != COACH or sources)
+    roles = roles_for(sources)
     record = Record(session, round_no)
     try:
         answer = json_answer(gate.send(ROLE, request_for(record, sources, roles), timeout=TIMEOUT_SECONDS))
@@ -222,6 +222,17 @@ def run(gate: Gate, session, round_no: int, sources: list[str]) -> Band:
 
 def label(role: str) -> str:
     return load_text(LABELS[role])
+
+
+def roles_for(sources: list[str]) -> tuple[str, ...]:
+    """The cards asked for, in CARDS order: the coach only with its pieces."""
+    return tuple(role for role in CARDS if role != COACH or sources)
+
+
+def roles_shown(on: bool, sources: list[str]) -> list[str]:
+    """The cards' lines (their files, the same words as on the cards) for the
+    host's page (the teacher, 11/6): none with the band off."""
+    return [label(role) for role in roles_for(sources)] if on else []
 
 
 def card_view(asked: Asked) -> dict:

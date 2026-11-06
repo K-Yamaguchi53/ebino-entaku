@@ -79,6 +79,10 @@ def test_setup_gives_texts_kinds_and_seat_labels(server):
     assert len(data["texts"]["start_notice"]) == 7
     assert data["texts"]["work_questions"] and "{n}" in data["texts"]["answered_count"]
     assert data["seats"][0] == {"seat_id": "S01", "kind": "adult", "title": "理容師", "detail": ""}
+    # The host's page names the AI's questions by the cards' lines (the teacher, 11/6).
+    from ebino import coach
+    library = srv.the_app.library
+    assert data["ai_roles"] == coach.roles_shown(library.coach_on, library.coach_sources)
 
 
 def test_a_whole_round_over_http(server):

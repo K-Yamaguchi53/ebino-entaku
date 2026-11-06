@@ -267,6 +267,16 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   color: var(--lamp); font-size: 16px; }
 .start-flow .flow-step { font-size: 19px; font-weight: 700; color: var(--lamp-bright); }
 .start-flow .flow-do { font-size: 16px; line-height: 1.55; color: var(--ink); }
+/* コーチとオブザーバー: the AI's, so in its colour, as on the cards. */
+.start-roles { margin: 16px 0 0; padding: 12px 18px 14px; border: 2px solid var(--ai); border-radius: 10px;
+  background: var(--ai-deep); }
+.start-roles[hidden] { display: none; }
+.start-roles-lead { margin: 0 0 10px; font-size: 17px; line-height: 1.6; color: var(--ai-ink); }
+.start-roles-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 16px;
+  margin: 0; padding: 0; list-style: none; }
+.start-roles-list li { display: grid; gap: 2px; }
+.start-roles-list .who { font-size: 18px; font-weight: 700; color: var(--ai); }
+.start-roles-list .what { font-size: 16px; line-height: 1.5; color: var(--ai-ink); }
 @media (max-width: 899px) {
   .start-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .start-flow li:nth-child(3)::before { content: none; }
@@ -1621,6 +1631,15 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
   .first-look-title { font-size: 23px; margin-bottom: 8px; }
   .first-look-body .inside-counts .number { font-size: 32px; }
   .first-look-row { margin-top: 10px; }
+  /* The host's page on a low screen (1366×650): all of it, its heading too, at once. */
+  .host-head .host-mark { width: 40px; height: 40px; font-size: 14px; }
+  .start-about { margin-bottom: 12px; font-size: 17px; line-height: 1.6; }
+  .host-says { padding: 10px 16px; }
+  .start-flow li { padding: 8px 12px 10px; }
+  .start-flow .flow-step { font-size: 17px; }
+  .start-flow .flow-do { font-size: 15px; line-height: 1.5; }
+  .start-roles { margin-top: 10px; padding: 8px 14px 10px; }
+  .start-roles-lead { margin-bottom: 6px; font-size: 16px; }
 }
 
 /* --- The guide (the teacher, 11/6): a bubble by the one thing to press now,

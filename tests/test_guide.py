@@ -170,3 +170,23 @@ def test_the_first_page_is_said_by_the_host_an_ai_in_the_ais_colour():
     assert ".host-head .host-mark { width: 52px; height: 52px;" in CSS
     # A paragraph for each of its lines.
     assert r'data.texts.start_about.split("\n")' in APP
+
+
+def test_the_host_page_names_the_coach_and_the_observer_by_the_cards_own_lines():
+    from ebino import coach
+    # The same files as the cards; the coach only with its pieces; none with the band off.
+    assert coach.roles_shown(True, ["片"]) == [coach.label(coach.COACH), coach.label(coach.OBSERVER)]
+    assert coach.roles_shown(True, []) == [coach.label(coach.OBSERVER)]
+    assert coach.roles_shown(False, ["片"]) == []
+    assert coach.roles_for([]) == (coach.OBSERVER,)
+    assert "コーチ" in coach.label(coach.COACH) and "オブザーバー" in coach.label(coach.OBSERVER)
+    assert texts.screen_texts()["guide"]["roles_lead"]
+    # On the first page, under the flow, hidden with none.
+    page = HTML[HTML.index('<section id="first-look-about"'):HTML.index('<section id="first-look-inside"')]
+    assert page.index('<ol id="start-flow"') < page.index('<div id="start-roles" class="start-roles" hidden>')
+    assert '$("start-roles").hidden = !roles.length;' in APP and "data.ai_roles || []" in APP
+    assert ".start-roles[hidden] { display: none; }" in CSS
+    # From its heading, on a low screen too (1366×650: the heading had gone up out of sight).
+    assert "look.showModal();\n  look.scrollTop = 0;" in _top("firstLook")
+    low = CSS[CSS.index("/* The host's page on a low screen"):]
+    assert ".start-roles { margin-top: 10px;" in low[:low.index("\n}\n")]
