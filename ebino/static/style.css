@@ -164,12 +164,24 @@ body:has(#start[hidden]) .masthead h1 { font-size: 36px; letter-spacing: .12em; 
 .now-steps li + li::before { content: "─"; margin-right: 10px; margin-left: -10px; padding-left: 0; color: var(--moon-soft); }
 .now-steps li + li { padding-left: 20px; }
 .now-steps li.lit { color: var(--lamp-bright); font-weight: bold; border-bottom-color: var(--lamp); }
-.now-line { margin: 4px 0 0; padding: 6px 14px; border-left: 4px solid var(--lamp); background: var(--night-2);
-  border-radius: 0 6px 6px 0; font-size: 18px; line-height: 1.6; color: var(--ink); }
+/* What to do now (the teacher, 11/6: the students did not read it and
+   could not go on without being told): larger, bold, in the lamp's colour
+   on a faint lamp ground; each time it changes, lit once (not with motion
+   reduced). */
+.now-line { margin: 4px 0 0; padding: 6px 14px; border-left: 6px solid var(--lamp); background: var(--lamp-faint);
+  border-radius: 0 6px 6px 0; font-size: 21px; font-weight: 700; line-height: 1.5; color: var(--lamp-bright); }
 @media (max-height: 720px) {
   .now { padding: 4px 16px 6px; }
   .now-steps { font-size: 13px; }
-  .now-line { margin-top: 2px; padding: 3px 12px; font-size: 16px; }
+  .now-line { margin-top: 2px; padding: 3px 12px; font-size: 18px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .now-line.fresh { animation: now-fresh 1.4s ease-out 1; }
+}
+@keyframes now-fresh {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--lamp) 70%, transparent);
+         background: color-mix(in srgb, var(--lamp) 38%, transparent); }
+  to { box-shadow: 0 0 0 14px transparent; }
 }
 .start-purpose { grid-column: 1 / -1; margin: 0; font-family: var(--mincho); font-size: 20px; line-height: 1.7; color: var(--ink); }
 

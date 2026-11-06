@@ -257,7 +257,9 @@ def test_no_timer_of_its_own_ends_a_wait():
 
 def test_the_top_line_stays_and_the_sign_redraws_with_it():
     now = _top(APP, "setNow")
-    assert 'if ($("now-line").textContent !== line.text) $("now-line").textContent = line.text;' in now
+    # Set only when it changes (11/6: and then lit once, "fresh").
+    assert "if (nowLine.textContent !== line.text) {\n    nowLine.textContent = line.text;" in now
+    assert 'nowLine.classList.add("fresh");' in now
     assert "drawWait();" in now
     assert "setNow({ asking: true });" in _top(APP, "ask") and "setNow({ asking: true });" in _top(APP, "sendAnswer")
 

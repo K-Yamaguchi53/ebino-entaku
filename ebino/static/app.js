@@ -736,7 +736,15 @@ function setNow(changes = {}) {
     if (lit) step.setAttribute("aria-current", "step");
     else step.removeAttribute("aria-current");
   }
-  if ($("now-line").textContent !== line.text) $("now-line").textContent = line.text;
+  const nowLine = $("now-line");
+  if (nowLine.textContent !== line.text) {
+    nowLine.textContent = line.text;
+    // Something new to do: lit once so the eye goes to it (11/6). The CSS
+    // keeps it still with motion reduced.
+    nowLine.classList.remove("fresh");
+    void nowLine.offsetWidth;
+    nowLine.classList.add("fresh");
+  }
   keepUnderNow();
   drawWait();  // The sign in the middle may step back or come out now (直し42).
 }
