@@ -78,7 +78,7 @@ story_chosen	{who}の言葉に近いと選んだ。
 story_wrote	そこで{*text}と書いた。
 story_scale	迷いは10から{n}へ。
 story_more	増えたのは{*text}。
-story_way	頭に置いておきたい道は{*text}。
+story_way	頭に置いておきたい進み方は{*text}。
 story_subject	授業とつながった話もあった。
 story_subject_note	授業とつながった話もあった（{note}）。
 print	印刷する（担任の先生に渡せます）

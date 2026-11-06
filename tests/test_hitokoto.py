@@ -529,7 +529,7 @@ def test_the_sheet_reads_in_order_from_the_record_and_the_students_words(tmp_pat
     story = "".join(part["text"] for part in sheet["story"])
     assert story == ("農家・理容師の話を聞いた。農家の「休みは空いたら取ります」が引っかかった。"
                      "そこで「空いたら取るのがいいと思った」と書いた。迷いは10から8へ。"
-                     "頭に置いておきたい道は「農業」。授業とつながった話もあった（家庭科）。")
+                     "頭に置いておきたい進み方は「農業」。授業とつながった話もあった（家庭科）。")
     assert [p["text"] for p in sheet["story"] if p["strong"]] == [
         "「休みは空いたら取ります」", "「空いたら取るのがいいと思った」", "「農業」"]
     assert sheet["now_question"] == "休みの決め方で、仕事はどう変わる？"
