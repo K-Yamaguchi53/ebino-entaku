@@ -23,7 +23,7 @@ send	送る
 placeholder	ひとことでいい
 again	だいじょうぶ。ひとことでいいよ。
 ask_reaction	「{word}」を読んで、最初に思ったことは？
-ask_self	その人の話は、自分にも当てはまりそう？ どんなところが？
+ask_self	その人の話の、どこが自分にも当てはまりそう？
 ladder_two	2人の言葉。自分に近いのは、どっち？
 ladder_two_me	{who}に近い
 ladder_three	話を聞いた人のうち、いちばん残った人は？
@@ -38,9 +38,9 @@ scale_ok	これにする
 scale_me	いまは {n}
 scale_down	下がったね。あと1つ下げるとしたら、何がありそう？
 scale_same	何があれば、1つ下がりそう？
-scale_up	迷いが増えたのは、考えが広がったしるし。どこが増えた？
+scale_up	迷いが増えたね。どこが増えた？
 skip	とばす
-way_q	まだ決めなくていい。頭に置いておきたい道は？
+way_q	まだ決めなくていい。気になっている進み方は？
 way_ok	置いておく
 way_none	いまはない
 way_example	例：農業もおもしろいかも

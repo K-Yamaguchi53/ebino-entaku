@@ -68,11 +68,15 @@ def test_the_sheet_and_the_record_keep_the_marks_with_the_line():
     assert sheet["first_question"] == FIRST  # The top as before.
 
 
-def test_the_questions_cards_say_coach_and_observer_ai():
+def test_the_questions_cards_say_coach_ai_and_the_teachers_question():
     words = hitokoto.screen_words()
-    assert words["who_coach"] == "コーチ（AI）" and words["who_observer"] == "オブザーバー（AI）"
+    assert words["who_coach"] == "コーチ（AI）" and "who_observer" not in words
+    assert hitokoto.words()["who_teacher"] == "先生の問い"
     assert set(words["marks"].values()) == {"いちばんおどろいた", "問いが深まった", "もっと聞きたかった"}
     say = HK[HK.index("  function say(who, text, extra"):HK.index("  function clearInput(")]
-    assert "app.state.hitokoto.who_coach" in say and "app.state.hitokoto.who_observer" in say
-    assert 'say("observer", result.question);' in HK  # ③ 前.
+    assert "app.state.hitokoto.who_coach" in say and "who_observer" not in say and "W.who_teacher" in say
+    # 直し46: ③ (the scale's next question, the teacher's fixed words) is
+    # 先生の問い in the teacher's card, not the AI's colour.
+    assert 'say("teacher", result.question);\n      lineBox("forward"' in HK
+    assert 'say("observer"' not in HK
     assert 'const marks = await markTrail();' in HK and 'post("begin", { opened: app.state.opened || [], marks })' in HK

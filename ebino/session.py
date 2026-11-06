@@ -1347,7 +1347,7 @@ class Session:
         return {"next": "way"}
 
     def hitokoto_way(self, text, skip: bool = False) -> dict:
-        """「まだ決めなくていい。頭に置いておきたい道は？」 (optional)."""
+        """「まだ決めなくていい。気になっている進み方は？」 (optional)."""
         talk = self._talk(hitokoto.WAY)
         text, named = self._kept_line(talk, "way", text, skip)
         if named:

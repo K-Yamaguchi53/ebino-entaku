@@ -165,13 +165,13 @@ def force_sentences() -> dict[int, str]:
 
 def screen_words() -> dict:
     """What the screen is sent once, with the forces' names; 直し45 段5: the
-    marks on the trail and their words, and whose card each question is in
-    (コーチ（AI） for ① and ②, オブザーバー（AI） for ③)."""
+    marks on the trail and their words, and the name on the AI's questions'
+    cards (コーチ（AI） for ① and ②; ③ is 先生の問い, 直し46)."""
     from . import coach, texts
     return {"words": words(), "kinds": KIND_LABELS,
             "marks": texts.id_table(texts.TRAIL_MARKS, texts.TRAIL_MARK_IDS),
             "mark_words": texts.id_table(texts.TRAIL_MARK_WORDS, texts.TRAIL_MARK_WORD_IDS),
-            "who_coach": coach.ai_label(coach.COACH), "who_observer": coach.ai_label(coach.OBSERVER)}
+            "who_coach": coach.ai_label(coach.COACH)}
 
 
 def is_blank(text: str) -> bool:

@@ -338,13 +338,12 @@ const EbinoHitokoto = (() => {
   // --- 段2・段3: the listener's questions, the ladder, the scale ---
 
   // One card in the talk: the listener (AI), the teacher's question, or the
-  // student. 直し45 段5: the AI's questions as コーチ（AI） (① and ②) and the
-  // scale's next one as オブザーバー（AI） (③), in the AI's colour and shape.
+  // student. 直し45 段5: the AI's questions as コーチ（AI） (① and ②), in the
+  // AI's colour and shape. 直し46: the scale's next one (③, the teacher's
+  // fixed words) is 先生の問い, as the teacher's other questions.
   function say(who, text, extra, cls = "") {
-    const ai = who === "ai" || who === "observer";
-    const card = el("div", `hk-card ${ai ? "ai" : who} ${cls}`.trim());
-    card.append(el("span", "hk-who", { ai: app.state.hitokoto.who_coach, observer: app.state.hitokoto.who_observer,
-      teacher: W.who_teacher, me: W.who_me }[who]));
+    const card = el("div", `hk-card ${who} ${cls}`.trim());
+    card.append(el("span", "hk-who", { ai: app.state.hitokoto.who_coach, teacher: W.who_teacher, me: W.who_me }[who]));
     if (text) card.append(el("p", "hk-q", text));
     if (extra) card.append(extra);
     $("hk-log").append(card);
@@ -557,7 +556,7 @@ const EbinoHitokoto = (() => {
       }
       busy = false;
       say("me", fill(W.scale_me, { n: range.value }));
-      say("observer", result.question);
+      say("teacher", result.question);
       lineBox("forward", { send: W.send, skip: W.skip }, () => askWay());
     });
     box.append(now, range, ticks, ok);
