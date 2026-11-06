@@ -11,13 +11,13 @@ import pytest
 from fake_client import FakeClient, text_response
 
 from conftest import COMPANY, DISPLAY_NAME
-from ebino import coach, harvest, reflection
+from ebino import coach, harvest, reflection, texts
 from ebino.banned_words import BANNED_WORDS
 from ebino.gate import Gate, NameList
 from ebino.ingest.seats import load_seats
 from ebino.records import Records, summary
 from ebino.session import Library, Refused, Session, _sheet_heading
-from ebino.texts import AI_QUESTION_BADGE, COACH_LABEL, OBSERVER_LABEL, load_text
+from ebino.texts import AI_QUESTION_BADGE, COACH_LABEL, OBSERVER_LABEL, load_lines, load_text
 from test_session import ANSWERED, SEATS, UTTERANCES, editor_says, librarian_finds, moderator_says
 
 SAMPLES = Path(__file__).resolve().parent.parent / "samples"
@@ -384,3 +384,29 @@ def test_the_reflection_reads_the_answer_as_the_students_but_not_the_ai_question
     assert answer.kind == "answer" and answer.for_model["asked"] == GOOD_OBSERVER
     assert record.holds("店を開ける人の役に立っている")
     assert not record.holds("誰の役に立っているのだろう")
+
+
+def _abstract_line(system):
+    """The words of the band's line on hard words (直し46: from the table)."""
+    head = "次のような、むずかしい言葉を使わない："
+    assert system.count(head) == 1
+    return system.split(head, 1)[1].split("。", 1)[0].split("・")
+
+
+def test_the_band_instruction_names_the_abstract_words_of_the_table_and_no_other():
+    session, client = round_one({"coach": GOOD_COACH, "observer": GOOD_OBSERVER})
+    session.coach_band(1)
+    system = client.requests[-1]["system"][0]["text"]
+    assert _abstract_line(system) == load_lines(texts.AI_ABSTRACT_WORDS)
+    assert "{abstract}" not in system
+
+
+def test_the_band_instruction_follows_the_table_when_it_changes(monkeypatch):
+    real = coach.load_lines
+    monkeypatch.setattr(coach, "load_lines", lambda name: ["架空語ア", "架空語イ"]
+                        if name == texts.AI_ABSTRACT_WORDS else real(name))
+    session, client = round_one({"coach": GOOD_COACH, "observer": GOOD_OBSERVER})
+    session.coach_band(1)
+    system = client.requests[-1]["system"][0]["text"]
+    assert _abstract_line(system) == ["架空語ア", "架空語イ"]
+    assert "価値観" not in system and "自己実現" not in system

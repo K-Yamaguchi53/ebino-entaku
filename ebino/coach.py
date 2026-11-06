@@ -282,7 +282,8 @@ def schema(roles: tuple[str, ...]) -> dict:
 def request_for(record: Record, sources: list[str], roles: tuple[str, ...]) -> dict:
     """The instruction part (with the observer's view) is the system text;
     the record and the coach's pieces are the data part (SPEC 6)."""
-    system = COACH_PROMPT.format(observer_view=load_text(OBSERVER_VIEW), banned="・".join(BANNED_WORDS))
+    system = COACH_PROMPT.format(observer_view=load_text(OBSERVER_VIEW), banned="・".join(BANNED_WORDS),
+                                 abstract="・".join(load_lines(AI_ABSTRACT_WORDS)))
     data = {"cards": list(roles), "rounds": record.rounds, "asked_before": record.asked_before}
     if COACH in roles:
         data["coach_sources"] = sources
