@@ -110,3 +110,7 @@ try_look	自分で調べてみる
 try_try	試してみる
 try_later	まだ決めない
 try_hint	何を？ 1行でいい
+story_word_short	{who}の1文が引っかかった。
+story_wrote_short	そこで、自分の言葉を書いた。
+story_more_short	増えたところも、書いた。
+story_way_short	頭に置いておきたい進み方も、書いた。

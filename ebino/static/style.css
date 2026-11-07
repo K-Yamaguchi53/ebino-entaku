@@ -1828,6 +1828,12 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
 .hk-tie-line { margin: 0 0 6px; font-weight: 700; }
 .hk-tie-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 14px; }
 .hk-tie-split { margin: 8px 0 2px; font-size: 13px; color: var(--paper-soft); }
+/* 直し51 段2: words in full elsewhere on the sheet, pointed at by that
+   place's heading (or the two people's titles): a small tag, not a quote. */
+.hk-sheet .hk-ref { display: inline-block; margin: 2px 0; padding: 0 8px; font-family: var(--gothic); font-size: 13px;
+  line-height: 1.7; color: var(--paper-soft); border: 1px solid var(--paper-line); border-radius: 999px; }
+.hk-sheet p.hk-ref { display: table; }
+.hk-tie-who { margin: 0; font-size: 14px; color: var(--paper-soft); }
 .hk-tie-heading { margin: 0; font-family: var(--mincho); font-size: 15px; }
 @media (max-width: 560px) { .hk-tie-two { grid-template-columns: minmax(0, 1fr); } }
 /* 直し48 段4: 「整理中」 while the sheet is made: the big word, the line, three

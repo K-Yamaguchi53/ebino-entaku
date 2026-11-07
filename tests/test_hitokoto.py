@@ -534,11 +534,16 @@ def test_the_sheet_reads_in_order_from_the_record_and_the_students_words(tmp_pat
     session.hitokoto_light()
     sheet = session.hitokoto_sheet("休みの決め方で、仕事はどう変わる？")
     story = "".join(part["text"] for part in sheet["story"])
-    assert story == ("農家・理容師の話を聞いた。農家の「休みは空いたら取ります」が引っかかった。"
-                     "そこで「空いたら取るのがいいと思った」と書いた。迷いは10から8へ。"
-                     "頭に置いておきたい進み方は「農業」。授業とつながった話もあった（家庭科）。")
-    assert [p["text"] for p in sheet["story"] if p["strong"]] == [
-        "「休みは空いたら取ります」", "「空いたら取るのがいいと思った」", "「農業」"]
+    # 直し51 段2: the person's sentence and the student's lines are in full
+    # above (今日会った人の、残った1文, 自分の言葉の動き): pointed at, not quoted again.
+    # 家庭科 is in no list above (a word of home: 直し48 段4), so in full here.
+    assert story == ("農家・理容師の話を聞いた。農家の1文が引っかかった。"
+                     "そこで、自分の言葉を書いた。迷いは10から8へ。"
+                     "頭に置いておきたい進み方も、書いた。授業とつながった話もあった（家庭科）。")
+    assert [p["text"] for p in sheet["story"] if p["strong"]] == []
+    # Without the sheet (story alone, as before): the words in full.
+    alone = "".join(part["text"] for part in hitokoto.story(session.talk))
+    assert "「休みは空いたら取ります」" in alone and "「空いたら取るのがいいと思った」" in alone and "「農業」" in alone
     assert sheet["now_question"] == "休みの決め方で、仕事はどう変わる？"
     assert sheet["light"] == {"quote": "空いたら取る", "why": LIGHT_OK["why"]}
     assert sheet["next_step"] == "先輩にもう一回聞く" and sheet["next_try"] is None

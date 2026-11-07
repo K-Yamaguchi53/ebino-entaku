@@ -161,6 +161,8 @@ TEXT_IDS = (
     "notice_q", "notice_yes", "notice_some", "notice_not_yet", "notice_no_answer", "notice_hint", "sheet_notice",
     # 直し49 段2.
     "try_q", "try_meet", "try_look", "try_try", "try_later", "try_hint",
+    # 直し51 段2: 今日の道すじ pointing at words already in full on the sheet.
+    "story_word_short", "story_wrote_short", "story_more_short", "story_way_short",
 )
 FILL_BLANK = "［　　］"  # In ladder_fill_line: where the student writes.
 
@@ -842,11 +844,17 @@ def light_view(talk: Hitokoto) -> dict:
 
 # --- the sheet ---
 
-def story(talk: Hitokoto) -> list[dict]:
+def story(talk: Hitokoto, shown: list[str] | None = None) -> list[dict]:
     """今日の道すじ, in the order things happened, from the record and the
-    student's own words only (the AI writes none of it)."""
+    student's own words only (the AI writes none of it). 直し51 段2: words
+    in full elsewhere on the sheet (shown) are not quoted again: the person's
+    title and 「引っかかった」, or that the student wrote, said short."""
     texts = words()
     out: list[dict] = []
+
+    def elsewhere(text: str) -> bool:
+        return on_sheet(text, shown or [])
+
     if talk.people:
         out += segments(texts["story_people"], people="・".join(p.title for p in talk.people))
     # The split (直し40-2): a question rewritten from it, or the heading sent as it was.
@@ -855,24 +863,51 @@ def story(talk: Hitokoto) -> list[dict]:
     elif talk.heading_sent:
         out += segments(texts["story_split_same"])
     if talk.chosen is not None:
-        out += segments(texts["story_word"], who=talk.people[talk.chosen].title, word=chosen_words(talk))
+        word, who = chosen_words(talk), talk.people[talk.chosen].title
+        out += (segments(texts["story_word_short"], who=who) if elsewhere(word)
+                else segments(texts["story_word"], who=who, word=word))
     two = chosen_two(talk)
     if two:
         out += segments(texts["story_chosen"], who=two.title)
     first = next((w["text"] for w in talk.written if w["step"] in (REACTION, SELF, "fill")
                   and not has_avoid(w["text"])), "")
     if first:
-        out += segments(texts["story_wrote"], text=first)
+        out += segments(texts["story_wrote_short"]) if elsewhere(first) else segments(texts["story_wrote"], text=first)
     if talk.scale is not None:
         out += segments(texts["story_scale"], n=talk.scale)
         if talk.scale > SCALE_FIRST and talk.forward and not has_avoid(talk.forward):
-            out += segments(texts["story_more"], text=talk.forward)
+            out += (segments(texts["story_more_short"]) if elsewhere(talk.forward)
+                    else segments(texts["story_more"], text=talk.forward))
     if talk.way and not has_avoid(talk.way):
-        out += segments(texts["story_way"], text=talk.way)
+        out += (segments(texts["story_way_short"]) if elsewhere(talk.way)
+                else segments(texts["story_way"], text=talk.way))
     if talk.subject == "yes":
-        out += (segments(texts["story_subject_note"], note=talk.subject_note) if talk.subject_note
-                else segments(texts["story_subject"]))
+        out += (segments(texts["story_subject_note"], note=talk.subject_note)
+                if talk.subject_note and not elsewhere(talk.subject_note) else segments(texts["story_subject"]))
     return out
+
+
+# 直し51 段2 (ヒビキ, 49_sheet_notice_try: the same sentence three times on
+# the one sheet thins 「なるほど」): one person's words, one sentence, and
+# the student's own, in full once on the sheet; again, pointed at by a
+# title or a heading of the sheet (texts/), never reworded nor cut. Kept in
+# full where it is first read, but for the student's line that is the
+# light, or the next step: in full in its own box at the foot (the sheet's
+# own words, 直し51 段5), and 自分の言葉の動き points at it by its heading.
+
+_BARE = re.compile(r"[\s　「」『』]+")
+
+
+def bare(text: str) -> str:
+    """The words to compare: no spaces nor 「」, no stop at the end."""
+    return _TRAIL.sub("", _BARE.sub("", text or ""))
+
+
+def on_sheet(text: str, shown: list[str]) -> bool:
+    """Whether text is already in full on the sheet: itself, or within a
+    sentence there (a part of a person's sentence is that sentence)."""
+    body = bare(text)
+    return bool(body) and any(body in bare(full) for full in shown if full)
 
 
 # 直し48 段4 (the teacher, 11/7: 「これで本当に生徒はなるほど！となるか？」):
@@ -997,13 +1032,58 @@ def sheet_view(talk: Hitokoto, meet: str = "") -> dict:
     light = talk.light
     now = talk.now_question if talk.now_question and talk.now_question != talk.first_question else ""
     trying = try_view(talk, meet)
-    return {"first_question": talk.first_question, "now_question": now, "story": story(talk),
-            "light": {"quote": light.quote, "why": light.why} if light else None,
+    step = "" if trying else next_step(talk)
+    met, moves, notice = met_lines(talk), own_moves(talk), notice_view(talk)
+    # 直し51 段2: what is in full on the sheet, read from the top: 今日の気づき,
+    # the two questions, each person's sentence.
+    shown = [notice, talk.first_question, now, *[m["quote"] for m in met]]
+    lit = None
+    if light:
+        lit = {"quote": light.quote, "why": light.why}
+        if bare(light.quote) == bare(talk.first_question):
+            lit["ref"] = "first_label"  # The first question, in full above.
+        elif light.source == "chosen" and on_sheet(light.quote, shown):
+            lit["ref"], lit["who"] = "chosen", light.chosen_who  # （農家の言葉）: in full above.
+        elif light.source == "chosen":
+            lit["who"] = light.chosen_who
+    own_light = bool(lit) and "ref" not in lit and "who" not in lit
+    # 自分の言葉の動き: the first and the now question in full above, the light
+    # and the next step in full below: each pointed at by its heading.
+    tops = {bare(talk.first_question): "first_label"}
+    if now:
+        tops[bare(now)] = "sheet_now"
+    refs = dict(tops)
+    if own_light:
+        refs.setdefault(bare(light.quote), "light_title")
+    if step:
+        refs.setdefault(bare(step), "sheet_step")
+    moves_ref = [refs.get(bare(text), "") for text in moves]
+    if all(moves_ref):  # Nothing of its own in full: no list of pointers alone.
+        moves, moves_ref = [], []
+    shown += [text for text, ref in zip(moves, moves_ref) if not ref]
+    if own_light:
+        shown.append(light.quote)
+    if step:
+        shown.append(step)
+    tie = tie_view(talk)
+    if tie and on_sheet(tie["a"]["quote"], shown) and on_sheet(tie["b"]["quote"], shown):
+        tie["short"] = True  # The fixed line and the two titles.
+    marks = []
+    for m in talk.marks:
+        mark = {"label": m["label"], "text": m["text"], "note": m["note"]}
+        if bare(m["text"]) in tops:
+            mark["ref"] = tops[bare(m["text"])]  # The question, in full above.
+        marks.append(mark)
+    shown += [m["note"] for m in talk.marks if m["note"]]
+    if trying and trying["text"]:
+        shown.append(trying["text"])
+    return {"first_question": talk.first_question, "now_question": now, "story": story(talk, shown),
+            "light": lit,
             # 直し49 段2: 次の一歩になりそうなこと only with no 次にやってみること
             # (one next step on the sheet, not two; its words are in 自分の言葉の動き).
-            "next_step": "" if trying else next_step(talk), "next_try": trying,
+            "next_step": step, "next_try": trying,
             # 直し45 段5: the steps marked on the trail, with the student's line.
-            "marks": [{"label": m["label"], "text": m["text"], "note": m["note"]} for m in talk.marks],
+            "marks": marks,
             # 直し48 段4.
-            "met": met_lines(talk), "moves": own_moves(talk), "split": split_view(talk), "meet": meet,
-            "tie": tie_view(talk), "notice": notice_view(talk)}
+            "met": met, "moves": moves, "moves_ref": moves_ref, "split": split_view(talk), "meet": meet,
+            "tie": tie, "notice": notice}

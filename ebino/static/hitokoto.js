@@ -1045,7 +1045,14 @@ const EbinoHitokoto = (() => {
       const moves = el("div", "hk-moves");
       moves.append(el("p", "hk-label", W.sheet_moves));
       const list = el("ol", "hk-moves-list");
-      for (const text of sheet.moves) list.append(el("li", "", text));
+      // 直し51 段2: a line in full elsewhere on the sheet, pointed at by that
+      // place's heading (最初の問い, いまの問い, 今日、光ったところ, …).
+      sheet.moves.forEach((text, n) => {
+        const ref = (sheet.moves_ref || [])[n];
+        const li = el("li", "", ref ? null : text);
+        if (ref) li.append(el("span", "hk-ref", W[ref]));
+        list.append(li);
+      });
       moves.append(list);
       box.append(moves);
     }
@@ -1054,9 +1061,14 @@ const EbinoHitokoto = (() => {
       tie.append(el("p", "hk-label hk-ai-label", W.sheet_tie));
       if (sheet.tie) {
         tie.append(el("p", "hk-tie-line", W[`tie_${sheet.tie.kind}`]));
-        const two = el("div", "hk-tie-two");
-        two.append(metLine(sheet.tie.a), metLine(sheet.tie.b));
-        tie.append(two);
+        if (sheet.tie.short) {
+          // 直し51 段2: the two sentences are in full above (残った1文): their titles only.
+          tie.append(el("p", "hk-tie-who", `${sheet.tie.a.title}・${sheet.tie.b.title}`));
+        } else {
+          const two = el("div", "hk-tie-two");
+          two.append(metLine(sheet.tie.a), metLine(sheet.tie.b));
+          tie.append(two);
+        }
       }
       if (sheet.split) {
         tie.append(el("p", "hk-tie-split", W.sheet_split),
@@ -1070,7 +1082,7 @@ const EbinoHitokoto = (() => {
       marked.append(el("p", "hk-label", app.state.hitokoto.mark_words.sheet));
       for (const mark of sheet.marks) {
         const line = el("p", "hk-marked-line");
-        line.append(el("b", "", mark.label), "　", mark.text);
+        line.append(el("b", "", mark.label), "　", mark.ref ? el("span", "hk-ref", W[mark.ref]) : mark.text);
         marked.append(line);
         if (mark.note) marked.append(el("p", "hk-marked-note", `「${mark.note}」`));
       }
@@ -1081,8 +1093,13 @@ const EbinoHitokoto = (() => {
     for (const part of sheet.story) story.append(part.strong ? el("b", "", part.text) : part.text);
     box.append(story);
     if (sheet.light) {
-      const lit = el("div", "hk-litbox");
-      lit.append(el("p", "hk-label", W.light_title), el("p", "hk-lit", `「${sheet.light.quote}」`), el("p", "", sheet.light.why));
+      const lit = el("div", "hk-litbox hk-light-box");
+      // 直し51 段2: words in full above (a person's sentence, the first
+      // question): pointed at, （農家の言葉） or 最初の問い.
+      const ref = sheet.light.ref;
+      const quote = ref === "chosen" ? el("p", "hk-ref", fill(W.light_chosen_who, { who: sheet.light.who }))
+        : ref ? el("p", "hk-ref", W[ref]) : el("p", "hk-lit", `「${sheet.light.quote}」`);
+      lit.append(el("p", "hk-label", W.light_title), quote, el("p", "", sheet.light.why));
       box.append(lit);
     }
     if (sheet.next_step) {
