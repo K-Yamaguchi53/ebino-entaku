@@ -1506,8 +1506,10 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #opening-skip { min-heigh
 body.one-open #ai-seat { visibility: hidden; }
 .one-person { pointer-events: none; }
 .one-person .shade { opacity: .35; }
+/* 直し53 段2: pressable (and, opened, scrollable) as its own: the overlay
+   under it takes no presses, so 「続きを読む」 could be reached only by keys. */
 .one-bubble { position: absolute; z-index: 5; padding: 12px 16px 10px; border-radius: 6px; background: var(--paper); color: var(--paper-ink);
-  box-shadow: 0 10px 26px var(--shadow); }
+  box-shadow: 0 10px 26px var(--shadow); pointer-events: auto; }
 .one-bubble .voice { font-family: var(--mincho); font-size: 18px; line-height: 1.8; }
 /* A piece a line of its own (直し43): pieces part where a sentence ends. */
 .one-bubble .voice .one-piece { display: block; white-space: pre-line; }
