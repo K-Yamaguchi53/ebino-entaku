@@ -168,6 +168,8 @@ TEXT_IDS = (
     "story_word_short", "story_wrote_short", "story_more_short", "story_way_short",
     # 直し51 段3.
     "sheet_hint", "drop", "restore",
+    # 直し52 段2: 今日のあなた, by its light on today's map (the screen only).
+    "map_you",
 )
 FILL_BLANK = "［　　］"  # In ladder_fill_line: where the student writes.
 

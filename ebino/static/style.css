@@ -1658,6 +1658,20 @@ body.one-open .input-area .ask { visibility: hidden; }
 .hk-pt.on { stroke: var(--paper-light); stroke-width: 4; }
 .hk-pt-label { fill: var(--ink); font-size: 15px; text-anchor: middle; font-family: var(--gothic); }
 .hk-counts { fill: var(--faint); font-size: 13px; text-anchor: middle; font-family: var(--gothic); }
+/* 直し52 段2: 今日のあなた on today's map (hitokoto.js youLight): a small
+   light; the first time on the page it comes up softly after the people and
+   one ring goes out from it, once. Motion reduced: lit, no ring. */
+.hk-you-dot { fill: var(--lamp-bright); stroke: var(--paper-light); stroke-width: 2; }
+.hk-you-glow { fill: url(#hk-glow); }
+.hk-you-ring { fill: none; stroke: var(--lamp-bright); stroke-width: 2; vector-effect: non-scaling-stroke; opacity: 0;
+  transform-box: fill-box; transform-origin: center; }
+.hk-you-label { fill: var(--lamp-bright); font-size: 15px; font-family: var(--gothic); }
+@media (prefers-reduced-motion: no-preference) {
+  .hk-you-new > :not(.hk-you-ring) { animation: hk-you-in .6s ease-out .5s both; }
+  .hk-you-new .hk-you-ring { animation: hk-you-ring 1.6s cubic-bezier(.2, .6, .3, 1) .9s 1 forwards; }
+}
+@keyframes hk-you-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hk-you-ring { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(4.2); } }
 .hk-cards { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 4px; }
 .hk-said { display: block; width: 100%; margin: 0; padding: 10px 14px; text-align: left; background: var(--paper); color: var(--paper-ink);
   border: 2px solid var(--paper-line); border-radius: 10px; font-family: var(--mincho); font-size: 16px; line-height: 1.9; }

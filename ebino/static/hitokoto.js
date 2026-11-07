@@ -260,9 +260,57 @@ const EbinoHitokoto = (() => {
     counts.textContent = fill(W.map_counts, view.counts);
     map.append(counts);
     box.append(map);
+    youLight(map);
     box.setAttribute("role", "img");
     box.setAttribute("aria-label", [W.step_map, fill(W.map_counts, view.counts),
-      ...view.people.map((p) => p.title), view.split ? `${W.map_split}${app.shownQuotes(view.split.heading)}` : ""].filter(Boolean).join("。"));
+      ...view.people.map((p) => p.title), view.split ? `${W.map_split}${app.shownQuotes(view.split.heading)}` : "",
+      W.map_you].filter(Boolean).join("。"));
+  }
+
+  // 直し52 段2 (the teacher, 11/7): last, after today's people, one small
+  // light for 今日のあなた, as the seats light on the map: where the school is
+  // on the town's map (north of the river, a little east of the middle), at
+  // the first of these spots that is on no point, label or the split's line.
+  // No name, no question: the light and 今日のあなた only. Nothing is sent or
+  // kept (not the record, not the server, not the browser): the page alone,
+  // gone when it is opened again. Its ring goes out once, the first time it
+  // is drawn on this page (CSS, motion not reduced); motion reduced: lit from
+  // the first, no ring. Never on the sheet or its print.
+  const YOU_SPOTS = [[335, 165], [350, 145], [300, 160], [365, 180], [270, 150], [250, 235], [340, 250], [440, 250], [160, 190]];
+  let youShown = false;
+
+  function youLight(map) {
+    const taken = [...map.querySelectorAll(".hk-pt, .hk-pt-label, .hk-grey, .hk-counts")].map((node) => {
+      const b = node.getBBox();
+      return [b.x - 6, b.y - 6, b.width + 12, b.height + 12];
+    });
+    const line = map.querySelector(".hk-split-line");
+    const g = svg("g", { class: youShown ? "hk-you" : "hk-you hk-you-new" });
+    const glow = svg("circle", { class: "hk-you-glow", r: 16 });
+    const ring = svg("circle", { class: "hk-you-ring", r: 7 });
+    const dot = svg("circle", { class: "hk-you-dot", r: 6 });
+    const label = svg("text", { class: "hk-you-label", x: 12, y: 5 });
+    label.textContent = W.map_you;
+    g.append(glow, ring, dot, label);
+    map.append(g);
+    youShown = true;
+    const meets = ([ax, ay, aw, ah], [bx, by, bw, bh]) => ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah;
+    const nearLine = ([x, y, w, h]) => {
+      if (!line) return false;
+      const [x1, y1, x2, y2] = ["x1", "y1", "x2", "y2"].map((k) => Number(line.getAttribute(k)));
+      for (let t = 0; t <= 1; t += 0.02) {
+        const px = x1 + (x2 - x1) * t, py = y1 + (y2 - y1) * t;
+        if (px > x - 18 && px < x + w + 18 && py > y - 18 && py < y + h + 18) return true;
+      }
+      return false;
+    };
+    for (const [x, y] of YOU_SPOTS) {
+      g.setAttribute("transform", `translate(${x} ${y})`);
+      const b = label.getBBox();
+      const own = [[x - 8, y - 8, 16, 16], [x + b.x, y + b.y, b.width, b.height]];
+      if (!own.some((box) => taken.some((t) => meets(box, t)) || nearLine(box))) return;
+    }
+    g.setAttribute("transform", `translate(${YOU_SPOTS[0][0]} ${YOU_SPOTS[0][1]})`);
   }
 
   // 直し48 段7: today's trail beside the talk, in the order it went; a step
