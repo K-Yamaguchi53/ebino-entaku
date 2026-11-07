@@ -660,7 +660,11 @@ class Session:
         kind_of = self.library.kind_of
         teacher = tables.get("teacher_pages", set())
         out = []
-        if pieces and all(one_to_one.is_page(u.section) for u in pieces):
+        # 直し54e (the list of every seat's answers, 11/8): a poster read as
+        # pages (探究をした先輩) is not someone who went 県外・海外; its pages
+        # have no poster's roles, so it gets no question (it was asked
+        # 「向こうで、何にびっくりした？」).
+        if pieces and all(one_to_one.is_page(u.section) for u in pieces) and seat.kind != "poster":
             group = one_to_one.GROUP_OUTSIDER if seat.kind == "outsider_teacher" else one_to_one.GROUP_CROSS
             pages = tables["pages"].get(seat_id, {})
             for item, question in asked[group]:

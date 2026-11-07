@@ -61,6 +61,22 @@ def test_no_stop_table_stops_nothing(tmp_path):
     assert one_to_one.load_hidden(tmp_path) == (set(), [], "")
 
 
+# --- 直し54e: a poster read as pages ---
+
+def test_a_poster_read_as_pages_is_not_asked_the_cross_questions(monkeypatch):
+    from test_one_to_one import _u
+    from ebino import texts
+    utterances = UTTERANCES + [_u("P01", "poster", "p1", "探究テーマの設定理由は、地域の資源を使いたかったから。"),
+                               _u("C01", "cross", "p1", "向こうでは、毎朝の市場の早さに驚いた。")]
+    monkeypatch.setenv("EBINO_SPEAKER", "0")
+    lib = Library.build(SEATS, [u for u in utterances if u.seat_id != "P01" or u.section == "p1"], {}, False, {})
+    lib.ask_tables = {"pages": {"P01": {"p1": ["向こうで"]}, "C01": {"p1": ["向こうで"]}}, "ranking": {}, "unread": []}
+    session = Session(lib, Gate(FakeClient([]), NameList.build(SEATS, {})), rng=random.Random(1))
+    assert session.one_items("P01") == []
+    cross = dict(texts.ask_questions()[one_to_one.GROUP_CROSS])
+    assert [item for item, _, _ in session.one_items("C01")] == ["向こうで"] and "向こうで" in cross
+
+
 # --- the list ---
 
 def test_the_list_shows_each_question_and_the_words_the_screen_shows(monkeypatch):
