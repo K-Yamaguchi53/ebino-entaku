@@ -3799,6 +3799,74 @@ const EbinoMap = (() => {
     if (one === mine) placeOne();
   }
 
+  // 直し48 段5 (the teacher, 11/7: one question's answer can be longer than
+  // the screen): past about four lines (FOLD_CHARS) the words stop at the end
+  // of a sentence (。！？) and 「続きを読む」 opens the rest in place (pressed
+  // again, it shuts). The words are never changed nor cut short: what shows
+  // and what is folded are, together, the words as they came.
+  const FOLD_CHARS = 120, FOLD_SPARE = 20;
+
+  // Where the words stop: the last sentence end at or before FOLD_CHARS (not
+  // before half of it), else the first after it; null when they are short
+  // enough, or the rest would be only a little.
+  function foldAt(text) {
+    const chars = [...text];
+    if (chars.length <= FOLD_CHARS + FOLD_SPARE) return null;
+    const ends = [];
+    chars.forEach((c, n) => { if ("。！？!?".includes(c)) ends.push(n + 1); });
+    const before = ends.filter((n) => n <= FOLD_CHARS && n >= FOLD_CHARS / 2);
+    const at = before.length ? before[before.length - 1] : ends.find((n) => n > FOLD_CHARS);
+    return at && chars.length - at >= FOLD_SPARE ? at : null;
+  }
+
+  // The pieces (each a line of its own), folded where foldAt says: the piece
+  // the fold is in split there, the rest hidden, and the button after them.
+  function foldPieces(texts, bubble) {
+    const at = foldAt(texts.join(""));
+    if (at === null) return texts.map((text) => div("one-piece", text));
+    const words = app.state.texts.one_words;
+    const nodes = [], rest = [];
+    let seen = 0;
+    for (const text of texts) {
+      const chars = [...text];
+      if (seen >= at) {
+        const node = div("one-piece one-rest", text);
+        rest.push(node);
+        nodes.push(node);
+      } else if (seen + chars.length <= at) {
+        nodes.push(div("one-piece", text));
+      } else {
+        const node = div("one-piece", chars.slice(0, at - seen).join(""));
+        const more = document.createElement("span");
+        more.className = "one-rest";
+        more.textContent = chars.slice(at - seen).join("");
+        node.append(more);
+        rest.push(more);
+        nodes.push(node);
+      }
+      seen += chars.length;
+    }
+    const id = `one-rest-${++foldCount}`;
+    rest.forEach((node, n) => { node.hidden = true; node.id = `${id}-${n}`; });
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "one-more";
+    toggle.textContent = words.read_more;
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-controls", rest.map((node) => node.id).join(" "));
+    toggle.addEventListener("click", () => {
+      const open = toggle.getAttribute("aria-expanded") !== "true";
+      for (const node of rest) node.hidden = !open;
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.textContent = open ? words.read_less : words.read_more;
+      bubble.classList.toggle("unfolded", open);
+      placeOne();
+    });
+    nodes.push(toggle);
+    return nodes;
+  }
+  let foldCount = 0;
+
   // Its words in its bubble: the item's pieces, as spoken words where they
   // were let through (a small mark says so), as recorded otherwise (a
   // slide's page tidied, 直し43). Each piece on a line of its own: they part
@@ -3809,7 +3877,7 @@ const EbinoMap = (() => {
     // Its kind's small line over the words (直し45 段1), or none.
     for (const old of one.bubble.querySelectorAll(".kind")) old.remove();
     voice.before(...kindOf({ kind_label: kindLabel }));
-    voice.replaceChildren(...pieces.map((piece) => div("one-piece", piece.spoken || piece.text)));
+    voice.replaceChildren(...foldPieces(pieces.map((piece) => piece.spoken || piece.text), one.bubble));
     const spoken = pieces.some((piece) => piece.spoken);
     one.bubble.classList.toggle("spoken", spoken);
     const mark = one.bubble.querySelector(".spoken-mark");

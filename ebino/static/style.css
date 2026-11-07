@@ -1474,6 +1474,14 @@ body.one-open #ai-seat { visibility: hidden; }
 .one-bubble .voice { font-family: var(--mincho); font-size: 18px; line-height: 1.8; }
 /* A piece a line of its own (直し43): pieces part where a sentence ends. */
 .one-bubble .voice .one-piece { display: block; white-space: pre-line; }
+.one-bubble .voice .one-rest[hidden] { display: none; }
+/* 直し48 段5: 「続きを読む」 under words folded at about four lines; opened,
+   the bubble scrolls inside the map's frame rather than leave it. */
+.one-more { display: inline-flex; align-items: center; min-height: 36px; margin-top: 6px; padding: 2px 14px; border-radius: 999px;
+  border: 1px solid var(--paper-line); background: transparent; color: var(--paper-ink); font-family: var(--gothic);
+  font-size: 14px; font-weight: 700; cursor: pointer; }
+.one-more:hover, .one-more:focus-visible { border-color: var(--paper-ink); }
+.one-bubble.unfolded { max-height: calc(100% - 16px); overflow: auto; }
 .one-bubble .who { margin-top: 4px; font-size: 13px; color: var(--paper-soft); }
 .one-bubble .spoken-mark { display: inline-block; margin-bottom: 4px; }
 /* The questions at one to one (直し34-4): buttons under its words. */

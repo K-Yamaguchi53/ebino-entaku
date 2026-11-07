@@ -120,7 +120,7 @@ DRAWER_PART_IDS = ("paragraph", "rounds", "seats", "purposes")
 # everyone), its button's word for each, and the line after a send.
 # One to one's words (直し34): 「円卓にもどす」 and the rest.
 ONE_WORDS = "one_words"
-ONE_WORD_IDS = ("back", "not_found", "to_card", "done", "thanks")
+ONE_WORD_IDS = ("back", "not_found", "to_card", "done", "thanks", "read_more", "read_less")
 INPUT_TO = "input_to"
 INPUT_TO_IDS = ("all", "seat", "ai", "ai_coach", "ai_observer", "asked_coach", "asked_observer", "clear")
 INPUT_SEND = "input_send"
