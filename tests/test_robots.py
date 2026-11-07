@@ -146,10 +146,11 @@ def test_at_the_ais_seat_each_question_has_its_roles_robot_by_its_name():
 const made = {};
 const part = (id) => made[id] || (made[id] = { id, textContent: "", hidden: true, children: [], attrs: {},
   classList: { toggle() {} }, setAttribute(k, v) { this.attrs[k] = v; },
-  replaceChildren(...kids) { this.children = kids; }, append(kid) { this.children.push(kid); } });
+  replaceChildren(...kids) { this.children = kids; }, append(kid) { this.children.push(kid); }, after() {} });
 const $ = part;
 function el(tag, attrs, ...kids) { return { tag, attrs, kids, classList: { add() {} }, addEventListener() {} }; }
 function mapMoved() {}
+function showAiPick() {}  // 直し53 段5: tests/test_ai_answer_53.py.
 const phrased = (text) => text;
 const state = { texts: {} };
 """ + DOCUMENT + ROBOT + _top(APP, "renderAiSeat") + _top(APP, "foldAiSeat") + _top(APP, "openAiSeat") + """

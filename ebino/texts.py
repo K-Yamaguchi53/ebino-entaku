@@ -129,6 +129,10 @@ INPUT_TO_IDS = ("all", "seat", "ai", "ai_coach", "ai_observer", "asked_coach", "
 INPUT_SEND = "input_send"
 INPUT_SEND_IDS = ("all", "seat", "ai")
 INPUT_DONE = "input_done"
+# 直し53 段5: the answer written in the AI's seat itself, under its questions:
+# the line before one is picked, and the two buttons.
+AI_ANSWER_WORDS = "ai_answer_words"
+AI_ANSWER_WORD_IDS = ("pick", "send", "cancel")
 INPUT_DONE_IDS = ("seat", "ai", "split")
 MAP_BUTTON_IDS = ("back", "zoom_in", "zoom_out", "zoom_all",
                   # 直し53 段3: the last round's table opened again, after 地図にもどす.
@@ -335,6 +339,7 @@ def screen_texts() -> dict:
     texts[ONE_WORDS] = id_table(ONE_WORDS, ONE_WORD_IDS)
     texts[INPUT_SEND] = id_table(INPUT_SEND, INPUT_SEND_IDS)
     texts[INPUT_DONE] = id_table(INPUT_DONE, INPUT_DONE_IDS)
+    texts[AI_ANSWER_WORDS] = id_table(AI_ANSWER_WORDS, AI_ANSWER_WORD_IDS)
     texts[SEAT_ICONS] = seat_icons()
     texts[NOW_STEPS] = now_steps()
     texts[NOW_LINE] = now_lines()

@@ -78,7 +78,7 @@ def test_its_shape_and_colour_are_not_a_seats():
 
 def test_pressing_a_question_the_box_answers_it_and_reflecting_goes_to_it_first():
     seat = _top("renderAiSeat")
-    assert "answerTo(roundNo, card.role);" in seat
+    assert 'button.addEventListener("click", () => answerTo(roundNo, card.role));' in seat
     assert 'class: "ai-question"' in seat
     first = _top("answerable")
     assert first.index('seat.querySelector(".ai-question:not(:disabled)")') < first.index("state.bands")
@@ -91,7 +91,7 @@ const part = (id) => made[id] || (made[id] = { id, textContent: "", hidden: true
   classList: { toggle(name, on) { if (name === "folded") made[id].folded = on; } },
   setAttribute(k, v) { this.attrs[k] = v; },
   replaceChildren(...kids) { this.children = kids; if (kids.length && kids.every((kid) => typeof kid === "string")) this.textContent = kids.join(""); },
-  append(kid) { this.children.push(kid); } });
+  append(kid) { this.children.push(kid); }, after() {} });
 const $ = part;
 function el(tag, attrs, ...kids) { return { tag, attrs, kids, classList: { add() {} }, addEventListener() {} }; }
 function mapMoved() {}
@@ -120,7 +120,8 @@ def test_no_heading_nor_note_the_seat_named_by_the_roles_names():
     """直し48 段2 (the teacher, 11/7): the heading and the note are gone
     (said on the first look); the seat is named by コーチ（AI）・オブザーバー（AI）
     for reading out, and folded its head is their robots."""
-    program = HARNESS % {"source": _top("renderAiSeat") + _top("foldAiSeat") + _top("openAiSeat")}
+    program = HARNESS % {"source": _top("renderAiSeat") + _top("foldAiSeat") + _top("openAiSeat") + "\n"
+                         + "function showAiPick() {}  // 直し53 段5: tests/test_ai_answer_53.py.\n"}
     out = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=30)
     assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
     got = json.loads(out.stdout.decode("utf-8"))

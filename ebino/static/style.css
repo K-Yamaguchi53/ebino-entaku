@@ -1432,6 +1432,21 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .ask { grid-template-colu
 .ai-question:disabled { cursor: default; opacity: .7; }
 .ai-question.answered:disabled { opacity: 1; }
 .ai-question.needs-answer .words { box-shadow: 0 0 0 2px var(--lamp-soft), 0 0 18px var(--lamp-faint); }
+/* 直し53 段5: under the questions, where there was only room: before one is
+   picked a quiet line (no box that looks like one and takes nothing);
+   picked, the box to write in and 送る・やめる, in the frame. */
+.ai-seat-pick { margin: 8px 4px 0; font-size: 14px; line-height: 1.5; color: var(--ai); text-align: center; }
+.ai-seat-pick[hidden], .ai-answer[hidden] { display: none; }
+.ai-answer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 8px; margin: 2px 0 4px; }
+.ai-answer textarea { flex: 1 1 200px; min-width: 0; min-height: 3.4em; max-height: 6em; padding: 6px 10px; resize: vertical; border-radius: 10px;
+  border: 1px solid var(--ai); background: var(--paper); color: var(--paper-ink); font-family: var(--mincho);
+  font-size: 16px; line-height: 1.6; }
+.ai-answer textarea:focus-visible { outline: 2px solid var(--ai-ink); outline-offset: 1px; }
+.ai-answer-buttons { display: flex; flex: none; margin-left: auto; justify-content: flex-end; gap: 8px; margin-bottom: 0; }
+.ai-answer-buttons button { min-height: 44px; padding: 4px 18px; font-size: 15px; }
+#ai-answer-send { border: 0; background: var(--ai); color: var(--ai-deep); font-weight: 700; }
+#ai-answer-send:hover { background: var(--ai-ink); }
+#ai-answer-cancel { border-color: var(--ai); color: var(--ai-ink); }
 /* 直し35-2: over a corner of the map (map.js chooses it: --ai-left,
    --ai-top, --ai-w, --ai-h), over none of the seats' homes; its questions
    side by side where it is wide. */
@@ -1444,7 +1459,8 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-head { margin-bo
    it, at the same corner (the bottom ones: its foot where it was; the right
    ones: its right side where it was), as wide as they are. Its place and
    the upright band under the map do not change. */
-.ai-seat.folded .ai-seat-note, .ai-seat.folded .ai-seat-cards { display: none; }
+.ai-seat.folded .ai-seat-note, .ai-seat.folded .ai-seat-cards, .ai-seat.folded .ai-seat-pick,
+.ai-seat.folded .ai-answer { display: none; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat.folded { height: auto; width: auto;
   max-width: var(--ai-w, 320px); overflow: visible; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat.folded .ai-seat-head { margin: 0; }

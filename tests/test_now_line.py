@@ -127,8 +127,8 @@ def test_one_state_at_a_time_in_order():
     assert now({"cardOpen": True, "now": {"choices": True, "pressed": True, "table": True, "band": True}}) == "card"
     assert now({"cardOpen": True, "now": {"band": True}}) == "card"
     assert now({"cardOpen": True, "now": {"reading": True}}) == "reading"
-    # The box at the foot answering an AI's question (直し32-2).
-    assert now({"to": {"kind": "ai"}, "now": {"choices": True, "pressed": True, "table": True}}) == "answer_ai"
+    # An AI's question being answered (直し32-2; 直し53 段5: in the AI's seat).
+    assert now({"aiAnswer": {"roundNo": 1, "role": "coach"}, "now": {"choices": True, "pressed": True, "table": True}}) == "answer_ai"
     # 直し40-1: the latest round's split not pressed yet: only where it would be 「after」.
     done = {"pressed": True, "table": True, "band": True}
     assert now({"aiAnswered": True, "splitOpen": True, "now": dict(done)}) == "split"

@@ -337,5 +337,6 @@ def test_the_hint_to_press_a_bubble_keeps_off_the_ais_questions():
     """直し48 (the screen check): 「吹き出しを1つ押してみよう」 hid the end of
     オブザーバー's question at 768×1024."""
     # 直し52 段3: and the AI's seat's frame.
-    assert ('clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line"), $("ai-seat")],\n'
-            '    sides: ["above", "below", "right", "left"] },') in APP
+    assert ('clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line"), $("ai-seat"),\n'
+            '      ...document.querySelectorAll("#map-svg .token, #map-svg .chair")],\n'
+            '    sides: ["above", "below", "right", "left"] },') in APP  # 直し53 段5: the seats' marks too.

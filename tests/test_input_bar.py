@@ -1,9 +1,10 @@
 """直し32-2: one box to write in, at the foot of the one screen. To the
-town's adults (/api/ask), to one seat (/api/card, a question card), or an
-AI's question (/api/coach_answer, the next round): a label on its left says
-which, × or Esc goes back to everyone, its button's word follows, and the
-button waits while a send is out. Run in node against app.js's own
-functions, the page's parts made by hand."""
+town's adults (/api/ask), to one seat (/api/card, a question card): a label
+on its left says which, × or Esc goes back to everyone, its button's word
+follows, and the button waits while a send is out. An AI's question
+(/api/coach_answer, the next round) is answered in the AI's seat itself
+(直し53 段5), the box at the foot staying the town's; the same body is sent.
+Run in node against app.js's own functions, the page's parts made by hand."""
 
 import json
 import shutil
@@ -28,14 +29,14 @@ def _top(name):
     return APP[start:APP.index("\n}\n", start) + 3]
 
 
-FUNCTIONS = ("seatName", "draftKey", "setTo", "sending", "askSeat", "answerTo", "backToEveryone", "showDone", "hideDone",
-             "send", "sendCard", "sendAnswer", "ask", "cardOpen")
+FUNCTIONS = ("seatName", "draftKey", "setTo", "sending", "askSeat", "answerTo", "keepAiDraft", "closeAiAnswer", "showAiPick",
+             "markAiChosen", "backToEveryone", "showDone", "hideDone", "send", "sendCard", "sendAnswer", "ask", "cardOpen")
 
 HARNESS = """
 const made = {};
 const part = (id) => made[id] || (made[id] = { id, textContent: "", hidden: false, value: "", disabled: false,
   dataset: {}, maxLength: 0, placeholder: "", title: "", attrs: {}, focused: 0,
-  setAttribute(k, v) { this.attrs[k] = v; }, focus() { this.focused += 1; },
+  setAttribute(k, v) { this.attrs[k] = v; }, focus() { this.focused += 1; }, after() {}, querySelectorAll() { return []; },
   replaceChildren(...kids) { this.textContent = kids.join(""); } });
 const $ = part;
 // Its words kept whole in their phrases (直し33-5): here, the words as they are.
@@ -47,7 +48,7 @@ async function call(path, body) {
   if (release) await new Promise((done) => { release = done; });
   return answer;
 }
-globalThis.document = { querySelectorAll: () => [] };
+globalThis.document = { querySelectorAll: () => [], querySelector: () => null };
 const state = { texts: %(texts)s, seatById: { S1: { title: "理容師", detail: "" } }, carded: new Set(),
   cardAgain: {}, drafts: {}, to: null, needsShown: false, aiAnswered: false, firstQuestion: "q", now: {} };
 const log = [];
@@ -93,13 +94,18 @@ def test_each_of_the_three_goes_to_its_own_way_with_its_own_words():
   await send({EVENT});
   const afterCard = [state.to.kind, $("input-done").textContent, state.carded.has("S1")];
   state.aiAsked = {{ "1:coach": "問いQ？" }};
+  $("ai-answer").hidden = true;
   answerTo(1, "coach");
-  const ai = [$("input-to-label").textContent, $("ask-button").textContent, $("question").maxLength,
-    $("input-to-asked").textContent, $("input-to-asked").hidden];
-  $("question").value = "決めて取るほうに近い";
+  // 直し53 段5: answered in the AI's seat; the box at the foot stays the town's.
+  const ai = [state.to.kind, $("input-to-label").textContent, $("ai-answer").hidden,
+    $("ai-answer-text").attrs["aria-label"], $("ai-answer-text").focused >= 1, $("ai-answer-text").maxLength];
+  $("question").value = "みんなへの次の問い";
+  $("ai-answer-text").value = "決めて取るほうに近い";
   answer = {{ status: "answered", round: 2, question: "q" }};
-  await send({EVENT});
-  process.stdout.write(JSON.stringify({{ first, seat, afterCard, ai, sent, to: state.to.kind, log }}));
+  await sendAnswer(state.aiAnswer.roundNo, state.aiAnswer.role);
+  const afterAi = [state.aiAnswer, $("ai-answer").hidden, $("ai-answer-text").value, $("question").value,
+    $("input-done").textContent];
+  process.stdout.write(JSON.stringify({{ first, seat, afterCard, ai, afterAi, sent, to: state.to.kind, log }}));
 }})();
 """)
     to, send_words, done = texts.id_table("input_to", texts.INPUT_TO_IDS), \
@@ -108,8 +114,10 @@ def test_each_of_the_three_goes_to_its_own_way_with_its_own_words():
     assert out["seat"][0] == to["seat"].replace("{seat}", "理容師") and out["seat"][1] == send_words["seat"]
     assert out["seat"][2] is False and out["seat"][3] >= 1 and out["seat"][4] == ""  # Empty, the keyboard in it.
     assert out["afterCard"] == ["all", done["seat"].replace("{seat}", "理容師"), True]
-    # 直し48 段3: whose question it answers, by name, and that question right over the box.
-    assert out["ai"] == [to["ai_coach"], send_words["ai"], 120, to["asked_coach"] + "問いQ？", False]
+    # 直し53 段5: in the AI's seat, read out as whose question it answers; the foot box unchanged.
+    # (The seat's box keeps 120 letters in index.html: maxlength="120".)
+    assert out["ai"] == ["all", to["all"], False, to["ai_coach"], True, 0]
+    assert out["afterAi"] == [None, True, "", "みんなへの次の問い", done["ai"]]
     assert [s["path"] for s in out["sent"]] == ["/api/ask", "/api/card", "/api/coach_answer"]
     assert out["sent"][0]["body"] == {"question": "休みの日って、みんな何してる？"}
     assert out["sent"][1]["body"] == {"seat_id": "S1", "text": "休みの日に、店のことを考えますか？"}
@@ -162,8 +170,10 @@ def test_while_a_send_is_out_the_button_waits_and_a_second_press_sends_nothing()
 
 def test_every_way_to_write_goes_to_the_one_box():
     assert "card-form-template" not in HTML and 'class="card-form"' not in HTML
-    # The box, the reflection's two, and 帰る前に、ひとこと's question held now (直し38).
-    assert HTML.count("<textarea") == 4
+    # The box, the reflection's two, and 帰る前に、ひとこと's question held now
+    # (直し38); 直し53 段5: the AI's question answered in its seat.
+    assert HTML.count("<textarea") == 5
+    assert '<textarea id="ai-answer-text" rows="2" maxlength="120"></textarea>' in HTML
     entry = _top("cardEntry")
     assert "askSeat(seatId)" in entry and "card-form" not in entry
     assert "askSeat(seatId);" in _top("openCardFor")
@@ -171,7 +181,7 @@ def test_every_way_to_write_goes_to_the_one_box():
     # From a card at the table, one to one (直し34-3), which writes to that seat.
     # 直し45 段3: one to one has no box to write in; the questions to pick only.
     assert 'button("card", () => openOne(seatId, card))' in MAP and "app.askSeat(seatId);  // The box at the foot" not in MAP
-    assert "answerTo(roundNo, card.role);" in _top("renderAiSeat")  # The AI's seat (直し32-3).
+    assert 'button.addEventListener("click", () => answerTo(roundNo, card.role));' in _top("renderAiSeat")  # 直し32-3
     assert "app.askSeat(seatId);" in MAP[MAP.index("function press("):]
     assert "function answerForm" not in APP and "putUnderLine" not in APP and "keptDraft" not in APP
 

@@ -14,6 +14,8 @@ const state = {
   cardAgain: {},
   // "round:role" -> コーチ's or オブザーバー's question (直し48 段3: shown over the box answering it).
   aiAsked: {},
+  // The AI's question being answered in its seat (直し53 段5): { roundNo, role }, or null.
+  aiAnswer: null,
   // What 「いまやること」 is worked out from (直し31-5): a question being sent;
   // the round's seats still lighting; a lamp card's choices open; one
   // pressed this round; the round's table open with its cards; AI
@@ -789,7 +791,7 @@ function nowState() {
   if (now.reading) return "reading";
   if (now.one) return "one";  // One to one (直し34-3).
   if (cardOpen()) return "card";
-  if (state.to.kind === "ai") return "answer_ai";
+  if (state.aiAnswer) return "answer_ai";  // Writing in the AI's seat (直し53 段5).
   if (now.choices) return "pressed";
   if (now.table && !now.pressed) return "table";
   if (!state.aiAnswered && now.band) return "answer_ai";
@@ -972,8 +974,11 @@ const GUIDE = {
   // 直し48 (the screen check): never over the AI's questions (their robots, names, bubbles).
   // 直し50 段2: never over the people's words either (voices).
   // 直し52 段3 (ヒビキ, 1366×650: its left end over the AI's seat's blue frame): the frame kept clear too.
+  // 直し53 段5 (ヒビキ, 52_ai_seat_1366x650: it hid the farmer's seat's mark):
+  // the gathered seats' marks and the empty chairs kept clear too.
   table: { at: () => document.querySelector("#map-overlay .table-bubble:not(.unplaced)"), voices: peopleVoices,
-    clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line"), $("ai-seat")],
+    clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line"), $("ai-seat"),
+      ...document.querySelectorAll("#map-svg .token, #map-svg .chair")],
     sides: ["above", "below", "right", "left"] },
   pressed: { at: () => document.querySelector('.map-choices button[data-choice="card"]'), lit: true },
   // 直し46: never over the AI's seat's heading (「AI（町の人ではありません）」)
@@ -1015,6 +1020,9 @@ function shown(node) {
 }
 
 function guideState() {
+  // 直し53 段5: none while an answer is being written in the AI's seat (it
+  // would lie over the box; what to do there is plain).
+  if (state.aiAnswer) return "";
   return state.texts && state.texts.now_line ? nowState() : "";
 }
 
@@ -1414,9 +1422,10 @@ function setTo(next, { focus = true } = {}) {
 // 「この人に聞きたいことを書く」, a 「？」, the seat list: the box writes to
 // that seat, the keyboard in it at once.
 // While a send is out the box keeps whom it writes to: what comes back
-// clears the words that went, never another's.
+// clears the words that went, never another's. The AI's seat's 送る too
+// (直し53 段5): one send at a time.
 function sending() {
-  return $("ask-button").disabled;
+  return $("ask-button").disabled || $("ai-answer-send").disabled;
 }
 
 function askSeat(seatId) {
@@ -1425,12 +1434,60 @@ function askSeat(seatId) {
   setTo({ kind: "seat", seatId });
 }
 
-// 「答える」 on an AI's question: the box answers it.
+// 「答える」 on an AI's question: its answer is written in the AI's seat,
+// right under the questions (直し53 段5, the teacher, 11/7: the box at the
+// foot was far from the frame). The box at the foot stays the town's.
 function answerTo(roundNo, role) {
   if (sending()) return;
   foldAiSeat(false);  // Answering it: open (直し37-2).
   hideDone();
-  setTo({ kind: "ai", roundNo, role });
+  keepAiDraft();
+  state.aiAnswer = { roundNo, role };
+  markAiChosen(role);
+  const text = $("ai-answer-text");
+  text.value = state.drafts[draftKey({ kind: "ai", roundNo, role })] || "";
+  // Read out as whose question it answers (input_to: 「コーチの問いに答える」).
+  text.setAttribute("aria-label", state.texts.input_to[`ai_${role}`] || state.texts.input_to.ai);
+  // Right under the question picked (the room under it), inside the frame.
+  const form = $("ai-answer"), picked = document.querySelector(`#ai-seat-cards .ai-question[data-role="${role}"]`);
+  if (picked) picked.after(form);
+  form.hidden = false;
+  $("ai-seat-pick").hidden = true;
+  setNow();
+  // In the seat's own scroll, never the page's: the box and its buttons in
+  // view, the question over it as far as there is room.
+  const seat = $("ai-seat");
+  if (seat.scrollHeight > seat.clientHeight) seat.scrollTop = Math.max(0, form.offsetTop + form.offsetHeight - seat.clientHeight + 8);
+  text.focus({ preventScroll: true });
+}
+
+// What was written to the open question kept for when it is picked again.
+function keepAiDraft() {
+  if (state.aiAnswer) state.drafts[draftKey({ kind: "ai", ...state.aiAnswer })] = $("ai-answer-text").value;
+}
+
+// やめる (or Esc in it): the box goes, its words kept; the question picked no more.
+function closeAiAnswer({ focus = true } = {}) {
+  if (!state.aiAnswer) return;
+  const role = state.aiAnswer.role;
+  keepAiDraft();
+  state.aiAnswer = null;
+  $("ai-answer").hidden = true;
+  markAiChosen(null);
+  showAiPick();
+  setNow();
+  const back = document.querySelector(`#ai-seat-cards .ai-question[data-role="${role}"]`);
+  if (focus && back) back.focus({ preventScroll: true });
+}
+
+// The quiet line under the questions, while one is still to be picked.
+function showAiPick() {
+  const open = [...document.querySelectorAll("#ai-seat-cards .ai-question")].some((button) => !button.disabled);
+  const words = state.texts.ai_answer_words;
+  $("ai-seat-pick").textContent = words.pick;
+  $("ai-answer-send").textContent = words.send;
+  $("ai-answer-cancel").textContent = words.cancel;
+  $("ai-seat-pick").hidden = !open || Boolean(state.aiAnswer);
 }
 
 function backToEveryone() {
@@ -1456,7 +1513,6 @@ async function send(event) {
   // At one to one there is no box (直し45 段3): the questions to pick only.
   if (state.now.one) return;
   if (state.to.kind === "seat") return sendCard(state.to.seatId);
-  if (state.to.kind === "ai") return sendAnswer(state.to.roundNo, state.to.role);
   return ask();
 }
 
@@ -1504,10 +1560,12 @@ async function oneThanks(seatId) {
   return done;
 }
 
-// To an AI's question: the answer starts the next round (直し29-1).
+// To an AI's question: the answer starts the next round (直し29-1), sent
+// from the AI's seat (直し53 段5) as it was from the box at the foot.
 async function sendAnswer(roundNo, role) {
-  const button = $("ask-button");
-  const answer = $("question").value.trim();
+  const button = $("ai-answer-send");
+  const answer = $("ai-answer-text").value.trim();
+  if (button.disabled || !answer) return;
   button.disabled = true;
   hideMessage();
   setNow({ asking: true });
@@ -1525,9 +1583,11 @@ async function sendAnswer(roundNo, role) {
     $("reflect-needs-answer").hidden = true;
     for (const node of document.querySelectorAll(".needs-answer")) node.classList.remove("needs-answer");
     bandAnswered(roundNo, role);
-    $("question").value = "";
+    $("ai-answer-text").value = "";
     delete state.drafts[`ai:${roundNo}:${role}`];
-    setTo({ kind: "all" });
+    state.aiAnswer = null;
+    $("ai-answer").hidden = true;
+    $("ai-seat-pick").hidden = true;
     showDone(state.texts.input_done.ai);
     renderRound(round);
   } catch (error) {
@@ -1731,22 +1791,24 @@ function renderAiSeat(roundNo, band) {
   $("ai-seat-label").textContent = band.cards.map((card) => card.label).join("・");
   $("ai-seat-faces").replaceChildren(...band.cards.map((card) => EbinoRobot.make(card.role)));
   const cards = $("ai-seat-cards");
+  $("ai-seat-pick").after($("ai-answer"));  // Out of the cards before they go (直し53 段5).
   cards.replaceChildren();
   for (const card of band.cards) {
     // Its role's robot (直し47, robot.js) just before its name; its words in a bubble from it (直し48).
     const button = el("button", { type: "button", class: "ai-question", "data-role": card.role, "data-round": roundNo },
       el("span", { class: "who" }, EbinoRobot.make(card.role), el("span", { class: "who-name", text: card.label })),
       el("span", { class: "words", text: card.question }));
-    button.addEventListener("click", () => {
-      answerTo(roundNo, card.role);
-      markAiChosen(card.role);
-    });
+    button.addEventListener("click", () => answerTo(roundNo, card.role));
     if (band.answered) {
       button.disabled = true;
       if (band.answered === card.role) button.classList.add("answered");
     }
     cards.append(button);
   }
+  // A new round's questions: no box open, the line asking to pick one.
+  state.aiAnswer = null;
+  $("ai-answer").hidden = true;
+  showAiPick();
   seat.hidden = false;
   $("ai-seat-open").onclick = openAiSeat;
   foldAiSeat(false);  // A round's questions: open while the meeting is out (直し37-2).
@@ -1772,10 +1834,12 @@ function openAiSeat() {
   if (first) first.focus({ preventScroll: true });
 }
 
-// The question the box at the foot answers, lit; the box back to everyone, none.
+// The question being answered in the AI's seat, lit (aria-pressed too); none, none.
 function markAiChosen(role) {
-  for (const button of $("ai-seat-cards").children) {
-    button.classList.toggle("chosen", state.to.kind === "ai" && button.dataset.role === role);
+  for (const button of $("ai-seat-cards").querySelectorAll(".ai-question")) {
+    const chosen = Boolean(state.aiAnswer) && button.dataset.role === role;
+    button.classList.toggle("chosen", chosen);
+    button.setAttribute("aria-pressed", String(chosen));
   }
 }
 
@@ -2645,6 +2709,19 @@ $("ask-button").addEventListener("click", (event) => {
 });
 $("ask-button").addEventListener("animationend", (event) => event.currentTarget.classList.remove("rang"));
 $("input-to-clear").addEventListener("click", backToEveryone);
+// 直し53 段5: the AI's question answered in its seat.
+$("ai-answer").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (state.aiAnswer) sendAnswer(state.aiAnswer.roundNo, state.aiAnswer.role);
+});
+$("ai-answer-cancel").addEventListener("click", () => closeAiAnswer());
+$("ai-answer-text").addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    closeAiAnswer();
+  }
+});
 // The box emptied: the split's line goes with what it was about (直し40-1).
 $("question").addEventListener("input", () => {
   if (state.doneKind === "split" && !$("question").value.trim()) hideDone();

@@ -176,6 +176,16 @@
           type="button" aria-expanded="false" aria-controls="ai-seat-cards" aria-labelledby="ai-seat-label"
           hidden></button></p>
         <div id="ai-seat-cards" class="ai-seat-cards"></div>
+        <!-- 直し53 段5 (the teacher, 11/7: あの余白に回答を書く方がわかりやすい):
+             the answer is written here, under the questions, not in the box
+             at the foot. Before one is picked, a quiet line; picked, a box
+             of 1 to 3 lines and 送る・やめる (texts/ai_answer_words.tsv). -->
+        <p id="ai-seat-pick" class="ai-seat-pick" hidden></p>
+        <form id="ai-answer" class="ai-answer" hidden>
+          <textarea id="ai-answer-text" rows="2" maxlength="120"></textarea>
+          <p class="ai-answer-buttons"><button type="button" id="ai-answer-cancel" class="quiet"></button><button
+            type="submit" id="ai-answer-send"></button></p>
+        </form>
       </section>
     </div>
 

@@ -33,7 +33,7 @@ def test_the_plain_building_is_not_lifted_into_the_meeting():
 
 def test_the_sign_keeps_clear_of_the_ai_frame():
     table = APP[APP.index("  table: { at: () =>"):APP.index("  pressed: {")]
-    assert 'clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line"), $("ai-seat")],' in table
+    assert 'clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line"), $("ai-seat"),' in table
 
 
 def test_far_from_the_frame_the_sign_reaches_it():

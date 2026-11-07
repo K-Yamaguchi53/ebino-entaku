@@ -44,7 +44,8 @@ def test_folded_it_is_its_heading_and_a_button_named_by_it_with_no_new_words():
     # Opened from its button, the keyboard to its first question.
     assert '$("ai-seat-open").onclick = openAiSeat;' in _top("renderAiSeat")
     assert "first.focus({ preventScroll: true });" in _top("openAiSeat")
-    assert ".ai-seat.folded .ai-seat-note, .ai-seat.folded .ai-seat-cards { display: none; }" in CSS
+    assert (".ai-seat.folded .ai-seat-note, .ai-seat.folded .ai-seat-cards, .ai-seat.folded .ai-seat-pick,\n"
+            ".ai-seat.folded .ai-answer { display: none; }") in CSS  # 直し53 段5: the line and the box too.
 
 
 def test_its_corner_and_the_upright_band_are_as_before_only_its_inside_folds():
