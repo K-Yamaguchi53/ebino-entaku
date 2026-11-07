@@ -1960,6 +1960,7 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
 .hk-sheet .hk-ref { display: inline-block; margin: 2px 0; padding: 0 8px; font-family: var(--gothic); font-size: 13px;
   line-height: 1.7; color: var(--paper-soft); border: 1px solid var(--paper-line); border-radius: 999px; }
 .hk-sheet p.hk-ref { display: table; }
+.hk-sheet .hk-moves-list .hk-ref { margin-left: 8px; }  /* 直し54l: after the words now. */
 .hk-tie-who { margin: 0; font-size: 14px; color: var(--paper-soft); }
 /* 直し51 段3: 外す by the student's own line (small, after it), 戻す in its
    place once it is off; neither printed, nor a line taken off. */

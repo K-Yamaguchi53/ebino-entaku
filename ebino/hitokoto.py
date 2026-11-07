@@ -905,11 +905,26 @@ LIGHT_SCHEMA = {
 NEXT_QUESTION = "next_question"  # A question sent after the first, not a heading (直し40-2).
 
 
+# 直し54l (the teacher, 11/8: 「よくわからない」は自分の言葉で分けて言えてない):
+# 「わからない」「特にない」 and the like say nothing to light: never the
+# light's words, from the model or from code.
+_NON_ANSWER = re.compile(
+    r"(?:よく|まだ|特に|とくに|全然|ぜんぜん|あまり|あんまり|ちょっと|今は|いまは)?"
+    r"(?:(?:わから|分から|解ら|判ら|わかん|分かん|知ら)(?:ない|なかった|ん|ねえ|ねー)?(?:です|かも|かな)?"
+    r"|(?:ない|無い|なし|無し|ありません|ないです))")
+
+
+def says_nothing(text: str) -> bool:
+    """「よくわからない」「特にない」「？」: no words of the student's own to light."""
+    plain = re.sub(r"[\s。、．，！？!?…・「」〜～w笑]+", "", text or "")
+    return not plain or bool(_NON_ANSWER.fullmatch(plain))
+
+
 def light_words(talk: Hitokoto) -> list[dict]:
     """The student's own words the light may pick from (student_words but the
-    first question): never of home, money or health."""
+    first question): never of home, money or health, never 「わからない」."""
     asked = [{"step": NEXT_QUESTION, "text": question} for question in talk.own_questions]
-    return [w for w in [*talk.written, *asked] if not has_avoid(w["text"])]
+    return [w for w in [*talk.written, *asked] if not has_avoid(w["text"]) and not says_nothing(w["text"])]
 
 
 def chosen_two(talk: Hitokoto) -> Person | None:
@@ -923,8 +938,8 @@ def code_light(talk: Hitokoto, reason: str) -> Light:
     longest = max((w["text"] for w in written if w["step"] in (REACTION, SELF, "fill")), key=len, default="")
     person = talk.people[talk.chosen] if talk.chosen is not None else None
     deep_word = fill(texts["deep_word"], who=person.title, word=chosen_words(talk)) if person else ""
-    forward = talk.forward if not has_avoid(talk.forward) else ""
-    way = talk.way if not has_avoid(talk.way) else ""
+    forward = talk.forward if not has_avoid(talk.forward) and not says_nothing(talk.forward) else ""
+    way = talk.way if not has_avoid(talk.way) and not says_nothing(talk.way) else ""
     scale = talk.scale
 
     def light(quote, force, deep, source="written", who=""):
@@ -971,7 +986,8 @@ def ask_light(gate: Gate, session, talk: Hitokoto) -> Light:
     deep = unquote_forces(reply.get("deep").strip()) if isinstance(reply.get("deep"), str) else ""
     sources = [w["text"] for w in written] if written else [two.text]
     check_words = Words(session, talk)
-    if len(quote) < 2 or not any(quote in source for source in sources) or gate.names.hits(quote):
+    if (len(quote) < 2 or not any(quote in source for source in sources) or gate.names.hits(quote)
+            or says_nothing(quote)):
         reason = STOP_QUOTE_NOT_WRITTEN
     elif not isinstance(force, int) or isinstance(force, bool) or force not in FORCES:
         reason = STOP_FORCE

@@ -56,6 +56,12 @@ STOP_LONG = "too_long"
 STOP_NAME = "name"
 STOP_EMPTY = "empty"
 STOP_MISSING = "missing"
+# 直し54l (the teacher, 11/8: この人が話してる体ではない？): spoken words that
+# still talk about the person (この方) or about the interview itself
+# (インタビューの中で何度もそう言ってた) are the writer's, not the person's.
+STOP_NARRATOR = "narrator"
+NARRATOR_WORDS = ("この方", "インタビュー", "取材")
+STOP_OTHER = "other_piece_stopped"  # Another piece of the same bubble was stopped.
 
 SYSTEM = """あなたは、高校生の問いに町の大人が答える「円卓」の、吹き出しの言葉を整える係です。
 渡す各 quotes の text は、取材記事・ポスター・スライドから選んだ、その人の言葉か、その人について書かれた文です。
@@ -152,6 +158,8 @@ def stop_reason(spoken: str, original: str, paragraph: str, gate: Gate, allowed=
         return STOP_NAME
     if banned_added(spoken, original):
         return STOP_BANNED
+    if any(word in spoken for word in NARRATOR_WORDS):
+        return STOP_NARRATOR
     source, plain = _plain(original), _plain(spoken)
     for word in _words(spoken, allowed):
         if word not in source:
@@ -189,3 +197,14 @@ def speak(gate: Gate, quotes: list[dict]) -> list[Spoken]:
         reason = STOP_MISSING if spoken is None else stop_reason(spoken, q["text"], q["paragraph"], gate, allowed, drop_ok)
         out.append(Spoken(q["id"], q["text"], "" if reason else spoken.strip(), reason))
     return out
+
+
+def one_voice(results: list[Spoken]) -> list[Spoken]:
+    """直し54l: the pieces of one bubble in one voice. When the checks stopped
+    any of them, all are shown in their original words (the reason of those
+    let through: STOP_OTHER), so the person's own talk and the writer's
+    words about them are never mixed in one bubble."""
+    if all(result.spoken for result in results):
+        return results
+    return [result if not result.spoken else Spoken(result.utterance_id, result.original, "", STOP_OTHER)
+            for result in results]

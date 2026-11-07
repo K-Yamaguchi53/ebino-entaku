@@ -67,6 +67,10 @@ def _sheet_heading(heading: str) -> str:
     return _SPLIT_LEAD.sub("", heading) or heading
 
 
+ARTICLE_TITLE = "本文タイトル"  # An article's section (one_to_one.ARTICLE_SAME_ITEM).
+TRAIL_WORDS = 60  # A bubble pressed, on the trail: its words up to this many characters.
+
+
 def _goes_on_into(piece: Utterance, after: Utterance) -> bool:
     """Whether `after` holds the words right after `piece`'s in their paragraph
     (a 「 or spaces between): 「…うまくいかない時は」 then 「まず深呼吸」."""
@@ -770,6 +774,11 @@ class Session:
         one to one, before the speaker (_one_words; 直し54d: the list of every
         seat's answers, tools/list_one_answers.py, shows the same words)."""
         shown, said, met, total = [], [], [], 0
+        # 直し54l (the teacher, 11/8): an article's title (本文タイトル) is the
+        # writer's heading, not something the person says: not in the bubble
+        # when the item has other words.
+        if any(piece.section != ARTICLE_TITLE for piece in pieces):
+            pieces = [piece for piece in pieces if piece.section != ARTICLE_TITLE]
         for piece in pieces:
             met.append(piece)
             words = self.one_page(piece).text
@@ -824,7 +833,7 @@ class Session:
                        "paragraph": text.replace("\n", "") if one_to_one.is_page(u.section)
                        else u.paragraph or u.text}
                       for u, text in zip(shown, said)]
-            for result in speaker.speak(self.gate, quotes):
+            for result in speaker.one_voice(speaker.speak(self.gate, quotes)):
                 spoken[result.utterance_id] = result
                 self.one_spoken.append(result)
         labels = [self.kind_label(u.id) for u in shown]
@@ -1729,7 +1738,8 @@ class Session:
                             changed=step["n"] in turned, came_from=turned.get(step["n"]))
             elif kind == trail.OPENED:
                 item.update(who=self._title(step["seat_id"]), label=self.kind_label(step["utterance_id"]),
-                            utterance_id=step["utterance_id"], round=step["round"])
+                            utterance_id=step["utterance_id"], round=step["round"],
+                            text=self._bubble_words(step["round"], step["utterance_id"]))
             elif kind == trail.ONE_ASK:
                 ids = step.get("utterance_ids") or []
                 item.update(who=self._title(step["seat_id"]), text=step["question"],
@@ -1747,6 +1757,20 @@ class Session:
                 item.update(who=self._title(step["seat_id"]) if step.get("seat_id") else "", text=step["text"])
             items.append(item)
         return {"items": items}
+
+    def _bubble_words(self, round_no: int, utterance_id: str) -> str:
+        """直し54l (the teacher, 11/8: ここ具体的に言葉はでない？): the words a
+        bubble pressed showed (spoken where they were), cut at TRAIL_WORDS
+        with 「…」; "" when the round or the bubble is not there."""
+        if not 0 < round_no <= len(self.rounds):
+            return ""
+        result = self.rounds[round_no - 1]
+        quote = next((q for q in result.quotes if q.utterance_id == utterance_id), None)
+        if quote is None:
+            return ""
+        spoken = result.spoken.get(utterance_id)
+        words = (spoken.spoken if spoken and spoken.spoken else quote.text).replace("\n", "").strip()
+        return words if len(words) <= TRAIL_WORDS else words[:TRAIL_WORDS] + "…"
 
     def _title(self, seat_id: str) -> str:
         seat = self._seats.get(seat_id)

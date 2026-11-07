@@ -229,6 +229,9 @@ _MASK_WORDS = [
     # The label: a word of kanji or katakana (企画協力者), or ○○した人.
     (re.compile(f"(?:[ァ-ヶー]+した人|[{_KANJI}ァ-ヶー]+)[：:]\\s*この方(?=[{_KANJI}ァ-ヶ])"), ""),
     (re.compile("この方[ 　]+(?=この方)"), ""),
+    # 直し54l (the teacher, 11/8: 話してる部分と説明している文章が混ざってる):
+    # a sentence ending on the masked name (…に就職した○○さん。) ends on its verb.
+    (re.compile("(?<=[たるいだうくすつぬむん])この方(?=[。！!])"), ""),
     (re.compile("[ 　]+この方$", re.M), ""),
     (re.compile(f"(?:^|(?<=[ 　]))この方(?=[{_KANJI}ァ-ヶ])(?!自身|以外|以上|達|曰|様|宅|家|側)", re.M), ""),
     (re.compile(f"この方(?=[{_KANJI}ァ-ヶ])(?!自身|以外|以上|達|曰|様|宅|家|側)"), "、"),

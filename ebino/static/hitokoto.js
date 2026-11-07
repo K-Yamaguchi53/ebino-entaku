@@ -198,7 +198,10 @@ const EbinoHitokoto = (() => {
     const small = (text) => el("span", "hk-mark-small", text);
     const text = (words) => el("span", "hk-mark-text", words);
     if (item.kind === "question") return [small(T.question), text(item.text)];
-    if (item.kind === "opened") return [small(`${T.opened}　${item.who}`), text(item.label || item.who)];
+    // 直し54l (the teacher, 11/8: ここ具体的に言葉はでない？): the bubble's words, its kind beside whose.
+    if (item.kind === "opened") {
+      return [small([`${T.opened}　${item.who}`, item.label].filter(Boolean).join("　")), text(item.text || item.label || item.who)];
+    }
     if (item.kind === "one_ask") return [small(`${T.one_ask}　${item.who}`), text(item.text)];
     if (item.kind === "card") return [small(T.card), text(item.text)];
     if (item.kind === "direction") return [small(T.direction), text(item.text)];
@@ -1183,9 +1186,10 @@ const EbinoHitokoto = (() => {
       const list = el("ol", "hk-moves-list");
       // 直し51 段2: a line in full elsewhere on the sheet, pointed at by that
       // place's heading (最初の問い, いまの問い, 今日、光ったところ, …).
+      // 直し54l (the teacher, 11/8: 具体的に表示されない？): the words too, the heading beside them.
       sheet.moves.forEach((text, n) => {
         const ref = (sheet.moves_ref || [])[n];
-        const li = el("li", "", ref ? null : text);
+        const li = el("li", "", text);
         if (ref) li.append(el("span", "hk-ref", W[ref]));
         list.append(li);
       });
