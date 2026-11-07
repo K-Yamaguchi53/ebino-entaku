@@ -27,11 +27,13 @@ def test_once_only_and_not_with_motion_reduced():
 
 
 def test_within_two_seconds_and_a_press_shows_it_all():
-    # Parts at most 1 s apart in all, the two lines 0.2 s apart after, each
-    # mark 0.25 s after its line and 0.45 s long: 1 + 0.2 + 0.25 + 0.45 = 1.9 s.
-    assert "Math.min(90, Math.floor(1000 / Math.max(parts.length, 1)))" in REVEAL
-    assert "const after = Math.min(parts.length * step, 1000);" in REVEAL
-    assert "`${after + n * 200}ms`" in REVEAL
+    # 直し52 段6: the student's boxes first, 0.2 s apart (three at most: 0.4 s),
+    # each mark 0.25 s after its line and 0.45 s long; the other parts from
+    # 0.6 s, at most 1 s apart in all, each rising 0.3 s: 0.6 + 1 + 0.3 = 1.9 s.
+    assert "part.style.setProperty(\"--hk-at\", `${n * 200}ms`);" in REVEAL
+    assert "const from = leads.length * 200;" in REVEAL
+    assert "const step = Math.min(90, Math.floor(1000 / Math.max(rest.length, 1)));" in REVEAL
+    assert "`${from + n * step}ms`" in REVEAL
     assert "animation-delay: calc(var(--hk-at, 0ms) + 250ms); }" in CSS
     assert "@keyframes hk-mark { from { background-size: 0% 100%; } to { background-size: 100% 100%; } }" in CSS
     assert ".hk-sheet.hk-reveal .hk-own-text { animation: hk-rise .3s ease-out both;" in CSS

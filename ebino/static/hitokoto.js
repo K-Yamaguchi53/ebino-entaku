@@ -1260,11 +1260,23 @@ const EbinoHitokoto = (() => {
       return;
     }
     revealed = true;
-    const parts = [...box.children];
-    const step = Math.min(90, Math.floor(1000 / Math.max(parts.length, 1)));
-    parts.forEach((part, n) => part.style.setProperty("--hk-at", `${n * step}ms`));
-    const after = Math.min(parts.length * step, 1000);
-    own.forEach((line, n) => line.style.setProperty("--hk-at", `${after + n * 200}ms`));
+    // 直し52 段6 (ヒビキ, 51_sheet_reveal): the student's words first, in the
+    // order they stand on the screen (今日の気づき, 次にやってみること, 今日、
+    // 光ったところ: style.css puts them at the top), 0.2 s apart, each box
+    // with its line and its 外す together; then the other parts in turn, in
+    // under a second. Still 2 seconds at most in all.
+    const leads = [".hk-notice-box", ".hk-try-box", ".hk-light-box"].map((q) => box.querySelector(`:scope > ${q}`))
+      .filter((part) => part && !part.hidden);
+    const title = box.querySelector(":scope > h3");
+    if (title) title.style.setProperty("--hk-at", "0ms");
+    leads.forEach((part, n) => {
+      part.style.setProperty("--hk-at", `${n * 200}ms`);
+      for (const line of part.querySelectorAll(".hk-own-text")) line.style.setProperty("--hk-at", `${n * 200}ms`);
+    });
+    const rest = [...box.children].filter((part) => part !== title && !leads.includes(part));
+    const from = leads.length * 200;
+    const step = Math.min(90, Math.floor(1000 / Math.max(rest.length, 1)));
+    rest.forEach((part, n) => part.style.setProperty("--hk-at", `${from + n * step}ms`));
     box.classList.add("hk-reveal");
     const done = () => {
       clearTimeout(timer);
