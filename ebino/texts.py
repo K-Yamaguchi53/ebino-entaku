@@ -172,7 +172,7 @@ NOW_LINE_IDS = ("start", "preparing", "write", "asking", "reading", "table", "pr
 # (roundtable.STEPS, 直し42 段2).
 WAIT_SIGN = "wait_sign"
 WAIT_SIGN_IDS = ("start", "ask", "coach", "ask_seat", "reflect", "subject", "listen", "light", "gather", "slow",
-                 "find", "moderate", "speak")
+                 "find", "moderate", "speak", "sheet")
 WAIT_SIGN_NO_WORD = ("slow",)
 START_PURPOSE = "start_purpose"
 # What the app is, in a few lines, and how it goes, step by step, one line

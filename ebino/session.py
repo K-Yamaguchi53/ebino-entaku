@@ -1450,8 +1450,15 @@ class Session:
             return named
         talk.now_question = text
         talk.stage = hitokoto.SHEET
+        hitokoto.ask_tie(self.gate, talk)  # 直し48 段4: once (「整理中」 meanwhile).
         self.save()
-        return hitokoto.sheet_view(talk)
+        # 直し48 段4: the seat to meet and the force to use (②), as the card says it.
+        meet = ""
+        if talk.meet_seat in self._seats:
+            title = seat_label(self._seats[talk.meet_seat], self.library.show_private).title
+            use = None if talk.meet_use in ("", harvest.CHOSE_NO_USE) else int(talk.meet_use)
+            meet = harvest.meet_line(title, use)
+        return hitokoto.sheet_view(talk, meet)
 
     # --- 今日の道すじ (直し45 段2, trail.py) ---
 

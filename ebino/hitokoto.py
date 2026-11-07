@@ -57,6 +57,7 @@ from .gate import Gate, GateError, ModelUnavailable, json_answer, json_request
 from .ingest.scrub import normalize_for_match
 from .prompts import LIGHT as LIGHT_PROMPT
 from .prompts import LISTENER as LISTENER_PROMPT
+from .prompts import TIE as TIE_PROMPT
 from .reflection import _QUOTED, Record, checked
 from .seat_label import KIND_LABELS
 from .texts import load_lines, load_table
@@ -138,7 +139,8 @@ TEXT_IDS = (
     "story_split_new", "story_split_same",
     "story_word", "story_chosen", "story_wrote", "story_scale", "story_more", "story_way", "story_subject",
     "story_subject_note", "print", "print_note", "print_side", "deep_word", "deep_more", "deep_way",
-    "deep_need", "deep_chosen", "now_after",
+    "deep_need", "deep_chosen", "now_after", "sheet_met", "sheet_moves", "sheet_split", "sheet_meet",
+    "sheet_tie", "tie_same", "tie_differ",
 )
 FILL_BLANK = "［　　］"  # In ladder_fill_line: where the student writes.
 
@@ -293,6 +295,10 @@ class Hitokoto:
     rewritten: str = ""
     heading_sent: bool = False
     last_question: str = ""
+    # 直し48 段4: 司会（AI）のまとめ, two people's sentences and how they go
+    # ({"kind", "a", "b"}: people's indexes), or None; asked once.
+    tie: dict | None = None
+    tie_asked: dict = field(default_factory=dict)  # {"reason", "seconds"} once asked.
 
     # --- what the screen gets ---
 
@@ -334,6 +340,9 @@ class Hitokoto:
             "stage": self.stage,
             # 直し45 段5: which step of the trail got which mark, and the line.
             "marks": [{"n": m["n"], "mark": m["mark"], "note": m["note"]} for m in self.marks],
+            "tie": ({"kind": self.tie["kind"], "a": self.people[self.tie["a"]].seat_id,
+                     "b": self.people[self.tie["b"]].seat_id} if self.tie else None),
+            "tie_asked": dict(self.tie_asked),
         }
 
 
@@ -780,10 +789,107 @@ def story(talk: Hitokoto) -> list[dict]:
     return out
 
 
-def sheet_view(talk: Hitokoto) -> dict:
+# 直し48 段4 (the teacher, 11/7: 「これで本当に生徒はなるほど！となるか？」):
+# more on the sheet, made by code from the record and the student's own
+# words (no model writes any of it): each person met with one sentence of
+# their words as recorded (the one the lit part is in, else the first) and
+# their title; the student's own words in the order written, from the first
+# question to the question as held now; the split, when the day had one; and
+# one next step (the seat to meet and the force to use, else the 前 answer).
+
+_SENTENCE = re.compile(r"[^。．！!？?\n]*[。．！!？?]?")
+
+
+def sentence_with(text: str, part: str) -> str:
+    """The whole sentence of text that part is in (word for word, as
+    recorded); with no part, or part not found, the first sentence."""
+    sentences = [m.group(0).strip() for m in _SENTENCE.finditer(text) if m.group(0).strip()]
+    if part:
+        for sentence in sentences:
+            if part in sentence:
+                return sentence
+    return sentences[0] if sentences else text.strip()
+
+
+def met_lines(talk: Hitokoto) -> list[dict]:
+    """Each person on today's map, one sentence of their recorded words."""
+    out = []
+    for n, person in enumerate(talk.people):
+        part = talk.parts.get(n) or (talk.chosen_part if n == talk.chosen else "")
+        out.append({"title": person.title, "kind_label": KIND_LABELS.get(person.kind, ""),
+                    "quote": sentence_with(person.text, part), "said": person.said, "note": person.note})
+    return out
+
+
+def own_moves(talk: Hitokoto) -> list[str]:
+    """The student's own words, in the order written (none of home, money or
+    health), the first question first; the question as held now last."""
+    out = [talk.first_question]
+    for written in talk.written:
+        if written["text"] and not has_avoid(written["text"]) and written["text"] not in out:
+            out.append(written["text"])
+    now = talk.now_question or ""
+    if now and now not in out:
+        out.append(now)
+    return out
+
+
+def split_view(talk: Hitokoto) -> dict | None:
+    """The day's split (the moderator's heading, as shown) and its two people's titles."""
+    split = talk.split
+    if not split or split.get("a") is None or split.get("b") is None:
+        return None
+    return {"heading": split["heading"], "a": talk.people[split["a"]].title, "b": talk.people[split["b"]].title}
+
+
+TIE_KINDS = ("same", "differ")
+TIE_SCHEMA = {
+    "type": "object",
+    "properties": {"kind": {"type": "string", "enum": ["same", "differ", "none"]}, "a": {"type": "string"},
+                   "b": {"type": "string"}},
+    "required": ["kind", "a", "b"], "additionalProperties": False,
+}
+
+
+def ask_tie(gate: Gate, talk: Hitokoto) -> None:
+    """司会（AI）のまとめ (直し48 段4): with two people or more, the model
+    picks two and whether their sentences go the same way or part. It is
+    sent the sentences only (met_lines: as recorded; no title, no name) and
+    writes no words; code checks the two ids. Asked once; nothing on a failure."""
+    if talk.tie_asked:
+        return
+    lines = met_lines(talk)
+    if len(lines) < 2:
+        talk.tie_asked = {"reason": NO_PEOPLE, "seconds": 0.0}
+        return
+    data = {"people": [{"id": str(n + 1), "text": line["quote"]} for n, line in enumerate(lines)]}
+    reply, reason, seconds = _send(gate, LIGHT, TIE_PROMPT, data, TIE_SCHEMA, LIGHT_SECONDS, 200)
+    if reply is not None:
+        ids = [str(n + 1) for n in range(len(lines))]
+        kind, a, b = reply.get("kind"), reply.get("a"), reply.get("b")
+        if kind == "none":
+            reason = "none"
+        elif kind not in TIE_KINDS or a not in ids or b not in ids or a == b:
+            reason = "bad_output"
+        else:
+            talk.tie = {"kind": kind, "a": int(a) - 1, "b": int(b) - 1}
+    talk.tie_asked = {"reason": reason, "seconds": seconds}
+
+
+def tie_view(talk: Hitokoto) -> dict | None:
+    if not talk.tie:
+        return None
+    lines = met_lines(talk)
+    return {"kind": talk.tie["kind"], "a": lines[talk.tie["a"]], "b": lines[talk.tie["b"]]}
+
+
+def sheet_view(talk: Hitokoto, meet: str = "") -> dict:
     light = talk.light
     now = talk.now_question if talk.now_question and talk.now_question != talk.first_question else ""
     return {"first_question": talk.first_question, "now_question": now, "story": story(talk),
             "light": {"quote": light.quote, "why": light.why} if light else None, "next_step": next_step(talk),
             # 直し45 段5: the steps marked on the trail, with the student's line.
-            "marks": [{"label": m["label"], "text": m["text"], "note": m["note"]} for m in talk.marks]}
+            "marks": [{"label": m["label"], "text": m["text"], "note": m["note"]} for m in talk.marks],
+            # 直し48 段4.
+            "met": met_lines(talk), "moves": own_moves(talk), "split": split_view(talk), "meet": meet,
+            "tie": tie_view(talk)}

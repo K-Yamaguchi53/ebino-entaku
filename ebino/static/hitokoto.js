@@ -50,7 +50,8 @@ const EbinoHitokoto = (() => {
 
   // The steps that wait on the model, and the kind of wait each is (直し42,
   // texts/wait_sign.tsv); the others are quick and show no sign.
-  const WAITS = { parts: "listen", choose: "listen", answer: "listen", subject_note: "subject", light: "light" };
+  // 直し48 段4: the sheet, 「整理中」 while it is made.
+  const WAITS = { parts: "listen", choose: "listen", answer: "listen", subject_note: "subject", light: "light", sheet: "sheet" };
 
   async function post(step, body = {}) {
     return app.call(`/api/hitokoto/${step}`, body, { wait: WAITS[step] });
@@ -812,27 +813,52 @@ const EbinoHitokoto = (() => {
 
   // --- 段6: the sheet, and printing it ---
 
+  // One person's sentence on the sheet (直し48 段4): their own words in 「」
+  // (an article's with its note), their title after.
+  function metLine(person) {
+    const line = el("p", "hk-met-line");
+    line.append(el("span", "hk-met-quote", person.said ? `「${person.quote}」` : person.quote),
+      el("span", "hk-met-who", [person.title, person.said ? "" : person.note].filter(Boolean).join("　")));
+    return line;
+  }
+
   async function toSheet() {
     if (busy) return;
     busy = true;
     const line = $("hk-now-message");
     line.hidden = true;
+    // 直し48 段4: while the sheet is made (司会（AI）のまとめ is asked), the
+    // sheet's page with 「整理中」 on it, never still; after a while, the slow line.
+    const box = $("hk-sheet-body");
+    const signs = app.state.texts.wait_sign;
+    const waitLine = el("p", "hk-making-line", signs.sheet.line);
+    const dots = el("span", "hk-making-dots");
+    for (let n = 0; n < 3; n++) dots.append(el("span"));
+    const waiting = el("div", "hk-making");
+    waiting.setAttribute("role", "status");
+    waiting.append(el("p", "hk-making-word", signs.sheet.word), waitLine, dots);
+    box.replaceChildren(waiting);
+    const slow = setTimeout(() => { waitLine.textContent = signs.slow.line; }, 15000);
+    show("sheet");
     let sheet;
     try {
       sheet = await post("sheet", { now_question: $("hk-now").value.trim() });
     } catch (error) {
+      clearTimeout(slow);
+      show("light");
       line.textContent = app.sendFailed(error);
       line.hidden = false;
       busy = false;
       return;
     }
+    clearTimeout(slow);
     busy = false;
     if (sheet.status === "ask_again") {
+      show("light");
       line.textContent = sheet.message;
       line.hidden = false;
       return;
     }
-    const box = $("hk-sheet-body");
     box.replaceChildren(el("h3", "", W.sheet_title));
     const questions = el("div", "hk-qq");
     const first = el("div", "hk-qbox");
@@ -843,6 +869,40 @@ const EbinoHitokoto = (() => {
     arrow.setAttribute("aria-hidden", "true");
     questions.append(first, arrow, now);
     box.append(questions);
+    // 直し48 段4 (the teacher, 11/7: 「なるほど！となるか？」): each person met,
+    // one sentence of their words as recorded with their title; the
+    // student's own words in turn; 司会（AI）のまとめ (two people's sentences
+    // and how they go, the split); the seat to meet. Every word is the
+    // record's, the student's, or texts/.
+    if (sheet.met && sheet.met.length) {
+      const met = el("div", "hk-met");
+      met.append(el("p", "hk-label", W.sheet_met));
+      for (const person of sheet.met) met.append(metLine(person));
+      box.append(met);
+    }
+    if (sheet.moves && sheet.moves.length > 1) {
+      const moves = el("div", "hk-moves");
+      moves.append(el("p", "hk-label", W.sheet_moves));
+      const list = el("ol", "hk-moves-list");
+      for (const text of sheet.moves) list.append(el("li", "", text));
+      moves.append(list);
+      box.append(moves);
+    }
+    if (sheet.tie || sheet.split) {
+      const tie = el("div", "hk-tie");
+      tie.append(el("p", "hk-label hk-ai-label", W.sheet_tie));
+      if (sheet.tie) {
+        tie.append(el("p", "hk-tie-line", W[`tie_${sheet.tie.kind}`]));
+        const two = el("div", "hk-tie-two");
+        two.append(metLine(sheet.tie.a), metLine(sheet.tie.b));
+        tie.append(two);
+      }
+      if (sheet.split) {
+        tie.append(el("p", "hk-tie-split", W.sheet_split),
+          el("p", "hk-tie-heading", `${sheet.split.heading}（${sheet.split.a}・${sheet.split.b}）`));
+      }
+      box.append(tie);
+    }
     // 直し45 段5: the steps marked on the trail, with the student's line.
     if (sheet.marks && sheet.marks.length) {
       const marked = el("div", "hk-marked");
@@ -868,6 +928,11 @@ const EbinoHitokoto = (() => {
       const step = el("div", "hk-litbox");
       step.append(el("p", "hk-label", W.sheet_step), el("p", "hk-lit", `「${sheet.next_step}」`));
       box.append(step);
+    }
+    if (sheet.meet) {
+      const meet = el("div", "hk-litbox");
+      meet.append(el("p", "hk-label", W.sheet_meet), el("p", "", sheet.meet));
+      box.append(meet);
     }
     box.append(el("p", "hk-print-note", W.print_note));
     show("sheet");

@@ -96,7 +96,7 @@ def test_the_caller_names_the_wait_and_quick_requests_name_none():
                   "/api/split", "/api/purposes"):
         assert quick not in waited
     # 帰る前に、ひとこと: the steps that wait on the model, through the same call.
-    assert 'const WAITS = { parts: "listen", choose: "listen", answer: "listen", subject_note: "subject", light: "light" };' in HK
+    assert 'const WAITS = { parts: "listen", choose: "listen", answer: "listen", subject_note: "subject", light: "light", sheet: "sheet" };' in HK
     assert "return app.call(`/api/hitokoto/${step}`, body, { wait: WAITS[step] });" in HK
     used = set(re.findall(r'wait: "([a-z_]+)"', APP)) | set(re.findall(r'"(listen|subject|light)"', HK))
     assert used <= set(texts.WAIT_SIGN_IDS)

@@ -1743,6 +1743,37 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
 .hk-litbox p { margin: 0; }
 .hk-lit { font-family: var(--mincho); font-size: 17px; }
 .hk-print-note { margin: 18px 0 0; font-size: 12px; color: var(--paper-soft); }
+/* 直し48 段4: each person met (their sentence, then their title), the
+   student's own words in turn, 司会（AI）のまとめ in the AI's colour. */
+.hk-met, .hk-moves, .hk-tie { margin-bottom: 14px; }
+.hk-met > .hk-label, .hk-moves > .hk-label, .hk-tie > .hk-label { margin-bottom: 4px; }
+.hk-met-line { margin: 0 0 6px; padding-left: 10px; border-left: 3px solid var(--paper-line); }
+.hk-met-quote { display: block; font-family: var(--mincho); font-size: 16px; line-height: 1.7; }
+.hk-met-who { display: block; font-size: 12px; color: var(--paper-soft); }
+.hk-moves-list { margin: 0; padding: 0; list-style: none; font-family: var(--mincho); font-size: 16px; line-height: 1.7; }
+.hk-moves-list li { position: relative; padding-left: 1.4em; }
+.hk-moves-list li + li::before { content: "↓"; position: absolute; left: .2em; top: -.85em; font-size: 12px; color: var(--lamp); }
+.hk-moves-list li + li { margin-top: 6px; }
+.hk-tie { padding: 10px 14px; border: 1px solid var(--ai); border-radius: 6px; }
+.hk-sheet .hk-ai-label { color: var(--ai-deep); font-weight: 700; }
+.hk-tie-line { margin: 0 0 6px; font-weight: 700; }
+.hk-tie-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 14px; }
+.hk-tie-split { margin: 8px 0 2px; font-size: 13px; color: var(--paper-soft); }
+.hk-tie-heading { margin: 0; font-family: var(--mincho); font-size: 15px; }
+@media (max-width: 560px) { .hk-tie-two { grid-template-columns: minmax(0, 1fr); } }
+/* 直し48 段4: 「整理中」 while the sheet is made: the big word, the line, three
+   dots (still with motion reduced); the print button not yet there. */
+.hk-making { display: grid; justify-items: center; gap: 8px; padding: 48px 16px; text-align: center; }
+.hk-making-word { margin: 0; font-family: var(--mincho); font-size: 40px; letter-spacing: .2em; color: var(--paper-ink); }
+.hk-making-line { margin: 0; font-size: 16px; color: var(--paper-soft); }
+.hk-making-dots { display: flex; gap: 8px; }
+.hk-making-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--lamp); opacity: .5; }
+@media (prefers-reduced-motion: no-preference) {
+  .hk-making-dots span { animation: one-wait 1.2s ease-in-out infinite; }
+  .hk-making-dots span:nth-child(2) { animation-delay: .2s; }
+  .hk-making-dots span:nth-child(3) { animation-delay: .4s; }
+}
+#hk-sheet:has(.hk-making) .hk-print-row { visibility: hidden; }
 .hk-back { margin-top: 20px; }
 .hk-heavy-talk { margin-top: 28px; }
 @media (max-width: 560px) {
@@ -1764,6 +1795,10 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
   .hitokoto { max-width: none; padding: 0; }
   .hk-sheet { padding: 0; background: none; }
   .hk-litbox { background: none; break-inside: avoid; }
+  /* 直し48 段4: more on it, still one A4 sheet. */
+  .hk-met-line, .hk-tie, .hk-moves { break-inside: avoid; }
+  .hk-sheet h3 { margin-bottom: 8px; }
+  .hk-story { line-height: 1.7; margin-bottom: 10px; }
 }
 
 /* The map's first stop for the keyboard (直し41の続き): seen only when the

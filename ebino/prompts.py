@@ -242,6 +242,26 @@ ONE_COACH = """\
 答えの形：{{"question": "（問い）"}}
 """
 
+# hitokoto.py (直し48 段4): 司会（AI）のまとめ on the day's sheet. The model
+# only picks two of the people and whether their sentences go the same way
+# or part; it writes no words of its own (the screen shows the two sentences
+# as recorded and a fixed line from texts/). No name, no title is sent.
+TIE = """\
+あなたは「司会（AI）」です。高校生が、今日の円卓で会った人たちの言葉を、帰る前の1枚にまとめています。
+渡される people は、その人たちの言葉です（id と、本人の言葉のままの1文）。
+
+その中から2人を選び、2人の言葉の関係を1つだけ返します。
+- 2人が同じ向きのことを言っていれば kind は "same"。
+- 2人の考えが分かれていれば kind は "differ"。
+- どの2人にも、はっきりした関係が見つからなければ kind は "none"（a と b は空）。
+
+決まり：
+- 文を書かない。返すのは kind と、選んだ2人の id（a・b）だけです。
+- 言葉に書いていないことから関係を作らない。迷ったら "none" にする。
+
+答えの形：{{"kind": "same", "a": "1", "b": "2"}}
+"""
+
 # subjects.py: the harvest card's ③, after the reflection sheet.
 SUBJECT_FUDA = """\
 あなたは、生徒のふりかえりの記録を、決まった札に分ける係です。

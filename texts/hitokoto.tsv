@@ -90,3 +90,10 @@ deep_way	その道の、どこがおもしろそうに見えたのか。
 deep_need	それがあったら、何が変わりそうか。
 deep_chosen	なぜこっちだったのか。
 now_after	ほかの人にも聞くか、『帰る前に、ひとこと』で今日をまとめよう。
+sheet_met	今日会った人の、残った1文
+sheet_moves	自分の言葉の動き
+sheet_split	割れていたところ
+sheet_meet	次に会うなら
+sheet_tie	司会（AI）のまとめ
+tie_same	この2人は、同じ向きのことを言っています。
+tie_differ	この2人は、ここで考えが分かれています。
