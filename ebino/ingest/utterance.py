@@ -197,9 +197,46 @@ def mend_spacing(text: str) -> str:
     return _SPACED_RUN.sub(lambda run: re.sub("[ 　]", "", run.group()), text)
 
 
+# 直し54h (the teacher, 11/8: 直せるところは直して): what reads badly on the
+# screen and has one meaning.
+# A web address, read aloud, says nothing: it goes, with the digits run into
+# it, a 「ページはこちらから」 that only pointed to it, and the brackets left empty.
+# The pointer stays inside its own bullet; an address ends at its .html when
+# it has one (the date written right after it is kept).
+_URL_POINTER = re.compile(r"(?:[•・]\s*)?[^。\n（()）•・]*こちら(?:から)?\s*[（(]\s*https?://[\x21-\x7e]*?\s*[）)]")
+_URL = re.compile(r"\d{6,}(?=https?://)|(?:https?://|www\.)(?:[\x21-\x7e]*?\.html?|[\x21-\x7e]+)")
+_EMPTY_BRACKETS = re.compile(r"[（(]\s*[）)]")
+# A word's reading set over it, read as each kana twice: リリ　ババ　イイ　ババ　ルル.
+_DOUBLED_KANA = re.compile(r"(?:([ァ-ヶぁ-んー])\1[ 　]+){3,}")
+# The masks (SPEC 14-3) put この職場 for a company's name and この方 for a
+# person's. Around them: the company's form left (株式会社この職場 → この会社),
+# 様 taken as a name (お客この方 → お客さん), 「この職場」というカフェ → カフェ.
+_COMPANY_FORM = "株式会社|有限会社|合資会社|合同会社|[(（]株[)）]|㈱|[(（]有[)）]|㈲"
+_MASK_WORDS = [
+    (re.compile(f"(?:{_COMPANY_FORM})\\s*この職場|この職場\\s*(?:{_COMPANY_FORM})"), "この会社"),
+    (re.compile("お客この方"), "お客さん"),
+    (re.compile("奥この方"), "奥さん"),
+    (re.compile("この方先生"), "この先生"),
+    # Only before a noun: 「この職場」というのは stays.
+    (re.compile(f"「?この職場」という(?=[{_KANJI}ァ-ヶ])"), ""),
+]
+
+
+def mend_reading(text: str) -> str:
+    text = _URL.sub("", _URL_POINTER.sub("", text))
+    text = _EMPTY_BRACKETS.sub("", text)
+    text = _DOUBLED_KANA.sub(lambda run: "".join(re.findall(r"([ァ-ヶぁ-んー])\1", run.group())), text)
+    for pattern, word in _MASK_WORDS:
+        text = pattern.sub(word, text)
+    return text
+
+
+def _mend(text: str) -> str:
+    return mend_reading(mend_spacing(mend_tenure(text)))
+
+
 def mended(utterance: Utterance) -> Utterance:
-    text = mend_spacing(mend_tenure(utterance.text))
-    paragraph = mend_spacing(mend_tenure(utterance.paragraph))
+    text, paragraph = _mend(utterance.text), _mend(utterance.paragraph)
     if (text, paragraph) == (utterance.text, utterance.paragraph):
         return utterance
     return Utterance(**(utterance.to_dict() | {"text": text, "paragraph": paragraph}))
