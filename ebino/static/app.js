@@ -935,8 +935,11 @@ const GUIDE = {
   // one being read, least of all); narrower when nothing else is clear.
   answer_ai: { at: () => shown(document.querySelector("#ai-seat-cards .ai-question:not(:disabled)")) || shown($("ai-seat-open")),
     // 直し48 段2: the heading and the note are gone; each question (its
-    // robot, its name and its bubble) kept clear.
-    clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question")],
+    // robot, its name and its bubble) kept clear; and (the screen check's
+    // 差し戻し) the line at the top and the map's column, which the room
+    // over the card now reaches.
+    clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line"),
+      document.querySelector(".map-controls")],
     spare: () => [...document.querySelectorAll("#map-overlay .table-bubble:not(.unplaced):not(.ai)")],
     sides: ["above", "right", "left", "below"] },
   // 直し48 段3 (the teacher, 11/7: it went unseen): large, in two lines,

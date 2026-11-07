@@ -327,6 +327,7 @@ def test_the_hint_to_answer_the_ai_keeps_its_questions_clear():
     assert got["slid"]["on"] == 0
     assert got["narrow"]["kept"] == 0
     # The heading and the note are no more among what it keeps clear: the questions are.
-    assert 'clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question")],' in APP
+    assert 'clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line"),' in APP
+    assert 'document.querySelector(".map-controls")],' in APP  # The screen check's 差し戻し: the top line and the column.
     assert ".guide.narrow { max-width: min(11em, calc(100vw - 16px)); }" in CSS
     assert '.guide[data-side="right"]::after { right: 100%;' in CSS and '.guide[data-side="left"]::after { left: 100%;' in CSS

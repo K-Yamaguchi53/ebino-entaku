@@ -119,7 +119,8 @@ async (page) => {
               const hits = (nodes) => nodes.filter((n) => n && n.getClientRects().length).map((n) => n.getBoundingClientRect())
                 .filter((b) => b.width && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom).length;
               // 直し48 段2: no heading nor note; the robots and their names instead.
-              return { head: hits([...document.querySelectorAll("#ai-seat-cards .robot, #ai-seat-cards .who-name")]),
+              return { head: hits([...document.querySelectorAll("#ai-seat-cards .robot, #ai-seat-cards .who-name"),
+                document.querySelector("#now-line"), document.querySelector(".map-controls")]),
                 cards: hits([...document.querySelectorAll("#ai-seat-cards .ai-question")]) };
             });
             hint = !over ? "no hint" : [over.head ? `hint over ${over.head}` : "", over.cards ? `hint over card ${over.cards}` : ""]
