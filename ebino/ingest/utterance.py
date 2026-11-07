@@ -186,8 +186,20 @@ def mend_tenure(text: str) -> str:
     return body
 
 
+# 直し54g: vertical text read one character at a time, a space after each:
+# 自 分 を 変 え た か っ た。 Five or more such characters in a row are
+# joined; the name check already reads text without spaces, so it sees the same.
+_SPACED_CHAR = f"[{_KANJI}ぁ-んァ-ヶー々。、！？「」『』（）A-Za-z0-9]"
+_SPACED_RUN = re.compile(f"(?:{_SPACED_CHAR}[ 　]){{4,}}{_SPACED_CHAR}")
+
+
+def mend_spacing(text: str) -> str:
+    return _SPACED_RUN.sub(lambda run: re.sub("[ 　]", "", run.group()), text)
+
+
 def mended(utterance: Utterance) -> Utterance:
-    text, paragraph = mend_tenure(utterance.text), mend_tenure(utterance.paragraph)
+    text = mend_spacing(mend_tenure(utterance.text))
+    paragraph = mend_spacing(mend_tenure(utterance.paragraph))
     if (text, paragraph) == (utterance.text, utterance.paragraph):
         return utterance
     return Utterance(**(utterance.to_dict() | {"text": text, "paragraph": paragraph}))

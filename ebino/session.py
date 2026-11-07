@@ -67,6 +67,18 @@ def _sheet_heading(heading: str) -> str:
     return _SPLIT_LEAD.sub("", heading) or heading
 
 
+def _goes_on_into(piece: Utterance, after: Utterance) -> bool:
+    """Whether `after` holds the words right after `piece`'s in their paragraph
+    (a 「 or spaces between): 「…うまくいかない時は」 then 「まず深呼吸」."""
+    paragraph = piece.paragraph
+    if not paragraph or paragraph != after.paragraph:
+        return False
+    at = paragraph.find(piece.text)
+    if at < 0:
+        return False
+    return paragraph[at + len(piece.text):].lstrip(" 　「『").startswith(after.text[:10])
+
+
 def _line(text, limit: int, empty_code: str, required: bool = True) -> str:
     """One line the student wrote, trimmed and capped."""
     text = " ".join((text if isinstance(text, str) else "").split())
@@ -763,6 +775,13 @@ class Session:
             total += len(words)
             if total >= one_to_one.ONE_CHARS:
                 break
+        # 直し54g: an article's words not followed on screen by the words
+        # that go on from them in their paragraph end at a sentence's end
+        # (one_tidy.end_whole).
+        for n, piece in enumerate(shown):
+            follows = n + 1 < len(shown) and _goes_on_into(piece, shown[n + 1])
+            if not follows and not one_to_one.is_page(piece.section):
+                said[n] = one_tidy.end_whole(said[n])
         was_cut = False
         if any(one_to_one.is_page(u.section) for u in shown):
             said, was_cut = one_tidy.cut(said, one_to_one.ONE_CUT_CHARS)

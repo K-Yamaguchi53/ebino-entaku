@@ -224,6 +224,26 @@ def sentences(text: str) -> list[str]:
     return out
 
 
+# 直し54g (the teacher, 11/8: 読みやすい？): an article's words led into a
+# 「」 that was a piece of its own and not shown after them, so they stopped
+# mid-sentence: 「…同僚がいるからである。うまくいかない時は」. Such words end
+# at their last sentence's end. Only a last part that goes on (a particle or
+# 、) on one line: a slogan, a list or a sentence without 。 is kept.
+_GOES_ON = ("、", "，", ",", "は", "が", "を", "に", "で", "と", "も", "の", "や", "て", "へ",
+            "から", "ので", "けど", "ため")
+_ENDS_WHOLE = ("こと", "もの")
+
+
+def end_whole(text: str) -> str:
+    """text without a last part that stops mid-sentence, if a sentence ends before it."""
+    parts = sentences(text.rstrip())
+    tail = parts[-1].strip() if parts else ""
+    if (len(parts) < 2 or "\n" in tail or ends_sentence(tail)
+            or not tail.endswith(_GOES_ON) or tail.endswith(_ENDS_WHOLE)):
+        return text
+    return "".join(parts[:-1]).rstrip()
+
+
 def cut(texts: list[str], limit: int) -> tuple[list[str], bool]:
     """texts kept whole while they come to limit or fewer characters; past
     it, cut at a sentence's end so that they do, the first sentence always
