@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .ingest.run import OUTPUT_DIR, OUTPUT_FILE
 from .ingest.seats import Seat
-from .ingest.utterance import Utterance
+from .ingest.utterance import Utterance, mended
 from .saved_output import load_output
 
 TOPICS_FILE = "topics.json"
@@ -36,7 +36,9 @@ class Entry:
 
 def load_utterances(data_dir: Path) -> list[Utterance]:
     rows = json.loads((data_dir / OUTPUT_DIR / OUTPUT_FILE).read_text(encoding="utf-8"))
-    return [Utterance(**row) for row in rows]
+    # 直し54f: mended here, so the round table, one to one and every tool read
+    # the same words, without ingesting again. The ID stays as ingested.
+    return [mended(Utterance(**row)) for row in rows]
 
 
 def load_topics(data_dir: Path) -> dict[str, list[str]]:

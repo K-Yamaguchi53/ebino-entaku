@@ -161,6 +161,38 @@ def split_voice(paragraph: str) -> list[tuple[str, str]]:
     return pieces
 
 
+# 直し54f (the teacher, 11/8): a senior's message signed 入社N年目 in vertical
+# text comes out read backwards at the very end, 目年２社入, and when the
+# reading slips the 目 or 年 it lacks lands inside the message: 頂け目年る,
+# みま目せんか. The label is left out (the seat already says who speaks) and
+# a slipped 目・年 between two non-kanji is taken out. Only after 。！？, so a
+# message that ends in a word with 社入 is never touched.
+_KANJI = "一-鿿"
+_TENURE_TAIL = re.compile(r"(?<=[。！？!?])\s*(目?)\s*(年?)\s*[0-9０-９]{1,2}\s*社\s*入\s*$")
+
+
+def mend_tenure(text: str) -> str:
+    """The message without its backwards 入社N年目 label and the 目・年 it slipped."""
+    tail = _TENURE_TAIL.search(text)
+    if tail is None:
+        return text
+    body = text[: tail.start()]
+    slipped = ("" if tail.group(1) else "目") + ("" if tail.group(2) else "年")
+    if slipped:
+        stray = re.compile(f"(?<![{_KANJI}])" + r"\s*".join(slipped) + f"(?![{_KANJI}])")
+        found = list(stray.finditer(body))
+        if found:
+            body = body[: found[-1].start()] + body[found[-1].end() :]
+    return body
+
+
+def mended(utterance: Utterance) -> Utterance:
+    text, paragraph = mend_tenure(utterance.text), mend_tenure(utterance.paragraph)
+    if (text, paragraph) == (utterance.text, utterance.paragraph):
+        return utterance
+    return Utterance(**(utterance.to_dict() | {"text": text, "paragraph": paragraph}))
+
+
 def unique_by_id(utterances: list[Utterance]) -> list[Utterance]:
     """The same piece twice in one file has one ID, so it becomes one utterance."""
     unique: dict[str, Utterance] = {}
