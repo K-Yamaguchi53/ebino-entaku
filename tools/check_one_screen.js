@@ -146,6 +146,23 @@ async (page) => {
           if (m.w > m.vw) bad.push(`wide ${m.w}>${m.vw}`);
           if (errors.length) bad.push(`errors ${errors.length}`);
           if (hint) bad.push(hint);
+          // 直し50 段2: the guide (吹き出しを1つ押してみよう, コーチとオブザーバーの
+          // 問いはここ, any shown) over none of the people's words in their
+          // bubbles ("guide over words N"); "guide far": put away from what it
+          // points at; "no guide" at table_out: none for want of room.
+          const g = await p.evaluate(() => {
+            const guide = document.querySelector("#guide");
+            if (!guide || guide.hidden) return { up: false };
+            const a = guide.getBoundingClientRect();
+            const words = [...document.querySelectorAll("#map-overlay .table-bubble:not(.ai) .voice, #map-overlay .map-bubble .voice, .one-bubble .voice")]
+              .filter((n) => n.getClientRects().length).map((n) => n.getBoundingClientRect())
+              .filter((b) => b.width && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom);
+            return { up: true, state: guide.dataset.state, over: words.length, far: guide.classList.contains("far") };
+          });
+          if (g.over) bad.push(`guide over words ${g.over}`);
+          let guideNote = "";
+          if (g.up && g.far) guideNote = " (guide far)";
+          if (moment === "table_out" && !g.up) guideNote = " (no guide)";
           // 直し48 段2: コーチ（AI）'s board over the map by the person: inside
           // the map's frame, over neither the person's words nor the questions.
           if (moment === "one_coach") {
@@ -171,7 +188,7 @@ async (page) => {
             if (asks.some((a) => a.cut)) bad.push("clipped");
             put = ` (put ${asks.filter((a) => a.put).length})`;
           }
-          row[moment] = (bad.length ? bad.join(" ") : "ok") + put;
+          row[moment] = (bad.length ? bad.join(" ") : "ok") + put + guideNote;
         } catch (error) {
           row[moment] = "could not reach: " + String(error).split("\n")[0].slice(0, 120);
         }

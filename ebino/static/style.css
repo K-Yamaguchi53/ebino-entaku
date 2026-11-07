@@ -2008,6 +2008,10 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
 .guide[data-side="left"]::after { left: 100%; top: calc(var(--point) - 10px); border-left-color: var(--lamp); }
 /* 直し46: narrower, broken between phrases, where nothing else is clear. */
 .guide.narrow { max-width: min(11em, calc(100vw - 16px)); }
+/* 直し50 段2: away from what it points at (no room by it clear of the people's words): its point short. */
+.guide.far::after { border-width: 6px; }
+.guide.far[data-side="above"]::after, .guide.far[data-side="below"]::after { left: calc(var(--point) - 6px); }
+.guide.far[data-side="right"]::after, .guide.far[data-side="left"]::after { top: calc(var(--point) - 6px); }
 /* The bubble's choices: the one to press lit itself, no bubble over the card. */
 .map-choices button.guide-here { outline: 3px solid var(--lamp); outline-offset: 2px; font-weight: 700;
   color: var(--lamp-bright); background: var(--lamp-faint); }

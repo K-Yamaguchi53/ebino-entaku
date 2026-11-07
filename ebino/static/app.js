@@ -926,7 +926,8 @@ const GUIDE = {
   // 直し45 段3: no box at one to one; the questions to pick, lit.
   one: { at: () => document.querySelector(".one-asks .one-ask:not(.one-finish)"), lit: true },
   // 直し48 (the screen check): never over the AI's questions (their robots, names, bubbles).
-  table: { at: () => document.querySelector("#map-overlay .table-bubble:not(.unplaced)"),
+  // 直し50 段2: never over the people's words either (voices).
+  table: { at: () => document.querySelector("#map-overlay .table-bubble:not(.unplaced)"), voices: peopleVoices,
     clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line")], sides: ["above", "below", "right", "left"] },
   pressed: { at: () => document.querySelector('.map-choices button[data-choice="card"]'), lit: true },
   // 直し46: never over the AI's seat's heading (「AI（町の人ではありません）」)
@@ -943,12 +944,22 @@ const GUIDE = {
     clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line"),
       document.querySelector(".map-controls")],
     spare: () => [...document.querySelectorAll("#map-overlay .table-bubble:not(.unplaced):not(.ai)")],
+    voices: peopleVoices,
     sides: ["above", "right", "left", "below"] },
   // 直し48 段3 (the teacher, 11/7: it went unseen): large, in two lines,
   // the second saying going on is fine too (「もっと話を聞きたい人は、…」), so
   // it is not taken for the one right next step; the button lit (once).
   after: { at: () => $("to-reflect"), more: "after_more", big: true },
 };
+
+// 直し50 段2 (ヒビキ: the sign hid a farmer's words): the people's words in
+// their bubbles (the quotes' text) are never under 「吹き出しを1つ押してみよう」
+// nor 「コーチとオブザーバーの問いはここ」. A place by the card first, else
+// a free place by the map's edges or under the table, its point short; with
+// none such, no sign rather than words hidden.
+function peopleVoices() {
+  return [...document.querySelectorAll("#map-overlay .table-bubble:not(.unplaced):not(.ai) .voice, #map-overlay .map-bubble .voice")];
+}
 
 // node if it is on screen (a box of its own), else null.
 function shown(node) {
@@ -1009,6 +1020,20 @@ function drawGuide() {
   const spot = narrow && (!wide || narrow.cost < wide.cost) ? narrow : wide;
   if (spot === narrow && narrow) guide.classList.add("narrow");
   else guide.classList.remove("narrow");
+  guide.classList.remove("far");
+  // 直し50 段2: no place by it clear of the people's words: a free place
+  // away from it (its point short), else no sign (never over their words).
+  // Hidden so, it comes back unlit (no blink as it comes and goes).
+  if (!spot && spec.voices) {
+    const room = guideRoom(spec, box);
+    if (!room) {
+      guide.hidden = true;
+      guide.classList.remove("fresh");
+      return;
+    }
+    guide.classList.add("narrow", "far");
+    return pointGuide(guide, room, box);
+  }
   const place = spot || (() => {
     guide.classList.remove("narrow");
     const w = guide.offsetWidth, h = guide.offsetHeight;
@@ -1016,6 +1041,12 @@ function drawGuide() {
     return { side, w, h, top: side === "above" ? box.top - gap - h : Math.min(box.bottom + gap, vh - h - edge),
       left: clamp(box.left + box.width / 2 - w / 2, edge, vw - w - edge) };
   })();
+  pointGuide(guide, place, box);
+}
+
+// The bubble at place { side, left, top, w, h }, its point at box.
+function pointGuide(guide, place, box) {
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   guide.dataset.side = place.side;
   guide.style.left = `${Math.round(place.left)}px`;
   guide.style.top = `${Math.round(place.top)}px`;
@@ -1024,6 +1055,53 @@ function drawGuide() {
   guide.style.setProperty("--point", place.side === "above" || place.side === "below"
     ? `${Math.round(clamp(box.left + box.width / 2 - place.left, 16, place.w - 16))}px`
     : `${Math.round(clamp(box.top + box.height / 2 - place.top, 16, place.h - 16))}px`);
+}
+
+// 直し50 段2: a free place for the bubble (narrow) away from what it points
+// at, inside the map's frame and the window: over none of what is kept clear,
+// the people's words, nor what it points at; first clear of the bubbles and
+// the split's heading too, else of their words only. Of those, the one over
+// least of the names on the map, the seats' titles and marks and the
+// scenery's label (a small matter), then the nearest. Its side faces what it
+// points at.
+// None such: null.
+function guideRoom(spec, box) {
+  const guide = $("guide");
+  guide.classList.add("narrow");
+  const w = guide.offsetWidth, h = guide.offsetHeight;
+  const edge = 8, step = 12, vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+  const frameNode = shown(document.querySelector("#map-overlay"));
+  const frame = frameNode ? frameNode.getBoundingClientRect() : { left: 0, top: 0, right: vw, bottom: vh };
+  const area = { left: Math.max(edge, frame.left), top: Math.max(edge, frame.top),
+    right: Math.min(vw - edge, frame.right), bottom: Math.min(vh - edge, frame.bottom) };
+  const rects = (nodes) => (nodes || []).map(shown).filter(Boolean).map((n) => n.getBoundingClientRect());
+  const over = (left, top, k) => Math.max(0, Math.min(left + w, k.right) - Math.max(left, k.left))
+    * Math.max(0, Math.min(top + h, k.bottom) - Math.max(top, k.top));
+  // The people's words with a margin for the bubble's point.
+  const grow = (k, by) => ({ left: k.left - by, top: k.top - by, right: k.right + by, bottom: k.bottom + by });
+  const hard = [...rects(spec.clear()), ...rects(spec.voices()).map((k) => grow(k, 6)), box];
+  const bubbles = rects([...document.querySelectorAll("#map-overlay .table-bubble:not(.unplaced), #map-overlay .map-bubble, #map-overlay .split-tag, #map-overlay .map-choices")]);
+  const small = rects([...document.querySelectorAll("#map-overlay .map-around, #map-overlay .table-label:not(.unplaced), #map-overlay .map-look-label, #map-overlay .map-compass, #map-overlay .seat-press, #map .points .pt .shape")]);
+  const cx = box.left + box.width / 2, cy = box.top + box.height / 2;
+  for (const avoid of [[...hard, ...bubbles], hard]) {
+    let best = null;
+    for (let top = area.top; top + h <= area.bottom; top += step) {
+      for (let left = area.left; left + w <= area.right; left += step) {
+        if (avoid.some((k) => over(left, top, k) > 0)) continue;
+        const cost = small.reduce((sum, k) => sum + over(left, top, k), 0);
+        const far = Math.hypot(left + w / 2 - cx, top + h / 2 - cy);
+        if (!best || cost < best.cost || (cost === best.cost && far < best.far)) best = { left, top, cost, far };
+      }
+    }
+    if (best) {
+      const { left, top } = best;
+      // Beside it when clear of it across (its point then reaches it along the
+      // row it is in), else over or under it.
+      const side = left >= box.right ? "right" : left + w <= box.left ? "left" : top + h <= box.top ? "above" : "below";
+      return { side, left, top, w, h };
+    }
+  }
+  return null;
 }
 
 // 直し46: where the bubble goes for a state that keeps things clear. Each of
@@ -1043,7 +1121,8 @@ function guideSpot(spec, box, wide) {
   const boxes = (nodes) => (nodes || []).map(shown).filter(Boolean)
     .map((n) => ({ rect: n.getBoundingClientRect(),
       weight: n.classList && (n.classList.contains("marked") || n === document.activeElement) ? 4 : 1 }));
-  const keep = boxes(spec.clear()), spare = boxes(spec.spare && spec.spare());
+  // 直し50 段2: the people's words kept clear as the rest is.
+  const keep = boxes([...spec.clear(), ...(spec.voices ? spec.voices() : [])]), spare = boxes(spec.spare && spec.spare());
   const over = (p, k) => Math.max(0, Math.min(p.left + w, k.right) - Math.max(p.left, k.left))
     * Math.max(0, Math.min(p.top + h, k.bottom) - Math.max(p.top, k.top));
   const spots = [];
