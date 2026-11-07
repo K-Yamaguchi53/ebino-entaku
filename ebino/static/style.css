@@ -1787,6 +1787,11 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
 .hk-scale input[type="range"] { width: 100%; accent-color: var(--lamp); }
 .hk-scale-now { margin: 0; font-family: var(--mincho); font-size: 28px; color: var(--lamp-bright); }
 .hk-ticks { display: flex; justify-content: space-between; margin: 0 0 6px; font-size: 12px; color: var(--faint); }
+/* 直し51 段7: 「10 最初」 under the knob at 10 (not halfway): the knob's
+   middle at 10 of 15 of the track, less half a knob each end (16px); its
+   「10」 there. */
+.hk-ticks { position: relative; }
+.hk-ticks span:nth-child(2) { position: absolute; left: calc(8px + (100% - 16px) * 10 / 15); transform: translateX(-.55em); white-space: nowrap; }
 .hk-meet select { width: 100%; min-height: 46px; margin-top: 8px; padding: 6px 10px; background: var(--paper); color: var(--paper-ink);
   border: 2px solid var(--paper-line); border-radius: 10px; font-size: 16px; }
 /* Answered or picked (直し40-0): not faded, the people's and the student's
