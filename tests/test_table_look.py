@@ -31,9 +31,11 @@ def test_the_table_is_the_risen_schools_ring_its_rim_lit_and_the_lamp_in_its_mid
 def test_the_size_and_the_seats_spots_are_as_before():
     assert "const TABLE_RX = 150, TABLE_RY = 110, TABLE_LIFT = 7, SEAT_OUT = 48;" in MAP
     assert "tableTop = ring(center, 0, TABLE_LIFT);" in _opened()
-    # The seats that spoke sit where their cards have room (直し33-4); the
-    # empty chairs, and a seat with no room there, round the table as before.
-    assert "const at = spot ? spot.at : onTable(center, sitting.angle, SEAT_OUT);" in _opened()
+    # The seats that spoke sit where their cards have room (直し33-4); a
+    # seat with no room there round the table as before; the empty chairs
+    # round its front clear of the gathered seats (直し53 段4, chairSpots).
+    assert ('const at = sitting.group === "front" ? chairsAt[sitting.id] : spot ? spot.at '
+            ': onTable(center, sitting.angle, SEAT_OUT);') in _opened()
 
 
 def test_each_seat_sits_on_a_chair_its_back_to_the_outside():

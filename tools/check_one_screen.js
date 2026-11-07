@@ -175,10 +175,17 @@ async (page) => {
             const table = [...document.querySelectorAll(".table-rim-glow, #map-overlay .table-bubble:not(.unplaced), #map-overlay .seat-press")]
               .filter(vis).map((n) => n.getBoundingClientRect());
             const school = [...document.querySelectorAll(".risen-school .yard-building")].filter(vis).map((n) => n.getBoundingClientRect());
-            return { overAi, school: school.reduce((sum, s) => sum + table.filter((k) => hit(s, k)).length, 0) };
+            // 直し53 段4: an empty chair 「？」 over a gathered seat's mark or
+            // its name at the table ("chair over token N").
+            const chairs = [...document.querySelectorAll("#map-svg .chair.ready circle")].filter(vis).map((n) => n.getBoundingClientRect());
+            const marks = [...document.querySelectorAll("#map-svg .token :is(.cushion, .chair-back, .shape, .icon), "
+              + "#map-overlay .table-label:not(.empty):not(.unplaced)")].filter(vis).map((n) => n.getBoundingClientRect());
+            return { overAi, school: school.reduce((sum, s) => sum + table.filter((k) => hit(s, k)).length, 0),
+              chair: chairs.reduce((sum, c) => sum + marks.filter((m) => hit(c, m)).length, 0) };
           });
           if (t.overAi) bad.push(`guide over ai ${t.overAi}`);
           if (t.school) bad.push(`school over ${t.school}`);
+          if (t.chair) bad.push(`chair over token ${t.chair}`);
           let guideNote = "";
           if (g.up && g.far) guideNote = " (guide far)";
           if (moment === "table_out" && !g.up) guideNote = " (no guide)";

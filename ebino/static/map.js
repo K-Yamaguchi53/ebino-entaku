@@ -2635,6 +2635,42 @@ const EbinoMap = (() => {
       .finished.catch(() => {});
   }
 
+  // 直し53 段4 (the teacher's screen: a 「？」 half over a gathered seat's
+  // mark): each empty chair at the first spot, nearest its own place round
+  // the front of the table (a few degrees either way, then a little further
+  // out), whose square (its press, CHAIR_BOX) is clear of every gathered
+  // seat's mark and name (TOKEN_BOX) and of the chairs put before it, inside
+  // the drawing; with none, its own place as before. In CSS px round a spot,
+  // made drawing units by view.unit (the table is seen on the whole drawing).
+  // It reads view and what it is given.
+  const TOKEN_BOX = [-60, -28, 60, 46], CHAIR_BOX = [-HIT_PX - 2, -HIT_PX - 2, HIT_PX + 2, HIT_PX + 2];
+  function chairSpots(chairs, gathered, center) {
+    const u = view.unit, edge = 8 * u;
+    const box = ([x, y], [l, t, r, b]) => [x + l * u, y + t * u, x + r * u, y + b * u];
+    const hit = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+    const taken = gathered.map((at) => box(at, TOKEN_BOX));
+    const tries = [];
+    for (const [k, out] of [SEAT_OUT, SEAT_OUT + 34, SEAT_OUT + 68].entries()) {
+      for (let d = 0; d <= 120; d += 4) for (const way of d ? [1, -1] : [1]) tries.push({ d: way * d, out, cost: d + k * 30 });
+    }
+    tries.sort((a, b) => a.cost - b.cost);
+    const out = {};
+    for (const { id, angle } of chairs) {
+      let at = null;
+      for (const t of tries) {
+        const spot = onTable(center, angle + t.d, t.out);
+        const mine = box(spot, CHAIR_BOX);
+        if (mine[0] < edge || mine[1] < edge || mine[2] > view.W - edge || mine[3] > view.H - edge) continue;
+        if (taken.some((b) => hit(mine, b))) continue;
+        at = spot;
+        break;
+      }
+      out[id] = at || onTable(center, angle, SEAT_OUT);
+      taken.push(box(out[id], CHAIR_BOX));
+    }
+    return out;
+  }
+
   function onTable(center, angle, out, lift = TABLE_LIFT) {
     const a = angle * Math.PI / 180;
     return (center.proj || view.proj)(center.x + (TABLE_RX + out) * Math.cos(a), center.y + (TABLE_RY + out) * Math.sin(a),
@@ -2827,9 +2863,14 @@ const EbinoMap = (() => {
     const landed = [];
     const spots = onArc(gatherSpots(seats.filter((sitting) => sitting.group !== "front"), center,
       { W: view.W, H: view.H, unit: view.unit, upright: view.upright, ai: view.aiCorner }), center.at);
+    // 直し53 段4: the empty chairs where none of the gathered seats' marks
+    // or names is (they sat on the arc before, whatever came there).
+    const gathered = seats.filter((sitting) => sitting.group !== "front")
+      .map((sitting) => (spots[sitting.id] ? spots[sitting.id].at : onTable(center, sitting.angle, SEAT_OUT)));
+    const chairsAt = chairSpots(seats.filter((sitting) => sitting.group === "front"), gathered, center);
     seats.forEach((sitting, k) => {
       const spot = spots[sitting.id];
-      const at = spot ? spot.at : onTable(center, sitting.angle, SEAT_OUT);
+      const at = sitting.group === "front" ? chairsAt[sitting.id] : spot ? spot.at : onTable(center, sitting.angle, SEAT_OUT);
       if (sitting.group === "front") return landed.push(chair(sitting.id, at, [lx, ly]));
       const kind = points[sitting.id].seat.kind;
       const node = svgEl("g", { class: `token pt lit kind-${kind}`, "aria-hidden": "true" });
