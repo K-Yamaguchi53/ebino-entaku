@@ -3,7 +3,7 @@
 // are drawn as people at their work. The teacher chose these two shapes
 // (案 A, 11/7) and they are written here, once, for every place that shows
 // them (the first look's two cards, the AI's seat's questions, the coach's
-// board at one to one).
+// board at one to one). 司会（AI） too (直し48), the first look's speaker.
 //
 // Never a person: no nose, hair, ears, brows or skin; no name, age, manner
 // or words of its own, and nothing it says. Lines only, no fill but the
@@ -15,8 +15,12 @@
 // a soft arc of a mouth, a rounded body, a pointer up from one hand.
 // オブザーバー: a square head, two antennas, one large lens for an eye (a ring
 // round a dot), no mouth, a rounded body.
-// The two tell apart small, by shape: round head and pointer, square head
-// and one eye.
+// 司会 (直し48): a wide head with rounded corners, one small dot on its top
+// (no antenna), two short level lines for eyes, no mouth, a bow tie (two
+// triangles) on the body's top, a microphone (a small ring on a short
+// stick) in one hand.
+// The three tell apart small, by shape: round head and pointer, square head
+// and one eye, wide head and bow tie.
 "use strict";
 
 const EbinoRobot = (() => {
@@ -43,13 +47,25 @@ const EbinoRobot = (() => {
       ["circle", { cx: 42, cy: 38, r: 4, fill: "currentColor" }],
       ["rect", { x: 26, y: 60, width: 32, height: 20, rx: 6 }],
     ],
+    host: [
+      ["circle", { cx: 42, cy: 14, r: 3, fill: "currentColor" }],
+      ["rect", { x: 12, y: 18, width: 60, height: 34, rx: 10 }],
+      ["line", { x1: 28, y1: 35, x2: 36, y2: 35 }],
+      ["line", { x1: 48, y1: 35, x2: 56, y2: 35 }],
+      ["rect", { x: 26, y: 60, width: 32, height: 20, rx: 6 }],
+      ["polygon", { points: "42,63 34,58 34,68" }],
+      ["polygon", { points: "42,63 50,58 50,68" }],
+      ["line", { x1: 26, y1: 70, x2: 18, y2: 66 }],
+      ["line", { x1: 18, y1: 66, x2: 15, y2: 58 }],
+      ["circle", { cx: 14, cy: 54, r: 4 }],
+    ],
   };
   // The part of the sheet the robot is on (its lines' width round it).
   const VIEW = "2 2 80 82";
   // The body's middle, for 「AI」 on it.
   const BODY = { x: 42, y: 70 };
 
-  // A robot for a role ("coach" or "observer"): a span (class "robot", its
+  // A robot for a role ("coach", "observer" or "host"): a span (class "robot", its
   // data-robot the role) holding the picture, aria-hidden. Its size and its
   // lines' width are the place's (style.css .robot). Given tag (the AI's
   // mark, 「AI」 from texts), it is written small on the body: for the large

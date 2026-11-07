@@ -359,28 +359,46 @@
      whose words are in. Its last button (or Esc) puts those back in the
      map's column and the keyboard goes to the box. app.js moves #inside's
      body in and out. -->
+<!-- 直し48 段1 (the teacher, 11/7: the more on one page, the more is
+     skipped): five pages, one thing each, 次へ and 戻る at the foot, always in
+     the window; the pages that have nothing (no coach nor observer, no words
+     in) are left out. 1 the host's hello, 2 how it goes, 3 コーチ and
+     オブザーバー, 4 whose words are in, 5 examples of questions. -->
 <dialog id="first-look" class="first-look" aria-labelledby="first-look-about-title">
-  <section id="first-look-about" class="first-look-page">
-    <!-- Said by the host (the teacher, 11/6): its mark in the AI's colour,
-         as the AI's seat, for it is an AI and none of the town's people. -->
-    <h2 id="first-look-about-title" class="first-look-title host-head"><span id="host-mark" class="ai-mark host-mark"
-      aria-hidden="true"></span><span id="host-name"></span></h2>
-    <div id="start-about" class="start-about host-says"></div>
-    <ol id="start-flow" class="start-flow" aria-label="すすみ方"></ol>
+  <div class="first-look-pages">
+    <section id="first-look-about" class="first-look-page" data-page="hello">
+      <!-- Said by the host (the teacher, 11/6), 司会（AI）'s robot (直し48,
+           robot.js) by its name, its words in a bubble from it. -->
+      <h2 id="first-look-about-title" class="first-look-title host-head"><span id="host-mark" class="host-mark"
+        aria-hidden="true"></span><span id="host-name"></span></h2>
+      <div id="start-about" class="start-about host-says"></div>
+    </section>
+    <section id="first-look-flow" class="first-look-page" data-page="flow" hidden>
+      <h2 id="first-look-flow-title" class="first-look-title" tabindex="-1"></h2>
+      <ol id="start-flow" class="start-flow" aria-label="すすみ方"></ol>
+    </section>
     <!-- コーチとオブザーバー (the teacher, 11/6; 直し46): the AI's questions
-         at the end of a round, a card for each; hidden with none. -->
-    <div id="start-roles" class="start-roles" hidden>
-      <p id="start-roles-lead" class="start-roles-lead"></p>
-      <ul id="start-roles-list" class="start-roles-list"></ul>
-      <p id="start-roles-note" class="start-roles-note"></p>
-    </div>
-    <p class="first-look-row"><button type="button" id="first-look-next" class="first-look-go" autofocus></button></p>
-  </section>
-  <section id="first-look-inside" class="first-look-page" hidden>
-    <h2 id="first-look-title" class="first-look-title" tabindex="-1"></h2>
-    <div id="first-look-body" class="first-look-body"></div>
-    <p class="first-look-row"><button type="button" id="first-look-go" class="first-look-go"></button></p>
-  </section>
+         at the end of a round, a card for each; the page left out with none. -->
+    <section id="first-look-roles" class="first-look-page" data-page="roles" hidden>
+      <div id="start-roles" class="start-roles" hidden>
+        <h2 id="start-roles-lead" class="first-look-title start-roles-lead" tabindex="-1"></h2>
+        <ul id="start-roles-list" class="start-roles-list"></ul>
+        <p id="start-roles-note" class="start-roles-note"></p>
+      </div>
+    </section>
+    <section id="first-look-inside" class="first-look-page" data-page="inside" hidden>
+      <h2 id="first-look-title" class="first-look-title" tabindex="-1"></h2>
+      <div id="first-look-body" class="first-look-body"></div>
+    </section>
+    <section id="first-look-examples" class="first-look-page" data-page="examples" hidden>
+      <div id="first-look-examples-body" class="first-look-body"></div>
+    </section>
+  </div>
+  <div class="first-look-foot">
+    <ol id="first-look-dots" class="first-look-dots" aria-hidden="true"></ol>
+    <button type="button" id="first-look-back" class="quiet first-look-back" disabled></button>
+    <button type="button" id="first-look-next" class="first-look-go" autofocus></button>
+  </div>
 </dialog>
 
 <!-- The guide (the teacher, 11/6): a bubble by the one thing to press now,

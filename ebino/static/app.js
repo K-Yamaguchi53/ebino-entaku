@@ -228,9 +228,12 @@ async function setup() {
   for (const line of data.texts.start_notice) $("start-notice").append(el("li", { text: line }));
   $("start-purpose").textContent = data.texts.start_purpose;
   // The host's words, a paragraph for each of its lines.
-  for (const line of data.texts.start_about.split("\n").filter((text) => text.trim())) {
-    $("start-about").append(el("p", { text: line }));
-  }
+  // 直し48 段1: on the first page all but the last; the last, 「進み方は、
+  // この4つです。」, heads the second page, the four steps under it.
+  const about = data.texts.start_about.split("\n").filter((text) => text.trim());
+  const flowTitle = about.length > 1 ? about.pop() : "";
+  for (const line of about) $("start-about").append(el("p", { text: line }));
+  $("first-look-flow-title").textContent = flowTitle;
   // How it goes: the band's own steps (the same words light up there later).
   for (const step of data.texts.now_steps) {
     $("start-flow").append(el("li", {}, el("span", { class: "flow-step", text: step.text }),
@@ -835,27 +838,56 @@ function setupInside() {
 // are in. Once only (the next student starts from the page read afresh).
 // Its last button, Esc, or a question example pressed puts whose words are
 // in back in the map's column, and the keyboard goes to the box.
+// The pages there are, in turn (直し48 段1): the host's hello and how it goes
+// always; コーチ and オブザーバー with any; whose words are in and the
+// examples of questions with any words in. Each page's heading names it.
+function firstLookPages(withRoles, withInside) {
+  return [["first-look-about", "first-look-about-title"], ["first-look-flow", "first-look-flow-title"],
+    withRoles && ["first-look-roles", "start-roles-lead"], withInside && ["first-look-inside", "first-look-title"],
+    withInside && ["first-look-examples", "examples-lead"]].filter(Boolean);
+}
+
 function firstLook() {
   const look = $("first-look"), words = state.texts.guide;
   if (state.firstLooked || !words || typeof look.showModal !== "function") return;
   state.firstLooked = true;
-  // Whose words are in, when there are any (with none, the first page alone).
+  // Whose words are in, when there are any: its two parts, each a page of
+  // its own here, moved (not copied) and put back after.
   const body = $("inside").hidden ? null : document.querySelector("#inside-fold .inside-body");
-  $("host-mark").textContent = words.host_mark;
+  const counts = body && body.querySelector(".inside-counts-part");
+  const examples = body && body.querySelector(".inside-examples");
+  // 司会（AI）'s robot (直し48 段2, robot.js) by its name.
+  $("host-mark").replaceChildren(EbinoRobot.make("host"));
   $("host-name").textContent = words.about_title;
   $("first-look-title").textContent = words.first_look_title;
-  $("first-look-go").textContent = words.first_look_go;
-  $("first-look-next").textContent = body ? words.about_next : words.first_look_go;
+  $("first-look-back").textContent = words.back;
   $("inside-fold").open = false;
-  if (body) $("first-look-body").append(body);
-  // 次へ: the second page in place of the first, the keyboard on its heading.
+  if (counts) $("first-look-body").append(counts);
+  if (examples) $("first-look-examples-body").append(examples);
+  const pages = firstLookPages(!$("start-roles").hidden, Boolean(counts && examples));
+  const dots = $("first-look-dots");
+  dots.replaceChildren(...pages.map(() => el("li")));
+  let at = 0;
+  // One page at a time: its heading names the window; 次へ on the last is
+  // 「見た。聞きたいことを書く」. The keyboard stays on 次へ (Enter, Enter, …).
+  const turn = (to) => {
+    at = Math.max(0, Math.min(pages.length - 1, to));
+    pages.forEach(([id], n) => { $(id).hidden = n !== at; });
+    [...dots.children].forEach((dot, n) => dot.classList.toggle("here", n === at));
+    look.setAttribute("aria-labelledby", pages[at][1]);
+    $("first-look-back").disabled = at === 0;
+    $("first-look-next").textContent = at === pages.length - 1 ? words.first_look_go : words.next;
+    look.querySelector(".first-look-pages").scrollTop = 0;
+  };
+  turn(0);
   $("first-look-next").onclick = () => {
-    if (!body) return done();
-    $("first-look-about").hidden = true;
-    $("first-look-inside").hidden = false;
-    look.setAttribute("aria-labelledby", "first-look-title");
-    look.scrollTop = 0;
-    $("first-look-title").focus();
+    if (at === pages.length - 1) return done();
+    turn(at + 1);
+    $("first-look-next").focus();
+  };
+  $("first-look-back").onclick = () => {
+    turn(at - 1);
+    ($("first-look-back").disabled ? $("first-look-next") : $("first-look-back")).focus();
   };
   // Every way out comes here, once (the browser's own close event does not
   // always come: Esc closes it here, not by the browser).
@@ -864,14 +896,14 @@ function firstLook() {
     if (over) return;
     over = true;
     if (look.open) look.close();
-    if (body) $("inside-fold").append(body);
+    if (counts) body.append(counts);
+    if (examples) body.append(examples);
     $("inside").classList.remove("beckon");  // Seen: the light goes for good.
     $("question").focus({ preventScroll: true });
     drawGuide();
   };
   look.addEventListener("cancel", (event) => { event.preventDefault(); done(); });
   look.addEventListener("close", done);
-  $("first-look-go").onclick = done;
   // An example pressed fills the box (fill); then the box is what is next.
   look.addEventListener("click", (event) => {
     if (event.target.closest("#work-questions button")) done();

@@ -23,7 +23,7 @@
 // hk_scale, hk_keep, hk_light, hk_sheet) it reads, apart from the eight
 // above, whether the page is wider than the window, and whether the button
 // that goes on is reached by scrolling and not covered ("next button").
-// intro (直し46): 司会（AI）から、はじめに, its first page with the cards of
+// intro (直し46, 直し48 段1: five pages): 司会（AI）から、はじめに, the cards of
 // コーチ（AI） and オブザーバー（AI）: its 次へ has the keyboard (autofocus)
 // and, scrolled to inside the window if need be, is there and not covered
 // ("next button").
@@ -192,21 +192,48 @@ async (page) => {
     }
   }
 
-  // 直し46: the first page of 司会（AI）から、はじめに, as it opens.
+  // 直し46, 直し48 段1: 司会（AI）から、はじめに, page by page (five). On
+  // each: 次へ in the window without scrolling and not covered ("next N"),
+  // the page not wider than the dialog ("wide page N"), the dots saying
+  // which page; the cards of コーチ（AI） and オブザーバー（AI） on the
+  // third ("cards N"); 戻る back once from the last; the last button shuts it.
   async function intro(p, errors) {
     await p.goto(BASE);
     await p.waitForSelector(".lab-pick button");
     await p.locator(".lab-pick button").first().click();
-    await p.waitForFunction(() => { const d = document.querySelector("#first-look"); return d && d.open; }, null, { timeout: 8000 });
+    await p.waitForFunction(() => { const d = document.querySelector("#first-look"); return d && d.open; }, null, { timeout: 15000 });
     await p.waitForTimeout(600);
     const bad = [];
     const m = await measure(p);
     if (m.h > m.vh) bad.push(`tall ${m.h}>${m.vh}`);
     if (m.w > m.vw) bad.push(`wide ${m.w}>${m.vw}`);
-    const roles = await p.locator("#start-roles .role-card").count();
-    if (roles !== 2) bad.push(`cards ${roles}`);
     if (!(await p.evaluate(() => document.activeElement && document.activeElement.id === "first-look-next"))) bad.push("not focused");
-    if (!(await reached(p, "#first-look-next"))) bad.push("next button");
+    const pages = await p.locator("#first-look-dots li").count();
+    if (pages !== 5) bad.push(`pages ${pages}`);
+    for (let n = 0; n < pages; n++) {
+      const seen = await p.evaluate((n) => {
+        const page = [...document.querySelectorAll(".first-look-page")].filter((s) => !s.hidden);
+        const dots = [...document.querySelectorAll("#first-look-dots li")];
+        const next = document.querySelector("#first-look-next").getBoundingClientRect();
+        const top = document.elementFromPoint(next.left + next.width / 2, next.top + next.height / 2);
+        return { one: page.length === 1, dot: dots.findIndex((d) => d.classList.contains("here")) === n,
+          next: next.top >= 0 && next.bottom <= window.innerHeight && next.left >= 0 && next.right <= window.innerWidth
+            && Boolean(top && top.closest("#first-look-next")),
+          wide: page[0] && page[0].scrollWidth > page[0].clientWidth + 1,
+          cards: document.querySelectorAll("#first-look-roles:not([hidden]) .role-card").length,
+          page: page[0] && page[0].dataset.page };
+      }, n);
+      if (!seen.one || !seen.dot) bad.push(`page ${n + 1} not alone`);
+      if (!seen.next) bad.push(`next ${n + 1}`);
+      if (seen.wide) bad.push(`wide page ${n + 1}`);
+      if (seen.page === "roles" && seen.cards !== 2) bad.push(`cards ${seen.cards}`);
+      if (n < pages - 1) await p.click("#first-look-next");
+    }
+    await p.click("#first-look-back");
+    if (!(await p.evaluate(() => !document.querySelector("#first-look-inside").hidden))) bad.push("back");
+    await p.click("#first-look-next");
+    await p.click("#first-look-next");
+    if (await p.evaluate(() => document.querySelector("#first-look").open)) bad.push("not shut");
     if (errors.length) bad.push(`errors ${errors.length}`);
     return bad.length ? bad.join(" ") : "ok";
   }

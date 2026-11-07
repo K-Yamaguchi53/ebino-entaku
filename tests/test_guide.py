@@ -33,20 +33,34 @@ def test_its_words_are_the_teachers_file_every_row_there():
     assert words["first_look_go"] and words["write"]
 
 
-def test_the_first_look_is_one_dialog_of_two_pages_what_the_app_is_then_whose_words():
+def test_the_first_look_is_one_dialog_of_five_pages_one_thing_each():
+    """直し48 段1 (the teacher, 11/7: the more on one page, the more is
+    skipped): the host's hello, how it goes, コーチ and オブザーバー, whose
+    words are in, examples of questions; one at a time, 次へ and 戻る at the
+    foot, the dots saying which."""
     assert '<dialog id="first-look" class="first-look" aria-labelledby="first-look-about-title">' in HTML
     look = HTML[HTML.index('<dialog id="first-look"'):HTML.index("</dialog>")]
-    assert look.index('<section id="first-look-about" class="first-look-page">') < look.index(
-        '<section id="first-look-inside" class="first-look-page" hidden>')
-    assert '<button type="button" id="first-look-next" class="first-look-go" autofocus></button>' in look
-    assert '<button type="button" id="first-look-go" class="first-look-go"></button>' in look
-    # 次へ: the second page in place of the first, the keyboard and the name on it.
+    order = ['<section id="first-look-about" class="first-look-page" data-page="hello">',
+             '<section id="first-look-flow" class="first-look-page" data-page="flow" hidden>',
+             '<section id="first-look-roles" class="first-look-page" data-page="roles" hidden>',
+             '<section id="first-look-inside" class="first-look-page" data-page="inside" hidden>',
+             '<section id="first-look-examples" class="first-look-page" data-page="examples" hidden>',
+             '<div class="first-look-foot">']
+    assert [look.index(part) for part in order] == sorted(look.index(part) for part in order)
+    foot = look[look.index('<div class="first-look-foot">'):]
+    assert '<ol id="first-look-dots" class="first-look-dots" aria-hidden="true"></ol>' in foot
+    assert '<button type="button" id="first-look-back" class="quiet first-look-back" disabled></button>' in foot
+    assert '<button type="button" id="first-look-next" class="first-look-go" autofocus></button>' in foot
+    assert 'id="first-look-go"' not in look and "first-look-row" not in look
+    # One page at a time, named by its heading; 戻る off on the first; the
+    # last 次へ is 「見た。聞きたいことを書く」 and closes it.
     page = _top("firstLook")
-    assert '$("first-look-about").hidden = true;' in page and '$("first-look-inside").hidden = false;' in page
-    assert 'look.setAttribute("aria-labelledby", "first-look-title");' in page and '$("first-look-title").focus();' in page
-    # With no words in, the first page alone, its button the last one.
-    assert '$("first-look-next").textContent = body ? words.about_next : words.first_look_go;' in page
-    assert "if (!body) return done();" in page
+    assert 'pages.forEach(([id], n) => { $(id).hidden = n !== at; });' in page
+    assert 'look.setAttribute("aria-labelledby", pages[at][1]);' in page
+    assert '$("first-look-back").disabled = at === 0;' in page
+    assert '$("first-look-next").textContent = at === pages.length - 1 ? words.first_look_go : words.next;' in page
+    assert "if (at === pages.length - 1) return done();" in page
+    assert '$("first-look-back").textContent = words.back;' in page
     # The guide is never read out (the line at the top is) and never pressed.
     assert '<div id="guide" class="guide" aria-hidden="true" hidden>' in HTML
     rule = CSS[CSS.index(".guide { position: fixed;"):]
@@ -59,15 +73,16 @@ def test_the_first_look_comes_once_when_the_table_is_out_and_goes_back_to_the_co
     look = _top("firstLook")
     assert "if (state.firstLooked ||" in look and "state.firstLooked = true;" in look
     # The same words as in the map's column, moved, not copied (no id twice).
-    assert 'if (body) $("first-look-body").append(body);' in look
-    assert 'if (body) $("inside-fold").append(body);' in look
+    assert 'if (counts) $("first-look-body").append(counts);' in look
+    assert 'if (examples) $("first-look-examples-body").append(examples);' in look
+    assert "if (counts) body.append(counts);" in look and "if (examples) body.append(examples);" in look
     assert '$("inside").classList.remove("beckon");' in look
     assert '$("question").focus({ preventScroll: true });' in look
     assert "look.showModal();" in look
     # Every way out (its button, Esc, the browser's close) the same, once:
     # the close event does not always come, so Esc is handled here.
     assert 'look.addEventListener("cancel", (event) => { event.preventDefault(); done(); });' in look
-    assert '$("first-look-go").onclick = done;' in look and "if (over) return;" in look
+    assert "if (over) return;" in look
     # An example pressed fills the box; then the box is next.
     assert 'event.target.closest("#work-questions button")' in look
 
@@ -149,6 +164,12 @@ def test_what_the_app_is_and_how_it_goes_come_right_before_whose_words_are_in():
     assert "start-about" not in start and "start-flow" not in start
     page = HTML[HTML.index('<section id="first-look-about"'):HTML.index('<section id="first-look-inside"')]
     assert page.index('id="start-about"') < page.index('<ol id="start-flow" class="start-flow" aria-label="すすみ方">')
+    # 直し48 段1: the hello on the first page, how it goes on the second,
+    # headed by the host's last line (「進み方は、この4つです。」).
+    assert page.index('id="start-about"') < page.index('<section id="first-look-flow"') < page.index('id="start-flow"')
+    assert 'const flowTitle = about.length > 1 ? about.pop() : "";' in APP
+    assert '$("first-look-flow-title").textContent = flowTitle;' in APP
+    assert screen["start_about"].strip().splitlines()[-1] == "進み方は、この4つです。"
     # The step names are the band's own (the same words light up there later).
     filled = APP[APP.index("// The host's words, a paragraph for each of its lines."):APP.index('$("lab-question").textContent')]
     assert "for (const step of data.texts.now_steps)" in filled and "data.texts.start_flow[step.id]" in filled
@@ -164,10 +185,11 @@ def test_the_first_page_is_said_by_the_host_an_ai_in_the_ais_colour():
     assert "司会" in said and "AI" in said and "本人がいま答えているのではありません" in said
     assert screen["guide"]["host_mark"] and "AI" in screen["guide"]["about_title"]
     page = HTML[HTML.index('<section id="first-look-about"'):HTML.index('<section id="first-look-inside"')]
-    assert 'class="ai-mark host-mark"' in page and 'class="start-about host-says"' in page
+    assert 'class="host-mark"' in page and 'class="start-about host-says"' in page
     assert ".host-says { position: relative;" in CSS and "border: 2px solid var(--ai);" in CSS
-    # Stronger than .ai-mark, which comes later in the file.
-    assert ".host-head .host-mark { width: 52px; height: 52px;" in CSS
+    # 直し48: 司会（AI）'s robot (robot.js) by its name, in place of the square mark.
+    assert '$("host-mark").replaceChildren(EbinoRobot.make("host"));' in _top("firstLook")
+    assert ".host-head .host-mark { display: inline-block; flex: none; width: 64px; height: 64px;" in CSS
     # A paragraph for each of its lines.
     assert r'data.texts.start_about.split("\n")' in APP
 
@@ -191,10 +213,15 @@ def test_the_host_page_has_a_card_for_the_coach_and_the_observer():
     assert 'EbinoRobot.make(role.role, { tag: data.texts.ai_seat_mark })' in roles
     assert "role.name" in roles and "role.knows" in roles and "role.does" in roles and "｜" not in roles
     assert '$("start-roles-note").textContent = data.texts.guide.roles_note;' in roles
-    # On the first page, under the flow, hidden with none.
-    page = HTML[HTML.index('<section id="first-look-about"'):HTML.index('<section id="first-look-inside"')]
-    assert page.index('<ol id="start-flow"') < page.index('<div id="start-roles" class="start-roles" hidden>')
-    assert page.index('id="start-roles-list"') < page.index('id="start-roles-note"') < page.index('id="first-look-next"')
+    # 直し48 段1: a page of their own, the third, after how it goes; left
+    # out with none. Its heading the lead; the note says both are AI.
+    page = HTML[HTML.index('<section id="first-look-roles"'):HTML.index('<section id="first-look-inside"')]
+    assert HTML.index('<ol id="start-flow"') < HTML.index('<section id="first-look-roles"')
+    assert '<div id="start-roles" class="start-roles" hidden>' in page
+    assert '<h2 id="start-roles-lead" class="first-look-title start-roles-lead" tabindex="-1"></h2>' in page
+    assert page.index('id="start-roles-list"') < page.index('id="start-roles-note"')
+    assert 'withRoles && ["first-look-roles", "start-roles-lead"]' in APP
+    assert 'firstLookPages(!$("start-roles").hidden, Boolean(counts && examples))' in _top("firstLook")
     assert '$("start-roles").hidden = !roles.length;' in APP and "data.ai_roles || []" in APP
     assert ".start-roles[hidden] { display: none; }" in CSS
     # From its heading, on a low screen too (1366×650: the heading had gone up out of sight).

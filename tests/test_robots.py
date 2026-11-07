@@ -72,15 +72,15 @@ def test_the_robots_are_drawn_in_one_place_only():
     assert "<svg" not in ROBOT and "innerHTML" not in ROBOT
     assert not list(STATIC.glob("robot*.svg")) and not list(STATIC.glob("robot*.png"))
     # Every place makes it there.
-    assert APP.count("EbinoRobot.make(") == 2 and MAP.count("EbinoRobot.make(") == 1
+    assert APP.count("EbinoRobot.make(") == 3 and MAP.count("EbinoRobot.make(") == 1
 
 
 @node
 def test_the_coach_and_the_observer_are_different_robots():
     got = _run('process.stdout.write(JSON.stringify({ coach: EbinoRobot.make("coach"), '
-               'observer: EbinoRobot.make("observer"), other: EbinoRobot.make("host"), roles: EbinoRobot.roles }));')
-    assert got["roles"] == ["coach", "observer"]
-    assert got["other"] is None  # 司会 and any other: no robot.
+               'observer: EbinoRobot.make("observer"), other: EbinoRobot.make("moderator"), roles: EbinoRobot.roles }));')
+    assert got["roles"] == ["coach", "observer", "host"]
+    assert got["other"] is None  # Any other: no robot.
     coach, observer = _shape(got["coach"]), _shape(got["observer"])
     assert coach != observer
     assert got["coach"]["dataset"]["robot"] == "coach" and got["observer"]["dataset"]["robot"] == "observer"
@@ -165,15 +165,48 @@ process.stdout.write(JSON.stringify({ mark: $("ai-seat-mark").textContent,
     assert got["mark"] == "AI"
 
 
-def test_the_hosts_mark_and_the_seats_heading_are_as_they_were():
-    assert 'class="ai-mark host-mark"' in HTML and '$("host-mark").textContent = words.host_mark;' in APP
+@node
+def test_the_host_is_a_third_robot_told_apart_by_its_shape():
+    """直し48 段2: 司会（AI） as a robot too, drawn as the other two (lines,
+    currentColor, the same width by its place): a wide head with rounded
+    corners, one small dot on its top (no antenna stick), two short level
+    lines for eyes, no mouth, a bow tie (two triangles) on the body's top, a
+    microphone (a small ring on a short stick) in one hand. Never a person."""
+    got = _run('process.stdout.write(JSON.stringify({ host: EbinoRobot.make("host"), coach: EbinoRobot.make("coach"), '
+               'observer: EbinoRobot.make("observer") }));')
+    host = _shape(got["host"])
+    assert got["host"]["dataset"]["robot"] == "host" and got["host"]["attrs"]["aria-hidden"] == "true"
+    assert host != _shape(got["coach"]) and host != _shape(got["observer"])
+    head = [a for t, a in host if t == "rect"][0]
+    assert float(head["width"]) > float(head["height"]) * 1.5  # Wide.
+    assert 0 < float(head["rx"]) * 2 < float(head["height"])  # Rounded corners, not round.
+    # One dot on top (filled, small, over the head), no stick up to it.
+    dots = [a for t, a in host if t == "circle" and a.get("fill") == "currentColor"]
+    assert len(dots) == 1 and float(dots[0]["r"]) <= 3 and float(dots[0]["cy"]) + float(dots[0]["r"]) <= float(head["y"])
+    assert not [a for t, a in host if t == "line" and min(float(a["y1"]), float(a["y2"])) < float(head["y"])]
+    # Eyes: two short level lines inside the head; no mouth (no path).
+    eyes = [a for t, a in host if t == "line" and a["y1"] == a["y2"]
+            and float(head["y"]) < float(a["y1"]) < float(head["y"]) + float(head["height"])]
+    assert len(eyes) == 2 and all(float(a["x2"]) - float(a["x1"]) <= 10 for a in eyes)
+    assert "path" not in [t for t, _ in host]
+    # A bow tie: two triangles meeting at the body's top middle.
+    ties = [a["points"].split() for t, a in host if t == "polygon"]
+    assert len(ties) == 2 and all(len(points) == 3 for points in ties) and ties[0][0] == ties[1][0]
+    # A microphone: a ring (not filled) outside the body, by a hand.
+    rings = [a for t, a in host if t == "circle" and "fill" not in a]
+    body = [a for t, a in host if t == "rect"][1]
+    assert len(rings) == 1 and float(rings[0]["cx"]) < float(body["x"])
+    for tag, attrs in host:
+        assert set(attrs.get("fill", "currentColor").split()) == {"currentColor"}
+        assert "stroke" not in attrs and "style" not in attrs
+
+
+def test_the_hosts_mark_is_its_robot_and_the_seats_heading_as_it_was():
+    # 直し48: the first look's speaker, 司会（AI）, is its robot by its name.
+    assert '<span id="host-mark" class="host-mark"' in HTML and 'class="ai-mark host-mark"' not in HTML
+    assert '$("host-mark").replaceChildren(EbinoRobot.make("host"));' in APP
+    assert ".host-head .host-mark .robot { --robot-line: 2.4px; width: 100%; height: 100%; }" in CSS
     assert '<span id="ai-seat-mark" class="ai-mark" aria-hidden="true"></span>' in HTML
-    assert ".host-head .host-mark { width: 52px; height: 52px;" in CSS
-    host = HTML[HTML.index('id="host-mark"') - 200:HTML.index('id="host-mark"') + 200]
-    assert "robot" not in host
-    for line in APP.splitlines():
-        if "host-mark" in line or "host_mark" in line:
-            assert "Robot" not in line
 
 
 def test_its_look_lines_in_the_ais_blue_never_moving():

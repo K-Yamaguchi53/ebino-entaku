@@ -212,7 +212,7 @@ BUBBLE_CHOICES_HELP = "bubble_choices_help"
 # told): the first look at whose words are in, its heading and its button;
 # and the bubble by the one thing to press now, for the states that have one.
 GUIDE = "guide"
-GUIDE_IDS = ("host_mark", "about_title", "roles_lead", "roles_note", "about_next", "first_look_title", "first_look_go", "write", "table", "pressed", "answer_ai", "after")
+GUIDE_IDS = ("host_mark", "about_title", "roles_lead", "roles_note", "about_next", "first_look_title", "first_look_go", "write", "table", "pressed", "answer_ai", "after", "back", "next")
 
 # 今日の道すじ (直し45 段2): the trail's words (叩き台), and the 「（AI）」 put
 # after コーチ and オブザーバー's names (coach_label.txt before its ｜).

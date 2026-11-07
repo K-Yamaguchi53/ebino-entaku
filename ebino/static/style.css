@@ -254,7 +254,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .start-about p + p { margin-top: 6px; }
 /* Said by the host: its mark (the AI's colour) and name, then a bubble from it. */
 .host-head { display: flex; align-items: center; gap: 12px; }
-.host-head .host-mark { width: 52px; height: 52px; border-radius: 12px; font-size: 17px; }
+/* 司会（AI）'s robot (直し48, robot.js), as large as the others at the first look. */
+.host-head .host-mark { display: inline-block; flex: none; width: 64px; height: 64px; line-height: 0; }
+.host-head .host-mark .robot { --robot-line: 2.4px; width: 100%; height: 100%; }
 .host-says { position: relative; padding: 14px 20px; border: 2px solid var(--ai); border-radius: 12px;
   background: var(--ai-deep); color: var(--ai-ink); }
 .host-says::before { content: ""; position: absolute; left: 18px; bottom: 100%; border: 10px solid transparent;
@@ -1769,6 +1771,38 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
   box-shadow: 0 18px 60px var(--shadow); overflow: auto; }
 .first-look::backdrop { background: var(--veil); }
 .first-look-page[hidden] { display: none; }
+/* 直し48 段1: five pages, one at a time; the pages scroll inside, the foot
+   (the dots, 戻る and 次へ) stays in the window whatever its size. No
+   movement between pages (none with motion reduced, nor without). */
+.first-look[open] { display: flex; flex-direction: column; overflow: hidden; }
+.first-look-pages { flex: 1 1 auto; min-height: 0; overflow: auto; scrollbar-width: thin;
+  scrollbar-color: var(--lamp-soft) transparent; padding: 2px; }
+.first-look-page { min-height: 10em; }
+.first-look-foot { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--moon-faint); }
+.first-look-back { justify-self: start; min-height: 48px; padding: 0 22px; font-size: 18px; }
+.first-look-back:disabled { visibility: hidden; }
+.first-look-foot .first-look-go { justify-self: end; grid-column: 3; grid-row: 1; }
+.first-look-dots { grid-column: 2; grid-row: 1; display: flex; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.first-look-dots li { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--lamp); }
+.first-look-dots li.here { background: var(--lamp); }
+.first-look-page .start-about { font-size: 22px; line-height: 1.8; }
+.first-look-page .host-says { margin-top: 18px; }
+.first-look-page .start-roles { margin: 0; }
+.first-look-page .start-roles-lead { font-size: 24px; line-height: 1.5; }
+.first-look-page .start-roles-note { font-size: 19px; font-weight: 700; color: var(--ai); }
+.first-look-body .inside-body > * { min-width: 0; }
+#first-look-examples-body .inside-examples { border: 0; padding: 0; }
+#first-look-examples-body .examples-lead { margin: 0 0 12px; font-family: var(--mincho); font-size: 26px; line-height: 1.5;
+  color: var(--lamp-bright); }
+#first-look-examples-body .examples-list { font-size: 20px; line-height: 1.9; }
+#first-look-examples-body .examples-end { margin-top: 10px; font-size: 18px; }
+@media (max-width: 600px) {
+  .first-look-foot { grid-template-columns: auto minmax(0, 1fr); }
+  .first-look-dots { grid-column: 1 / -1; grid-row: 1; justify-content: center; }
+  .first-look-back { grid-row: 2; }
+  .first-look-foot .first-look-go { grid-row: 2; grid-column: 2; padding: 0 20px; font-size: 19px; }
+}
 .first-look-title:focus { outline: none; }
 .first-look-title { margin: 0 0 14px; font-family: var(--mincho); font-size: 28px; line-height: 1.4; color: var(--lamp-bright); }
 .first-look-body .inside-body { display: grid; gap: 14px 36px; }
@@ -1788,8 +1822,12 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
   .first-look-title { font-size: 23px; margin-bottom: 8px; }
   .first-look-body .inside-counts .number { font-size: 32px; }
   .first-look-row { margin-top: 10px; }
+  .first-look-foot { margin-top: 10px; padding-top: 8px; }
+  .first-look-page .start-about { font-size: 19px; line-height: 1.7; }
+  .first-look-page .start-roles-lead { font-size: 20px; }
   /* The host's page on a low screen (1366×650): all of it, its heading too, at once. */
-  .host-head .host-mark { width: 40px; height: 40px; font-size: 14px; }
+  .host-head .host-mark { width: 48px; height: 48px; }
+  .host-head .host-mark .robot { --robot-line: 2px; }
   .start-about { margin-bottom: 12px; font-size: 17px; line-height: 1.6; }
   .host-says { padding: 10px 16px; }
   .start-flow li { padding: 8px 12px 10px; }
