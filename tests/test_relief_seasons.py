@@ -98,8 +98,9 @@ def test_it_opens_on_the_months_season_and_switches_only_the_two_pictures():
     start = _inner("startLook")
     assert "new Date().getMonth() + 1" in start and "|| all[0]" in start  # Else the night.
     show = _inner("showLook")
-    assert show.count("setAttribute(\"href\"") == 2
-    assert "lookNodes.picture" in show and "lookNodes.ground" in show
+    # The two pictures only; 直し48 段6: at once, or melted in (a picture over it, then its own href).
+    assert "for (const [node, href] of [[lookNodes.picture, look.image], [lookNodes.ground, look.blur]])" in show
+    assert show.count("setAttribute(\"href\"") == 3
     # Nothing else is redrawn: no draw, no move, no relayout.
     assert not re.search(r"\b(draw|build|moveTo|relayout)\(", show)
     assert 'aria-pressed", String(button.dataset.look === look.id)' in show

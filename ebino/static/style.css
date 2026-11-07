@@ -71,6 +71,8 @@
   --wood-side: #170f09;
   --wood-lit: #7a5634;
   --river: #86b3dd;
+  --sakura: #f5b3c8;  /* Spring's flowers on the map (直し48 段6). */
+  --sakura-edge: #fff4f7;
   --ink: #ece6d8;  /* Words on the night. */
   --soft: #a9bdd9;  /* Quieter words on the night. */
   --faint: #7d8fae;
@@ -815,6 +817,19 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
    edge, in moonlight about the size of a place name, what lies that way
    with a little chevron pointing out. They take no presses. */
 .map-compass, .map-around { position: absolute; transition: opacity .9s ease; }
+/* 直し48 段6: the scenery's name, small, in a corner (map.js places it);
+   never pressed; out of the way at one to one and while the map moves. */
+.map-look-label { position: absolute; z-index: 2; display: grid; margin: 0; padding: 4px 10px; border-radius: 8px;
+  background: color-mix(in srgb, var(--night) 72%, transparent); color: var(--moon); pointer-events: none; line-height: 1.35; }
+.map-look-label[hidden] { display: none; }
+.map-look-label .look-name { font-family: var(--mincho); font-size: 14px; font-weight: 700; }
+.map-look-label .look-note { font-size: 11px; color: var(--soft); }
+.one-on .map-look-label, .moving .map-look-label { visibility: hidden; }
+/* Spring's flowers: cherry-pink dots, still, on the spring picture only. */
+.spring-flowers .flower { fill: var(--sakura); fill-opacity: .85; stroke: var(--sakura-edge); stroke-opacity: .5; stroke-width: .8; }
+.spring-flowers { opacity: 0; }
+.map-frame[data-look="spring"] .spring-flowers { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) { .spring-flowers { transition: opacity 1.6s ease-in-out; } }
 .map-compass { width: 56px; height: 56px; }
 .map-compass svg { position: absolute; left: 13px; top: 13px; width: 30px; height: 30px; overflow: visible; }
 .map-compass .dial { fill: var(--veil-thin); stroke: var(--moon-soft); stroke-width: 1px; }

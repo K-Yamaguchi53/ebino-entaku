@@ -193,6 +193,7 @@ const EbinoMap = (() => {
   // The map's seasons (the teacher, 11/6): which one opens by the month
   // (3-5 spring, 9-11 autumn, else the night), when its picture is there.
   const SEASON_MONTHS = { spring: [3, 4, 5], autumn: [9, 10, 11] };
+  const LOOK_FADE = 1600;  // ms for the next scenery to melt in (直し48 段6).
   // Where the picture melts into it ([where, shown]): its see-through or
   // black margin hidden, the land shown a little further in.
   const RELIEF_FADE_X = [[0, 0], [0.016, 0], [0.04, 1], [0.96, 1], [0.984, 0], [1, 0]];
@@ -537,6 +538,8 @@ const EbinoMap = (() => {
       faded.append(picture);
       image.append(faded);
       lookNodes = { picture, ground };
+      // 直し48 段6: spring's flowers, over the picture, under everything else.
+      drawFlowers(layer("spring-flowers"));
     }
     $("map-season").hidden = !view.relief || looksOf().length < 2;
     const fill = layer("basin-fill");
@@ -1383,15 +1386,114 @@ const EbinoMap = (() => {
     showLook(look.id);
   }
 
-  function showLook(id) {
+  // 直し48 段6 (the teacher's 決定, 11/7): with fade, the new picture melts
+  // in over the old one (LOOK_FADE; at once with motion reduced).
+  function showLook(id, { fade = false } = {}) {
+    const was = look;
     look = looksOf().find((one) => one.id === id) || look;
-    frame.dataset.look = look.id;  // The place names' halo (style.css).
+    frame.dataset.look = look.id;  // The place names' halo, the spring's flowers (style.css).
     if (lookNodes) {
-      lookNodes.picture.setAttribute("href", look.image);
-      lookNodes.ground.setAttribute("href", look.blur);
+      const melt = fade && was && was.id !== look.id && !reduced();
+      for (const [node, href] of [[lookNodes.picture, look.image], [lookNodes.ground, look.blur]]) {
+        if (!melt) {
+          node.setAttribute("href", href);
+          continue;
+        }
+        const over = node.cloneNode();
+        over.setAttribute("href", href);
+        over.style.opacity = "0";
+        node.after(over);
+        const run = over.animate([{ opacity: 0 }, { opacity: 1 }], { duration: LOOK_FADE, easing: "ease-in-out", fill: "forwards" });
+        run.onfinish = () => { node.setAttribute("href", href); over.remove(); };
+      }
     }
     for (const button of $("map-season").querySelectorAll("button")) {
       button.setAttribute("aria-pressed", String(button.dataset.look === look.id));
+    }
+    const label = $("map-look-label");
+    const words = app && app.state.texts.map_look_label;
+    if (label && words) {
+      label.querySelector(".look-name").textContent = words[look.id] || "";
+      label.querySelector(".look-note").textContent = words.note;
+      label.hidden = !words[look.id];
+      placeLookLabel();
+    }
+  }
+
+  // 直し48 段6: each time someone answers (the town's adults at the table,
+  // or one to one), the scenery goes one on: night, spring, autumn, night…
+  // From the one shown (a button pressed is where it goes on from).
+  function nextLook() {
+    const all = looksOf();
+    if (!map || !map.relief || all.length < 2 || !look) return;
+    const at = all.findIndex((one) => one.id === look.id);
+    showLook(all[(at + 1) % all.length].id, { fade: true });
+  }
+
+  // The scenery's name in a corner of the frame (直し48 段6): the first of
+  // the corners (the AI's seat's not among them) over the fewest of the
+  // map's words, bubbles and marks.
+  function placeLookLabel() {
+    const label = $("map-look-label");
+    if (!label || label.hidden || !frame) return;
+    const f = frame.getBoundingClientRect(), l = label.getBoundingClientRect();
+    if (!f.width || !l.width) return;
+    const m = 8;
+    const corners = { "top-right": [f.width - l.width - m, m], "bottom-left": [m, f.height - l.height - m],
+      "bottom-right": [f.width - l.width - m, f.height - l.height - m], "top-left": [m, m] };
+    const ai = view && view.aiCorner && !$("ai-seat").hidden ? view.aiCorner : "";
+    const busy = [...frame.querySelectorAll(".table-bubble:not(.unplaced), .table-label:not(.unplaced), .map-around, "
+      + ".map-compass, .split-tag, .school-count, .home-names text, .place-names text, .pt .shape, .one-bubble, .one-asks, .one-coach")]
+      .filter((n) => n.getClientRects().length).map((n) => n.getBoundingClientRect());
+    const seat = $("ai-seat");
+    if (seat && !seat.hidden) busy.push(seat.getBoundingClientRect());
+    let best = null, least = Infinity;
+    for (const [name, [x, y]] of Object.entries(corners)) {
+      if (name === ai) continue;
+      const box = { left: f.left + x, top: f.top + y, right: f.left + x + l.width, bottom: f.top + y + l.height };
+      const n = busy.filter((b) => b.left < box.right && box.left < b.right && b.top < box.bottom && box.top < b.bottom).length;
+      if (n < least) [best, least] = [[x, y], n];
+      if (!n) break;
+    }
+    label.style.left = `${Math.round(best[0])}px`;
+    label.style.top = `${Math.round(best[1])}px`;
+  }
+
+  // Spring's flowers (直し48 段6): small cherry-pink dots on the low land
+  // and along the river, from a fixed seed (the same place every time),
+  // still, under the points and the bubbles; shown on the spring picture only.
+  const FLOWER_SEED = 48, FLOWER_MOST = 140, FLOWER_LOW = 0.3;
+  function flowerSpots() {
+    let s = FLOWER_SEED;
+    const rand = () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const rim = map.boundary;
+    const xs = rim.map((p) => p[0]), ys = rim.map((p) => p[1]);
+    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    const inside = (x, y) => {
+      let hit = false;
+      for (let i = 0, j = rim.length - 1; i < rim.length; j = i++) {
+        const [xi, yi] = rim[i], [xj, yj] = rim[j];
+        if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) hit = !hit;
+      }
+      return hit;
+    };
+    const tries = [];
+    for (let n = 0; n < 3000; n++) {
+      const x = x0 + rand() * (x1 - x0), y = y0 + rand() * (y1 - y0), r = rand();
+      if (inside(x, y)) tries.push({ x, y, r, z: view.zAt(x, y) });
+    }
+    if (!tries.length) return [];
+    const low = [...tries].map((t) => t.z).sort((a, b) => a - b)[Math.floor(tries.length * FLOWER_LOW)];
+    // Along the river: within a few units of its lines.
+    const near = (x, y) => (map.river || []).some((line) => line.some(([rx, ry]) => Math.abs(rx - x) + Math.abs(ry - y) < 6));
+    return tries.filter((t) => t.z <= low || near(t.x, t.y)).slice(0, FLOWER_MOST);
+  }
+
+  function drawFlowers(layer) {
+    for (const spot of flowerSpots()) {
+      const [px, py] = view.proj(spot.x, spot.y, 0.5);
+      layer.append(svgEl("circle", { class: "flower", cx: px.toFixed(1), cy: py.toFixed(1), r: (2.6 + spot.r * 2.4).toFixed(1) }));
     }
   }
 
@@ -1903,6 +2005,7 @@ const EbinoMap = (() => {
     if (one) placeOne();
     putChoices();
     placeAskMarks();
+    placeLookLabel();
   }
 
   // The AI's seat over a corner of the map (直し35-2): the first of
@@ -2296,6 +2399,7 @@ const EbinoMap = (() => {
     const order = result.seat_order.filter((id) => points[id]);
     if (!order.length) return;
     roundSeats = order;
+    nextLook();  // 直し48 段6: someone answered; the scenery goes one on.
     // 「いまやること」 (直し31-5): the seats are lighting until the table's
     // cards (or, on the flat map, the last bubble) are out.
     app.setNow({ reading: true });
@@ -3661,6 +3765,7 @@ const EbinoMap = (() => {
           const answer = await app.oneAsk(mine.seatId, item);
           if (one !== mine) return;
           says(answer.pieces, answer.source, answer.kind_label);
+          nextLook();  // 直し48 段6.
           // The next questions at once; the coach's question after, if it comes.
           if (answer.coach) askCoach(mine, answer.coach.ask_no);
           showAsks(answer);

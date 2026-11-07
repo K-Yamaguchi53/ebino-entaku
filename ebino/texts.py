@@ -113,6 +113,9 @@ SCHOOL_LABEL = "school_label"
 # The map's buttons (map.js): 地図にもどす and the zoom buttons. Columns
 # ID・文字・読み上げ; an empty 読み上げ reads the 文字 itself.
 MAP_BUTTONS = "map_buttons"
+# 直し48 段6: the scenery shown, in a corner of the map (叩き台).
+MAP_LOOK_LABEL = "map_look_label"
+MAP_LOOK_LABEL_IDS = ("night", "spring", "autumn", "note")
 # The drawer's parts (直し32-1): each one's name, on its button and over it.
 DRAWER_PARTS = "drawer_parts"
 DRAWER_PART_IDS = ("paragraph", "rounds", "seats", "purposes")
@@ -320,6 +323,7 @@ def screen_texts() -> dict:
     texts: dict = {name: load_text(name) for name in SCREEN_TEXTS}
     texts.update({name: load_lines(name) for name in SCREEN_LISTS})
     texts[MAP_BUTTONS] = map_buttons()
+    texts[MAP_LOOK_LABEL] = id_table(MAP_LOOK_LABEL, MAP_LOOK_LABEL_IDS)
     texts[MAP_AROUND] = map_around()
     texts[BUBBLE_CHOICES] = bubble_choices()
     texts[DRAWER_PARTS] = id_table(DRAWER_PARTS, DRAWER_PART_IDS)
