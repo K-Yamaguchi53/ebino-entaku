@@ -273,6 +273,7 @@ class App:
             "fill": lambda: session.hitokoto_fill(body.get("text", ""), skip=skip),
             "scale": lambda: session.hitokoto_scale(body.get("value")),
             "forward": lambda: session.hitokoto_forward(body.get("text", ""), skip=skip),
+            "notice": lambda: session.hitokoto_notice(body.get("answer"), body.get("text", ""), skip=skip),
             "way": lambda: session.hitokoto_way(body.get("text", ""), skip=skip),
             "subject": lambda: session.hitokoto_subject(body.get("answer")),
             "subject_note": lambda: session.hitokoto_subject_note(body.get("text", ""), skip=skip),

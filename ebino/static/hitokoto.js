@@ -606,10 +606,10 @@ const EbinoHitokoto = (() => {
       }
       busy = false;
       say("me", fill(W.scale_me, { n: range.value }));
-      // 直し48 段7: at 0, no next question; on to the way to keep.
-      if (result.next === "way") return askWay();
+      // 直し48 段7: at 0, no next question; on to 今日の気づき (直し49 段1).
+      if (result.next === "notice") return askNotice();
       say("teacher", result.question);
-      lineBox("forward", { send: W.send, skip: W.skip }, () => askWay());
+      lineBox("forward", { send: W.send, skip: W.skip }, () => askNotice());
     });
     box.append(now, range, ticks, ok);
     say("teacher", question, box);
@@ -658,6 +658,81 @@ const EbinoHitokoto = (() => {
     });
     pass.addEventListener("click", () => go({ skip: true }));
     return form;
+  }
+
+  // --- 直し49 段1: 今日の気づき ---
+
+  // (the teacher, 11/7: 「気づきがある、または行動などのきっかけが作れれば良い」)
+  // Four to pick, 「答えない」 always there. 「あった」 or 「ちょっとあった」
+  // opens one line under them, optional, with no example in it (an example
+  // is copied) and the line of how little is enough; the others go on at
+  // once. The line is the student's own, set as text, sent to no model;
+  // 送る with it empty goes on as とばす does.
+  function askNotice() {
+    clearInput();
+    const box = el("div", "hk-notice");
+    const picks = el("div", "hk-picks");
+    const form = el("form", "hk-answer hk-notice-line");
+    form.hidden = true;
+    const hint = el("p", "hk-notice-hint", W.notice_hint);
+    hint.id = "hk-notice-hint";
+    const input = el("input");
+    Object.assign(input, { type: "text", maxLength: 120, autocomplete: "off" });
+    input.setAttribute("aria-label", W.notice_q);
+    input.setAttribute("aria-describedby", hint.id);
+    const ok = el("button", "hk-primary", W.send);
+    ok.type = "submit";
+    let open = null;  // [key, label, node]: 「あった」 or 「ちょっとあった」 pressed.
+    const go = async (key, label, node, text) => {
+      if (busy) return;
+      busy = true;
+      lock(box, node);
+      let result;
+      try {
+        result = await post("notice", text ? { answer: key, text } : { answer: key, skip: true });
+      } catch (error) {
+        busy = false;
+        unlock(box);
+        if (open) open[2].setAttribute("aria-pressed", "true");
+        return message(app.sendFailed(error));
+      }
+      busy = false;
+      if (result.status === "ask_again") {  // A name in the line: nothing kept.
+        unlock(box);
+        if (open) open[2].setAttribute("aria-pressed", "true");
+        input.focus();
+        return message(result.message);
+      }
+      say("me", label, text ? el("p", "hk-q hk-me-line", text) : null);
+      askWay();
+    };
+    const pass = button("quiet", W.skip, () => { if (open) go(open[0], open[1], open[2], ""); });
+    form.append(hint, input, ok, pass);
+    const answers = [["yes", W.notice_yes], ["some", W.notice_some], ["not_yet", W.notice_not_yet], ["no_answer", W.notice_no_answer]];
+    for (const [key, label] of answers) {
+      const pick = button("hk-pick", label, () => {
+        if (busy) return;
+        if (key === "yes" || key === "some") {
+          open = [key, label, pick];
+          for (const other of picks.querySelectorAll(".hk-pick[aria-pressed]")) other.setAttribute("aria-pressed", String(other === pick));
+          form.hidden = false;
+          input.focus({ preventScroll: true });
+          form.scrollIntoView({ block: "nearest", behavior: still() ? "auto" : "smooth" });
+        } else {
+          go(key, label, pick, "");
+        }
+      });
+      pick.dataset.answer = key;
+      if (key === "yes" || key === "some") pick.setAttribute("aria-pressed", "false");
+      picks.append(pick);
+    }
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (open) go(open[0], open[1], open[2], input.value.trim());
+    });
+    box.append(picks, form);
+    say("teacher", W.notice_q, box);
+    picks.querySelector("button").focus({ preventScroll: true });
   }
 
   // --- 段4: what to keep, and the harvest card's ② and ③ ---
@@ -911,6 +986,13 @@ const EbinoHitokoto = (() => {
       return;
     }
     box.replaceChildren(el("h3", "", W.sheet_title));
+    // 直し49 段1: 今日の気づき near the top, the student's line as written;
+    // none written (「まだない」「答えない」, or not written): no box.
+    if (sheet.notice) {
+      const notice = el("div", "hk-litbox hk-notice-box");
+      notice.append(el("p", "hk-label", W.sheet_notice), el("p", "hk-lit hk-notice-text", `「${sheet.notice}」`));
+      box.append(notice);
+    }
     const questions = el("div", "hk-qq");
     const first = el("div", "hk-qbox");
     first.append(el("p", "hk-label", W.first_label), el("p", "", sheet.first_question));

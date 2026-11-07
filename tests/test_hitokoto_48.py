@@ -75,11 +75,12 @@ def test_the_scales_next_question_by_the_value(value, asked):
     result = session.hitokoto_scale(value)
     words = hitokoto.words()
     if asked is None:
-        assert result == {"next": "way", "question": ""} and session.talk.stage == hitokoto.WAY
+        # 直し49 段1: on to 今日の気づき.
+        assert result == {"next": "notice", "question": ""} and session.talk.stage == hitokoto.NOTICE
         assert not [a for a in session.talk.asked if a.step == "forward"]
     else:
         assert result == {"next": "forward", "question": words[asked]}
-    assert 'if (result.next === "way") return askWay();' in HK
+    assert 'if (result.next === "notice") return askNotice();' in HK
 
 
 def test_five_only_on_a_day_with_a_split():

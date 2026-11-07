@@ -1342,11 +1342,11 @@ class Session:
         talk.scale = value
         texts = hitokoto.words()
         # 直し48 段7 (the teacher, 11/7: at 0 a question to lower it is
-        # asked): at 0 no next question; on to the way to keep.
+        # asked): at 0 no next question; on to 今日の気づき (直し49 段1).
         if value == 0:
-            talk.stage = hitokoto.WAY
+            talk.stage = hitokoto.NOTICE
             self.save()
-            return {"next": "way", "question": ""}
+            return {"next": "notice", "question": ""}
         if value < hitokoto.SCALE_FIRST:
             key = "scale_down"
         elif value == hitokoto.SCALE_FIRST:
@@ -1375,7 +1375,28 @@ class Session:
         text, named = self._kept_line(talk, "forward", text, skip)
         if named:
             return named
-        talk.forward, talk.stage = text, hitokoto.WAY
+        talk.forward, talk.stage = text, hitokoto.NOTICE
+        self.save()
+        return {"next": "notice"}
+
+    def hitokoto_notice(self, answer, text="", skip: bool = False) -> dict:
+        """直し49 段1: 「今日、気づいたことや、はじめて知ったことはあった？」, one
+        of four (「答えない」 always there); after 「あった」 or 「ちょっとあった」 a
+        line, optional. The line is the student's own: kept as written (a
+        name in it: asked again, nothing kept), sent to no model."""
+        talk = self._talk(hitokoto.NOTICE)
+        if answer not in hitokoto.NOTICE_ANSWERS:
+            raise Refused("unknown_answer")
+        line = ""
+        if answer in hitokoto.NOTICE_WRITE and not skip:
+            line = _line(text, hitokoto.MAX_LINE, "", required=False)
+            named = self._named(line)
+            if named:
+                return named
+            if hitokoto.is_blank(line):
+                line = ""
+        talk.notice, talk.notice_text = answer, line
+        talk.stage = hitokoto.WAY
         self.save()
         return {"next": "way"}
 

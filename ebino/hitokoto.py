@@ -116,11 +116,20 @@ NO_PEOPLE = "no_people"
 NOTHING_WRITTEN = "nothing_written"
 
 # The stages, in order.
-MAP, TALK, LADDER_TWO, LADDER_THREE, FILL, SCALE, FORWARD, WAY, SUBJECT, SUBJECT_NOTE, MEET, USE, END, \
-    LIT, SHEET = ("map", "talk", "ladder_two", "ladder_three", "fill", "scale", "forward", "way", "subject",
-                  "subject_note", "meet", "use", "end", "lit", "sheet")
-TALKING = (MAP, TALK, LADDER_TWO, LADDER_THREE, FILL, SCALE, FORWARD, WAY, SUBJECT, SUBJECT_NOTE, MEET, USE, END)
+MAP, TALK, LADDER_TWO, LADDER_THREE, FILL, SCALE, FORWARD, NOTICE, WAY, SUBJECT, SUBJECT_NOTE, MEET, USE, END, \
+    LIT, SHEET = ("map", "talk", "ladder_two", "ladder_three", "fill", "scale", "forward", "notice", "way",
+                  "subject", "subject_note", "meet", "use", "end", "lit", "sheet")
+TALKING = (MAP, TALK, LADDER_TWO, LADDER_THREE, FILL, SCALE, FORWARD, NOTICE, WAY, SUBJECT, SUBJECT_NOTE, MEET, USE,
+           END)
 SUBJECT_ANSWERS = ("yes", "no", "unsure")  # あった・なかった・わからない
+# 直し49 段1 (the teacher, 11/7: 「気づきがある、または行動などのきっかけが作れれば
+# 良い」): 今日の気づき, asked after the scale (and its next question) and
+# before the way to keep: four answers to pick, 「答えない」 always there; a
+# line to write (optional) only after 「あった」 or 「ちょっとあった」. What is
+# written is the student's own, kept and put on the sheet as written; no
+# model is sent it or writes about it (not in written, so not the light's).
+NOTICE_ANSWERS = ("yes", "some", "not_yet", "no_answer")  # あった・ちょっとあった・まだない・答えない
+NOTICE_WRITE = ("yes", "some")
 
 TEXTS = "hitokoto"
 FORCE_TEXTS = "hitokoto_forces"
@@ -141,6 +150,8 @@ TEXT_IDS = (
     "story_subject_note", "print", "print_note", "print_side", "deep_word", "deep_more", "deep_way",
     "deep_need", "deep_chosen", "now_after", "sheet_met", "sheet_moves", "sheet_split", "sheet_meet",
     "sheet_tie", "tie_same", "tie_differ",
+    # 直し49 段1.
+    "notice_q", "notice_yes", "notice_some", "notice_not_yet", "notice_no_answer", "notice_hint", "sheet_notice",
 )
 FILL_BLANK = "［　　］"  # In ladder_fill_line: where the student writes.
 
@@ -301,6 +312,10 @@ class Hitokoto:
     # ({"kind", "a", "b"}: people's indexes), or None; asked once.
     tie: dict | None = None
     tie_asked: dict = field(default_factory=dict)  # {"reason", "seconds"} once asked.
+    # 直し49 段1: 今日の気づき, a NOTICE_ANSWERS key ("" not asked), and the
+    # line written after 「あった」 or 「ちょっとあった」 ("" none).
+    notice: str = ""
+    notice_text: str = ""
 
     # --- what the screen gets ---
 
@@ -345,6 +360,8 @@ class Hitokoto:
             "tie": ({"kind": self.tie["kind"], "a": self.people[self.tie["a"]].seat_id,
                      "b": self.people[self.tie["b"]].seat_id} if self.tie else None),
             "tie_asked": dict(self.tie_asked),
+            # 直し49 段1: the answer picked and the student's line, as written.
+            "notice": {"answer": self.notice, "text": self.notice_text},
         }
 
 
@@ -916,6 +933,12 @@ def tie_view(talk: Hitokoto) -> dict | None:
     return {"kind": talk.tie["kind"], "a": lines[talk.tie["a"]], "b": lines[talk.tie["b"]]}
 
 
+def notice_view(talk: Hitokoto) -> str:
+    """直し49 段1: 今日の気づき on the sheet, the student's line as written
+    (never a model's words); "" when none was written (no box, not 「なし」)."""
+    return talk.notice_text if talk.notice in NOTICE_WRITE else ""
+
+
 def sheet_view(talk: Hitokoto, meet: str = "") -> dict:
     light = talk.light
     now = talk.now_question if talk.now_question and talk.now_question != talk.first_question else ""
@@ -925,4 +948,4 @@ def sheet_view(talk: Hitokoto, meet: str = "") -> dict:
             "marks": [{"label": m["label"], "text": m["text"], "note": m["note"]} for m in talk.marks],
             # 直し48 段4.
             "met": met_lines(talk), "moves": own_moves(talk), "split": split_view(talk), "meet": meet,
-            "tie": tie_view(talk)}
+            "tie": tie_view(talk), "notice": notice_view(talk)}

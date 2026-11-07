@@ -97,3 +97,10 @@ sheet_meet	次に会うなら
 sheet_tie	司会（AI）のまとめ
 tie_same	この2人は、同じ向きのことを言っています。
 tie_differ	この2人は、ここで考えが分かれています。
+notice_q	今日、気づいたことや、はじめて知ったことはあった？
+notice_yes	あった
+notice_some	ちょっとあった
+notice_not_yet	まだない
+notice_no_answer	答えない
+notice_hint	1行でいい。書かなくても進めます
+sheet_notice	今日の気づき

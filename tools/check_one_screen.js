@@ -36,10 +36,11 @@ async (page) => {
   const SIZES = [[768, 1024], [1180, 820], [1366, 650], [1536, 760], [1920, 1080]];
   const MOMENTS = ["intro", "before_question", "school_zoom", "table_out", "bubble_pressed", "one_coach", "one_asks", "one_to_one",
     "ai_hint", "answering_ai"];
-  const HK_MOMENTS = ["hk_map", "hk_talk", "hk_ladder", "hk_scale", "hk_keep", "hk_light", "hk_sheet"];
+  // 直し49 段1: hk_notice, 今日の気づき with 「あった」 pressed and a line written.
+  const HK_MOMENTS = ["hk_map", "hk_talk", "hk_ladder", "hk_scale", "hk_notice", "hk_keep", "hk_light", "hk_sheet"];
   // The button that goes on, at each moment.
   const HK_NEXT = { hk_map: "#hk-go", hk_talk: "#hk-input button[type=submit]", hk_ladder: ".hk-options .hk-quote, .hk-picks .hk-pick, .hk-fill .hk-primary",
-    hk_scale: ".hk-scale button", hk_keep: "#hk-to-light", hk_light: "#hk-to-sheet", hk_sheet: "#hk-print" };
+    hk_scale: ".hk-scale button", hk_notice: ".hk-notice-line .hk-primary", hk_keep: "#hk-to-light", hk_light: "#hk-to-sheet", hk_sheet: "#hk-print" };
   const browser = page.context().browser();
   const table = {};
   const measure = (p) => p.evaluate(() => {
@@ -331,6 +332,12 @@ async (page) => {
     await p.locator(".hk-scale button").click();
     await p.waitForSelector("#hk-input form .quiet");
     await p.locator("#hk-input form .quiet").click();  // とばす
+    // 直し49 段1: 今日の気づき, 「あった」 and a line.
+    await p.waitForSelector(".hk-notice .hk-pick:not([disabled])");
+    await p.locator(".hk-notice .hk-pick").first().click();
+    await p.fill(".hk-notice-line input", "畑の人は雨の日も休みじゃないと、はじめて知った");
+    if (moment === "hk_notice") return;
+    await p.locator(".hk-notice-line .hk-primary").click();
     await p.waitForFunction(() => [...document.querySelectorAll("#hk-log .hk-card.teacher form .quiet")].some((b) => !b.disabled));
     await p.locator("#hk-log .hk-card.teacher form .quiet:not([disabled])").last().click();  // いまはない
     await p.locator("#hk-log .hk-picks button:not([disabled])").nth(1).click();  // なかった

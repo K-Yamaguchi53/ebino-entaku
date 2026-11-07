@@ -87,9 +87,10 @@ def to_scale(session):
     return session.hitokoto_answer("部活がない日は空いたら休む")
 
 
-def to_end(session, scale=8, forward="先輩にもう一回聞く", way="農業", subject="no"):
+def to_end(session, scale=8, forward="先輩にもう一回聞く", way="農業", subject="no", notice="not_yet"):
     session.hitokoto_scale(scale)
     session.hitokoto_forward(forward)
+    session.hitokoto_notice(notice)  # 直し49 段1: 今日の気づき, after the scale's next question.
     session.hitokoto_way(way)
     session.hitokoto_subject(subject)
     if subject == "yes":
@@ -361,6 +362,7 @@ def test_the_subject_card_comes_only_after_yes():
     to_scale(session)
     session.hitokoto_scale(10)
     session.hitokoto_forward("", skip=True)
+    session.hitokoto_notice("no_answer")
     session.hitokoto_way("", skip=True)
     assert session.hitokoto_subject("no") == {"next": "meet"}
     with pytest.raises(Refused):
@@ -369,6 +371,7 @@ def test_the_subject_card_comes_only_after_yes():
     to_scale(other)
     other.hitokoto_scale(10)
     other.hitokoto_forward("", skip=True)
+    other.hitokoto_notice("no_answer")
     other.hitokoto_way("", skip=True)
     assert other.hitokoto_subject("yes") == {"next": "subject_note"}
     view = other.hitokoto_subject_note("家庭科")
@@ -400,6 +403,7 @@ def test_the_meet_line_comes_only_when_a_seat_is_picked_and_the_first_line_never
     to_scale(other)
     other.hitokoto_scale(8)
     other.hitokoto_forward("", skip=True)
+    other.hitokoto_notice("no_answer")
     other.hitokoto_way("", skip=True)
     other.hitokoto_subject("unsure")
     uses = other.hitokoto_meet("S02")["uses"]
@@ -543,6 +547,7 @@ def test_the_sheet_and_the_record_hold_no_name(tmp_path, monkeypatch):
     to_scale(session)
     session.hitokoto_scale(8)
     session.hitokoto_forward("先輩にもう一回聞く")
+    session.hitokoto_notice("no_answer")
     session.hitokoto_way("農業")
     session.hitokoto_subject("no")
     session.hitokoto_meet("S01")
