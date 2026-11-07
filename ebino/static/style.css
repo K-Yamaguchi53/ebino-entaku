@@ -1614,6 +1614,8 @@ body.one-open .input-area .ask { visibility: hidden; }
 .school-count:hover, .school-count:focus-visible { background: var(--night-3); }
 .map-frame:not(.seniors-out) .pt.school-home, .map-frame:not(.seniors-out) .home-names .at-school { display: none; }
 .map-frame:has(svg.dim) .school-count, .one-on .school-count { visibility: hidden; }
+/* 直し52 段1: while the camera comes in before 司会（AI）から、はじめに. */
+.coming-in .school-count { visibility: hidden; }
 /* 直し48 段2: one question under the other (コーチ top left, オブザーバー bottom right), not side by side. */
 /* A seat with no place on the map: its point's line dotted. */
 .pt.no-place .shape { stroke-dasharray: 3 2; }

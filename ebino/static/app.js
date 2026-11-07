@@ -326,7 +326,50 @@ async function start(lab, chosen) {
   onMap((map) => map.show());  // Draws the rim and the river once the map is on screen.
   renderPurposes(data.purposes);
   $("question").focus();
+  await comingIn();
   firstLook();
+}
+
+// 直し52 段1 (the teacher, 11/7): the first time only, before 司会（AI）から、
+// はじめに: the map not covered, the camera from a little wider than the
+// whole (set as the opening's plane began) to the basin and the school, in
+// APPROACH_FOR ms; then the cover and the window as before. A press or a key
+// (taken, not passed on): the window at once. Motion reduced, no map, or the
+// window not to come: the window at once, as before. Never longer than
+// 3 seconds whatever the frames do. Kept when it is over (at once: nothing to do).
+const APPROACH_FOR = 2400;
+
+function comingIn() {
+  const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (still || state.approached || state.firstLooked || !state.texts.guide || typeof EbinoMap === "undefined" || $("map").hidden) {
+    return Promise.resolve();
+  }
+  state.approached = true;
+  state.approaching = true;
+  drawGuide();  // Its bubble away now, not at its next look.
+  return new Promise((finished) => {
+    let over = false, cap = null;
+    const end = () => {
+      if (over) return;
+      over = true;
+      clearTimeout(cap);
+      for (const type of ["pointerdown", "keydown"]) document.removeEventListener(type, skip, true);
+      onMap((map) => map.approachEnd());
+      state.approaching = false;
+      finished();
+    };
+    const skip = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      end();
+    };
+    for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, skip, true);
+    cap = setTimeout(end, 2.8 * 1000);
+    let going = null;
+    onMap((map) => { going = map.approach(APPROACH_FOR); });
+    if (going) going.then(end);
+    else end();
+  });
 }
 
 // Waiting for /api/start with the table out (直し32-5): the box and its
@@ -418,6 +461,7 @@ function mapStage(run) {
   $("table").hidden = false;
   $("table").classList.add("opening-on");
   onMap((map) => map.show());
+  onMap((map) => map.wideStart());  // 直し52 段1: a little wider than the whole, to come in from after.
   const frame = $("map-frame");
   const box = frame.getBoundingClientRect();
   if (!box.width || !box.height || $("map").hidden) {
@@ -981,7 +1025,8 @@ function drawGuide() {
   const guide = $("guide"), words = state.texts && state.texts.guide;
   const now = guideState();
   const spec = GUIDE[now];
-  const target = spec && shown(spec.at());
+  // 直し52 段1: nothing while the camera comes in before the first look.
+  const target = spec && !state.approaching && shown(spec.at());
   const lit = spec && spec.lit ? target : null;
   for (const node of document.querySelectorAll(".guide-here")) if (node !== lit) node.classList.remove("guide-here");
   if (lit) lit.classList.add("guide-here");

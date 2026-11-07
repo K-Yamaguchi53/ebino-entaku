@@ -1145,6 +1145,46 @@ const EbinoMap = (() => {
     return moveTo({ x: cx - w / 2, y: cy - h / 2, w, h }, reduced() ? 0 : CAMERA_FOR);
   }
 
+  // 直し52 段1 (the teacher, 11/7): the way in, before 司会（AI）から、はじめに,
+  // once. wideStart: the camera at once a little wider than the whole (the
+  // paper plane at the start flies over it). approach: from there to the basin and
+  // the school, slowing as moveTo does; never so near that the seniors come
+  // out at their windows (that is the count's press). approachEnd: there at
+  // once (a press or a key).
+  const APPROACH_WIDE = 1.12, APPROACH_NEAR = 1.6;
+  let approachTo = null;
+
+  function wideStart() {
+    if (!view || !view.whole) return;
+    stopCamera();
+    const v = view.whole, w = v.w * APPROACH_WIDE, h = v.h * APPROACH_WIDE;
+    setView({ x: v.x + v.w / 2 - w / 2, y: v.y + v.h / 2 - h / 2, w, h });
+  }
+
+  function approach(ms) {
+    if (!view || !view.whole) return Promise.resolve();
+    const v = view.whole;
+    let cx = v.x + v.w / 2, cy = v.y + v.h / 2;
+    if (view.yard) {
+      const { x, y, k, model } = view.yard;
+      cx = x + model.width * k / 2;
+      cy = y + model.height * k / 2;
+    }
+    const near = view.seniorStep ? view.seniorStep / (2 * SCHOOL_R_PX) * (frame.clientWidth || 1) * 1.25 : 0;
+    const w = Math.min(v.w, Math.max(v.w / APPROACH_NEAR, near)), h = w * view.H / view.W;
+    approachTo = { x: cx - w / 2, y: cy - h / 2, w, h };
+    // The seniors' count stays where it was laid out while the camera moves:
+    // away until it is there (the words over the map go as with any move).
+    frame.classList.add("coming-in");
+    return moveTo(approachTo, reduced() ? 0 : ms);
+  }
+
+  function approachEnd() {
+    if (approachTo) moveTo(approachTo, 0);
+    approachTo = null;
+    frame.classList.remove("coming-in");
+  }
+
   // The count over the school, or the seniors at their windows: never both,
   // never neither.
   function foldSchool(perPx) {
@@ -4134,5 +4174,5 @@ const EbinoMap = (() => {
     relayout();
   }
 
-  return { init, show, round, refresh, marked, markOf, layoutAgain, asked };
+  return { init, show, round, refresh, marked, markOf, layoutAgain, asked, wideStart, approach, approachEnd };
 })();
