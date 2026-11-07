@@ -105,9 +105,12 @@ def test_its_movement_is_once_and_still_with_motion_reduced():
 PLACE = """
 const made = {};
 const node = (id, box) => ({ id, box, hidden: id === "guide", dataset: {}, style: { setProperty(k, v) { this[k] = v; } },
-  classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); } },
+  classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); },
+    toggle(c, on) { if (on) this.set.add(c); else this.set.delete(c); }, contains(c) { return this.set.has(c); } },
   offsetWidth: 280, offsetHeight: 44, open: false, textContent: "",
+  replaceChildren(...kids) { this.textContent = kids.join(""); },  // 直し53 段7: the box's sign keeps clear (guideSpot).
   getBoundingClientRect() { return this.box; } });
+const phrased = (text) => text;
 const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height });
 const $ = (id) => made[id] || (made[id] = node(id, box(0, 0, 0, 0)));
 let now = "write", choice = null;

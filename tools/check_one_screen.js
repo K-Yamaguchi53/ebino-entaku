@@ -171,9 +171,18 @@ async (page) => {
             const words = [...document.querySelectorAll("#map-overlay .table-bubble:not(.ai) .voice, #map-overlay .map-bubble .voice, .one-bubble .voice")]
               .filter((n) => n.getClientRects().length).map((n) => n.getBoundingClientRect())
               .filter((b) => b.width && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom);
-            return { up: true, state: guide.dataset.state, over: words.length, far: guide.classList.contains("far") };
+            // 直し53 段7: over the map's own words (the ways out's tags, the
+            // homes' names, the place names) ("guide over label N").
+            const labels = [...document.querySelectorAll("#map-frame .map-around, #map-frame .home-names text, "
+              + "#map-frame .place-names text, #map-frame .school-count, #map-look-label")]
+              .filter((n) => n.getClientRects().length && getComputedStyle(n).visibility !== "hidden" && !n.closest("[hidden]"))
+              .map((n) => n.getBoundingClientRect())
+              .filter((b) => b.width && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom);
+            return { up: true, state: guide.dataset.state, over: words.length, far: guide.classList.contains("far"),
+              labels: labels.length };
           });
           if (g.over) bad.push(`guide over words ${g.over}`);
+          if (g.labels) bad.push(`guide over label ${g.labels}`);
           // 直し52 段3: 「吹き出しを1つ押してみよう」 over the AI's seat's frame
           // ("guide over ai N"); the school lifted into the meeting over the
           // table's ring, its seats and the bubbles ("school over N").

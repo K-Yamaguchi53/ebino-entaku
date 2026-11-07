@@ -966,9 +966,15 @@ function firstLook() {
 // For each state with one thing to press: where it is (null: not on screen
 // now), whose words the bubble says, or lit: the thing itself lit instead
 // (the bubble's choices, so no bubble covers the card being read).
+// 直し53 段7 (52_scene_autumn_start: 「ここに書いて『聞く』を押そう」 hid the
+// ways out's tags 霧島山・鹿児島県 and 県外・海外に出た人): over the box, slid
+// along it, clear of the map's words (its point still on the box).
 const GUIDE = {
-  write: { at: () => $("question") },
-  card: { at: () => $("question"), words: "write" },
+  write: { at: () => $("question"), voices: () => [], sides: ["above", "below"],
+    clear: () => [...document.querySelectorAll("#map-frame .map-around, #map-frame .home-names text, "
+      + "#map-frame .place-names text, #map-frame .school-count, #map-look-label")] },
+  card: { at: () => $("question"), words: "write", voices: () => [], sides: ["above", "below"],
+    clear: () => GUIDE.write.clear() },
   // 直し45 段3: no box at one to one; the questions to pick, lit.
   one: { at: () => document.querySelector(".one-asks .one-ask:not(.one-finish)"), lit: true },
   // 直し48 (the screen check): never over the AI's questions (their robots, names, bubbles).
