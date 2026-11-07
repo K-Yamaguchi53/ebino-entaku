@@ -495,8 +495,17 @@ const EbinoHitokoto = (() => {
       if (box) unlock(box);
       return message(result.message);
     }
+    settle(box);
     if (shown) say("me", shown);
     next(result);
+  }
+
+  // 直し51 段1: a question answered, skipped or picked past keeps no line to
+  // write, nor its 送る・とばす: the form goes (the words are in the
+  // student's card under it). What was picked stays, pressed no more, its ✓.
+  // Only the question waiting at the foot has a line.
+  function settle(box) {
+    if (box && box.matches("form")) box.remove();
   }
 
   // Answered or picked (直し40-0): nothing more to press, but the card is not
@@ -648,7 +657,7 @@ const EbinoHitokoto = (() => {
         return message(result.message);
       }
       if (body.text) say("me", body.text);
-      if (!card) form.remove();
+      settle(form);
       after(result);
     };
     form.addEventListener("submit", (event) => {
@@ -703,6 +712,7 @@ const EbinoHitokoto = (() => {
         input.focus();
         return message(result.message);
       }
+      settle(form);
       say("me", label, text ? el("p", "hk-q hk-me-line", text) : null);
       after(key);
     };

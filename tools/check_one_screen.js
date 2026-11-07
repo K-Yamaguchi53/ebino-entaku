@@ -209,6 +209,16 @@ async (page) => {
           if (m.w > m.vw) bad.push(`wide ${m.w}>${m.vw}`);
           if (!(await reached(p, HK_NEXT[moment]))) bad.push("next button");
           if (errors.length) bad.push(`errors ${errors.length}`);
+          // 直し51 段1: a question answered, skipped or picked past keeps no
+          // line to write ("closed line N": one still seen, shut or not);
+          // only the question waiting at the foot has one ("lines N": more).
+          const lines = await p.evaluate(() => {
+            const seen = (n) => n.getClientRects().length > 0;
+            const all = [...document.querySelectorAll("#hk-talk input[type=text], #hk-talk textarea")].filter(seen);
+            return { open: all.filter((n) => !n.disabled).length, shut: all.filter((n) => n.disabled).length };
+          });
+          if (lines.shut) bad.push(`closed line ${lines.shut}`);
+          if (lines.open > 1) bad.push(`lines ${lines.open}`);
           row[moment] = bad.length ? bad.join(" ") : "ok";
         } catch (error) {
           row[moment] = "could not reach: " + String(error).split("\n")[0].slice(0, 120);
