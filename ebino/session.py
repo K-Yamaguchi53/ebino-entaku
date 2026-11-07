@@ -1105,7 +1105,8 @@ class Session:
         marks (直し45 段5): the trail's steps marked first, each optional,
         at most one mark a step and one step a mark, each with a line or
         none. The first word is looked for at the step marked もっと聞きたかった,
-        else 問いが深まった, else いちばんおどろいた, where it is a person's words."""
+        else 問いが深まった, else はじめて知った・気づいた
+        (surprised; 直し49 段3, was いちばんおどろいた), where it is a person's words."""
         if config.reflect_old():
             raise Refused("reflect_old")
         if not any(r.status in (roundtable.ANSWERED, roundtable.SILENT) for r in self.rounds):

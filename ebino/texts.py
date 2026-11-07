@@ -234,7 +234,8 @@ ONE_COACH_WORD_IDS = ("decline", "note", "send")
 LISTENER_AVOID = "listener_avoid"
 # 帰る前に、ひとこと's way in (直し45 段5): the three marks on the trail and
 # the words round them (叩き台). The marks' order is the order the first
-# word is looked for in: もっと聞きたかった, 問いが深まった, いちばんおどろいた.
+# word is looked for in: もっと聞きたかった, 問いが深まった, はじめて知った・気づいた (直し49 段3:
+# surprised's words, was いちばんおどろいた; its ID kept for the records).
 TRAIL_MARKS = "trail_marks"
 TRAIL_MARK_IDS = ("surprised", "deeper", "more")
 TRAIL_MARK_FIRST = ("more", "deeper", "surprised")

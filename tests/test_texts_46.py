@@ -16,7 +16,7 @@ def test_the_trails_marks_are_fusen_and_the_three_kinds_stay():
     assert words["lead"] == "今日の道すじ。ふせんを貼りたい所があれば、貼ってみよう（貼らなくてもいい）。"
     assert words["sheet"] == "ふせんを貼った所"
     assert list(texts.id_table(texts.TRAIL_MARKS, texts.TRAIL_MARK_IDS).values()) == [
-        "いちばんおどろいた", "問いが深まった", "もっと聞きたかった"]
+        "はじめて知った・気づいた", "問いが深まった", "もっと聞きたかった"]  # 直し49 段3: surprised's words.
 
 
 def test_the_three_hitokoto_lines_and_the_ones_left_as_they_were():
