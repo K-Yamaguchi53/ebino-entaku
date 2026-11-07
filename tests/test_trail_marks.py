@@ -64,7 +64,8 @@ def test_the_sheet_and_the_record_keep_the_marks_with_the_line():
     assert kept.sessions[-1]["hitokoto"]["marks"] == [{"n": 4, "mark": "deeper", "note": "仕事のことに変わった"}]
     session.talk.stage = hitokoto.LIT
     sheet = session.hitokoto_sheet("")
-    assert sheet["marks"] == [{"label": "問いが深まった", "text": SECOND, "note": "仕事のことに変わった"}]
+    # 直し53 段6: the same line, parted (the student's own question: own).
+    assert sheet["marks"] == [{"label": "問いが深まった", "text": SECOND, "note": "仕事のことに変わった", "head": "", "own": SECOND}]
     assert sheet["first_question"] == FIRST  # The top as before.
 
 

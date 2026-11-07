@@ -1784,8 +1784,14 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
 .hk-mark-note { min-height: 40px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--moon-soft); background: var(--night);
   color: var(--ink); font-size: 15px; }
 .hk-marked { margin: 12px 0; }
-.hk-marked-line { margin: 4px 0 0; }
-.hk-marked-note { margin: 0 0 4px 1em; }
+/* 直し53 段6: one note each, its tag a small heading, whom and which question
+   in plain words, the student's own words as the student's words are. */
+.hk-marked-item { margin: 8px 0 0; padding: 6px 0 6px 12px; border-left: 3px solid var(--lamp); }
+.hk-marked-tag { margin: 0; font-family: var(--gothic); font-size: 14px; font-weight: 700; letter-spacing: .04em; color: var(--paper-soft); }
+.hk-marked-head { margin: 2px 0 0; font-size: 15px; line-height: 1.6; color: var(--paper-ink); }
+.hk-sheet .hk-marked-head .hk-ref { font-size: 14px; }
+.hk-marked-own, .hk-marked-note { margin: 2px 0 0; font-family: var(--mincho); font-size: 17px; font-weight: 700; line-height: 1.6;
+  color: var(--paper-ink); }
 .hk-card.ai { align-self: flex-start; background: var(--ai-deep); color: var(--ai-ink); border: 1px solid var(--ai); }
 .hk-card.ai .hk-who { color: var(--ai); }
 .hk-card.ai.waiting .hk-q { color: var(--soft); }
@@ -2014,6 +2020,14 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
   .hk-sheet :is(.hk-met-quote, .hk-moves-list, .hk-story, .hk-light-why) { font-size: 13px; }
   /* 直し52 段6: on paper as before (14px on the screen only). */
   .hk-met-who, .hk-print-note, .hk-moves-list li + li::before { font-size: 12px; }
+  /* 直し53 段6: the marked notes on paper, as the sheet's other parts. */
+  /* A4 one page: the tag beside the words, as a small heading column. */
+  .hk-marked-item { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: baseline;
+    margin-top: 2px; padding: 0 0 0 8px; }
+  .hk-marked-item > :not(.hk-marked-tag) { grid-column: 2; }
+  .hk-marked-tag { grid-row: 1 / span 3; font-size: 12px; }
+  .hk-marked-head { margin: 0; font-size: 13px; line-height: 1.4; }
+  .hk-marked-own, .hk-marked-note { margin: 0; font-size: 14px; line-height: 1.4; }
   .hk-drop, .hk-restore, .hk-own-message { display: none !important; }
   /* 直し51 段6: all there on paper; the marker's line not printed (ink on white). */
   .hk-sheet.hk-reveal > *, .hk-sheet.hk-reveal .hk-own-text, .hk-own-mark { animation: none !important; }

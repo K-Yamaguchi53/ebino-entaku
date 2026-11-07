@@ -1201,7 +1201,8 @@ class Session:
                 return named
             seen_n.add(n)
             seen_mark.add(kind)
-            kept.append({"n": n, "mark": kind, "note": note, "label": labels[kind], "text": self._mark_text(items[n])})
+            kept.append({"n": n, "mark": kind, "note": note, "label": labels[kind], "text": self._mark_text(items[n]),
+                         **self._mark_parts(items[n])})
         return sorted(kept, key=lambda m: m["n"])
 
     def _mark_text(self, item: dict) -> str:
@@ -1214,6 +1215,21 @@ class Session:
         if item["kind"] == trail.ONE_ASK:
             return "　".join(filter(None, [item["who"], item["text"]]))
         return item.get("text", "")
+
+    def _mark_parts(self, item: dict) -> dict:
+        """直し53 段6: the same words as _mark_text, parted for the sheet: whom
+        and which question ("head"), and the student's own answer or words
+        ("own"), so the two read apart. Nothing is added or left out."""
+        if item["kind"] in (trail.AI_ANSWER, trail.ONE_COACH):
+            return {"head": item["question"],
+                    "own": "　".join(filter(None, [item.get("choice", ""), item.get("answer", "")]))}
+        if item["kind"] == trail.OPENED:
+            return {"head": "　".join(filter(None, [item["who"], item["label"]])), "own": ""}
+        if item["kind"] == trail.ONE_ASK:
+            return {"head": "　".join(filter(None, [item["who"], item["text"]])), "own": ""}
+        if item["kind"] in (trail.QUESTION, trail.CARD):
+            return {"head": "", "own": item.get("text", "")}  # The student's own question.
+        return {"head": item.get("text", ""), "own": ""}
 
     def _mark_start(self, kept: list[dict]) -> tuple[str, str] | None:
         """(seat, piece) of the step the first word is looked for at: by the

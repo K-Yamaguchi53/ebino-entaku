@@ -1188,14 +1188,27 @@ const EbinoHitokoto = (() => {
       box.append(tie);
     }
     // 直し45 段5: the steps marked on the trail, with the student's line.
+    // 直し53 段6 (the teacher: もっと見やすく): each a note of its own, its tag
+    // a small heading on its line, then whom and which question, then the
+    // student's own words as the student's words are shown on the sheet.
+    // The words as they were; only their order, size, weight and room.
     if (sheet.marks && sheet.marks.length) {
       const marked = el("div", "hk-marked");
       marked.append(el("p", "hk-label", app.state.hitokoto.mark_words.sheet));
       for (const mark of sheet.marks) {
-        const line = el("p", "hk-marked-line");
-        line.append(el("b", "", mark.label), "　", mark.ref ? el("span", "hk-ref", W[mark.ref]) : mark.text);
-        marked.append(line);
-        if (mark.note) marked.append(el("p", "hk-marked-note", `「${mark.note}」`));
+        const note = el("div", "hk-marked-item");
+        note.append(el("p", "hk-marked-tag", mark.label));
+        if (mark.ref) {
+          const head = el("p", "hk-marked-head");
+          head.append(el("span", "hk-ref", W[mark.ref]));
+          note.append(head);
+        }
+        else if (mark.head || mark.own) {
+          if (mark.head) note.append(el("p", "hk-marked-head", mark.head));
+          if (mark.own) note.append(el("p", "hk-marked-own", `「${mark.own}」`));
+        } else note.append(el("p", "hk-marked-head", mark.text));
+        if (mark.note) note.append(el("p", "hk-marked-note", `「${mark.note}」`));
+        marked.append(note);
       }
       box.append(marked);
     }

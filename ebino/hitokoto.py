@@ -1084,7 +1084,9 @@ def sheet_view(talk: Hitokoto, meet: str = "") -> dict:
         tie["short"] = True  # The fixed line and the two titles.
     marks = []
     for m in talk.marks:
-        mark = {"label": m["label"], "text": m["text"], "note": m["note"]}
+        mark = {"label": m["label"], "text": m["text"], "note": m["note"],
+                # 直し53 段6: whom and which question, and the student's own words, apart.
+                "head": m.get("head", ""), "own": m.get("own", "")}
         if bare(m["text"]) in tops:
             mark["ref"] = tops[bare(m["text"])]  # The question, in full above.
         marks.append(mark)

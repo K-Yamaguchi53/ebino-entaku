@@ -123,7 +123,8 @@ def test_a_mark_on_the_first_question_points_at_it():
                            "text": session.talk.first_question}]
     sheet = hitokoto.sheet_view(session.talk)
     assert sheet["marks"][0]["ref"] == "first_label" and sheet["marks"][0]["text"] == session.talk.first_question
-    assert 'mark.ref ? el("span", "hk-ref", W[mark.ref]) : mark.text' in SHEET_JS
+    # 直し53 段6: its own note, the tag over the pointer.
+    assert 'if (mark.ref) {' in SHEET_JS and 'head.append(el("span", "hk-ref", W[mark.ref]));' in SHEET_JS
 
 
 def test_the_light_on_a_persons_sentence_above_says_whose():
