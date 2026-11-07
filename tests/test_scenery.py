@@ -41,9 +41,9 @@ let melted = 0;
 const node = (href) => ({ attrs: { href }, setAttribute(k, v) { this.attrs[k] = v; },
   cloneNode() { const n = node(this.attrs.href); return n; }, style: {},
   after() {}, animate() { melted += 1; return {}; }, remove() {} });
-const lookNodes = { picture: node("/relief.webp"), ground: node("/relief_blur.webp") };
-const map = { relief: { looks: [{ id: "night", image: "/n", blur: "/nb" }, { id: "spring", image: "/s", blur: "/sb" },
-  { id: "autumn", image: "/a", blur: "/ab" }] } };
+const lookNodes = { picture: node("/relief.webp") };
+const map = { relief: { looks: [{ id: "night", image: "/n" }, { id: "spring", image: "/s" },
+  { id: "autumn", image: "/a" }] } };
 const view = null, app = null;
 const LOOK_FADE = 1600;
 let look = map.relief.looks[0];
@@ -114,7 +114,7 @@ def test_spring_flowers_are_in_the_same_place_every_time_on_low_land_and_by_the_
 
 
 def test_flowers_still_under_the_points_spring_only():
-    build = MAP[MAP.index("      lookNodes = { picture, ground };"):MAP.index('    const fill = layer("basin-fill");')]
+    build = MAP[MAP.index("      lookNodes = { picture };"):MAP.index('    const fill = layer("basin-fill");')]
     assert 'drawFlowers(layer("spring-flowers"));' in build  # Right over the picture, before the rest is drawn.
     assert ".spring-flowers { opacity: 0; }" in CSS and '.map-frame[data-look="spring"] .spring-flowers { opacity: 1; }' in CSS
     flower = re.search(r"\.spring-flowers \.flower \{[^}]*\}", CSS).group(0)

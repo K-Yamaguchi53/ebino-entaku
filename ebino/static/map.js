@@ -190,18 +190,21 @@ const EbinoMap = (() => {
   const WORD_PAD = 2;  // CSS px kept clear round a word drawn on the map.
   const SLIDE_MOST = 40;  // CSS px the school's name may slide off a seat's point.
   const NAME_MOVE_MOST = 36;  // CSS px a place name may move off the seats' points (直し41の続き).
-  // 直し41の続き 段4: under the picture, the same picture mirrored, blurred
-  // and darkened (tools/make_relief_blur.py), three times as wide and as
-  // tall, the picture in its middle: no empty black in the frame.
-  const BLUR_IMAGE = "/relief_blur.webp";
+  // 直し53 段1 (the teacher, 11/7: 上と左右のぼかしを消して): under the
+  // picture, three times as wide and as tall with the picture in its middle,
+  // a plain ground of the season's own edge colour (style.css
+  // .relief-ground), no longer the picture mirrored and blurred (直し41の続き
+  // 段4), whose upside-down hills showed at the frame's edges.
   // The map's seasons (the teacher, 11/6): which one opens by the month
   // (3-5 spring, 9-11 autumn, else the night), when its picture is there.
   const SEASON_MONTHS = { spring: [3, 4, 5], autumn: [9, 10, 11] };
   const LOOK_FADE = 1600;  // ms for the next scenery to melt in (直し48 段6).
   // Where the picture melts into it ([where, shown]): its see-through or
   // black margin hidden, the land shown a little further in.
-  const RELIEF_FADE_X = [[0, 0], [0.016, 0], [0.04, 1], [0.96, 1], [0.984, 0], [1, 0]];
-  const RELIEF_FADE_Y = [[0, 0], [0.05, 0], [0.085, 1], [0.9, 1], [0.935, 0], [1, 0]];
+  // Wider than before 直し53, so the land melts into the plain ground with
+  // no seam.
+  const RELIEF_FADE_X = [[0, 0], [0.016, 0], [0.07, 1], [0.93, 1], [0.984, 0], [1, 0]];
+  const RELIEF_FADE_Y = [[0, 0], [0.05, 0], [0.12, 1], [0.88, 1], [0.935, 0], [1, 0]];
   // The whole map (「全体」, the first screen): the basin's rim this much of
   // the frame's height, every seat's home (the ways out's triangles among
   // them) kept inside by WHOLE_EDGE of the height, which comes first.
@@ -217,8 +220,8 @@ const EbinoMap = (() => {
   let lastSeats = [];  // The seats as last drawn, to draw them again (直し33-2).
   let yardPicture = null;  // The school's large picture once it has loaded (直し33-2).
   let view = null;  // How the map's (x, y) reach the drawing (flatView, reliefView).
-  let look = null;  // The picture shown, night or a season: { id, image, blur }.
-  let lookNodes = null;  // The picture's and the ground's <image>, to switch them.
+  let look = null;  // The picture shown, night or a season: { id, image }.
+  let lookNodes = null;  // The picture's <image>, to switch it (the ground follows by style.css).
   let vb = null;  // The part of the drawing on screen.
   let splitLayer, tableLayer, schoolGroup = null;
   const points = {};  // Seat ID -> { node, seat, at() }.
@@ -519,10 +522,7 @@ const EbinoMap = (() => {
     drawGlows();
 
     if (view.relief) {
-      const blur = layer("relief-blur");
-      const ground = svgEl("image", { href: look.blur, x: ox - base.W, y: oy - base.H, width: 3 * base.W, height: 3 * base.H,
-        preserveAspectRatio: "none" });
-      blur.append(ground);
+      layer("relief-ground").append(svgEl("rect", { x: ox - base.W, y: oy - base.H, width: 3 * base.W, height: 3 * base.H }));
       const image = layer("relief-image");
       // Its edges (the render's margin, see-through or black) melt into the
       // ground under it: two still masks, across and down (no blur here).
@@ -541,7 +541,7 @@ const EbinoMap = (() => {
       const picture = svgEl("image", { href: look.image, x: ox, y: oy, width: base.W, height: base.H, mask: "url(#relief-fade-x)" });
       faded.append(picture);
       image.append(faded);
-      lookNodes = { picture, ground };
+      lookNodes = { picture };
       // 直し48 段6: spring's flowers, over the picture, under everything else.
       drawFlowers(layer("spring-flowers"));
     }
@@ -634,7 +634,7 @@ const EbinoMap = (() => {
   // frame's height, round its middle; every seat's home (the triangles of
   // the ways out, the people from outside) kept inside, WHOLE_EDGE of the
   // height from the frame's edges, before the rim's share. Never past the
-  // drawing (the blurred ground). It reads view and the points.
+  // drawing (the plain ground round the picture). It reads view and the points.
   function wholeView() {
     const rim = view.rimBox;
     if (!rim) return { x: 0, y: 0, w: view.W, h: view.H };
@@ -1402,7 +1402,7 @@ const EbinoMap = (() => {
 
   // The pictures there are: the night, then each season's (relief.py).
   function looksOf() {
-    return (map.relief && map.relief.looks) || [{ id: "night", image: map.relief.image, blur: BLUR_IMAGE }];
+    return (map.relief && map.relief.looks) || [{ id: "night", image: map.relief.image }];
   }
 
   // The season by today's month when its picture is there; else the night.
@@ -1413,7 +1413,7 @@ const EbinoMap = (() => {
     return all.find((one) => one.id === season) || all[0];
   }
 
-  // 夜・春・秋 (the teacher, 11/6): only the picture and its ground change,
+  // 夜・春・秋 (the teacher, 11/6): only the picture and the ground's colour change,
   // where they are; the points, the words and the view stay as they were.
   function seasonButtons() {
     const words = app.state.texts.map_buttons;
@@ -1440,7 +1440,7 @@ const EbinoMap = (() => {
     frame.dataset.look = look.id;  // The place names' halo, the spring's flowers (style.css).
     if (lookNodes) {
       const melt = fade && was && was.id !== look.id && !reduced();
-      for (const [node, href] of [[lookNodes.picture, look.image], [lookNodes.ground, look.blur]]) {
+      for (const [node, href] of [[lookNodes.picture, look.image]]) {
         if (!melt) {
           node.setAttribute("href", href);
           continue;

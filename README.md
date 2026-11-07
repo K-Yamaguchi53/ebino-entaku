@@ -81,15 +81,14 @@ python -m venv .venv
 - 地図（えびの市の境界・川内川・地名・学校の位置）は、OpenStreetMap のデータから作りました。**© OpenStreetMap contributors**。地図のデータ（`mapdata/ebino_osm.json`）は OpenStreetMap からの派生データで、ODbL 1.0（Open Database License）に従います。
 - 地図のデータは `python tools/fetch_osm_map.py` で1回だけ取ってきて、リポジトリに入れました。アプリは動いている間に外へ取りに行きません。
 - 手描き風の線は rough.js 4.6.6（MIT License）を同梱して描いています（`ebino/static/rough.js`、ライセンスの文は `ebino/static/rough.LICENSE.txt`）。
-- 地図を重ねる立体の絵（南から北を見下ろした、ふつうの地図と同じく北が上の夜の地形模型）は、Copernicus DEM GLO-30 の標高から Blender で描きました。リポジトリに入れたのは、小さく縮めた絵（`mapdata/relief.webp`）、絵の画素と地図の座標の対応（`mapdata/relief_projection.json`）、粗い高さの網（`mapdata/relief_heights.json`、10単位ごと）の3つと、その絵をふちで折り返してぼかし、暗くした地（`mapdata/relief_blur.webp`。絵の外の枠を埋める）だけです。生の標高と大きな絵は入れていません。アプリは動いている間に外へ取りに行きません。3つのどれかが無い・読めないときは平らな地図に、地図も無ければ席の一覧に戻ります。
-- 地図の横の「＋ − 全体」の上にある「夜・春・秋」で、立体の絵を季節の夕方に切り替えられます（開いたときは、その月の季節。3〜5月は春、9〜11月は秋、ほかは夜）。春と秋は同じ模型を夕方の光で描き直したもので、色は高さだけで付けています（盆地の底は田んぼ、斜面は杉の林の中に新緑や紅葉、高い所は高原の草と霧島の峰）。手元に田畑や森の場所のデータはないので、実際の景色そのままではなく、それらしい色です。絵は `mapdata/relief_spring.webp`・`relief_autumn.webp` と、その外の地 `relief_blur_spring.webp`・`relief_blur_autumn.webp` です。どちらかが無いか大きさが夜の絵と違う季節は、切り替えに出ません。
-- 季節の絵を描く：`blender -b --python tools/render_relief.py -- 作業フォルダ 2400 32 autumn`（`spring` も同じ）、外の地は `python tools/make_relief_blur.py autumn`
+- 地図を重ねる立体の絵（南から北を見下ろした、ふつうの地図と同じく北が上の夜の地形模型）は、Copernicus DEM GLO-30 の標高から Blender で描きました。リポジトリに入れたのは、小さく縮めた絵（`mapdata/relief.webp`）、絵の画素と地図の座標の対応（`mapdata/relief_projection.json`）、粗い高さの網（`mapdata/relief_heights.json`、10単位ごと）の3つだけです。絵の外の枠は、その季節の絵の縁と同じ色の無地で埋めます（画面の上で塗るだけで、絵のファイルはありません）。生の標高と大きな絵は入れていません。アプリは動いている間に外へ取りに行きません。3つのどれかが無い・読めないときは平らな地図に、地図も無ければ席の一覧に戻ります。
+- 地図の横の「＋ − 全体」の上にある「夜・春・秋」で、立体の絵を季節の夕方に切り替えられます（開いたときは、その月の季節。3〜5月は春、9〜11月は秋、ほかは夜）。春と秋は同じ模型を夕方の光で描き直したもので、色は高さだけで付けています（盆地の底は田んぼ、斜面は杉の林の中に新緑や紅葉、高い所は高原の草と霧島の峰）。手元に田畑や森の場所のデータはないので、実際の景色そのままではなく、それらしい色です。絵は `mapdata/relief_spring.webp`・`relief_autumn.webp` です。絵が無いか大きさが夜の絵と違う季節は、切り替えに出ません。
+- 季節の絵を描く：`blender -b --python tools/render_relief.py -- 作業フォルダ 2400 32 autumn`（`spring` も同じ）
 - produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved
 - The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.
 - 標高を取ってくる（4タイル・約110MB。置き場所はリポジトリの外で、2回目からは使い回す）：`python tools/fetch_copernicus_dem.py 作業フォルダ`
 - 立体の絵を描く（上の作業フォルダの高さの網から）：`blender -b --python tools/render_relief.py -- 作業フォルダ`
-- 絵の外の地を作る（`mapdata/relief.webp` から。Pillow が要ります）：`python tools/make_relief_blur.py`
-- 2本の台本には numpy と Pillow が要ります（Blender の中で流す方は、Blender に入っている numpy を使います）。アプリ本体は標準ライブラリだけです。
+- 標高を取ってくる台本には numpy と Pillow が、描く台本には numpy が要ります（Blender の中で流す方は、Blender に入っている numpy を使います）。アプリ本体は標準ライブラリだけです。
 - 題の書体は Shippori Mincho B1（SIL Open Font License 1.1）から、題に使う字だけを切り出して同梱しています（`ebino/static/title.woff`、ライセンスの文は `ebino/static/title.OFL.txt`）。
 
 ## ライセンス

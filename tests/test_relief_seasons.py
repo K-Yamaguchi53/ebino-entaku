@@ -1,7 +1,8 @@
 """The map's seasons (the teacher, 11/6): beside the night, the same model at
 dusk in spring and in autumn, switched on the screen by 夜・春・秋. Only the
-picture and the ground under it change; a season is offered only when both
-its files are there and its picture is the night's size (the same camera)."""
+picture and the plain ground's colour change (直し53 段1: no blurred ground);
+a season is offered only when its picture is there and is the night's size
+(the same camera)."""
 
 import json
 import re
@@ -33,23 +34,21 @@ def _inner(name):
 
 
 def _with_season(folder, season, image_from=relief.IMAGE):
-    image, blur = relief.season_files(season)
-    shutil.copy(folder / image_from, folder / image)
-    shutil.copy(relief.RELIEF_DIR / "relief_blur.webp", folder / blur)
+    shutil.copy(folder / image_from, folder / relief.season_image(season))
 
 
 def test_the_repo_has_spring_and_autumn_after_the_night():
     data = load_relief(VIEWBOX)
     ids = [look["id"] for look in data["looks"]]
     assert ids == ["night", "spring", "autumn"]
-    assert data["looks"][0] == {"id": "night", "image": "/relief.webp", "blur": "/relief_blur.webp"}
+    assert data["looks"][0] == {"id": "night", "image": "/relief.webp"}
     for season in relief.SEASONS:
-        image, blur = relief.season_files(season)
         # Autumn's crowns of trees (a grain of colours, the teacher's 11/6)
         # cost more than the night's smooth wash; still small for a page
         # served on this computer only.
-        assert (relief.RELIEF_DIR / image).stat().st_size < 450_000
-        assert (relief.RELIEF_DIR / blur).stat().st_size < 240 * 1024  # More colour than the night's.
+        assert (relief.RELIEF_DIR / relief.season_image(season)).stat().st_size < 450_000
+    # 直し53 段1: no blurred grounds left in mapdata/.
+    assert not list(relief.RELIEF_DIR.glob("relief_blur*"))
 
 
 def test_a_season_missing_a_file_or_of_another_size_is_left_out(tmp_path):
@@ -57,13 +56,14 @@ def test_a_season_missing_a_file_or_of_another_size_is_left_out(tmp_path):
     assert [look["id"] for look in load_relief(VIEWBOX, folder)["looks"]] == ["night"]
     _with_season(folder, "autumn")
     assert [look["id"] for look in load_relief(VIEWBOX, folder)["looks"]] == ["night", "autumn"]
-    (folder / relief.season_files("autumn")[1]).unlink()  # No ground: not offered.
+    (folder / relief.season_image("autumn")).unlink()  # No picture: not offered.
     assert [look["id"] for look in load_relief(VIEWBOX, folder)["looks"]] == ["night"]
     # Another size is another camera: never laid misplaced.
-    shutil.copy(relief.RELIEF_DIR / "relief_blur.webp", folder / "other.webp")
+    from PIL import Image
+    Image.new("RGB", (60, 40)).save(folder / "other.webp", "WEBP")
     _with_season(folder, "spring", image_from="other.webp")
     assert [look["id"] for look in load_relief(VIEWBOX, folder)["looks"]] == ["night"]
-    (folder / relief.season_files("spring")[0]).write_bytes(b"not a picture")
+    (folder / relief.season_image("spring")).write_bytes(b"not a picture")
     assert [look["id"] for look in load_relief(VIEWBOX, folder)["looks"]] == ["night"]
 
 
@@ -79,12 +79,15 @@ def server():
 
 def test_the_seasons_files_are_served_by_name_from_mapdata(server):
     for season in relief.SEASONS:
-        for name in relief.season_files(season):
-            status, body = request(server, "GET", f"/{name}")
-            assert status == 200 and body == (relief.RELIEF_DIR / name).read_bytes()
-            assert app_module.MAP_FILES[f"/{name}"][1] == "image/webp"
-            assert request(server, "GET", f"/mapdata/{name}")[0] == 404
+        name = relief.season_image(season)
+        status, body = request(server, "GET", f"/{name}")
+        assert status == 200 and body == (relief.RELIEF_DIR / name).read_bytes()
+        assert app_module.MAP_FILES[f"/{name}"][1] == "image/webp"
+        assert request(server, "GET", f"/mapdata/{name}")[0] == 404
     assert request(server, "GET", "/relief_winter.webp")[0] == 404
+    # 直し53 段1: the blurred grounds are no longer served.
+    for name in ("relief_blur.webp", "relief_blur_spring.webp", "relief_blur_autumn.webp"):
+        assert request(server, "GET", f"/{name}")[0] == 404 and f"/{name}" not in app_module.MAP_FILES
 
 
 def test_the_switchs_words_are_the_teachers_table():
@@ -98,14 +101,15 @@ def test_it_opens_on_the_months_season_and_switches_only_the_two_pictures():
     start = _inner("startLook")
     assert "new Date().getMonth() + 1" in start and "|| all[0]" in start  # Else the night.
     show = _inner("showLook")
-    # The two pictures only; 直し48 段6: at once, or melted in (a picture over it, then its own href).
-    assert "for (const [node, href] of [[lookNodes.picture, look.image], [lookNodes.ground, look.blur]])" in show
+    # The picture only (the ground's colour follows frame.dataset.look in
+    # style.css); 直し48 段6: at once, or melted in (a picture over it, then its own href).
+    assert "for (const [node, href] of [[lookNodes.picture, look.image]])" in show
     assert show.count("setAttribute(\"href\"") == 3
     # Nothing else is redrawn: no draw, no move, no relayout.
     assert not re.search(r"\b(draw|build|moveTo|relayout)\(", show)
     assert 'aria-pressed", String(button.dataset.look === look.id)' in show
     draw = _inner("draw")
-    assert "href: look.blur" in draw and "href: look.image" in draw
+    assert 'layer("relief-ground")' in draw and "href: look.image" in draw and "look.blur" not in draw
     assert '$("map-season").hidden = !view.relief || looksOf().length < 2;' in draw
     # A season that will not load falls back to the night, then the flat map.
     init = _inner("init")
@@ -136,7 +140,6 @@ def test_the_night_is_drawn_as_it_was_and_a_season_keeps_its_camera():
 
 
 _MONTHS = """
-const BLUR_IMAGE = "/relief_blur.webp";
 %(months)s
 let map = { relief: { image: "/relief.webp", looks: %(looks)s } };
 %(looksOf)s
@@ -163,9 +166,9 @@ def _opening(looks):
 
 @node
 def test_each_month_opens_on_its_season_and_the_night_when_it_has_none():
-    night = {"id": "night", "image": "/relief.webp", "blur": "/relief_blur.webp"}
-    spring = {"id": "spring", "image": "/relief_spring.webp", "blur": "/relief_blur_spring.webp"}
-    autumn = {"id": "autumn", "image": "/relief_autumn.webp", "blur": "/relief_blur_autumn.webp"}
+    night = {"id": "night", "image": "/relief.webp"}
+    spring = {"id": "spring", "image": "/relief_spring.webp"}
+    autumn = {"id": "autumn", "image": "/relief_autumn.webp"}
     # January to December, as the teacher's switch is meant: spring in March
     # to May, autumn in September to November, the night in the rest.
     assert _opening([night, spring, autumn]) == ["night", "night", "spring", "spring", "spring", "night",

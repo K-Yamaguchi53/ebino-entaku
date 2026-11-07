@@ -15,10 +15,11 @@ flat map (and with no map, the seat list): the app still starts. Nothing here
 holds a seat's words.
 
 The seasons (the teacher, 11/6): the same model at dusk in spring and in
-autumn, mapdata/relief_<season>.webp with its blurred ground
-relief_blur_<season>.webp (tools/render_relief.py, tools/make_relief_blur.py),
-switched on the screen. Each is offered only when both files are there and
-the picture is the night's size (the same camera): else the night alone.
+autumn, mapdata/relief_<season>.webp (tools/render_relief.py), switched on
+the screen. Each is offered only when its picture is there and is the
+night's size (the same camera): else the night alone. Round the picture the
+screen lays a plain ground of the season's edge colour (style.css, 直し53
+段1); there is no blurred ground any more.
 """
 
 import json
@@ -30,30 +31,29 @@ IMAGE = "relief.webp"
 PROJECTION = "relief_projection.json"
 HEIGHTS = "relief_heights.json"
 IMAGE_PATH = "/relief.webp"  # Where the screen asks for the picture.
-BLUR_PATH = "/relief_blur.webp"  # The night's ground round it (make_relief_blur.py).
 MAX_IMAGE_BYTES = 1_000_000
 SEASONS = ("spring", "autumn")  # Besides the night, in the switch's order.
 
 
-def season_files(season: str) -> tuple[str, str]:
-    """The season's picture and its ground, as named in mapdata/ and served."""
-    return f"relief_{season}.webp", f"relief_blur_{season}.webp"
+def season_image(season: str) -> str:
+    """The season's picture, as named in mapdata/ and served."""
+    return f"relief_{season}.webp"
 
 
 def looks(folder: Path, size: tuple[int, int]) -> list[dict]:
     """The pictures the screen may switch between: the night first, then
-    each season whose two files are there and whose picture is the night's
-    size (a season that is not is left out, never shown misplaced)."""
-    found = [{"id": "night", "image": IMAGE_PATH, "blur": BLUR_PATH}]
+    each season whose picture is there and is the night's size (a season
+    that is not is left out, never shown misplaced)."""
+    found = [{"id": "night", "image": IMAGE_PATH}]
     for season in SEASONS:
-        image, blur = season_files(season)
+        image = season_image(season)
         try:
             data = (folder / image).read_bytes()
-            if not (folder / blur).is_file() or len(data) > MAX_IMAGE_BYTES or webp_size(data) != size:
+            if len(data) > MAX_IMAGE_BYTES or webp_size(data) != size:
                 continue
         except (OSError, ValueError):
             continue
-        found.append({"id": season, "image": f"/{image}", "blur": f"/{blur}"})
+        found.append({"id": season, "image": f"/{image}"})
     return found
 
 

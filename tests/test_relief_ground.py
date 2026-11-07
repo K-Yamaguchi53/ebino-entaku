@@ -1,16 +1,14 @@
-"""直し41の続き 段4: the frame has no empty black round the map's picture:
-the same picture mirrored, blurred and darkened, made once by
-tools/make_relief_blur.py, served from mapdata/ and laid under the picture.
-The whole map shows the basin larger, every seat's home and its name kept
-inside the frame first."""
+"""直し41の続き 段4: the frame has no empty black round the map's picture.
+直し53 段1: round it, a plain ground of the season's edge colour (no longer
+the picture mirrored and blurred, whose upside-down hills showed at the
+frame's edges). The whole map shows the basin larger, every seat's home and
+its name kept inside the frame first."""
 
-import importlib.util
 import re
 import threading
 from pathlib import Path
 
 import pytest
-from PIL import Image
 
 from ebino import app as app_module
 from ebino import relief
@@ -41,40 +39,34 @@ def server():
     srv.server_close()
 
 
-def test_the_blurred_ground_is_served_from_mapdata(server):
-    status, body = request(server, "GET", "/relief_blur.webp")
-    assert status == 200 and body == (relief.RELIEF_DIR / "relief_blur.webp").read_bytes()
-    assert app_module.MAP_FILES["/relief_blur.webp"][1] == "image/webp"
-    assert request(server, "GET", "/mapdata/relief_blur.webp")[0] == 404
+def test_no_blurred_ground_is_served_or_made_any_more(server):
+    # 直し53 段1 (the teacher, 11/7: 上と左右のぼかしを消して).
+    assert request(server, "GET", "/relief_blur.webp")[0] == 404
+    assert "/relief_blur.webp" not in app_module.MAP_FILES
+    assert not list(relief.RELIEF_DIR.glob("relief_blur*")) and not TOOL.exists()
+    assert "BLUR_IMAGE" not in SCRIPT and "relief_blur" not in SCRIPT and "relief-blur" not in CSS
 
 
-def test_the_ground_is_three_times_the_picture_and_small(tmp_path):
-    spec = importlib.util.spec_from_file_location("make_relief_blur", TOOL)
-    tool = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(tool)
-    made = tool.make(relief.RELIEF_DIR / relief.IMAGE, tmp_path / "ground.webp")
-    picture, ground = Image.open(relief.RELIEF_DIR / relief.IMAGE), Image.open(made)
-    small = (picture.width // tool.SHRINK, picture.height // tool.SHRINK)
-    assert ground.size == (3 * small[0], 3 * small[1])
-    kept = Image.open(relief.RELIEF_DIR / "relief_blur.webp")
-    assert kept.size == ground.size and (relief.RELIEF_DIR / "relief_blur.webp").stat().st_size < 128 * 1024
-    # Made here, from mapdata only: nothing is fetched.
-    source = TOOL.read_text(encoding="utf-8")
-    assert "http" not in source and "urllib" not in source and "requests" not in source
-
-
-def test_the_ground_lies_under_the_picture_three_times_as_large_and_takes_no_press():
+def test_a_plain_ground_three_times_the_picture_lies_under_it_and_takes_no_press():
     draw = _inner("draw")
-    assert draw.index('layer("relief-blur")') < draw.index('layer("relief-image")')
-    assert "x: ox - base.W, y: oy - base.H, width: 3 * base.W, height: 3 * base.H" in draw
-    # The picture's own margin melts into it: still masks, across and down.
+    assert draw.index('layer("relief-ground")') < draw.index('layer("relief-image")')
+    assert 'layer("relief-ground").append(svgEl("rect", { x: ox - base.W, y: oy - base.H, width: 3 * base.W, height: 3 * base.H }));' in draw
+    # The picture's own margin melts into it: still masks, across and down,
+    # wider than before so there is no seam.
     assert 'mask: "url(#relief-fade-x)"' in draw and '{ mask: "url(#relief-fade-y)" }' in draw
-    assert "const RELIEF_FADE_X = [[0, 0], [0.016, 0], [0.04, 1]," in SCRIPT
-    assert 'const BLUR_IMAGE = "/relief_blur.webp";' in SCRIPT
-    assert ".relief-blur { pointer-events: none; }" in CSS
-    assert ".dim .relief-image, .dim .relief-blur { opacity: .42; }" in CSS
-    # No blur drawn on the screen: the picture comes blurred.
-    assert not re.search(r"\.relief-(blur|image)[^{]*\{[^}]*filter", CSS)
+    assert "const RELIEF_FADE_X = [[0, 0], [0.016, 0], [0.07, 1], [0.93, 1], [0.984, 0], [1, 0]];" in SCRIPT
+    assert "const RELIEF_FADE_Y = [[0, 0], [0.05, 0], [0.12, 1], [0.88, 1], [0.935, 0], [1, 0]];" in SCRIPT
+    assert ".relief-ground { pointer-events: none; }" in CSS
+    assert ".dim .relief-image, .dim .relief-ground { opacity: .42; }" in CSS
+    # Each season's own edge colour, from the tokens; it melts with the picture.
+    assert ".relief-ground rect { fill: var(--ground-night); }" in CSS
+    assert '.map-frame[data-look="spring"] .relief-ground rect { fill: var(--ground-spring); }' in CSS
+    assert '.map-frame[data-look="autumn"] .relief-ground rect { fill: var(--ground-autumn); }' in CSS
+    for token in ("--ground-night", "--ground-spring", "--ground-autumn"):
+        assert re.search(token + r": #[0-9a-f]{6};", CSS)
+    assert "@media (prefers-reduced-motion: no-preference) { .relief-ground rect { transition: fill 1.6s ease-in-out; } }" in CSS
+    # No blur drawn on the screen.
+    assert not re.search(r"\.relief-(ground|image)[^{]*\{[^}]*filter", CSS)
     assert "feGaussianBlur" not in SCRIPT and "ctx.filter" not in SCRIPT
 
 
