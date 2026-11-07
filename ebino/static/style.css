@@ -156,6 +156,10 @@ main { padding-bottom: 72px; }
 }
 body:has(#start[hidden]) .masthead { padding-top: 20px; }
 body:has(#start[hidden]) .masthead h1 { font-size: 36px; letter-spacing: .12em; margin-bottom: 4px; }
+/* 直し50 段4: on 帰る前に、ひとこと (整理中, the sheet) the title's foot
+   touched the band under it: the title alone a little higher (it moves
+   nothing else; its own place in the page is kept). */
+body:has(#hitokoto:not([hidden])) .masthead h1 { position: relative; top: -6px; }
 
 /* --- 「いまやること」 (直し31-5): the four steps and the one line, kept at the top --- */
 .now { position: sticky; top: 0; z-index: 25; max-width: 1200px; margin: 0 auto; padding: 8px 16px 10px;
