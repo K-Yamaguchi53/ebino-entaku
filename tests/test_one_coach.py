@@ -57,12 +57,13 @@ def test_the_next_questions_come_at_once_and_the_coach_after(sitting):
 
 
 def test_the_choices_are_the_teachers_table_never_the_models(sitting):
-    out = text_response({"question": "その人は、なぜそうしたと思う？", "choices": ["モデルの選択肢"]})
+    out = text_response({"question": "その人の話は、自分にも重なると思う？", "choices": ["モデルの選択肢"]})
     session, _, _ = sitting([out])
     session.one_ask("A01", "プロフィール")
     view = run_coach(session, "A01", 1)
     table = texts.id_table(texts.ONE_COACH_CHOICES, texts.ONE_COACH_CHOICE_IDS)
-    assert view["choices"] == [{"id": key, "text": text} for key, text in table.items()]
+    # 「〜と思う？」 (直し48 段3: the set by the question's form): the teacher's first four.
+    assert view["choices"] == [{"id": key, "text": table[key]} for key in ("know", "differ", "new", "unsure")]
     assert "モデルの選択肢" not in json.dumps(view, ensure_ascii=False)
 
 
@@ -144,7 +145,7 @@ def test_three_at_most_and_never_the_same_way_twice(sitting):
 
 
 def test_an_answer_is_a_choice_a_line_or_none_and_kept(sitting):
-    session, _, kept = sitting([ask("その人は、なぜそうしたと思う？"), ask("自分なら、どうすると思う？")])
+    session, _, kept = sitting([ask("その人の話は、自分にも重なると思う？"), ask("自分でも、同じように決めると思う？")])
     session.one_ask("A01", "プロフィール")
     run_coach(session, "A01", 1)
     with pytest.raises(Refused):
@@ -165,7 +166,7 @@ def test_an_answer_is_a_choice_a_line_or_none_and_kept(sitting):
 
 def test_a_line_with_a_name_is_asked_again(sitting):
     from conftest import DISPLAY_NAME, make_seat
-    session, _, kept = sitting([ask("その人は、なぜそうしたと思う？")])
+    session, _, kept = sitting([ask("その人の話は、自分にも重なると思う？")])
     session.gate.names = NameList.build([*SEATS, make_seat(seat_id="X99")], {})
     session.one_ask("A01", "プロフィール")
     run_coach(session, "A01", 1)
@@ -187,7 +188,7 @@ def test_the_model_is_asked_outside_the_lock(monkeypatch):
 
     def model(request):
         seen["locked"] = the_app.lock.locked()
-        return ask("その人は、なぜそうしたと思う？")
+        return ask("その人の話は、自分にも重なると思う？")
     the_app = App(lib, Gate(FakeClient(model), NameList.build(SEATS, {})))
     the_app.handle("/api/start", {"lab": "quest"})
     answer = the_app.handle("/api/one/ask", {"seat_id": "A01", "item": "プロフィール"})

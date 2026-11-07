@@ -2,4 +2,8 @@ ID	文字
 all	町の大人に聞く
 seat	{seat}に聞く
 ai	AI の問いに答える
+ai_coach	コーチの問いに答える
+ai_observer	オブザーバーの問いに答える
+asked_coach	コーチの問い：
+asked_observer	オブザーバーの問い：
 clear	町の大人に聞くにもどす

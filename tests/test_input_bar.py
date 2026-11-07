@@ -92,8 +92,10 @@ def test_each_of_the_three_goes_to_its_own_way_with_its_own_words():
   answer = {{ card_id: "q-1", text: "休みの日に、店のことを考えますか？", again: false }};
   await send({EVENT});
   const afterCard = [state.to.kind, $("input-done").textContent, state.carded.has("S1")];
+  state.aiAsked = {{ "1:coach": "問いQ？" }};
   answerTo(1, "coach");
-  const ai = [$("input-to-label").textContent, $("ask-button").textContent, $("question").maxLength];
+  const ai = [$("input-to-label").textContent, $("ask-button").textContent, $("question").maxLength,
+    $("input-to-asked").textContent, $("input-to-asked").hidden];
   $("question").value = "決めて取るほうに近い";
   answer = {{ status: "answered", round: 2, question: "q" }};
   await send({EVENT});
@@ -106,7 +108,8 @@ def test_each_of_the_three_goes_to_its_own_way_with_its_own_words():
     assert out["seat"][0] == to["seat"].replace("{seat}", "理容師") and out["seat"][1] == send_words["seat"]
     assert out["seat"][2] is False and out["seat"][3] >= 1 and out["seat"][4] == ""  # Empty, the keyboard in it.
     assert out["afterCard"] == ["all", done["seat"].replace("{seat}", "理容師"), True]
-    assert out["ai"] == [to["ai"], send_words["ai"], 120]
+    # 直し48 段3: whose question it answers, by name, and that question right over the box.
+    assert out["ai"] == [to["ai_coach"], send_words["ai"], 120, to["asked_coach"] + "問いQ？", False]
     assert [s["path"] for s in out["sent"]] == ["/api/ask", "/api/card", "/api/coach_answer"]
     assert out["sent"][0]["body"] == {"question": "休みの日って、みんな何してる？"}
     assert out["sent"][1]["body"] == {"seat_id": "S1", "text": "休みの日に、店のことを考えますか？"}
@@ -183,5 +186,9 @@ def test_the_200_letters_names_and_the_one_card_stay():
 def test_the_words_are_in_texts():
     assert texts.id_table("input_to", texts.INPUT_TO_IDS)["seat"].count("{seat}") == 1
     shown = texts.screen_texts()
-    assert set(shown["input_to"]) == {"all", "seat", "ai", "clear"}
+    assert set(shown["input_to"]) == {"all", "seat", "ai", "ai_coach", "ai_observer", "asked_coach", "asked_observer", "clear"}
+    # 直し48 段3 (叩き台): which AI's question, by its name.
+    assert shown["input_to"]["ai_coach"] == "コーチの問いに答える"
+    assert shown["input_to"]["ai_observer"] == "オブザーバーの問いに答える"
+    assert shown["input_to"]["asked_coach"] == "コーチの問い：" and shown["input_to"]["asked_observer"] == "オブザーバーの問い："
     assert set(shown["input_send"]) == {"all", "seat", "ai"} and set(shown["input_done"]) == {"seat", "ai", "split"}

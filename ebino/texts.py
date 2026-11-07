@@ -122,7 +122,7 @@ DRAWER_PART_IDS = ("paragraph", "rounds", "seats", "purposes")
 ONE_WORDS = "one_words"
 ONE_WORD_IDS = ("back", "not_found", "to_card", "done", "thanks")
 INPUT_TO = "input_to"
-INPUT_TO_IDS = ("all", "seat", "ai", "clear")
+INPUT_TO_IDS = ("all", "seat", "ai", "ai_coach", "ai_observer", "asked_coach", "asked_observer", "clear")
 INPUT_SEND = "input_send"
 INPUT_SEND_IDS = ("all", "seat", "ai")
 INPUT_DONE = "input_done"
@@ -212,7 +212,7 @@ BUBBLE_CHOICES_HELP = "bubble_choices_help"
 # told): the first look at whose words are in, its heading and its button;
 # and the bubble by the one thing to press now, for the states that have one.
 GUIDE = "guide"
-GUIDE_IDS = ("host_mark", "about_title", "roles_lead", "roles_note", "about_next", "first_look_title", "first_look_go", "write", "table", "pressed", "answer_ai", "after", "back", "next")
+GUIDE_IDS = ("host_mark", "about_title", "roles_lead", "roles_note", "about_next", "first_look_title", "first_look_go", "write", "table", "pressed", "answer_ai", "after", "after_more", "back", "next")
 
 # 今日の道すじ (直し45 段2): the trail's words (叩き台), and the 「（AI）」 put
 # after コーチ and オブザーバー's names (coach_label.txt before its ｜).
@@ -225,7 +225,7 @@ AI_ROLE_SUFFIX = "ai_role_suffix"
 # words (叩き台); the words of home, money and health are the listener's.
 AI_ABSTRACT_WORDS = "ai_abstract_words"
 ONE_COACH_CHOICES = "one_coach_choices"
-ONE_COACH_CHOICE_IDS = ("know", "differ", "new", "unsure")
+ONE_COACH_CHOICE_IDS = ("know", "differ", "new", "unsure", "can", "some", "cannot", "did", "not_yet")
 ONE_COACH_WORDS = "one_coach_words"
 ONE_COACH_WORD_IDS = ("decline", "note", "send")
 LISTENER_AVOID = "listener_avoid"

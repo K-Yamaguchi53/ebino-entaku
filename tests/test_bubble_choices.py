@@ -34,12 +34,16 @@ def _top(name):
 
 
 def test_the_words_are_the_teachers():
-    assert texts.bubble_choices() == {"paragraph": "元の段落を読む", "mark": "印をつける",
+    # 直し48 段3 (叩き台; the teacher read 「元の段落」 as a book's): where the words came from.
+    assert texts.bubble_choices() == {"paragraph": "この言葉の出どころを読む", "mark": "印をつける",
                                       "card": "この人に聞きたいことを書く", "read": "これまでの円卓で読む"}
+    assert texts.screen_texts()["drawer_parts"]["paragraph"] == "この言葉の出どころ"
+    assert "『この言葉の出どころを読む』" in texts.screen_texts()["spoken_note"]
+    assert "段落" not in texts.screen_texts()["bubble_choices_help"]["paragraph"]
     shown = texts.screen_texts()
     assert shown["bubble_choices"] == texts.bubble_choices()
     assert shown["bubble_hint"] == "吹き出しを押すと、次にできることが出ます"
-    for word in ("元の段落を読む", "この人に聞きたいことを書く", "これまでの円卓で読む", "吹き出しを押すと"):
+    for word in ("この言葉の出どころを読む", "この人に聞きたいことを書く", "これまでの円卓で読む", "吹き出しを押すと"):
         # Not written into the screen's code (a comment may name it).
         assert f'"{word}' not in MAP and f'"{word}' not in APP
     assert "app.state.texts.bubble_choices" in _inner("openChoices")

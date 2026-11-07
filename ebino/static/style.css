@@ -1331,6 +1331,10 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) #table > .map-source { gr
 .input-to-clear { min-width: 36px; min-height: 36px; padding: 0; border-radius: 50%; font-size: 18px; line-height: 1;
   background: transparent; color: inherit; border: 1px solid var(--moon-faint); }
 .input-done { margin: 0 0 6px; padding: 3px 12px; border-left: 3px solid var(--lamp); color: var(--ink); font-size: 15px; }
+/* 直し48 段3: the AI's question the box answers, over it, in the AI's blue. */
+.input-to-asked { margin: 0 0 6px; padding: 4px 12px; border-left: 3px solid var(--ai); color: var(--ai-ink); font-size: 15px;
+  line-height: 1.5; }
+.input-to-asked[hidden] { display: none; }
 body:has(#table:not([hidden])):has(#map:not([hidden])) .ask { grid-template-columns: auto minmax(0, 1fr) auto; }
 @media (max-width: 640px) { .ask { grid-template-columns: 1fr; } .input-to { justify-self: start; } }
 /* A seat its card was made for: a small ring of the lamp's light on the map. */
@@ -1541,6 +1545,13 @@ body.one-open .input-area .ask { visibility: hidden; }
 .one-coach-choices { grid-column: 1 / -1; grid-row: 3; }
 .one-coach input { grid-column: 1 / -1; grid-row: 4; }
 .one-coach-message { grid-column: 1 / -1; grid-row: 5; }
+/* 直し48 段3: a question asking for an answer: the line (and 答える) first, then the choices. */
+.one-coach-write { grid-column: 1 / -1; grid-row: 3; display: flex; gap: 6px; }
+.one-coach-write input { flex: 1 1 auto; }
+.one-coach.open-form .one-coach-choices { grid-row: 4; }
+.one-coach-send { min-height: 36px; padding: 3px 16px; border-radius: 999px; border: 1px solid var(--ai);
+  background: var(--ai); color: var(--ai-deep); font-size: 14px; font-weight: 700; cursor: pointer; }
+.one-coach-send:disabled { opacity: .45; cursor: default; }
 .one-coach input { min-width: 0; }
 .one-coach.waiting .one-coach-question { min-height: 36px; display: flex; align-items: center; }
 .one-coach-dots { display: flex; gap: 6px; }
@@ -1890,9 +1901,24 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
 .map-choices button.guide-here { outline: 3px solid var(--lamp); outline-offset: 2px; font-weight: 700;
   color: var(--lamp-bright); background: var(--lamp-faint); }
 @media (max-height: 720px) { .guide { font-size: 18px; padding: 6px 14px; } }
+/* 直し48 段3 (the teacher, 11/7: 「まとめるときは、ここ」 went unseen): large,
+   two lines, the second (going on is fine too) smaller; the button lit in
+   the lamp's light, a slow ring once (none with motion reduced: colour and
+   size only). Never blinking. */
+.guide.big { max-width: min(400px, calc(100vw - 16px)); padding: 12px 22px; font-size: 26px; }
+.guide-main, .guide-more { display: block; }
+.guide-more { margin-top: 4px; font-size: 17px; font-weight: 600; line-height: 1.5; }
+@media (max-height: 720px) { .guide.big { padding: 8px 18px; font-size: 22px; } .guide-more { font-size: 15px; } }
+#to-reflect.guide-glow { border-color: var(--lamp); background: var(--lamp); color: var(--night);
+  box-shadow: 0 0 0 3px var(--lamp-soft); transform: scale(1.06); }
 @media (prefers-reduced-motion: no-preference) {
   .guide.fresh { animation: guide-fresh 1.4s ease-out 1; }
   .map-choices button.guide-here { animation: guide-fresh 1.4s ease-out 1; }
+  #to-reflect.guide-glow { animation: guide-glow 2.6s ease-out 1; }
+}
+@keyframes guide-glow {
+  from { box-shadow: 0 0 0 3px var(--lamp-soft), 0 0 0 0 color-mix(in srgb, var(--lamp) 70%, transparent); }
+  to { box-shadow: 0 0 0 3px var(--lamp-soft), 0 0 0 22px transparent; }
 }
 @keyframes guide-fresh {
   from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--lamp) 80%, transparent), 0 6px 18px var(--shadow); }

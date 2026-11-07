@@ -31,7 +31,7 @@ from .texts import (ASK_ANSWER_SAID, ASK_ANSWER_WRITTEN, ASK_NOT_ANSWERED, ASK_S
 from . import librarian, texts
 from .gate import Gate, GateError, ModelUnavailable, NameList, load_names
 from .guard import Guard
-from . import asker, directions, hitokoto, one_tidy, one_to_one, trail
+from . import asker, directions, hitokoto, one_choices, one_tidy, one_to_one, trail
 from .index import Entry, build_index, load_topics, load_utterances
 from .ingest.run import OUTPUT_DIR as INGESTED_DIR
 from .ingest.scrub import normalize_for_match
@@ -834,8 +834,8 @@ class Session:
             return {"seat_id": seat_id, "ask_no": asked["ask_no"], "question": ""}
         return {"seat_id": seat_id, "ask_no": asked["ask_no"], "question": asked["question"],
                 "label": coach.ai_label(coach.COACH), "badge": load_text(texts.AI_QUESTION_BADGE),
-                "choices": [{"id": key, "text": text} for key, text in
-                            texts.id_table(texts.ONE_COACH_CHOICES, texts.ONE_COACH_CHOICE_IDS).items()]}
+                # 直し48 段3: the set that fits the question's form (one_choices).
+                "choices": one_choices.choices(asked["question"])}
 
     def one_coach_answer(self, seat_id, ask_no, choice, note, declined: bool = False) -> dict:
         """A choice from the teacher's table and a line (both may be empty),
@@ -844,7 +844,8 @@ class Session:
                       and a["ask_no"] == ask_no and a["status"] == coach.ONE_SHOWN), None)
         if asked is None or asked.get("answered"):
             raise Refused("no_coach_question")
-        choices = texts.id_table(texts.ONE_COACH_CHOICES, texts.ONE_COACH_CHOICE_IDS)
+        # Only the choices shown for this question (直し48 段3: by its form).
+        choices = {item["id"]: item["text"] for item in one_choices.choices(asked["question"])}
         choice = choice if isinstance(choice, str) else ""
         if choice and choice not in choices:
             raise Refused("unknown_choice")

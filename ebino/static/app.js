@@ -12,6 +12,8 @@ const state = {
   aiAnswered: false, aiUnavailable: false, needsShown: false,
   // Seat -> the card's words, when the same card was sent to it again (直し31-2).
   cardAgain: {},
+  // "round:role" -> コーチ's or オブザーバー's question (直し48 段3: shown over the box answering it).
+  aiAsked: {},
   // What 「いまやること」 is worked out from (直し31-5): a question being sent;
   // the round's seats still lighting; a lamp card's choices open; one
   // pressed this round; the round's table open with its cards; AI
@@ -937,7 +939,10 @@ const GUIDE = {
     clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question")],
     spare: () => [...document.querySelectorAll("#map-overlay .table-bubble:not(.unplaced):not(.ai)")],
     sides: ["above", "right", "left", "below"] },
-  after: { at: () => $("to-reflect") },
+  // 直し48 段3 (the teacher, 11/7: it went unseen): large, in two lines,
+  // the second saying going on is fine too (「もっと話を聞きたい人は、…」), so
+  // it is not taken for the one right next step; the button lit (once).
+  after: { at: () => $("to-reflect"), more: "after_more", big: true },
 };
 
 // node if it is on screen (a box of its own), else null.
@@ -964,6 +969,10 @@ function drawGuide() {
   const lit = spec && spec.lit ? target : null;
   for (const node of document.querySelectorAll(".guide-here")) if (node !== lit) node.classList.remove("guide-here");
   if (lit) lit.classList.add("guide-here");
+  // 「帰る前に、ひとこと」 lit while the sign points at it (直し48 段3).
+  const glow = spec && spec.big ? target : null;
+  for (const node of document.querySelectorAll(".guide-glow")) if (node !== glow) node.classList.remove("guide-glow");
+  if (glow && !$("first-look").open) glow.classList.add("guide-glow");
   if (!words || !target || lit || $("first-look").open) {
     guide.hidden = true;
     guide.dataset.state = "";
@@ -972,7 +981,12 @@ function drawGuide() {
   if (guide.dataset.state !== now) {
     // Broken between phrases where it may be made narrower (直し46).
     if (spec.clear) $("guide-text").replaceChildren(phrased(words[spec.words || now]));
-    else $("guide-text").textContent = words[spec.words || now];
+    else if (spec.more && words[spec.more]) {
+      $("guide-text").replaceChildren(el("span", { class: "guide-main", text: words[spec.words || now] }),
+        el("span", { class: "guide-more", text: words[spec.more] }));
+    } else $("guide-text").textContent = words[spec.words || now];
+    if (spec.big) guide.classList.add("big");
+    else guide.classList.remove("big");
     guide.dataset.state = now;
     guide.classList.remove("fresh");
     void guide.offsetWidth;
@@ -1189,7 +1203,13 @@ function setTo(next, { focus = true } = {}) {
   if (state.to) state.drafts[draftKey(state.to)] = box.value;
   state.to = next;
   const words = state.texts.input_to;
-  const label = next.kind === "seat" ? words.seat.replace("{seat}", seatName(next.seatId)) : words[next.kind];
+  // 直し48 段3: which AI's question it answers, by its name (「コーチの問いに
+  // 答える」), and that question right over the box.
+  const roleWord = next.kind === "ai" && words[`ai_${next.role}`];
+  const label = next.kind === "seat" ? words.seat.replace("{seat}", seatName(next.seatId)) : roleWord || words[next.kind];
+  const asked = next.kind === "ai" && (state.aiAsked || {})[`${next.roundNo}:${next.role}`];
+  $("input-to-asked").textContent = asked && words[`asked_${next.role}`] ? words[`asked_${next.role}`] + asked : "";
+  $("input-to-asked").hidden = !$("input-to-asked").textContent;
   // Never broken inside a word nor its （…） (直し33-5: 「架空の川／1」).
   $("input-to-label").replaceChildren(phrased(label));
   $("question-label").textContent = label;
@@ -1497,6 +1517,7 @@ async function loadBand(roundNo, box) {
   // over the cards as well (直し30の続き-0): said once, in one place.
   if (!band.answered && roundNo === state.lastRound) setNow({ band: true });
   for (const card of band.cards) {
+    (state.aiAsked ||= {})[`${roundNo}:${card.role}`] = card.question;
     const node = el("div", { class: "ai-card" },
       el("p", { class: "label", text: card.label }),
       el("p", { class: "badge", text: card.badge }),

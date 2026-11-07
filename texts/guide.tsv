@@ -9,7 +9,8 @@ first_look_go	見た。聞きたいことを書く
 write	ここに書いて「聞く」を押そう
 table	吹き出しを1つ押してみよう
 pressed	次は、ここを押そう
-answer_ai	AI の問いはここ。押して答えよう
+answer_ai	コーチとオブザーバーの問いはここ。押して答えよう
 after	まとめるときは、ここ
+after_more	もっと話を聞きたい人は、吹き出しを押してみよう
 back	戻る
 next	次へ

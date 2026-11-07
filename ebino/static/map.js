@@ -3773,7 +3773,21 @@ const EbinoMap = (() => {
     decline.textContent = words.decline;
     decline.addEventListener("click", () => send({ declined: true }));
     choices.append(decline);
-    board.replaceChildren(head, question, choices, note, said);
+    // 直し48 段3: a question asking for an answer, not a choice (one_choices:
+    // まだわからない only): the line to write in first, with its own 「答える」
+    // (on once something is written); then まだわからない and 答えない.
+    if (view.choices.length <= 1) {
+      board.classList.add("open-form");
+      const answer = document.createElement("button");
+      answer.type = "button";
+      answer.className = "one-coach-send";
+      answer.textContent = words.send;
+      answer.disabled = true;
+      note.addEventListener("input", () => { answer.disabled = !note.value.trim(); });
+      answer.addEventListener("click", () => { if (note.value.trim()) send({ choice: "", note: note.value }); });
+      board.replaceChildren(head, question, div("one-coach-write"), choices, said);
+      board.querySelector(".one-coach-write").append(note, answer);
+    } else board.replaceChildren(head, question, choices, note, said);
     placeOne();
   }
 
