@@ -815,7 +815,11 @@ def ai_data(session, talk: Hitokoto, direction: str, chosen: str, card: str, ans
     return data
 
 
-_AHEAD = ThreadPoolExecutor(max_workers=6, thread_name_prefix="hitokoto-ahead")
+# 直し53b: room for every request of one sitting at once (three asked as the
+# map comes, three again with the lit parts, and the student's own), so the
+# student's own never waits behind the ones asked ahead.
+AHEAD_WORKERS = 8
+_AHEAD = ThreadPoolExecutor(max_workers=AHEAD_WORKERS, thread_name_prefix="hitokoto-ahead")
 
 
 def _ask_ai(gate: Gate, data: dict):
@@ -825,6 +829,18 @@ def _ask_ai(gate: Gate, data: dict):
 
 def ai_on(session) -> bool:
     return voice() == "ai" and bool(session.library.coach_on)
+
+
+def voice_report(library) -> str:
+    """One line at start (直し53b): who puts the two questions, so the morning's
+    comparison can see the switch took. Roles only, no words of the screen."""
+    if voice() == VOICE_LISTENER:
+        return f"hitokoto questions: listener ({VOICE_ENV}={VOICE_LISTENER})"
+    if not library.coach_on:
+        return "hitokoto questions: listener (coach band off)"
+    if not library.coach_sources:
+        return "hitokoto questions: observer (reaction), listener (self: no coach pieces)"
+    return f"hitokoto questions: observer (reaction), coach (self)  ({VOICE_ENV}={VOICE_LISTENER} for the listener)"
 
 
 def ask_ahead(gate: Gate, session, talk: Hitokoto) -> None:

@@ -111,12 +111,17 @@ class App:
         # lock: read while a round holds the one above.
         self.step = ""
         self.step_lock = threading.Lock()
+        # 直し53b: 帰る前に、ひとこと asks ahead in threads (hitokoto.ask_ahead),
+        # so prompts may be kept from two threads at once; one at a time, so
+        # each keeps its own number.
+        self.send_lock = threading.Lock()
         if records is not None:
             gate.on_send = self._on_send
 
     def _on_send(self, role: str, request: dict) -> None:
-        if self.session is not None:
-            self.records.save_prompt(self.session.session_id, role, request)
+        with self.send_lock:
+            if self.session is not None:
+                self.records.save_prompt(self.session.session_id, role, request)
 
     def set_step(self, name: str) -> None:
         with self.step_lock:
@@ -420,6 +425,7 @@ def main(argv=None) -> int:
     print(f"seats {len(library.seats)}  pieces {len(library.entries)}  purpose samples {len(library.purposes)}")
     print(f"coach band {'on' if library.coach_on else 'off'}  coach pieces {len(library.coach_sources)}  "
           f"seats off the map {len(library.all_seats) - len(library.seats)}")
+    print(hitokoto.voice_report(library))  # 直し53b: オブザーバー・コーチ, or the listener.
     print(library.map_report())  # 「地図なし」 when the map file is missing or broken.
     if library.placement is not None:
         print(library.relief_report())  # No picture: the flat map.
