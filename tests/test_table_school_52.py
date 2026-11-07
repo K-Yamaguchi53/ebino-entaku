@@ -43,6 +43,12 @@ def test_far_from_the_frame_the_sign_reaches_it():
     assert 'const frame = target.closest && target.closest("#ai-seat");' in draw
     assert "return reachGuide(room, frame ? frame.getBoundingClientRect() : box);" in draw
     assert 'reach = el("div", { id: "guide-reach", class: "guide-reach", "aria-hidden": "true" });' in APP
+    # The screen check's 差し戻し (768×1024: it ran through two cards' quotes): never over the
+    # people's words nor the AI's questions; no clear way, no line.
+    reach = APP[APP.index("function reachGuide(place, to) {"):APP.index("// The bubble at place { side, left, top, w, h }")]
+    assert 'const keep = [...peopleVoices(), ...document.querySelectorAll("#ai-seat-cards .ai-question")]' in reach
+    assert "if (crosses(sx, sy, ex, ey)) continue;" in reach
+    assert reach.index("if (crosses(sx, sy, ex, ey)) continue;") < reach.index("reach.hidden = false;")
     assert ".guide-reach { position: fixed;" in CSS and "pointer-events: none;" in CSS[CSS.index(".guide-reach {"):]
     assert "@media print { .guide, .guide-reach, .first-look { display: none !important; } }" in CSS
 

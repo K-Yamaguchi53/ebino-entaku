@@ -1109,17 +1109,39 @@ function guideReach() {
   return reach;
 }
 
+// The line never over the people's words nor the AI's questions (the
+// screen check, 768×1024: it ran through two cards' quotes): from the
+// nearest point of the frame's edge outward, the first way that crosses
+// none of them; none such: no line (the bubble's short point, as before).
 function reachGuide(place, to) {
   const reach = guideReach();
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const keep = [...peopleVoices(), ...document.querySelectorAll("#ai-seat-cards .ai-question")].map(shown).filter(Boolean)
+    .map((n) => n.getBoundingClientRect());
+  const crosses = (sx, sy, ex, ey) => {
+    const steps = Math.ceil(Math.hypot(ex - sx, ey - sy) / 3);
+    for (let k = 0; k <= steps; k++) {
+      const x = sx + (ex - sx) * k / steps, y = sy + (ey - sy) * k / steps;
+      if (keep.some((r) => x > r.left - 4 && x < r.right + 4 && y > r.top - 4 && y < r.bottom + 4)) return true;
+    }
+    return false;
+  };
   const mx = place.left + place.w / 2, my = place.top + place.h / 2;
-  const ex = clamp(mx, to.left + 12, to.right - 12), ey = clamp(my, to.top, to.bottom);
-  const sx = clamp(ex, place.left + 12, place.left + place.w - 12), sy = clamp(ey, place.top, place.top + place.h);
-  const length = Math.hypot(ex - sx, ey - sy);
-  if (length < 24) return;
-  Object.assign(reach.style, { left: `${Math.round(sx)}px`, top: `${Math.round(sy) - 2}px`, width: `${Math.round(length)}px`,
-    transform: `rotate(${Math.atan2(ey - sy, ex - sx)}rad)` });
-  reach.hidden = false;
+  const near = clamp(mx, to.left + 12, to.right - 12);
+  const tries = [near];
+  for (let d = 16; d < to.right - to.left; d += 16) tries.push(near - d, near + d);
+  for (const tx of tries) {
+    if (tx < to.left + 12 || tx > to.right - 12) continue;
+    const ex = tx, ey = clamp(my, to.top, to.bottom);
+    const sx = clamp(ex, place.left + 12, place.left + place.w - 12), sy = clamp(ey, place.top, place.top + place.h);
+    const length = Math.hypot(ex - sx, ey - sy);
+    if (length < 24) return;
+    if (crosses(sx, sy, ex, ey)) continue;
+    Object.assign(reach.style, { left: `${Math.round(sx)}px`, top: `${Math.round(sy) - 2}px`, width: `${Math.round(length)}px`,
+      transform: `rotate(${Math.atan2(ey - sy, ex - sx)}rad)` });
+    reach.hidden = false;
+    return;
+  }
 }
 
 // The bubble at place { side, left, top, w, h }, its point at box.
