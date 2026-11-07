@@ -124,7 +124,8 @@ const EbinoMap = (() => {
   const CHAIR_GAP = HIT_PX + 6;  // CSS px between an empty chair and its label, clear of that square.
   const DRAG_FROM = 5;  // px moved before a press becomes a drag.
   // Words drawn on the picture, in CSS px (they keep their size as it zooms).
-  const TEXT_PX = { place: 11, school: 12, home: 12 };
+  // 直し52 段4: the place names 13px on the screen, the homes' 14px (were 11 and 12).
+  const TEXT_PX = { place: 13, school: 12, home: 14 };
   // The seats' homes (直し35-2): 地域で働く大人 at their places on the map
   // (those with no place, together where the map is free); 県外・海外に出た人
   // at a way out on the map's edge, to 県外 by the north side, to
@@ -1322,7 +1323,7 @@ const EbinoMap = (() => {
     if (!view.relief) return;  // The flat map keeps its words' sizes from style.css.
     for (const text of svg.querySelectorAll("text[data-px]")) {
       text.style.fontSize = `${Number(text.dataset.px) * perPx}px`;
-      text.style.strokeWidth = `${2 * perPx}px`;  // A thin halo, not an outline.
+      text.style.strokeWidth = `${3 * perPx}px`;  // A halo of the night (直し52 段4: 3px, was 2px).
     }
   }
 
