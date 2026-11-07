@@ -645,12 +645,19 @@ class Session:
         pieces = [u for u in self.library.utterances if u.seat_id == seat_id]
         asked = texts.ask_questions()
         tables = self.library.ask_tables
+        kind_of = self.library.kind_of
+        teacher = tables.get("teacher_pages", set())
         out = []
         if pieces and all(one_to_one.is_page(u.section) for u in pieces):
             group = one_to_one.GROUP_OUTSIDER if seat.kind == "outsider_teacher" else one_to_one.GROUP_CROSS
             pages = tables["pages"].get(seat_id, {})
             for item, question in asked[group]:
                 found = [u for u in pieces if item in pages.get(u.section, [])]
+                # 直し54: a page the model gave this item but whose talk is
+                # plainly something else is not shown for it; the teacher's
+                # rows stay as the teacher wrote them.
+                mine = [u for u in found if (seat_id, u.section) in teacher]
+                found = mine + one_to_one.fit_kinds(group, item, [u for u in found if u not in mine], kind_of)
                 # An item none of whose pages has anything to show once tidied
                 # (a title only, a name) is not offered (直し43).
                 if any(self.one_page(u).text for u in found):
@@ -664,6 +671,9 @@ class Session:
             ranking = tables["ranking"].get(seat_id)
             for item, question in asked[one_to_one.GROUP_ARTICLE]:
                 found = [u for u in pieces if one_to_one.ARTICLE_SAME_ITEM.get(u.section, u.section) == item]
+                # 直し54: the pieces that answer its question first; one of
+                # plainly another talk not shown for it (one_to_one.ITEM_KINDS).
+                found = one_to_one.fit_kinds(one_to_one.GROUP_ARTICLE, item, found, kind_of)
                 if found:
                     out.append((item, question, found))
                 if item == "本文" and ranking:  # The ranking after the body, as in the article.

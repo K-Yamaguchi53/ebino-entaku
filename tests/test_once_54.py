@@ -81,6 +81,61 @@ def test_the_legal_form_beside_the_company_mask_goes():
     assert one_tidy.tidy_page("経歴\n2024-現在 合同会社この職場 代表").text.endswith("この職場 代表。")
 
 
+# --- one to one: a question shows only words that may answer it ---
+
+def _pieces(*ids):
+    return [SimpleNamespace(id=i) for i in ids]
+
+
+def test_fit_kinds_puts_the_answering_kind_first_and_drops_other_talk():
+    from ebino import one_to_one
+    pieces = _pieces("a", "b", "c", "d")
+    kinds = {"a": "refresh", "b": "none", "c": "reason", "d": "school_days"}
+    out = one_to_one.fit_kinds("記事", "プロフィール", pieces, kinds)
+    assert [p.id for p in out] == ["c", "d", "b"]  # 気分転換 (a) is not an answer to 「どんな道を通って」.
+
+
+def test_fit_kinds_leaves_nothing_when_all_is_other_talk():
+    from ebino import one_to_one
+    pieces = _pieces("p1", "p2")
+    kinds = {"p1": "school_days", "p2": "hardship"}
+    assert one_to_one.fit_kinds("外から来た", "見えたこと", pieces, kinds) == []
+    assert one_to_one.fit_kinds("外から来た", "したかったこと", pieces, kinds) == []
+
+
+def test_fit_kinds_keeps_an_item_with_no_rule_as_it_was():
+    from ebino import one_to_one
+    pieces = _pieces("x", "y")
+    assert one_to_one.fit_kinds("記事", "本文", pieces, {"x": "refresh"}) == pieces
+    assert one_to_one.fit_kinds("ポスター", "結果", pieces, {}) == pieces
+
+
+def test_every_rule_names_a_question_and_kinds_that_exist():
+    from ebino import one_to_one
+    from ebino.texts import ask_questions, kind_labels
+    asked = ask_questions()
+    kinds = set(kind_labels())
+    for (group, item), wanted in one_to_one.ITEM_KINDS.items():
+        assert item in [name for name, _ in asked[group]], (group, item)
+        assert set(wanted) <= kinds, (group, item)
+
+
+def test_the_teachers_page_rows_are_kept_apart(tmp_path):
+    from ebino import one_to_one
+    (tmp_path / one_to_one.PAGES_FILE).write_text("席\tページ\t軸\nX01\tp1\t見えたこと\nX01\tp2\t\n", encoding="utf-8")
+    (tmp_path / one_to_one.PAGES_MODEL_FILE).write_text("席\tページ\t軸\nX01\tp2\t見えたこと\n", encoding="utf-8")
+    tables = one_to_one.load_tables(tmp_path)
+    assert tables["teacher_pages"] == {("X01", "p1")}
+    assert tables["pages"]["X01"] == {"p1": ["見えたこと"], "p2": ["見えたこと"]}
+
+
+def test_one_items_fits_the_models_pages_but_not_the_teachers():
+    src = (Path(__file__).resolve().parent.parent / "ebino" / "session.py").read_text(encoding="utf-8")
+    assert "mine = [u for u in found if (seat_id, u.section) in teacher]" in src
+    assert "found = mine + one_to_one.fit_kinds(group, item, [u for u in found if u not in mine], kind_of)" in src
+    assert "found = one_to_one.fit_kinds(one_to_one.GROUP_ARTICLE, item, found, kind_of)" in src
+
+
 # --- the screen ---
 
 def test_the_name_card_hides_while_the_wait_sign_is_up():

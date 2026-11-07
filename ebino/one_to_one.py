@@ -62,6 +62,39 @@ PAGE_SECTION = "p"  # A page's section: p1, p2, ... (ingest/slides_pdf.py).
 AXIS_SEPARATORS = ("・", "、", ",", " ", "　")
 
 
+# 直し54 (the teacher, 11/8: 質問への回答になっていない): the kinds of talk
+# (closing_kind_labels.tsv, given each piece at ingest) that answer each of
+# the teacher's questions. An item's pieces of these kinds are shown first;
+# a piece of another kind (plainly something else) is not shown for it; a
+# piece with no kind stays (nothing says it is off). An item left with no
+# piece is not offered. Items not here (本文, a poster's roles...) as before.
+ITEM_KINDS = {
+    ("記事", "プロフィール"): ("reason", "school_days"),
+    ("記事", "仕事の内容"): ("daily", "values", "joy", "hardship", "skills"),
+    ("記事", "高校生に一言"): ("to_students",),
+    ("記事", "求める人材"): ("skills", "values", "to_students"),
+    ("記事", "会社PR"): ("joy", "values", "local", "daily"),
+    ("外から来た", "来たわけ"): ("reason", "local"),
+    ("外から来た", "見えたこと"): ("local",),
+    ("外から来た", "したかったこと"): ("future", "to_students"),
+    ("県外・海外", "行く前"): ("reason",),
+    ("県外・海外", "向こうで"): ("hardship", "joy", "daily"),
+    ("県外・海外", "これから"): ("future",),
+}
+NO_KIND = "none"  # talk_kinds.NONE
+
+
+def fit_kinds(group: str, item: str, pieces: list, kind_of: dict) -> list:
+    """The item's pieces that may answer its question, those of its kinds
+    first (each part in the order it came): see ITEM_KINDS."""
+    wanted = ITEM_KINDS.get((group, item))
+    if not wanted:
+        return list(pieces)
+    good = [p for p in pieces if kind_of.get(p.id, NO_KIND) in wanted]
+    unknown = [p for p in pieces if kind_of.get(p.id, NO_KIND) in (NO_KIND, "", None)]
+    return good + unknown
+
+
 def is_page(section: str) -> bool:
     return section.startswith(PAGE_SECTION) and section[len(PAGE_SECTION):].isdigit()
 
@@ -188,13 +221,23 @@ def _cells(folder, teacher_file: str, model_file: str, columns: tuple[str, ...])
     return {key: cell for key, cell in cells.items() if cell and cell != NONE_MARK}, unread
 
 
+def _teacher_keys(folder, teacher_file: str, columns: tuple[str, ...]) -> set:
+    """直し54: the keys of the rows the teacher filled (a teacher's row is
+    the teacher's call: never fitted to kinds, fit_kinds)."""
+    rows, problem = read_rows(folder / teacher_file, columns)
+    if problem:
+        return set()
+    return {tuple(row[c] for c in columns[:-1]) for row in rows or [] if row[columns[-1]].strip()}
+
+
 def load_tables(folder) -> dict:
     """{"pages": {seat: {page: [axes]}}, "ranking": {seat: question},
     "unread": [the tables not read, by name and line]} from the teacher's
     tables in folder and the model's beside them (直し36): a row the teacher
     filled is the teacher's, 「-」 shows nothing; an empty one is the
     model's. A table not there is empty."""
-    out = {"pages": {}, "ranking": {}, "unread": []}
+    out = {"pages": {}, "ranking": {}, "unread": [],
+           "teacher_pages": _teacher_keys(folder, PAGES_FILE, PAGES_COLUMNS)}
     cells, unread = _cells(folder, PAGES_FILE, PAGES_MODEL_FILE, PAGES_COLUMNS)
     out["unread"] += unread
     for (seat, page), cell in cells.items():

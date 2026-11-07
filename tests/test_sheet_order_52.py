@@ -44,6 +44,8 @@ def test_on_the_screen_at_the_top_printed_as_before():
 
 def test_the_small_words_on_the_sheet():
     assert ".hk-met-who { display: block; font-size: 14px; color: var(--paper-soft); }" in CSS
-    assert 'content: "↓"; position: absolute; left: .2em; top: -.85em; font-size: 14px; color: var(--paper-soft); }' in CSS
+    # 直し54 (the teacher, 11/8: こじつけ感): the order written, a number, not an arrow; still 14px.
+    assert 'content: "↓"' not in CSS
+    assert ".hk-moves-list li::before { content: counter(hk-move);" in CSS and "font-size: 14px;\n  line-height: 1.4; color: var(--paper-soft); }" in CSS
     assert ".hk-print-note { margin: 18px 0 0; font-size: 14px; color: var(--paper-soft); }" in CSS
-    assert ".hk-met-who, .hk-print-note, .hk-moves-list li + li::before { font-size: 12px; }" in PRINTED
+    assert ".hk-met-who, .hk-print-note, .hk-moves-list li::before { font-size: 12px; }" in PRINTED

@@ -50,7 +50,8 @@ def test_the_teachers_tables_are_never_written_over_and_only_axes_are_taken(tmp_
 
 
 def test_no_table_or_a_broken_one_is_empty_and_the_broken_one_is_said(tmp_path):
-    assert one_to_one.load_tables(tmp_path) == {"pages": {}, "ranking": {}, "unread": []}
+    # 直し54: the teacher's own page rows are kept apart too (none here).
+    assert one_to_one.load_tables(tmp_path) == {"pages": {}, "ranking": {}, "unread": [], "teacher_pages": set()}
     (tmp_path / "ask_pages.tsv").write_text("ほかの見出し\n", encoding="utf-8")
     assert one_to_one.load_tables(tmp_path)["pages"] == {}
     assert one_to_one.load_tables(tmp_path)["unread"] == ["ask_pages.tsv line 1"]

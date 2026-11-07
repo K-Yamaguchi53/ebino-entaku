@@ -1942,10 +1942,13 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
 .hk-met-line { margin: 0 0 6px; padding-left: 10px; border-left: 3px solid var(--paper-line); }
 .hk-met-quote { display: block; font-family: var(--mincho); font-size: 16px; line-height: 1.7; }
 .hk-met-who { display: block; font-size: 14px; color: var(--paper-soft); }  /* 直し52 段6: was 12px (6.7:1). */
-.hk-moves-list { margin: 0; padding: 0; list-style: none; font-family: var(--mincho); font-size: 16px; line-height: 1.7; }
-.hk-moves-list li { position: relative; padding-left: 1.4em; }
-/* 直し52 段6: the arrow 14px in the sheet's quiet ink (the lamp's colour on the paper was 1.7:1). */
-.hk-moves-list li + li::before { content: "↓"; position: absolute; left: .2em; top: -.85em; font-size: 14px; color: var(--paper-soft); }
+/* 直し54 (the teacher, 11/8: こじつけ感がある): no arrow between the lines
+   (an arrow said each came from the one before); the order they were
+   written in, a small number, in the sheet's quiet ink (直し52 段6: 14px). */
+.hk-moves-list { margin: 0; padding: 0; list-style: none; counter-reset: hk-move; font-family: var(--mincho); font-size: 16px; line-height: 1.7; }
+.hk-moves-list li { position: relative; padding-left: 1.6em; counter-increment: hk-move; }
+.hk-moves-list li::before { content: counter(hk-move); position: absolute; left: 0; top: .2em; font-family: var(--gothic); font-size: 14px;
+  line-height: 1.4; color: var(--paper-soft); }
 .hk-moves-list li + li { margin-top: 6px; }
 .hk-tie { padding: 10px 14px; border: 1px solid var(--ai); border-radius: 6px; }
 .hk-sheet .hk-ai-label { color: var(--ai-deep); font-weight: 700; }
@@ -2032,7 +2035,7 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
   .hk-sheet .hk-label { font-size: 12px; }
   .hk-sheet :is(.hk-met-quote, .hk-moves-list, .hk-story, .hk-light-why) { font-size: 13px; }
   /* 直し52 段6: on paper as before (14px on the screen only). */
-  .hk-met-who, .hk-print-note, .hk-moves-list li + li::before { font-size: 12px; }
+  .hk-met-who, .hk-print-note, .hk-moves-list li::before { font-size: 12px; }
   /* 直し53 段6: the marked notes on paper, as the sheet's other parts. */
   /* A4 one page: the tag beside the words, as a small heading column. */
   .hk-marked-item { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: baseline;
