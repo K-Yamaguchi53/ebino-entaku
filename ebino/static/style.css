@@ -1901,6 +1901,16 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
   .hk-glow { animation: hk-breathe 2.4s ease-in-out infinite; }
 }
 @keyframes hk-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* 直し51 段6: the sheet coming up once (hitokoto.js reveal): its parts rise
+   in turn, then the student's two lines, each with a marker's line drawn
+   once under it, left to right; all in 2 seconds. Without .hk-reveal (done,
+   pressed, opened again, motion reduced) all is there, the lines drawn. */
+.hk-own-mark { background: linear-gradient(transparent 62%, var(--lamp-soft) 62%) no-repeat 0 0 / 100% 100%; }
+@media (prefers-reduced-motion: no-preference) {
+  .hk-sheet.hk-reveal > *, .hk-sheet.hk-reveal .hk-own-text { animation: hk-rise .3s ease-out both; animation-delay: var(--hk-at, 0ms); }
+  .hk-sheet.hk-reveal .hk-own-text .hk-own-mark { animation: hk-mark .45s ease-out both; animation-delay: calc(var(--hk-at, 0ms) + 250ms); }
+}
+@keyframes hk-mark { from { background-size: 0% 100%; } to { background-size: 100% 100%; } }
 @keyframes hk-breathe { 50% { opacity: .55; } }
 /* Printed: the one sheet alone, ink on the page's white. */
 @media print {
@@ -1929,6 +1939,9 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
   .hk-sheet .hk-label { font-size: 12px; }
   .hk-sheet :is(.hk-met-quote, .hk-moves-list, .hk-story, .hk-light-why) { font-size: 13px; }
   .hk-drop, .hk-restore, .hk-own-message { display: none !important; }
+  /* 直し51 段6: all there on paper; the marker's line not printed (ink on white). */
+  .hk-sheet.hk-reveal > *, .hk-sheet.hk-reveal .hk-own-text, .hk-own-mark { animation: none !important; }
+  .hk-own-mark { background: none; }
   .hk-notice-box.hk-dropped { display: none; }
 }
 @page { size: A4; margin: 12mm; }

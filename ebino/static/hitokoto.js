@@ -14,6 +14,7 @@ const EbinoHitokoto = (() => {
   let view = null;  // Today's map, as the server sent it.
   let picked = null;  // { person, part } pressed on the map.
   let busy = false;
+  let revealed = false;  // 直し51 段6: the sheet came up once; opened again, it is just there.
 
   const $ = (id) => document.getElementById(id);
   const still = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1186,10 +1187,46 @@ const EbinoHitokoto = (() => {
     }
     box.append(el("p", "hk-print-note", W.print_note));
     show("sheet");
+    reveal(box);
     // 最初にもどる, as under the reflection sheet (直し30-2).
     $("hk-back").append($("back-to-start"));
     app.showBackToStart();
     $("hk-print").focus({ preventScroll: true });
+  }
+
+  // 直し51 段6 (the teacher, 11/7: 「1枚ができる」瞬間): the first time the
+  // sheet comes up, its parts rise one after another, short (as hk-rise);
+  // last, the student's own two lines, one then the other, each with a
+  // marker's line drawn once under it, left to right. In 2 seconds at most,
+  // once only; a press or a key shows it all at once. Motion reduced: all
+  // there, the lines drawn. Never blinking, never the whole screen moving.
+  // A line not written (or taken off) is not waited for. Printed: all there.
+  function reveal(box) {
+    const own = [...box.querySelectorAll(".hk-notice-text, .hk-try-text")].filter((line) => !line.hidden);
+    for (const line of own) {
+      const mark = el("span", "hk-own-mark", line.textContent);
+      line.replaceChildren(mark);
+    }
+    if (revealed || still()) {
+      revealed = true;
+      return;
+    }
+    revealed = true;
+    const parts = [...box.children];
+    const step = Math.min(90, Math.floor(1000 / Math.max(parts.length, 1)));
+    parts.forEach((part, n) => part.style.setProperty("--hk-at", `${n * step}ms`));
+    const after = Math.min(parts.length * step, 1000);
+    own.forEach((line, n) => line.style.setProperty("--hk-at", `${after + n * 200}ms`));
+    box.classList.add("hk-reveal");
+    const done = () => {
+      clearTimeout(timer);
+      box.classList.remove("hk-reveal");
+      document.removeEventListener("pointerdown", done, true);
+      document.removeEventListener("keydown", done, true);
+    };
+    const timer = setTimeout(done, 2 * 1000);  // 2 seconds at most.
+    document.addEventListener("pointerdown", done, true);
+    document.addEventListener("keydown", done, true);
   }
 
   function setup() {
