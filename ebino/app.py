@@ -29,7 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from . import coach, hitokoto, inside, relief
+from . import coach, hitokoto, inside, one_to_one, relief
 from .config import PlaceError, data_dir, load_env_file, records_dir, reflect_old
 from .gate import Gate, load_names
 from .records import Records
@@ -434,6 +434,17 @@ def main(argv=None) -> int:
     # One to one's tables (直し36): one that could not be read, by name and line.
     for problem in library.ask_tables.get("unread", []):
         print(f"one to one, a table not read: {problem}")
+        # 直し54c: what it means, and what to do.
+        hint = one_to_one.UNREAD_HINT.get(problem.split(" line ")[0])
+        if hint:
+            print(f"  {hint}\n{one_to_one.UNREAD_FIX}")
+    # 直し54c: the teacher's rows in ask_pages.tsv, and those that do not work as written.
+    if library.ask_tables.get("teacher_rows"):
+        problems = library.ask_tables.get("teacher_problems", [])
+        print(f"1対1 ask_pages.tsv：先生が書いた行 {library.ask_tables['teacher_rows']}"
+              f"・書いたとおりに効かない行 {len(problems)}")
+        for problem in problems:
+            print(f"  {problem}")
     print(f"open http://{HOST}:{server.server_address[1]}/  (Ctrl+C to stop)")
     try:
         server.serve_forever()

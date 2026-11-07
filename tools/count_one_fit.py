@@ -75,7 +75,38 @@ def main() -> int:
     print("出なくなる質問（席ID・項目）")
     for seat_id, item in gone:
         print(f"{seat_id}\t{item}")
+    print()
+    print("先生の行（ask_pages.tsv）が画面に出るか（席ID・ページ・軸）")
+    for line in teacher_rows(session):
+        print(line)
+    for problem in session.library.ask_tables.get("teacher_problems", []):
+        print(f"書いたとおりに効かない：{problem}")
     return 0
+
+
+def teacher_rows(session) -> list[str]:
+    """直し54c: each page the teacher gave axes, and whether one to one shows
+    it (a page whose words tidied leave nothing, or hold a name, is never
+    shown: one_tidy.py). A row naming no seat the pieces have is left to the
+    start's check (its cell may hold a name)."""
+    from ebino import one_tidy
+    tables = session.library.ask_tables
+    seats = {seat.seat_id for seat in session.library.all_seats}
+    out = []
+    for seat_id, page in sorted(tables.get("teacher_pages", ())):
+        axes = tables["pages"].get(seat_id, {}).get(page)
+        if seat_id not in seats or not axes:
+            continue  # 「-」, no axis read, or no such seat: the start's check says which.
+        pieces = [u for u in session.library.utterances if u.seat_id == seat_id and u.section == page]
+        tidied = [session.one_page(u) for u in pieces]
+        if any(t.text for t in tidied):
+            state = "出る"
+        elif any(one_tidy.NAME in t.reasons for t in tidied):
+            state = "出ない（名前が含まれるページ）"
+        else:
+            state = "出ない（整えると文が残らないページ）" if pieces else "出ない（このページがない）"
+        out.append(f"{seat_id}\t{page}\t{'・'.join(axes)}\t{state}")
+    return out
 
 
 if __name__ == "__main__":

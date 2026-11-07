@@ -156,6 +156,10 @@ class Library:
                          relief_data=(relief.load_relief((map_data.width, map_data.height), relief_dir)
                                       if map_data else None))
         library.ask_tables = one_to_one.load_tables(data_dir / INGESTED_DIR)
+        # 直し54c: the teacher's page rows that do not work as written, said at the start.
+        library.ask_tables["teacher_rows"], library.ask_tables["teacher_problems"] = \
+            one_to_one.teacher_page_problems(data_dir / INGESTED_DIR, library.utterances,
+                                             {seat.seat_id: seat.kind for seat in library.all_seats})
         return library
 
     def seat_view(self, seat: Seat) -> dict:

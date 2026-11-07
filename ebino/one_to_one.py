@@ -14,6 +14,7 @@ Which items a seat's words have:
 """
 
 import re
+import unicodedata
 
 # 種類 in ask_questions.txt.
 GROUP_ARTICLE = "記事"
@@ -175,15 +176,56 @@ def write_tables(folder, utterances, kinds: dict[str, str], gate=None) -> dict:
             "unread": tables["unread"], "model": model}
 
 
+LINE = "_line"  # A row's line in its file (blank lines counted), for the teacher.
+
+
+def _read(path, columns: tuple[str, ...]) -> list[dict]:
+    """直し54c (the teacher's own table, typed by hand on the morning): a row
+    with its last (empty) cell's tab left off, empty cells after the last,
+    and columns of the teacher's own after the table's (a memo) are read as
+    meant. Anything else as texts.read_table: the header's first columns
+    these, the key cells filled, a cell more than the header an error."""
+    numbered = [(n, line) for n, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), start=1)
+                if line.strip()]
+    header = [cell.strip() for cell in numbered[0][1].split("\t")] if numbered else []
+    if tuple(header[:len(columns)]) != columns:
+        raise ValueError(f"{path.name} line {numbered[0][0] if numbered else 1}: columns do not match")
+    rows = []
+    for number, line in numbered[1:]:
+        cells = [cell.strip() for cell in line.split("\t")]
+        while len(cells) > len(header) and not cells[-1]:
+            cells.pop()
+        if len(cells) == len(columns) - 1:
+            cells.append("")
+        if not len(columns) <= len(cells) <= len(header) or not all(cells[:len(columns) - 1]):
+            raise ValueError(f"{path.name} line {number}: wrong column count or empty cell")
+        row = dict(zip(columns, cells))
+        row[LINE] = number
+        rows.append(row)
+    return rows
+
+
+def _key(columns: tuple[str, ...], row: dict) -> tuple[str, ...]:
+    """A row's key cells as the pieces name them (直し54c): full-width
+    letters and digits as half-width; a page 「3」「P3」「ｐ.３」 is p3."""
+    out = []
+    for column in columns[:-1]:
+        cell = unicodedata.normalize("NFKC", row[column]).strip()
+        if column == PAGES_COLUMNS[1]:
+            cell = re.sub(r"[\s.]", "", cell).lower()
+            cell = PAGE_SECTION + cell if cell.isdigit() else cell
+        out.append(cell)
+    return tuple(out)
+
+
 def read_rows(path, columns: tuple[str, ...]) -> tuple[list[dict] | None, str]:
     """(rows, problem) of a table; rows None when it is not there or cannot
     be read. problem: "" or the table's name and the line it could not read
     there (直し36: it said nothing before); never a path or a cell."""
-    from .texts import read_table
     if not path.exists():
         return None, ""
     try:
-        return read_table(path, columns, may_be_empty=(columns[-1],)), ""
+        return _read(path, columns), ""
     except UnicodeDecodeError:
         lines = path.read_bytes().split(b"\n")
         bad = next((n for n, line in enumerate(lines, start=1) if not _utf8(line)), 1)
@@ -214,10 +256,10 @@ def _cells(folder, teacher_file: str, model_file: str, columns: tuple[str, ...])
         return {}, unread
     cells: dict[tuple, str] = {}
     for row in model or []:
-        cells[tuple(row[c] for c in columns[:-1])] = row[columns[-1]].strip()
+        cells[_key(columns, row)] = row[columns[-1]].strip()
     for row in teacher or []:
         if row[columns[-1]].strip():
-            cells[tuple(row[c] for c in columns[:-1])] = row[columns[-1]].strip()
+            cells[_key(columns, row)] = row[columns[-1]].strip()
     return {key: cell for key, cell in cells.items() if cell and cell != NONE_MARK}, unread
 
 
@@ -227,7 +269,69 @@ def _teacher_keys(folder, teacher_file: str, columns: tuple[str, ...]) -> set:
     rows, problem = read_rows(folder / teacher_file, columns)
     if problem:
         return set()
-    return {tuple(row[c] for c in columns[:-1]) for row in rows or [] if row[columns[-1]].strip()}
+    return {_key(columns, row) for row in rows or [] if row[columns[-1]].strip()}
+
+
+def _words(cell: str) -> list[str]:
+    text = cell or ""
+    for mark in AXIS_SEPARATORS:
+        text = text.replace(mark, "\t")
+    return [word.strip() for word in text.split("\t") if word.strip()]
+
+
+def teacher_page_problems(folder, utterances, kinds: dict[str, str]) -> tuple[int, list[str]]:
+    """直し54c: (the rows the teacher filled in ask_pages.tsv, those that do
+    not work as written), said at the server's start: a row whose seat or
+    page the pieces do not have, whose 軸 names no axis, an axis of the other
+    group, a word that is not an axis, or a seat and page written twice (the
+    later row is used). Each by its line, the seat ID and the page; a seat
+    or page cell that is no ID is not said (it may hold a name), nor the 軸."""
+    rows, problem = read_rows(folder / PAGES_FILE, PAGES_COLUMNS)
+    if problem or not rows:
+        return 0, []
+    pages = pages_only(utterances)
+    seen: dict[tuple, int] = {}
+    filled, out = 0, []
+    for row in rows:
+        cell = row[PAGES_COLUMNS[-1]].strip()
+        if not cell:
+            continue
+        filled += 1
+        seat, page = _key(PAGES_COLUMNS, row)
+        known_seat = seat in pages or seat in kinds
+        where = (f"{PAGES_FILE} {row[LINE]}行目（{seat if known_seat else '席ID?'} "
+                 f"{page if is_page(page) else 'ページ?'}）")
+        if (seat, page) in seen:
+            out.append(f"{where}：{seen[(seat, page)]}行目と同じ席・ページ（あとの行を使う）")
+        seen[(seat, page)] = row[LINE]
+        if seat not in pages:
+            out.append(f"{where}：この席IDは、ページだけの席にない")
+            continue
+        if page not in pages[seat]:
+            out.append(f"{where}：この席にこのページはない（{pages[seat][0]}〜{pages[seat][-1]}）")
+            continue
+        if cell == NONE_MARK:
+            continue
+        allowed = axes_for(kinds.get(seat, ""))[1]
+        hint = f"この席の軸：{'・'.join(allowed)}。出さないなら -"
+        words = _words(cell)
+        known = [word for word in words if word in CROSS_AXES + OUTSIDER_AXES]
+        here = [word for word in known if word in allowed]
+        if not known:
+            out.append(f"{where}：軸の言葉が読めない（{hint}）")
+        elif not here:
+            out.append(f"{where}：この席の質問にない軸（{hint}）")
+        elif len(here) < len(words):
+            out.append(f"{where}：読めない言葉がある。読めた軸だけ使う（{hint}）")
+    return filled, out
+
+
+# 直し54c: said at the server's start under a table not read (app.py).
+UNREAD_HINT = {
+    PAGES_FILE: "→ この表が読めないので、県外・海外と外から来た人の席の1対1の質問は、ひとつも出ません。",
+    RANKING_FILE: "→ この表が読めないので、ランキングの質問は出ません。",
+}
+UNREAD_FIX = "  メモ帳で開き、UTF-8・タブ区切りのまま保存し直して、起動し直してください。"
 
 
 def load_tables(folder) -> dict:
