@@ -118,7 +118,8 @@ async (page) => {
               const a = g.getBoundingClientRect();
               const hits = (nodes) => nodes.filter((n) => n && n.getClientRects().length).map((n) => n.getBoundingClientRect())
                 .filter((b) => b.width && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom).length;
-              return { head: hits([document.querySelector("#ai-seat-label"), document.querySelector("#ai-seat-note")]),
+              // 直し48 段2: no heading nor note; the robots and their names instead.
+              return { head: hits([...document.querySelectorAll("#ai-seat-cards .robot, #ai-seat-cards .who-name")]),
                 cards: hits([...document.querySelectorAll("#ai-seat-cards .ai-question")]) };
             });
             hint = !over ? "no hint" : [over.head ? `hint over ${over.head}` : "", over.cards ? `hint over card ${over.cards}` : ""]
@@ -142,6 +143,24 @@ async (page) => {
           if (m.w > m.vw) bad.push(`wide ${m.w}>${m.vw}`);
           if (errors.length) bad.push(`errors ${errors.length}`);
           if (hint) bad.push(hint);
+          // 直し48 段2: コーチ（AI）'s board over the map by the person: inside
+          // the map's frame, over neither the person's words nor the questions.
+          if (moment === "one_coach") {
+            const c = await p.evaluate(() => {
+              const box = (q) => { const n = document.querySelector(q); return n ? n.getBoundingClientRect() : null; };
+              const b = box(".one-coach"), f = box("#map-overlay");
+              if (!b) return null;
+              const over = (o) => Boolean(o && b.left < o.right && o.left < b.right && b.top < o.bottom && o.top < b.bottom);
+              return { words: over(box(".one-bubble")), asks: over(box(".one-asks")),
+                out: b.left < f.left - 1 || b.top < f.top - 1 || b.right > f.right + 1 || b.bottom > f.bottom + 1 };
+            });
+            if (!c) bad.push("no coach");
+            else {
+              if (c.words) bad.push("coach over words");
+              if (c.asks) bad.push("coach over questions");
+              if (c.out) bad.push("coach out of the map");
+            }
+          }
           let put = "";
           if (["one_asks", "one_to_one", "one_coach"].includes(moment)) {
             const asks = await p.locator(".one-asks .one-ask").evaluateAll((els) => els.map((e) => ({

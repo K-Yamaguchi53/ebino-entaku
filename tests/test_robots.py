@@ -72,7 +72,7 @@ def test_the_robots_are_drawn_in_one_place_only():
     assert "<svg" not in ROBOT and "innerHTML" not in ROBOT
     assert not list(STATIC.glob("robot*.svg")) and not list(STATIC.glob("robot*.png"))
     # Every place makes it there.
-    assert APP.count("EbinoRobot.make(") == 3 and MAP.count("EbinoRobot.make(") == 1
+    assert APP.count("EbinoRobot.make(") == 4 and MAP.count("EbinoRobot.make(") == 2
 
 
 @node
@@ -135,6 +135,8 @@ def test_every_place_keeps_the_name_with_ai_beside_it():
     # The coach's board: the coach's robot, then its name.
     board = MAP[MAP.index("async function askCoach("):MAP.index("const question = div(\"one-coach-question\"")]
     assert 'head.append(EbinoRobot.make("coach"), div("one-coach-name", view.label));' in board
+    # 直し48 段2: while it comes, the robot already there with three dots in its bubble.
+    assert 'board.append(EbinoRobot.make("coach"), div("one-coach-question", ""));' in board
     assert '"ai-mark"' not in board
 
 
@@ -149,11 +151,11 @@ const $ = part;
 function el(tag, attrs, ...kids) { return { tag, attrs, kids, classList: { add() {} }, addEventListener() {} }; }
 function mapMoved() {}
 const phrased = (text) => text;
-const state = { texts: { ai_seat_mark: "AI", ai_seat_label: "L", ai_seat_note: "N" } };
+const state = { texts: {} };
 """ + DOCUMENT + ROBOT + _top(APP, "renderAiSeat") + _top(APP, "foldAiSeat") + _top(APP, "openAiSeat") + """
 renderAiSeat(1, { cards: [{ role: "coach", label: "コーチ（AI）", question: "Q1" },
   { role: "observer", label: "オブザーバー（AI）", question: "Q2" }], answered: null });
-process.stdout.write(JSON.stringify({ mark: $("ai-seat-mark").textContent,
+process.stdout.write(JSON.stringify({ faces: $("ai-seat-faces").children.map((k) => k.dataset.robot),
   cards: $("ai-seat-cards").children.map((b) => b.kids[0].kids.map((k) => k.dataset
     ? [k.dataset.robot, k.attrs["aria-hidden"]] : k.attrs.text)) }));
 """
@@ -161,8 +163,8 @@ process.stdout.write(JSON.stringify({ mark: $("ai-seat-mark").textContent,
     assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
     got = json.loads(out.stdout.decode("utf-8"))
     assert got["cards"] == [[["coach", "true"], "コーチ（AI）"], [["observer", "true"], "オブザーバー（AI）"]]
-    # The seat's heading keeps the AI's square mark (one mark over both roles' questions).
-    assert got["mark"] == "AI"
+    # 直し48 段2: no square mark nor heading; folded, the head is the two robots.
+    assert got["faces"] == ["coach", "observer"]
 
 
 @node
@@ -201,12 +203,12 @@ def test_the_host_is_a_third_robot_told_apart_by_its_shape():
         assert "stroke" not in attrs and "style" not in attrs
 
 
-def test_the_hosts_mark_is_its_robot_and_the_seats_heading_as_it_was():
+def test_the_hosts_mark_is_its_robot_and_the_seats_heading_is_gone():
     # 直し48: the first look's speaker, 司会（AI）, is its robot by its name.
     assert '<span id="host-mark" class="host-mark"' in HTML and 'class="ai-mark host-mark"' not in HTML
     assert '$("host-mark").replaceChildren(EbinoRobot.make("host"));' in APP
     assert ".host-head .host-mark .robot { --robot-line: 2.4px; width: 100%; height: 100%; }" in CSS
-    assert '<span id="ai-seat-mark" class="ai-mark" aria-hidden="true"></span>' in HTML
+    assert 'id="ai-seat-mark"' not in HTML  # 直し48 段2: the seat's square mark gone too.
 
 
 def test_its_look_lines_in_the_ais_blue_never_moving():

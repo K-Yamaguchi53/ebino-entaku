@@ -198,11 +198,26 @@ def test_the_model_is_asked_outside_the_lock(monkeypatch):
     assert isinstance(threading.Lock(), type(the_app.lock))
 
 
-def test_the_board_is_in_the_band_at_the_foot_apart_from_the_person():
+def test_the_board_is_over_the_map_by_the_person_a_bubble_from_the_coachs_robot():
+    """直し48 段2 (the teacher, 11/7: in the band at the foot it went
+    unseen): over the map by the person, apart from its words: the question
+    in a bubble from コーチ's robot, the choices and the line under it."""
     from ebino import app as app_module
     static = app_module.STATIC_DIR
     map_js = (static / "map.js").read_text(encoding="utf-8")
     css = (static / "style.css").read_text(encoding="utf-8")
     ask = map_js[map_js.index("  async function askCoach(mine, askNo) {"):map_js.index("  // The coach's board gone")]
-    assert '$("ask-form").append(board);' in ask and "mine.panel" not in ask
-    assert "#ask-form .one-coach { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; visibility: visible; }" in css
+    assert "overlay.append(board);" in ask and '$("ask-form")' not in ask and "mine.panel" not in ask
+    assert "#ask-form .one-coach" not in css and "#ask-form .one-coach" not in map_js
+    # Placed with the person's words, the person and the questions kept clear (the words most).
+    place = map_js[map_js.index("  function placeOne() {"):map_js.index("  // One to one's own parts gone")]
+    assert "const taken = [[left, top, width, height, 3], [lx, py, rx - lx, fy - py, 1]];" in place
+    assert "const board = one.coach && one.coach.node;" in place
+    assert "const at = spot(board, (c) => [[left, top - c.height - 12]" in place
+    # Narrower (taller) when 30em covers something and a narrower one does not.
+    assert "for (const em of [30, 24, 20]) {" in place and "if (!at.cost) break;" in place
+    # The robot at the top left, the bubble's tail at it, the choices and the line under the bubble.
+    assert ".one-coach-head { display: contents; }" in css
+    assert ".one-coach-question::before {" in css
+    assert ".one-coach-choices { grid-column: 1 / -1; grid-row: 3; }" in css
+    assert ".one-coach input { grid-column: 1 / -1; grid-row: 4; }" in css

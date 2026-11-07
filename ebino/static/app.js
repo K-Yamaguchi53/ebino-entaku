@@ -932,7 +932,9 @@ const GUIDE = {
   // over as little of the people's bubbles as it can (the one pressed, the
   // one being read, least of all); narrower when nothing else is clear.
   answer_ai: { at: () => shown(document.querySelector("#ai-seat-cards .ai-question:not(:disabled)")) || shown($("ai-seat-open")),
-    clear: () => [$("ai-seat-label"), $("ai-seat-note"), ...document.querySelectorAll("#ai-seat-cards .ai-question")],
+    // 直し48 段2: the heading and the note are gone; each question (its
+    // robot, its name and its bubble) kept clear.
+    clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question")],
     spare: () => [...document.querySelectorAll("#map-overlay .table-bubble:not(.unplaced):not(.ai)")],
     sides: ["above", "right", "left", "below"] },
   after: { at: () => $("to-reflect") },
@@ -1512,25 +1514,21 @@ async function loadBand(roundNo, box) {
 
 // --- the AI's seat (直し32-3) ---
 
-// コーチ and オブザーバー, out of the round table's ring: a rounded square in
-// the AI's blue with 「AI」 on it, its name, and the newest round's two
-// questions. Pressed, the box at the foot answers that one. The first time
-// there are questions, one line says they are the AI's, not the map's
-// people's; after that the name only.
+// コーチ and オブザーバー, out of the round table's ring, with the newest
+// round's two questions. Pressed, the box at the foot answers that one.
+// 直し48 段2 (the teacher, 11/7): no heading 「AI（町の人ではありません）」
+// nor the note 「この問いは、AI が作りました。…」 (the first look says both
+// are AI); each question in a bubble from its robot, its name with （AI）
+// right by the robot (style.css: コーチ top left, オブザーバー bottom right).
+// Folded, the head is their robots; the seat is named by their names.
 function renderAiSeat(roundNo, band) {
   const seat = $("ai-seat");
-  $("ai-seat-mark").textContent = state.texts.ai_seat_mark;
-  $("ai-seat-label").replaceChildren(phrased(state.texts.ai_seat_label));  // 「ませ／ん」 no more (直し33-5).
-  const note = $("ai-seat-note");
-  if (!state.aiNoted) {
-    state.aiNoted = roundNo;
-    note.textContent = state.texts.ai_seat_note;
-  }
-  note.hidden = state.aiNoted !== roundNo;
+  $("ai-seat-label").textContent = band.cards.map((card) => card.label).join("・");
+  $("ai-seat-faces").replaceChildren(...band.cards.map((card) => EbinoRobot.make(card.role)));
   const cards = $("ai-seat-cards");
   cards.replaceChildren();
   for (const card of band.cards) {
-    // Its role's robot (直し47, robot.js) just before its name, small.
+    // Its role's robot (直し47, robot.js) just before its name; its words in a bubble from it (直し48).
     const button = el("button", { type: "button", class: "ai-question", "data-role": card.role, "data-round": roundNo },
       el("span", { class: "who" }, EbinoRobot.make(card.role), el("span", { class: "who-name", text: card.label })),
       el("span", { class: "words", text: card.question }));

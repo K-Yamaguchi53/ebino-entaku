@@ -44,7 +44,11 @@ def test_its_words_are_the_teachers_drafts_in_texts():
 
 def test_it_sits_on_the_one_screen_apart_from_the_table():
     stage = HTML[HTML.index('<div id="stage"'):HTML.index('<aside id="drawer"')]
-    assert 'id="ai-seat"' in stage and 'id="ai-seat-mark"' in stage and 'id="ai-seat-note"' in stage
+    assert 'id="ai-seat"' in stage and 'id="ai-seat-cards"' in stage
+    # 直し48 段2 (the teacher, 11/7): no heading 「AI（町の人ではありません）」
+    # nor note (the first look says both are AI); the seat named for reading out only.
+    assert 'id="ai-seat-mark"' not in stage and 'id="ai-seat-note"' not in stage
+    assert '<span\n          id="ai-seat-label" class="visually-hidden"></span>' in stage
     assert stage.index('id="map"') < stage.index('id="ai-seat"')  # Not in the map's frame: off the table.
 
 
@@ -61,7 +65,10 @@ def test_its_shape_and_colour_are_not_a_seats():
     mark = _rule(".ai-mark")
     assert "border-radius: 9px" in mark and "background: var(--ai)" in mark
     question = _rule(".ai-question")
-    assert "var(--ai)" in question and "var(--paper" not in question and "var(--lamp" not in question
+    assert "var(--ai" in question and "var(--paper" not in question and "var(--lamp" not in question
+    # 直し48 段2: its words in a bubble in the AI's blue, from its robot.
+    words = _rule(".ai-question .words")
+    assert "border: 1px solid var(--ai);" in words and "var(--paper" not in words and "var(--lamp" not in words
     seat = _rule(".ai-seat")
     assert "border: 2px solid var(--ai)" in seat and "background: var(--ai-deep)" in seat
     # The seats' bubbles at the table are paper, never the AI's blue.
@@ -83,7 +90,7 @@ const made = {};
 const part = (id) => made[id] || (made[id] = { id, textContent: "", hidden: true, children: [], attrs: {}, folded: null,
   classList: { toggle(name, on) { if (name === "folded") made[id].folded = on; } },
   setAttribute(k, v) { this.attrs[k] = v; },
-  replaceChildren(...kids) { this.children = kids; if (kids.every((kid) => typeof kid === "string")) this.textContent = kids.join(""); },
+  replaceChildren(...kids) { this.children = kids; if (kids.length && kids.every((kid) => typeof kid === "string")) this.textContent = kids.join(""); },
   append(kid) { this.children.push(kid); } });
 const $ = part;
 function el(tag, attrs, ...kids) { return { tag, attrs, kids, classList: { add() {} }, addEventListener() {} }; }
@@ -103,17 +110,25 @@ foldAiSeat(true);
 const folded = [$("ai-seat").folded, $("ai-seat-open").hidden, $("ai-seat-open").attrs["aria-expanded"]];
 renderAiSeat(3, band);
 const opened = [$("ai-seat").folded, $("ai-seat-open").hidden, $("ai-seat-open").attrs["aria-expanded"]];
-process.stdout.write(JSON.stringify({ first, second, folded, opened, label: $("ai-seat-label").textContent }));
+process.stdout.write(JSON.stringify({ first, second, folded, opened, label: $("ai-seat-label").textContent,
+  faces: $("ai-seat-faces").children }));
 """
 
 
 @node
-def test_the_line_that_says_it_is_the_ais_comes_the_first_time_only():
+def test_no_heading_nor_note_the_seat_named_by_the_roles_names():
+    """直し48 段2 (the teacher, 11/7): the heading and the note are gone
+    (said on the first look); the seat is named by コーチ（AI）・オブザーバー（AI）
+    for reading out, and folded its head is their robots."""
     program = HARNESS % {"source": _top("renderAiSeat") + _top("foldAiSeat") + _top("openAiSeat")}
     out = subprocess.run(["node", "-"], input=program.encode("utf-8"), capture_output=True, timeout=30)
     assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
     got = json.loads(out.stdout.decode("utf-8"))
-    assert got["first"] == [False, False, "NOTE", 2]
-    assert got["second"] == [True] and got["label"] == "LABEL"
+    assert got["first"] == [False, True, "", 2]  # The note never shown, never filled.
+    assert got["second"] == [True] and got["label"] == "C・O"
+    assert got["faces"] == [{"robot": "coach"}, {"robot": "observer"}]
+    seat = _top("renderAiSeat")
+    assert "ai_seat_label" not in seat and "ai_seat_note" not in seat and "ai_seat_mark" not in seat
+    assert ".ai-seat:not(.folded) .ai-seat-head { display: none; }" in CSS
     # 直し37-2: folded back at the map, the button that opens it shown; a round's questions open it.
     assert got["folded"] == [True, False, "false"] and got["opened"] == [False, True, "true"]

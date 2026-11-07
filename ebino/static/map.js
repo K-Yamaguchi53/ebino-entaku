@@ -3693,22 +3693,26 @@ const EbinoMap = (() => {
 
   // コーチ（AI） at one to one (直し45 段3): asked for after the person's
   // words came (never waited for: the next questions are already there); on
-  // its own small board in the AI's colour and shape with its name, in the
-  // band at the foot (the box's place), never from the person or its bubble. Three dots
-  // while it comes; nothing when it does not. Answered with the teacher's
-  // choices (and a line, or not), or 答えない; then on as before.
+  // its own small board in the AI's colour and shape with its name, never
+  // from the person or its bubble. Three dots while it comes; nothing when
+  // it does not. Answered with the teacher's choices (and a line, or not),
+  // or 答えない; then on as before.
+  // 直し48 段2 (the teacher, 11/7: the band at the foot went unseen): over
+  // the map by the person (placeOne: above its words, else beside it), the
+  // question in a bubble from コーチ's robot, the choices and the line right
+  // under the bubble.
   async function askCoach(mine, askNo) {
     const words = app.state.texts.one_coach_words;
     const board = div("one-coach waiting");
     board.setAttribute("aria-busy", "true");
     const dots = div("one-coach-dots");
     for (let n = 0; n < 3; n++) dots.append(document.createElement("span"));
-    board.append(dots);
+    board.append(EbinoRobot.make("coach"), div("one-coach-question", ""));
+    board.lastChild.append(dots);
     mine.coach = { askNo, node: board };
-    // In the band at the foot, where the box to write in was (hidden at one
-    // to one): apart from the person and from the questions to pick.
-    for (const old of document.querySelectorAll("#ask-form .one-coach")) old.remove();
-    $("ask-form").append(board);
+    for (const old of overlay.querySelectorAll(".one-coach")) old.remove();
+    overlay.append(board);
+    placeOne();
     let view = null;
     try {
       view = await app.oneCoach(mine.seatId, askNo);
@@ -3835,28 +3839,56 @@ const EbinoMap = (() => {
     // The questions under the words; with no room there, above them, then
     // beside them: the first spot inside the frame that covers neither the
     // words nor the person (else the one that covers least).
-    const panel = one.panel;
-    if (!panel || !panel.isConnected) return;
-    panel.style.maxWidth = `${Math.floor(Math.min(frameBox.width * 0.46, 24 * 16))}px`;
-    const p = panel.getBoundingClientRect();
     const [, py] = toFrame(one.home[0], one.home[1] + bb.y * one.scale);
     const [, fy] = toFrame(one.home[0], one.home[1]);
-    const taken = [[left, top, width, height], [lx, py, rx - lx, fy - py]];
-    const clampL = (x) => Math.max(8, Math.min(x, frameBox.width - p.width - 8));
-    // コーチ（AI）'s board at the foot may rise over the frame's foot (直し45 段3): the questions keep above it.
-    const board = document.querySelector("#ask-form .one-coach");
-    const floor = board ? Math.min(frameBox.height, board.getBoundingClientRect().top - frameBox.top) : frameBox.height;
-    const clampT = (y) => Math.max(8, Math.min(y, floor - p.height - 8));
-    const spots = [[left, top + height + 10], [left, top - p.height - 10],
-      [left + width + 10, top], [left - p.width - 10, top],
-      // Beside the person, the other side from its words.
-      [rx + 12, top], [rx + 12, fy - p.height], [lx - p.width - 12, top], [lx - p.width - 12, fy - p.height]]
-      .map(([x, y]) => [clampL(x), clampT(y)]);
-    const covered = ([x, y]) => taken.reduce((sum, [l, t, w, h]) =>
-      sum + Math.max(0, Math.min(x + p.width, l + w) - Math.max(x, l)) * Math.max(0, Math.min(y + p.height, t + h) - Math.max(y, t)), 0);
-    const [pLeft, pTop] = spots.reduce((best, spot) => (covered(spot) < covered(best) ? spot : best));
-    panel.style.left = `${pLeft}px`;
-    panel.style.top = `${pTop}px`;
+    // What is kept clear, each with its weight: the person's words most,
+    // then the questions to pick, then the person.
+    const taken = [[left, top, width, height, 3], [lx, py, rx - lx, fy - py, 1]];
+    // node at the first of spots (made from its size) inside the frame that
+    // covers none of taken, else at the one that covers least; then taken too.
+    const spot = (node, spotsFor) => {
+      const p = node.getBoundingClientRect();
+      const clampL = (x) => Math.max(8, Math.min(x, frameBox.width - p.width - 8));
+      const clampT = (y) => Math.max(8, Math.min(y, frameBox.height - p.height - 8));
+      const covered = ([x, y]) => taken.reduce((sum, [l, t, w, h, k]) =>
+        sum + k * Math.max(0, Math.min(x + p.width, l + w) - Math.max(x, l)) * Math.max(0, Math.min(y + p.height, t + h) - Math.max(y, t)), 0);
+      const spots = spotsFor(p).map(([x, y]) => [clampL(x), clampT(y)]);
+      const [x, y] = spots.reduce((best, at) => (covered(at) < covered(best) ? at : best));
+      return { x, y, w: p.width, h: p.height, cost: covered([x, y]) };
+    };
+    const put = (node, at) => {
+      node.style.left = `${at.x}px`;
+      node.style.top = `${at.y}px`;
+      taken.push([at.x, at.y, at.w, at.h, 2]);
+    };
+    const panel = one.panel;
+    if (panel && panel.isConnected) {
+      panel.style.maxWidth = `${Math.floor(Math.min(frameBox.width * 0.46, 24 * 16))}px`;
+      put(panel, spot(panel, (p) => [[left, top + height + 10], [left, top - p.height - 10],
+        [left + width + 10, top], [left - p.width - 10, top],
+        // Beside the person, the other side from its words.
+        [rx + 12, top], [rx + 12, fy - p.height], [lx - p.width - 12, top], [lx - p.width - 12, fy - p.height]]));
+    }
+    // コーチ（AI）'s board (直し48 段2: no more in the band at the foot, where
+    // it went unseen): by the person, where the eye is: above its words,
+    // else beside the person, else the frame's top corners; over none of the
+    // words, the person or the questions when it can.
+    const board = one.coach && one.coach.node;
+    if (board && board.isConnected) {
+      // As wide as 30em where that covers nothing, else narrower (taller) if that does.
+      let best = null;
+      for (const em of [30, 24, 20]) {
+        board.style.maxWidth = `${Math.floor(Math.min(frameBox.width - 16, em * 16))}px`;
+        const at = spot(board, (c) => [[left, top - c.height - 12], [lx - c.width - 12, top], [rx + 12, top],
+          [left + width - c.width, top - c.height - 12], [left + width + 12, top], [left - c.width - 12, top],
+          [8, 8], [frameBox.width - c.width - 8, 8], [8, frameBox.height - c.height - 8],
+          [frameBox.width - c.width - 8, frameBox.height - c.height - 8]]);
+        if (!best || at.cost < best.at.cost) best = { at, em };
+        if (!at.cost) break;
+      }
+      board.style.maxWidth = `${Math.floor(Math.min(frameBox.width - 16, best.em * 16))}px`;
+      put(board, best.at);
+    }
   }
 
   // One to one's own parts gone (the table cleared, or closed).
@@ -3864,7 +3896,7 @@ const EbinoMap = (() => {
     const { token, group, flight } = one;
     one = null;
     for (const node of overlay.querySelectorAll(".one-bubble, .one-asks")) node.remove();
-    for (const node of document.querySelectorAll("#ask-form .one-coach")) node.remove();
+    for (const node of overlay.querySelectorAll(".one-coach")) node.remove();
     if (group) group.remove();
     if (flight) flight.cancel();
     if (token) token.node.classList.remove("one-self", "stood");

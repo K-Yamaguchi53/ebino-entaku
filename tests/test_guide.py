@@ -264,7 +264,7 @@ for (const [name, x, by] of [["column", 1100, false], ["corner", 8, false], ["ro
   drawGuide();
   const g = $("guide");
   out[name] = { hidden: g.hidden, side: g.dataset.side, point: g.style["--point"],
-    over: [made["ai-seat-label"].box, made["ai-seat-note"].box, card.box, other.box].filter((k) => overlaps(g, k)).length };
+    over: [card.box, other.box].filter((k) => overlaps(g, k)).length };
 }
 out.text = $("guide-text").textContent;
 // Room over the card clear of the heading and the note: over it, as before.
@@ -283,7 +283,7 @@ bubbles = [pressed, node("b1", box(500, 210, 190, 108)), node("b2", box(528, 403
 drawGuide();
 { const g = $("guide"), l = parseInt(g.style.left);
   out.pressed = { side: g.dataset.side, left: g.style.left, narrow: g.classList.set.has("narrow"),
-    kept: [made["ai-seat-label"].box, made["ai-seat-note"].box, card.box, other.box].filter((k) => overlaps(g, k)).length,
+    kept: [card.box, other.box].filter((k) => overlaps(g, k)).length,
     on_pressed: area(g, pressed.box), on_others: bubbles.slice(1).filter((b) => overlaps(g, b.box)).length,
     tip: l + parseInt(g.style["--point"]) }; }
 // Clear of the bubbles when it can be: slid along under the card.
@@ -298,36 +298,35 @@ card.box = box(280, 590, 170, 200); other.box = box(458, 590, 170, 200);
 drawGuide();
 { const g = $("guide");
   out.narrow = { side: g.dataset.side, narrow: g.classList.set.has("narrow"),
-    kept: [made["ai-seat-label"].box, made["ai-seat-note"].box, card.box, other.box].filter((k) => overlaps(g, k)).length }; }
+    kept: [card.box, other.box].filter((k) => overlaps(g, k)).length }; }
 process.stdout.write(JSON.stringify(out));
 """
 
 
 @node
-def test_the_hint_to_answer_the_ai_keeps_its_seats_heading_and_note_clear():
-    """直し46: 「AI の問いはここ。押して答えよう」 never over 「AI（町の人では
-    ありません）」 nor 「この問いは、AI が作りました。…」 nor the other AI
-    card: beside the card (left in the map's column, right in the map's
-    corner), under it with the cards side by side, over it with room; under
-    it slid along it over the least of the bubble pressed (768×1024, after
-    the screen check's 差し戻し); narrower by it when no side is clear wide
-    (900×800)."""
+def test_the_hint_to_answer_the_ai_keeps_its_questions_clear():
+    """直し46: 「AI の問いはここ。押して答えよう」 never over the AI's
+    questions (the other card's words). 直し48 段2: the seat's heading and
+    note are gone (the first look says they are AI), so with that room over
+    the card the hint is there, its point on the card; still over none of
+    the two questions (their robots, names and bubbles) nor over the bubble
+    pressed (768×1024)."""
     source = APP[APP.index("const GUIDE = {"):APP.index("// What it points at moves with the window")]
     out = subprocess.run(["node", "-"], input=(PLACE_AI % {"source": source}).encode("utf-8"), capture_output=True, timeout=30)
     assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
     got = json.loads(out.stdout.decode("utf-8"))
-    assert got["column"] == {"hidden": False, "side": "left", "point": "22px", "over": 0}
-    assert got["corner"] == {"hidden": False, "side": "right", "point": "22px", "over": 0}
-    assert got["row"] == {"hidden": False, "side": "below", "point": "123px", "over": 0}  # 38 + 92.5 - 8, rounded as JS does.
+    for name in ("column", "corner", "row"):
+        assert got[name]["hidden"] is False and got[name]["over"] == 0, name
+        assert got[name]["side"] == "above", name
     assert got["text"] == "A"  # Broken between phrases (phrased).
     assert got["room"] == {"side": "above", "top": f"{300 - 14 - 44}px"}
-    # 768×1024: never over the heading, the note or the cards; under the card,
-    # slid to its right end (its point still on it: 35 + 185 - 28 at most).
+    # 768×1024: never over the cards nor any of the people's bubbles; its point on the card.
     p = got["pressed"]
-    assert p["side"] == "below" and p["kept"] == 0 and p["on_others"] == 0 and not p["narrow"]
-    assert p["left"] == "191px" and p["on_pressed"] == (240 - 191) * 44  # was 220 × 44 in the middle.
+    assert p["kept"] == 0 and p["on_others"] == 0 and p["on_pressed"] == 0 and not p["narrow"]
     assert 35 < p["tip"] <= 35 + 185
-    assert got["slid"] == {"side": "below", "on": 0}
-    assert got["narrow"] == {"side": "left", "narrow": True, "kept": 0}
+    assert got["slid"]["on"] == 0
+    assert got["narrow"]["kept"] == 0
+    # The heading and the note are no more among what it keeps clear: the questions are.
+    assert 'clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question")],' in APP
     assert ".guide.narrow { max-width: min(11em, calc(100vw - 16px)); }" in CSS
     assert '.guide[data-side="right"]::after { right: 100%;' in CSS and '.guide[data-side="left"]::after { left: 100%;' in CSS

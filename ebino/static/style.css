@@ -1358,22 +1358,39 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .ask { grid-template-colu
   dominant-baseline: central; }
 .ai-mark { display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 9px;
   background: var(--ai); color: var(--ai-deep); font: 800 15px/1 var(--gothic); letter-spacing: .04em; }
-.ai-seat-note { margin: 0 0 8px; font-size: 14px; line-height: 1.6; color: var(--ai-ink); }
-/* On the one screen, under the school, a little smaller so it reads whole (直し33-5). */
-body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-note { margin-bottom: 4px; font-size: 13px; line-height: 1.45; }
+/* 直し48 段2 (the teacher, 11/7): no heading nor note; each question in a
+   bubble from its robot (44px; 40px on the one screen), the bubble's tail
+   pointing at it, its name with （AI） right by the robot. コーチ: the robot
+   at the top left, the bubble to its right. オブザーバー: the robot at the
+   bottom right, the bubble to its left. Open, the head is not shown;
+   folded, it is their robots (small) and the button that opens it. */
+.ai-seat:not(.folded) .ai-seat-head { display: none; }
+.ai-seat-faces { display: inline-flex; gap: 4px; }
+.ai-seat-faces .robot { --robot-line: 1.4px; width: 28px; height: 28px; }
 .ai-seat-cards { display: grid; gap: 8px; }
-.ai-question { display: grid; gap: 2px; width: 100%; text-align: left; padding: 8px 12px; min-height: 44px;
-  border: 1px solid var(--ai); border-radius: 10px; background: color-mix(in srgb, var(--ai-deep) 70%, var(--night));
-  color: var(--ai-ink); font-family: var(--gothic); }
-.ai-question .who { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: bold; color: var(--ai); }
-.ai-question .robot { --robot-line: 1.4px; width: 24px; height: 24px; }
-.ai-question .words { font-size: 15px; line-height: 1.6; }
-.ai-question:hover { border-color: var(--ai-ink); }
-.ai-question.chosen { box-shadow: 0 0 0 2px var(--ai); }
-.ai-question.answered { border-style: solid; border-width: 2px; }
+.ai-question { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; gap: 2px 12px;
+  align-items: start; width: 100%; text-align: left; padding: 2px; min-height: 44px; border: 0; border-radius: 12px;
+  background: transparent; color: var(--ai-ink); font-family: var(--gothic); }
+.ai-question .who { display: contents; }
+.ai-question .robot { --robot-line: 1.8px; grid-column: 1; grid-row: 1 / span 2; width: 44px; height: 44px; }
+.ai-question .who-name { grid-column: 2; grid-row: 1; font-size: 13px; font-weight: bold; line-height: 1.4; color: var(--ai); }
+.ai-question .words { position: relative; grid-column: 2; grid-row: 2; padding: 6px 12px; border: 1px solid var(--ai);
+  border-radius: 12px; background: color-mix(in srgb, var(--ai-deep) 70%, var(--night)); font-size: 15px; line-height: 1.6; }
+/* The tail: a corner of the bubble turned toward its robot. */
+.ai-question .words::before { content: ""; position: absolute; top: 10px; left: -7px; width: 12px; height: 12px;
+  background: inherit; border: solid var(--ai); border-width: 0 0 1px 1px; transform: rotate(45deg); }
+.ai-question[data-role="observer"] { grid-template-columns: minmax(0, 1fr) auto; }
+.ai-question[data-role="observer"] .robot { grid-column: 2; align-self: end; }
+.ai-question[data-role="observer"] .who-name { grid-column: 1; text-align: right; }
+.ai-question[data-role="observer"] .words { grid-column: 1; }
+.ai-question[data-role="observer"] .words::before { top: auto; bottom: 10px; left: auto; right: -7px;
+  border-width: 1px 1px 0 0; }
+.ai-question:hover .words { border-color: var(--ai-ink); }
+.ai-question.chosen .words { box-shadow: 0 0 0 2px var(--ai); }
+.ai-question.answered .words { border-width: 2px; }
 .ai-question:disabled { cursor: default; opacity: .7; }
 .ai-question.answered:disabled { opacity: 1; }
-.ai-question.needs-answer { box-shadow: 0 0 0 2px var(--lamp-soft), 0 0 18px var(--lamp-faint); }
+.ai-question.needs-answer .words { box-shadow: 0 0 0 2px var(--lamp-soft), 0 0 18px var(--lamp-faint); }
 /* 直し35-2: over a corner of the map (map.js chooses it: --ai-left,
    --ai-top, --ai-w, --ai-h), over none of the seats' homes; its questions
    side by side where it is wide. */
@@ -1402,9 +1419,8 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .stage[data-ai-corner$="r
   transform: rotate(-135deg) translate(-2px, -2px); }
 .ai-seat-open:hover, .ai-seat-open:focus-visible { border-color: var(--ai-ink); }
 .ai-seat-open[hidden] { display: none; }
-body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-question { padding: 6px 10px; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-question .robot { width: 40px; height: 40px; }
 @media (orientation: portrait) {
-  body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-cards { grid-template-columns: 1fr 1fr; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) #ai-seat { padding: 6px 8px; }
   body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-head { margin-bottom: 2px; }
 }
@@ -1507,13 +1523,26 @@ body.one-open .input-area .ask { visibility: hidden; }
 .one-finish { border-style: dashed; color: var(--soft); }
 /* コーチ（AI） at one to one: the AI's colour and shape (as its seat, 直し32),
    its name over the question; never from the person. */
-.one-coach { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 12px; border: 1px solid var(--ai);
-  border-radius: 12px; background: var(--ai-deep); color: var(--ai-ink); box-shadow: 0 6px 16px var(--shadow);
-  word-break: auto-phrase; overflow-wrap: break-word; }
-/* In the band at the foot, over the hidden box (its place), growing upward. */
-#ask-form .one-coach { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; visibility: visible; }
-.one-coach input { flex: 1 1 12em; min-width: 10em; }
-.one-coach.waiting { display: flex; align-items: center; min-height: 36px; }
+/* 直し48 段2 (the teacher, 11/7: at the foot it went unseen): over the map by
+   the person (map.js placeOne), コーチ's robot at its top left, the
+   question in a bubble from it (its tail at the robot), the name right by
+   the robot; the choices and the line right under the bubble. */
+.one-coach { position: absolute; z-index: 6; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px;
+  align-items: start; width: max-content; padding: 10px 12px; border: 1px solid var(--ai); border-radius: 14px;
+  background: color-mix(in srgb, var(--ai-deep) 92%, transparent); color: var(--ai-ink); box-shadow: 0 6px 16px var(--shadow);
+  word-break: auto-phrase; overflow-wrap: break-word; pointer-events: auto; }
+.one-coach > .robot, .one-coach-head > .robot { --robot-line: 2px; grid-column: 1; grid-row: 1 / span 2; width: 48px; height: 48px; }
+.one-coach-head { display: contents; }
+.one-coach-name { grid-column: 2; grid-row: 1; }
+.one-coach-question { position: relative; grid-column: 2; grid-row: 2; padding: 8px 14px; border: 1px solid var(--ai);
+  border-radius: 12px; background: var(--night-2); }
+.one-coach-question::before { content: ""; position: absolute; top: 12px; left: -7px; width: 12px; height: 12px;
+  background: inherit; border: solid var(--ai); border-width: 0 0 1px 1px; transform: rotate(45deg); }
+.one-coach-choices { grid-column: 1 / -1; grid-row: 3; }
+.one-coach input { grid-column: 1 / -1; grid-row: 4; }
+.one-coach-message { grid-column: 1 / -1; grid-row: 5; }
+.one-coach input { min-width: 0; }
+.one-coach.waiting .one-coach-question { min-height: 36px; display: flex; align-items: center; }
 .one-coach-dots { display: flex; gap: 6px; }
 .one-coach-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--ai); opacity: .5; }
 @media (prefers-reduced-motion: no-preference) {
@@ -1521,11 +1550,11 @@ body.one-open .input-area .ask { visibility: hidden; }
   .one-coach-dots span:nth-child(2) { animation-delay: .2s; }
   .one-coach-dots span:nth-child(3) { animation-delay: .4s; }
 }
-.one-coach-head { display: flex; align-items: center; gap: 6px; }
+/* (.one-coach-head: display: contents, 直し48 段2, above.) */
 .one-coach-name { font-size: 13px; font-weight: 700; color: var(--ai); }
 .one-coach-question { font-size: 16px; line-height: 1.6; color: var(--ai-ink); }
 .one-coach-choices { display: flex; flex-wrap: wrap; gap: 6px; }
-.one-coach-choice, .one-coach-decline { min-height: 40px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--ai);
+.one-coach-choice, .one-coach-decline { min-height: 36px; padding: 3px 12px; border-radius: 999px; border: 1px solid var(--ai);
   background: transparent; color: var(--ai-ink); font-size: 14px; cursor: pointer; }
 .one-coach-choice:hover, .one-coach-choice:focus-visible { background: color-mix(in srgb, var(--ai) 22%, transparent); }
 .one-coach-decline { border-style: dashed; color: var(--soft); border-color: var(--moon-soft); }
@@ -1546,7 +1575,7 @@ body.one-open .input-area .ask { visibility: hidden; }
 .school-count:hover, .school-count:focus-visible { background: var(--night-3); }
 .map-frame:not(.seniors-out) .pt.school-home, .map-frame:not(.seniors-out) .home-names .at-school { display: none; }
 .map-frame:has(svg.dim) .school-count, .one-on .school-count { visibility: hidden; }
-body:has(#table:not([hidden])):has(#map:not([hidden])) .ai-seat-cards { grid-template-columns: 1fr 1fr; }
+/* 直し48 段2: one question under the other (コーチ top left, オブザーバー bottom right), not side by side. */
 /* A seat with no place on the map: its point's line dotted. */
 .pt.no-place .shape { stroke-dasharray: 3 2; }
 /* The meeting (直し35-3): the school lifted from the map, a faint shadow

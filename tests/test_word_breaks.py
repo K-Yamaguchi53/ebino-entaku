@@ -35,7 +35,9 @@ def test_the_new_boxes_break_between_words():
     assert "word-break: auto-phrase;" in rule
     # A label with a （…） is never broken inside it: 「架空の川／1」, 「ませ／ん」 no more.
     assert '$("input-to-label").replaceChildren(phrased(label));' in _top("setTo")
-    assert '$("ai-seat-label").replaceChildren(phrased(state.texts.ai_seat_label));' in _top("renderAiSeat")
+    # 直し48 段2: the AI's seat has no heading to see; its name (read out
+    # only) is the two roles' names.
+    assert '$("ai-seat-label").textContent = band.cards.map((card) => card.label).join("・");' in _top("renderAiSeat")
 
 
 def test_the_choices_keep_off_the_maps_words_where_they_can():
