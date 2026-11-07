@@ -241,6 +241,11 @@ const EbinoMap = (() => {
   let tableRoundNo = 0;  // The round the table is for.
   let tableAt = null;  // The table open: { center, angles, split }, for the band's seats.
   let tableOf = null;  // The round the table is open for, to open it again laid out afresh (直し33-4).
+  // 直し53 段3 (the teacher, 11/7: 円卓から地図に戻ると、もう円卓には戻れない？):
+  // the round whose table 地図にもどす put away, until the next question:
+  // 「円卓にもどる」 opens it again, the same seats and the same bubbles.
+  // On the screen only: nothing is sent or kept for it.
+  let lastTable = null;
   let playing = false;  // A round's seats lighting or gathering: not drawn again meanwhile.
 
   const reduced = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1551,7 +1556,7 @@ const EbinoMap = (() => {
   function controls() {
     if (map.relief) seasonButtons();
     const words = app.state.texts.map_buttons;
-    for (const [id, key] of [["map-back", "back"], ["map-zoom-in", "zoom_in"], ["map-zoom-out", "zoom_out"],
+    for (const [id, key] of [["map-back", "back"], ["map-reopen", "reopen"], ["map-zoom-in", "zoom_in"], ["map-zoom-out", "zoom_out"],
       ["map-zoom-all", "zoom_all"]]) {
       $(id).textContent = words[key].text;
       if (words[key].label !== words[key].text) $(id).setAttribute("aria-label", words[key].label);
@@ -1567,6 +1572,7 @@ const EbinoMap = (() => {
     $("map-zoom-out").addEventListener("click", () => moveTo(round(1 / ZOOM_STEP), 300));
     $("map-zoom-all").addEventListener("click", () => moveTo(view.whole, 500));
     $("map-back").addEventListener("click", () => (one ? closeOne() : closeTable()));
+    $("map-reopen").addEventListener("click", () => reopenTable());
 
     svg.addEventListener("wheel", (event) => {
       if (!view) return;
@@ -2400,6 +2406,7 @@ const EbinoMap = (() => {
   function isSilent(seatId) { return app.state.silent.has(seatId) && !app.state.met.has(seatId); }
 
   function clearRound() {
+    forgetLastTable();
     roundNo += 1;
     playing = false;
     for (const timer of timers) clearTimeout(timer);
@@ -3592,6 +3599,7 @@ const EbinoMap = (() => {
   // 「地図にもどす」: the table goes, the camera goes back to the whole map
   // (at once when motion is reduced). The lit seats and the marks stay.
   async function closeTable() {
+    const closing = tableOf;
     roundNo += 1;
     playing = false;
     const mine = roundNo;
@@ -3618,6 +3626,33 @@ const EbinoMap = (() => {
     clearTable();
     app.foldAiSeat(true);  // Back at the map: the AI's seat folded (直し37-2).
     requestAnimationFrame(placeFoldedSeat);
+    // 直し53 段3: until the next question, the table can be opened again.
+    if (closing && view && view.relief) {
+      lastTable = closing;
+      $("map-reopen").hidden = false;
+    }
+  }
+
+  function forgetLastTable() {
+    lastTable = null;
+    if ($("map-reopen")) $("map-reopen").hidden = true;
+  }
+
+  // 「円卓にもどる」 (直し53 段3): the round's table as it was, its seats and
+  // bubbles from the same round, opened as when the room changes shape
+  // (recompose: at once, nothing flies, a second time); from the whole
+  // drawing, as a round's table is.
+  async function reopenTable() {
+    const again = lastTable;
+    if (!again || !view || !view.relief || tableAt || one) return;
+    forgetLastTable();
+    const mine = roundNo;
+    if (vb.w < view.W - 0.5) await moveTo({ x: 0, y: 0, w: view.W, h: view.H }, reduced() ? 0 : 400);
+    if (mine !== roundNo) return;
+    for (const id of again.order) if (points[id]) points[id].node.classList.add("lit");
+    await openTable(again.result, again.order, tableCenter(), () => mine === roundNo, true);
+    app.foldAiSeat(false);  // The round's questions open again with its table (直し37-2).
+    $("map-back").focus({ preventScroll: true });
   }
 
   // --- marks that stay: met seats, and 「？」 on seats nobody asked yet ---

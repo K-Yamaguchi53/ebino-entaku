@@ -290,7 +290,8 @@ def test_no_year_on_the_screen_or_in_the_readme_but_the_fixed_source_line():
 def test_the_map_buttons_words_come_from_texts():
     from ebino.texts import map_buttons, screen_texts
     words = map_buttons()
-    assert list(words) == ["back", "zoom_in", "zoom_out", "zoom_all", "seasons", "season_night", "season_spring", "season_autumn"]
+    assert list(words) == ["back", "zoom_in", "zoom_out", "zoom_all", "reopen", "seasons", "season_night", "season_spring",
+                           "season_autumn"]  # reopen: 直し53 段3
     assert words["back"] == {"text": "地図にもどす", "label": "地図にもどす"}
     assert words["zoom_in"]["text"] == "＋" and words["zoom_in"]["label"]
     assert screen_texts()["map_buttons"] == words

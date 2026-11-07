@@ -131,6 +131,8 @@ INPUT_SEND_IDS = ("all", "seat", "ai")
 INPUT_DONE = "input_done"
 INPUT_DONE_IDS = ("seat", "ai", "split")
 MAP_BUTTON_IDS = ("back", "zoom_in", "zoom_out", "zoom_all",
+                  # 直し53 段3: the last round's table opened again, after 地図にもどす.
+                  "reopen",
                   # The map's seasons (the teacher, 11/6): the band's name, then each.
                   "seasons", "season_night", "season_spring", "season_autumn")
 # Round the map (map.js): the word on the mark that points north (the north
