@@ -12,16 +12,19 @@ def _piece(seat, text, n=0, paragraph=None):
     return Utterance(f"{seat}-{n}", seat, "cross", f"p{n}", "own", text, paragraph or text)
 
 
-def test_a_masked_name_gets_a_break_before_the_next_word():
-    assert mend_reading("協力者：この方農園　この方") == "協力者：この方の農園　この方"
-    assert mend_reading("景色が好きこの方小学校四年 福岡") == "景色が好きこの方、小学校四年 福岡"
-    assert mend_reading("インタビューした人：この方場所：公民館") == "インタビューした人：この方、場所：公民館"
-    assert mend_reading("この方　この方茶道という文化") == "この方　この方、茶道という文化"
+def test_a_masked_name_on_a_name_tag_or_credit_line_goes():
+    assert mend_reading("第三回寺子屋　ー協力者：この方農園　この方") == "第三回寺子屋　ー協力者：地元の農園"
+    assert mend_reading("景色が好きこの方小学校四年 福岡") == "景色が好き、小学校四年 福岡"
+    assert mend_reading("インタビューした人：この方場所：公民館") == "場所：公民館"
+    assert mend_reading("この方　この方　この方茶道という文化") == "茶道という文化"
+    assert mend_reading("話を聞いて企画協力者：この方鹿革ができるまで") == "話を聞いて鹿革ができるまで"
+    assert mend_reading("この方協力者：町のファーム") == "協力者：町のファーム"
 
 
-def test_a_masked_name_before_a_word_that_goes_with_it_stays():
+def test_this_person_as_a_sentence_subject_stays():
     for text in ("この方自身が語る。", "この方以外にいない。", "この方達と話した。", "この方は町の人。",
-                 "この方の夢。", "この方。", "この方、"):
+                 "この方の夢。", "この方。", "この方、", "代表：この方。", "この方：町の出身。",
+                 "と語るこの方は、", "この方！ごきげんよう"):
         assert mend_reading(text) == text
 
 

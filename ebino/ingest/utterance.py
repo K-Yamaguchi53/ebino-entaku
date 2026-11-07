@@ -219,11 +219,19 @@ _MASK_WORDS = [
     (re.compile("この方先生"), "この先生"),
     # Only before a noun: 「この職場」というのは stays.
     (re.compile(f"「?この職場」という(?=[{_KANJI}ァ-ヶ])"), ""),
-    # 直し54i: a name masked with nothing after it before the next word (the
-    # teacher, 11/8): 協力者：この方農園 (the family's farm) → この方の農園,
-    # この方小学校四年 (a slide's self-introduction) → この方、小学校四年.
-    (re.compile("この方(?=農園|農場|牧場|商店|工房|食堂)"), "この方の"),
-    (re.compile(f"この方(?=[{_KANJI}ァ-ヶ])(?!自身|以外|以上|達|曰|様|宅|家|側|の)"), "この方、"),
+    # 直し54i (the teacher, 11/8: この方ってなくていいんじゃない？): a name
+    # on a poster's or slide's name tag or credit line says nothing once
+    # masked, so it goes, with its label: 協力者：この方農園 (the family's
+    # farm) → 協力者：地元の農園, インタビューした人：この方場所： → 場所：,
+    # この方　この方　この方茶道という → 茶道という, 好きこの方小学校四年 →
+    # 好き、小学校四年. この方 as a sentence's subject (この方は) stays.
+    (re.compile("この方(?=農園|農場|牧場|商店|工房|食堂)"), "地元の"),
+    # The label: a word of kanji or katakana (企画協力者), or ○○した人.
+    (re.compile(f"(?:[ァ-ヶー]+した人|[{_KANJI}ァ-ヶー]+)[：:]\\s*この方(?=[{_KANJI}ァ-ヶ])"), ""),
+    (re.compile("この方[ 　]+(?=この方)"), ""),
+    (re.compile("[ 　]+この方$", re.M), ""),
+    (re.compile(f"(?:^|(?<=[ 　]))この方(?=[{_KANJI}ァ-ヶ])(?!自身|以外|以上|達|曰|様|宅|家|側)", re.M), ""),
+    (re.compile(f"この方(?=[{_KANJI}ァ-ヶ])(?!自身|以外|以上|達|曰|様|宅|家|側)"), "、"),
 ]
 
 
