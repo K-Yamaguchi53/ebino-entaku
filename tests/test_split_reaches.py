@@ -39,3 +39,40 @@ def test_the_moderator_still_has_its_split_in_its_instruction_and_answer():
     from ebino.prompts import MODERATOR
     assert "考えが分かれているところにだけ、見出しを立てる（多くて3つ）" in MODERATOR
     assert "splits" in moderator.SCHEMA["properties"] and "splits" in moderator.SCHEMA["required"]
+
+
+# 直し50 段1 (案A, the teacher's choice): the moderator is told that the ids on
+# both sides of a heading are ids it put in quotes. Only this one line was
+# added to MODERATOR; the code that drops a side not quoted stays as it was.
+SIDES_RULE = "見出しの両側に置く id は、引用（quotes）に入れた片の id にする。引用に入れていない片の id は置かない。"
+
+
+def test_the_moderator_is_told_the_sides_are_ids_it_quoted():
+    from ebino.prompts import MODERATOR
+    assert MODERATOR.count(SIDES_RULE) == 1
+    # It sits under 3 (the splits), before 4 (the silent seats).
+    lines = MODERATOR.splitlines()
+    at = next(i for i, line in enumerate(lines) if SIDES_RULE in line)
+    assert lines[at - 1].startswith("3. 考えが分かれているところにだけ、見出しを立てる")
+    assert lines[at + 1].startswith("4. ")
+
+
+def test_a_heading_whose_sides_are_both_quoted_reaches_the_screen():
+    # Both sides name only quoted pieces (two on one side): 「ここで割れた：」 goes to the screen.
+    split = ('ここで割れた：休みを"決めて取る"人と"空いたら取る"人', ["a1", "a2"], ["b1"])
+    session, _ = sitting([librarian_finds("a1", "a2", "b1"), moderator_says(QUOTES, [split])])
+    view = session.ask("休みの日って、みんな何してる？")
+    assert len(view["splits"]) == 1
+    assert view["splits"][0]["heading"].startswith("ここで割れた：")
+    assert view["splits"][0]["side_a"] == ["a1", "a2"] and view["splits"][0]["side_b"] == ["b1"]
+    assert session.rounds[-1].splits_dropped == 0
+
+
+def test_a_heading_with_an_unquoted_id_on_one_side_still_falls():
+    # b1 was found but not quoted: the side has no words on screen, so the
+    # heading falls as before (the line in the prompt changes nothing here).
+    split = ('ここで割れた：休みを"決めて取る"人と"空いたら取る"人', ["a1"], ["b1"])
+    session, _ = sitting([librarian_finds("a1", "a2", "b1"), moderator_says(QUOTES[:2], [split])])
+    view = session.ask("休みの日って、みんな何してる？")
+    assert view["splits"] == []
+    assert session.rounds[-1].splits_dropped == 1
