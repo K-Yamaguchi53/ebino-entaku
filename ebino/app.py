@@ -445,6 +445,12 @@ def main(argv=None) -> int:
               f"・書いたとおりに効かない行 {len(problems)}")
         for problem in problems:
             print(f"  {problem}")
+    # 直し54d: the questions the teacher stopped (ask_hide.tsv), and its rows that stop nothing.
+    if library.ask_tables.get("hide_rows"):
+        problems = library.ask_tables.get("hide_problems", [])
+        print(f"1対1 ask_hide.tsv：止めた質問 {library.ask_tables['hide_rows']}・効かない行 {len(problems)}")
+        for problem in problems:
+            print(f"  {problem}")
     print(f"open http://{HOST}:{server.server_address[1]}/  (Ctrl+C to stop)")
     try:
         server.serve_forever()

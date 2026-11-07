@@ -160,6 +160,14 @@ class Library:
         library.ask_tables["teacher_rows"], library.ask_tables["teacher_problems"] = \
             one_to_one.teacher_page_problems(data_dir / INGESTED_DIR, library.utterances,
                                              {seat.seat_id: seat.kind for seat in library.all_seats})
+        # 直し54d: the questions the teacher stopped (ask_hide.tsv), and its rows that stop nothing.
+        hidden, rows, problem = one_to_one.load_hidden(data_dir / INGESTED_DIR)
+        library.ask_tables["hidden"] = hidden
+        library.ask_tables.setdefault("unread", []).extend([problem] if problem else [])
+        items = {item for group in texts.ask_questions().values() for item, _ in group} | {one_to_one.RANKING_ITEM}
+        library.ask_tables["hide_rows"] = len(rows)
+        library.ask_tables["hide_problems"] = one_to_one.hide_problems(
+            rows, {seat.seat_id for seat in library.all_seats}, items)
         return library
 
     def seat_view(self, seat: Seat) -> dict:
@@ -684,7 +692,9 @@ class Session:
                     found = [u for u in pieces if u.section == "ランキング"]
                     if found:
                         out.append((one_to_one.RANKING_ITEM, ranking, found))
-        return out
+        # 直し54d: a question the teacher stopped for this seat (ask_hide.tsv) is not offered.
+        hidden = tables.get("hidden", set())
+        return [entry for entry in out if (seat_id, entry[0]) not in hidden]
 
     def one_open(self, seat_id: str) -> dict:
         """「この人に聞く」 pressed (直し36-3): in one request, the teacher's
@@ -734,16 +744,10 @@ class Session:
             self._tidied[utterance.id] = tidied
         return self._tidied[utterance.id]
 
-    def _one_words(self, seat_id: str, pieces: list[Utterance]) -> dict:
-        """The words shown at one to one: the pieces, up to about ONE_CHARS,
-        as spoken words where the speaker's checks let them through. A
-        slide's page tidied first (直し43): its title's line, its numbers
-        and the PDF's breaks gone; a page with nothing left, or a name, not
-        shown; the pages together cut at a sentence's end past ONE_CUT_CHARS.
-        The words recorded are never changed: only those shown. The speaker
-        is given the words tidied as the original (段2): the title's line
-        gone is not a word dropped; stopped, past its limit or turned off,
-        the words tidied are shown, never the page as recorded."""
+    def one_shown(self, pieces: list[Utterance]) -> tuple[list[Utterance], list[str], list[Utterance], bool]:
+        """(the pieces shown, their words, the pieces met, cut) for an item at
+        one to one, before the speaker (_one_words; 直し54d: the list of every
+        seat's answers, tools/list_one_answers.py, shows the same words)."""
         shown, said, met, total = [], [], [], 0
         for piece in pieces:
             met.append(piece)
@@ -758,6 +762,19 @@ class Session:
         was_cut = False
         if any(one_to_one.is_page(u.section) for u in shown):
             said, was_cut = one_tidy.cut(said, one_to_one.ONE_CUT_CHARS)
+        return shown, said, met, was_cut
+
+    def _one_words(self, seat_id: str, pieces: list[Utterance]) -> dict:
+        """The words shown at one to one: the pieces, up to about ONE_CHARS,
+        as spoken words where the speaker's checks let them through. A
+        slide's page tidied first (直し43): its title's line, its numbers
+        and the PDF's breaks gone; a page with nothing left, or a name, not
+        shown; the pages together cut at a sentence's end past ONE_CUT_CHARS.
+        The words recorded are never changed: only those shown. The speaker
+        is given the words tidied as the original (段2): the title's line
+        gone is not a word dropped; stopped, past its limit or turned off,
+        the words tidied are shown, never the page as recorded."""
+        shown, said, met, was_cut = self.one_shown(pieces)
         kept = {u.id: text for u, text in zip(shown, said)}
         last = shown[len(said) - 1].id if was_cut else ""
         # Each page met, in order: the words shown, or "" and why; "cut" on

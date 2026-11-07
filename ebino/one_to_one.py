@@ -326,10 +326,40 @@ def teacher_page_problems(folder, utterances, kinds: dict[str, str]) -> tuple[in
     return filled, out
 
 
+# 直し54d (the teacher, 11/8: 質問と回答を全員分見ておく): a question the teacher
+# stops for a seat, having seen in the list (tools/list_one_answers.py) that
+# its words do not answer it. Next to the other tables (ingested/); never
+# written over (the list tool writes its header when it is not there).
+HIDE_FILE = "ask_hide.tsv"
+HIDE_COLUMNS = ("席", "項目")
+
+
+def load_hidden(folder) -> tuple[set, list[dict], str]:
+    """({(seat ID, item)} stopped, the rows, "" or the table not read)."""
+    rows, problem = read_rows(folder / HIDE_FILE, HIDE_COLUMNS)
+    rows = [row for row in rows or [] if row[HIDE_COLUMNS[1]].strip()]
+    return {(_key(HIDE_COLUMNS, row)[0], row[HIDE_COLUMNS[1]].strip()) for row in rows}, rows, problem
+
+
+def hide_problems(rows: list[dict], seats: set, items: set) -> list[str]:
+    """The rows of ask_hide.tsv that stop nothing: a seat ID or an item that
+    is not there (a cell that is neither is not said: it may hold a name)."""
+    out = []
+    for row in rows:
+        seat, item = _key(HIDE_COLUMNS, row)[0], row[HIDE_COLUMNS[1]].strip()
+        where = f"{HIDE_FILE} {row[LINE]}行目（{seat if seat in seats else '席ID?'} {item if item in items else '項目?'}）"
+        if seat not in seats:
+            out.append(f"{where}：この席IDはない")
+        elif item not in items:
+            out.append(f"{where}：この項目の名前はない（一覧の「項目」の欄から写す）")
+    return out
+
+
 # 直し54c: said at the server's start under a table not read (app.py).
 UNREAD_HINT = {
     PAGES_FILE: "→ この表が読めないので、県外・海外と外から来た人の席の1対1の質問は、ひとつも出ません。",
     RANKING_FILE: "→ この表が読めないので、ランキングの質問は出ません。",
+    HIDE_FILE: "→ この表が読めないので、止めたはずの質問も出ます。",
 }
 UNREAD_FIX = "  メモ帳で開き、UTF-8・タブ区切りのまま保存し直して、起動し直してください。"
 
