@@ -80,8 +80,10 @@ def test_the_hosts_tie_is_its_line_and_the_two_titles():
     _, sheet = _sheet()
     tie = sheet["tie"]
     assert tie["short"] is True and tie["kind"] == "differ"
-    assert 'tie.append(el("p", "hk-tie-who", `${sheet.tie.a.title}・${sheet.tie.b.title}`));' in SHEET_JS
-    assert "if (sheet.tie.short) {" in SHEET_JS
+    # 直し54 (the teacher, 11/8: 「ここ」ってどこ？): the two sentences are
+    # always set under the line, short or not, so 「ここ」 is beside it.
+    assert "if (sheet.tie.short) {" not in SHEET_JS
+    assert "two.append(metLine(sheet.tie.a), metLine(sheet.tie.b));" in SHEET_JS
     # The record keeps the tie as it was (kind and seats only).
     assert set(session_record_tie()) == {"kind", "a", "b"}
 

@@ -58,6 +58,30 @@ CUT = "cut"  # Cut at a sentence's end (the session cuts at ONE_CUT_CHARS).
 _BULLET = re.compile(r"^(?:[・●○■□◆◇◎▪▫►▶➢✓✔－\-＊*※]|(?:\d{1,2}|[a-zA-Z])[.)）．](?!\d)|[(（]\d{1,2}[)）]|[①-⑳])\s*")
 _DASHES = "-‐‑–—―─━~〜"
 _NUMBER = re.compile(rf"^[{_DASHES}\s]*(?:[pP]\.?\s*|No\.?\s*)?\d{{1,3}}(?:\s*/\s*\d{{1,3}})?[{_DASHES}\s]*$")
+# 直し54 (the teacher, 11/8: 経歴が1つの段落に流れて読みにくい): a line that
+# starts with a year (「2020 宮崎大学…」「2021-2022 …」「2024-現在 …」) is a
+# step of a career's list: never joined to the line before, a line of its own.
+_YEAR_LINE = re.compile(rf"^(?:19|20)\d{{2}}(?:\s*[{_DASHES}]\s*(?:(?:19|20)\d{{2}}|現在|今))?(?:年度?)?(?=[\s　]|$)")
+# 直し54 (the teacher, 11/8: 「合同会社この職場」は変): the company mask with
+# the legal form left beside it (the seat table's company had none) is the
+# mask alone.
+_LEGAL_BY_MASK = re.compile(
+    r"(?:株式会社|有限会社|合同会社|合資会社|合名会社|（株）|\(株\)|（有）|\(有\)|㈱|㈲)[\s　]*(この職場)"
+    r"|(この職場)[\s　]*(?:株式会社|有限会社|合同会社|合資会社|合名会社|（株）|\(株\)|（有）|\(有\)|㈱|㈲)")
+
+
+def plain_mask(line: str) -> str:
+    """The company mask with no legal form beside it."""
+    return _LEGAL_BY_MASK.sub(lambda m: m.group(1) or m.group(2), line)
+
+
+YEAR = "year"  # A unit that is a career's step: a line of its own, as a heading is.
+
+
+def is_year_line(line: str) -> bool:
+    return bool(_YEAR_LINE.match(_plain(line)))
+
+
 _WEEKDAY = r"(?:\s*[(（][月火水木金土日](?:曜日?)?[)）])?"
 _DATE = re.compile(rf"^(?:\d{{1,4}}\s*[./\-年]\s*)?\d{{1,2}}\s*[./\-月]\s*\d{{1,2}}\s*日?{_WEEKDAY}$")
 
@@ -139,7 +163,7 @@ def _sentence(unit: str) -> str:
 
 def tidy_page(text: str) -> Tidied:
     """A slide's page as one to one shows it: see the module's words."""
-    lines = [line.strip() for line in (text or "").split("\n") if line.strip()]
+    lines = [plain_mask(line.strip()) for line in (text or "").split("\n") if line.strip()]
     reasons, kept = [], []
     for line in lines:
         why = line_drop(line)
@@ -168,7 +192,12 @@ def _words(kept: list[str], headings: bool) -> str:
             body = line[head.end():].strip()
             if body:
                 units.append([body, False])
-        elif units and not ends_sentence(units[-1][0]) and not units[-1][1]:
+        elif headings and is_year_line(line):
+            # 直し54: a career's step, a line of its own; the lines that go
+            # on from it are still joined to it (the name check's words,
+            # headings off, are joined as before).
+            units.append([line, YEAR])
+        elif units and not ends_sentence(units[-1][0]) and units[-1][1] in (False, YEAR):
             units[-1][0] = _joined(units[-1][0], line)
         else:
             units.append([line, headings and is_heading(line)])

@@ -1036,6 +1036,22 @@ const EbinoHitokoto = (() => {
       box.append(step);
     }
     $("hk-now").value = light.now_question;
+    // 直し54 (the teacher, 11/8: 書かない生徒が多かった): the student's own
+    // lines today, each a button that puts it in the box (still editable).
+    const choices = (light.now_choices || []).filter((text) => text);
+    const list = $("hk-now-list");
+    list.replaceChildren();
+    $("hk-now-pick").textContent = W.now_pick;
+    for (const text of choices) {
+      list.append(button("hk-now-choice", text, () => {
+        const box = $("hk-now");
+        box.value = text;
+        for (const other of list.querySelectorAll("button")) other.setAttribute("aria-pressed", String(other.textContent === text));
+        box.focus({ preventScroll: true });
+      }));
+    }
+    for (const other of list.querySelectorAll("button")) other.setAttribute("aria-pressed", String(other.textContent === $("hk-now").value));
+    $("hk-now-choices").hidden = choices.length < 2;
     $("hk-to-sheet").focus({ preventScroll: true });
   }
 
@@ -1181,14 +1197,12 @@ const EbinoHitokoto = (() => {
       tie.append(el("p", "hk-label hk-ai-label", W.sheet_tie));
       if (sheet.tie) {
         tie.append(el("p", "hk-tie-line", W[`tie_${sheet.tie.kind}`]));
-        if (sheet.tie.short) {
-          // 直し51 段2: the two sentences are in full above (残った1文): their titles only.
-          tie.append(el("p", "hk-tie-who", `${sheet.tie.a.title}・${sheet.tie.b.title}`));
-        } else {
-          const two = el("div", "hk-tie-two");
-          two.append(metLine(sheet.tie.a), metLine(sheet.tie.b));
-          tie.append(two);
-        }
+        // 直し54 (the teacher, 11/8: 「ここ」ってどこ？): the two sentences are
+        // always set here under the line, even when they are in full above
+        // (直し51 段2 showed their titles only), so 「ここ」 is beside it.
+        const two = el("div", "hk-tie-two");
+        two.append(metLine(sheet.tie.a), metLine(sheet.tie.b));
+        tie.append(two);
       }
       if (sheet.split) {
         tie.append(el("p", "hk-tie-split", W.sheet_split),

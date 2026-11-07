@@ -77,8 +77,9 @@ LIGHT_SECONDS = 15.0  # Past it, code picks the light.
 MAX_PEOPLE = 3
 MAX_PART = 16  # A lit part of a card.
 MAX_QUESTION = 60
-MAX_WHY = 60
-MAX_DEEP = 50
+# 直し54 (the teacher, 11/8: もう少し詳しく): 60 and 50 before, one sentence each.
+MAX_WHY = 100
+MAX_DEEP = 80
 MAX_LINE = 120  # Each line the student writes.
 MAX_LISTENER = 2  # Questions the listener puts: one per direction.
 MAX_LADDER = 3  # Questions of the ladder.
@@ -177,6 +178,8 @@ TEXT_IDS = (
     "sheet_hint", "drop", "restore",
     # 直し52 段2: 今日のあなた, by its light on today's map (the screen only).
     "map_you",
+    # 直し54: over the student's own lines to put in 「いまの問い」 with one press.
+    "now_pick",
 )
 FILL_BLANK = "［　　］"  # In ladder_fill_line: where the student writes.
 
@@ -995,11 +998,32 @@ def next_step(talk: Hitokoto) -> str:
     return "" if talk.light and talk.light.quote == talk.forward else talk.forward
 
 
+# 直し54 (the teacher, 11/8: 書かない生徒が多かった): at most this many of the
+# student's own lines offered under 「いまの問い」 to put in the box with one press.
+NOW_CHOICES = 6
+
+
+def now_choices(talk: Hitokoto) -> list[str]:
+    """The student's own words today, to pick 「いまの問い」 from: the
+    questions sent (the first one first), then what the student wrote on the
+    way, none of home, money or health; the latest last, at most NOW_CHOICES
+    (the latest kept). Only the student's words: never a model's or a seat's."""
+    out: list[str] = []
+    lines = [talk.first_question, *talk.own_questions, talk.rewritten, talk.last_question,
+             *(written["text"] for written in talk.written)]
+    for line in lines:
+        text = (line or "").strip()
+        if text and not has_avoid(text) and text not in out:
+            out.append(text)
+    return out[-NOW_CHOICES:]
+
+
 def light_view(talk: Hitokoto) -> dict:
     light = talk.light
     return {"scale": talk.scale, "quote": light.quote, "source": light.source, "chosen_who": light.chosen_who,
             "why": light.why, "deep": light.deep, "force": FORCES[light.force], "next_step": next_step(talk),
-            "now_question": talk.now_question or talk.last_question or talk.first_question}
+            "now_question": talk.now_question or talk.last_question or talk.first_question,
+            "now_choices": now_choices(talk)}
 
 
 # --- the sheet ---

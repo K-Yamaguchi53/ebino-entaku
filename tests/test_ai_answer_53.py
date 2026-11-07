@@ -51,7 +51,8 @@ def test_the_box_is_in_the_ai_seat_under_the_questions():
     seat_js = _top("renderAiSeat")
     assert seat_js.index('$("ai-seat-pick").after($("ai-answer"));') < seat_js.index("cards.replaceChildren();")
     # Words 14px or more; buttons 44px to press; folded, not shown.
-    assert re.search(r"\.ai-seat-pick \{[^}]*font-size: 14px;", CSS)
+    # 直し54 (the teacher, 11/8: 小さいと気付かない): 18px and bold now.
+    assert re.search(r"\.ai-seat-pick \{[^}]*font-size: 18px; font-weight: 700;", CSS)
     assert ".ai-answer-buttons button { min-height: 44px;" in CSS
     assert ".ai-seat.folded .ai-seat-pick,\n.ai-seat.folded .ai-answer { display: none; }" in CSS
 

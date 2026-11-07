@@ -1428,10 +1428,15 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .ask { grid-template-colu
 /* 直し53 段5: under the questions, where there was only room: before one is
    picked a quiet line (no box that looks like one and takes nothing);
    picked, the box to write in and 送る・やめる, in the frame. */
-.ai-seat-pick { margin: 8px 4px 0; font-size: 14px; line-height: 1.5; color: var(--ai); text-align: center; }
+/* 直し54 (the teacher, 11/8: 小さいと気付かない): larger and bold, in the
+   AI's light ink, so it is read as what to do next. */
+.ai-seat-pick { margin: 10px 4px 2px; font-size: 18px; font-weight: 700; line-height: 1.5; color: var(--ai-ink);
+  text-align: center; }
 .ai-seat-pick[hidden], .ai-answer[hidden] { display: none; }
 .ai-answer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 8px; margin: 2px 0 4px; }
-.ai-answer textarea { flex: 1 1 200px; min-width: 0; min-height: 3.4em; max-height: 6em; padding: 6px 10px; resize: vertical; border-radius: 10px;
+/* 直し54 (the teacher, 11/8: もう少し広く): the box takes the whole width,
+   the two buttons under it at the right. */
+.ai-answer textarea { flex: 1 1 100%; width: 100%; min-width: 0; min-height: 4.8em; max-height: 9em; padding: 8px 12px; resize: vertical; border-radius: 10px;
   border: 1px solid var(--ai); background: var(--paper); color: var(--paper-ink); font-family: var(--mincho);
   font-size: 16px; line-height: 1.6; }
 .ai-answer textarea:focus-visible { outline: 2px solid var(--ai-ink); outline-offset: 1px; }
@@ -1572,6 +1577,9 @@ body.one-open #ai-seat { visibility: hidden; }
 .wait-dots { display: flex; gap: 7px; margin-top: 4px; }
 .wait-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--lamp); opacity: .45; }
 .map-frame:has(.opening:not([hidden])) .wait-sign { display: none; }
+/* 直し54 (the teacher, 11/8: 整え中に名前の札が重なる): while the sign is up,
+   the mouse's name card is not shown over it. */
+body:has(#wait-sign:not([hidden])) .map-tip { visibility: hidden; }
 .one-bubble.not-found .voice { color: var(--paper-soft); }
 .one-card { pointer-events: auto; margin-top: 8px; min-height: 40px; padding: 4px 14px; color: var(--paper-ink); background: var(--paper-light);
   border-color: var(--paper-soft); }
@@ -1879,6 +1887,15 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
 #hk-light > .hk-label { display: block; margin-top: 22px; }
 #hk-now { width: 100%; min-height: 72px; margin-top: 4px; padding: 10px 12px; background: var(--paper); color: var(--paper-ink);
   border: 2px solid var(--paper-line); border-radius: 10px; font-family: var(--mincho); font-size: 17px; resize: vertical; }
+/* 直し54: the student's own lines under the box, each a button. */
+.hk-now-choices[hidden] { display: none; }
+.hk-now-choices { margin: 10px 0 4px; }
+.hk-now-pick { margin: 0 0 6px; font-size: 14px; color: var(--soft); }
+.hk-now-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.hk-now-choice { min-height: 44px; max-width: 100%; padding: 6px 14px; border: 1px solid var(--lamp-soft); border-radius: 12px;
+  background: transparent; color: var(--ink); font-family: var(--mincho); font-size: 15px; line-height: 1.5; text-align: left; }
+.hk-now-choice:hover { border-color: var(--lamp); }
+.hk-now-choice[aria-pressed="true"] { border-color: var(--lamp); background: var(--lamp-faint); }
 .hk-sheet { padding: 28px 30px; background: var(--paper-light); color: var(--paper-ink); border-radius: 6px; overflow-wrap: break-word; }
 .hk-sheet h3 { margin: 0 0 14px; padding-bottom: 6px; font-family: var(--mincho); font-size: 20px; border-bottom: 2px solid var(--paper-ink); }
 .hk-sheet .hk-label { color: var(--paper-soft); }
