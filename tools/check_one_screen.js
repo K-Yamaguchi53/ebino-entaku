@@ -141,6 +141,17 @@ async (page) => {
             }
             await p.waitForTimeout(300);
             await p.keyboard.type("決めて取るほうに近い");
+            // 直し53 段5: the box and its buttons in the AI's seat, seen inside it
+            // ("ai box out"), the words in it ("ai box empty").
+            const box = await p.evaluate(() => {
+              const seat = document.querySelector("#ai-seat"), form = document.querySelector("#ai-answer");
+              if (!form || form.hidden) return { up: false };
+              const s = seat.getBoundingClientRect(), f = form.getBoundingClientRect();
+              return { up: true, out: f.top < s.top - 1 || f.bottom > s.bottom + 1 || f.left < s.left - 1 || f.right > s.right + 1,
+                words: document.querySelector("#ai-answer-text").value };
+            });
+            if (box.up && box.out) hint = "ai box out";
+            if (box.up && !box.words) hint = (hint ? hint + " " : "") + "ai box empty";
           }
           await p.waitForTimeout(300);
           const m = await measure(p);
@@ -358,7 +369,7 @@ async (page) => {
       if (await seat.count()) await seat.click();
       await p.waitForTimeout(300);
       await p.keyboard.type("決めて取るほうに近い");
-      await p.click("#ask-button");
+      await p.click("#ai-answer-send");  // 直し53 段5: answered in the AI's seat.
       await p.waitForTimeout(2500);
       await p.click("#to-reflect");
     }
