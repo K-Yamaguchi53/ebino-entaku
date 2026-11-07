@@ -2,11 +2,12 @@
 town's adults at the table, or one to one) the map's scenery goes one on,
 night → spring → autumn → night…; the buttons stay, and the next answer goes
 on from the one pressed. It melts in slowly (at once with motion reduced).
-The scenery's name sits in a corner of the map; spring has small cherry-pink
-flowers on the low land and along the river, from a fixed seed (the same
-place every time), still, under the points and the bubbles."""
+The scenery's name sits in a corner of the map. 直し53 段8: spring's cherry
+trees are in its picture (tools/render_relief.py); the dots that were drawn
+over it (直し48 段6) are gone."""
 
 import json
+from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -87,39 +88,12 @@ def test_it_goes_on_when_someone_answers_at_the_table_and_at_one_to_one():
     assert "const LOOK_FADE = 1600;" in MAP
 
 
-FLOWERS = """
-const map = { boundary: [[0, 0], [100, 0], [100, 100], [0, 100]], river: [[[0, 90], [100, 90]]] };
-const view = { zAt: (x, y) => y, proj: (x, y) => [x * 2, y * 2] };
-const made = [];
-const svgEl = (tag, attrs) => ({ tag, attrs });
-%(source)s
-const one = flowerSpots(), two = flowerSpots();
-const layer = { append(n) { made.push(n); } };
-drawFlowers(layer);
-process.stdout.write(JSON.stringify({ one, two, made: made.length, classes: [...new Set(made.map((n) => n.attrs.class))] }));
-"""
-
-
-@node
-def test_spring_flowers_are_in_the_same_place_every_time_on_low_land_and_by_the_river():
-    start = MAP.index("  const FLOWER_SEED = 48")
-    source = MAP[start:MAP.index("\n  }\n", MAP.index("  function drawFlowers(")) + 4]
-    out = subprocess.run(["node", "-"], input=(FLOWERS % {"source": source}).encode("utf-8"), capture_output=True, timeout=30)
-    assert out.returncode == 0, out.stderr.decode("utf-8", "replace")
-    got = json.loads(out.stdout.decode("utf-8"))
-    assert got["one"] == got["two"] and 0 < len(got["one"]) <= 140  # The same seed, the same place; not too many.
-    # Low land (here: low y) or near the river (y about 90).
-    assert all(spot["z"] <= 35 or abs(spot["y"] - 90) < 6 for spot in got["one"])
-    assert got["made"] == len(got["one"]) and got["classes"] == ["flower"]
-
-
-def test_flowers_still_under_the_points_spring_only():
-    build = MAP[MAP.index("      lookNodes = { picture };"):MAP.index('    const fill = layer("basin-fill");')]
-    assert 'drawFlowers(layer("spring-flowers"));' in build  # Right over the picture, before the rest is drawn.
-    assert ".spring-flowers { opacity: 0; }" in CSS and '.map-frame[data-look="spring"] .spring-flowers { opacity: 1; }' in CSS
-    flower = re.search(r"\.spring-flowers \.flower \{[^}]*\}", CSS).group(0)
-    assert "animation" not in flower and "transition" not in flower
-    assert "@media (prefers-reduced-motion: no-preference) { .spring-flowers { transition: opacity 1.6s ease-in-out; } }" in CSS
+def test_no_flower_dots_over_the_spring_picture():
+    assert "drawFlowers" not in MAP and "flowerSpots" not in MAP and "FLOWER_" not in MAP
+    assert "spring-flowers" not in MAP and "spring-flowers" not in CSS and "--sakura" not in CSS
+    # The picture paints them (直し53 段8): cherry trees and rape in spring's look.
+    render = (Path(__file__).resolve().parents[1] / "tools" / "render_relief.py").read_text(encoding="utf-8")
+    assert '"blossom": {' in render and "def blossoms(" in render
 
 
 def test_the_sceneries_name_in_a_corner_its_words_in_texts():

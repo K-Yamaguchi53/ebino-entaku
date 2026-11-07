@@ -45,8 +45,8 @@ def test_the_repo_has_spring_and_autumn_after_the_night():
     for season in relief.SEASONS:
         # Autumn's crowns of trees (a grain of colours, the teacher's 11/6)
         # cost more than the night's smooth wash; still small for a page
-        # served on this computer only.
-        assert (relief.RELIEF_DIR / relief.season_image(season)).stat().st_size < 450_000
+        # served on this computer only (直し53 段8: 4800 px across).
+        assert (relief.RELIEF_DIR / relief.season_image(season)).stat().st_size < 3_000_000
     # 直し53 段1: no blurred grounds left in mapdata/.
     assert not list(relief.RELIEF_DIR.glob("relief_blur*"))
 
@@ -130,13 +130,30 @@ def test_the_band_sits_with_the_zoom_and_shows_the_season_lit():
     assert ':not([data-look' not in CSS
 
 
-def test_the_night_is_drawn_as_it_was_and_a_season_keeps_its_camera():
-    # The night's colours and lights, unchanged (直し31-4).
-    assert '"ramp": [(0.0, (0.035, 0.065, 0.12)), (0.35, (0.075, 0.12, 0.19)), (1.0, (0.20, 0.25, 0.34))]' in RENDER
-    assert '"lights": (("moon", 1.15, (0.72, 0.80, 1.0), (62, 0, -118)), ("rim", 0.35, (1.0, 0.86, 0.6), (70, 0, 135)))' in RENDER
-    # A season never writes the projection; one drawn by another camera is removed.
-    assert "if season == \"night\":\n        OUT_PROJECTION.write_text(written" in RENDER
+def test_the_pictures_keep_the_camera_and_the_projection():
+    # 直し53 段8: drawn twice as wide (4800), the camera framed as before by
+    # every STEP-th height at PROJECTION_PX (2400): the projection unchanged;
+    # one drawn by another camera is removed.
+    assert "PROJECTION_PX = 2400" in RENDER and "STEP = 2" in RENDER
+    assert "projection = camera(scene, frame_verts, PROJECTION_PX)" in RENDER
+    assert 'if OUT_PROJECTION.is_file() and OUT_PROJECTION.read_text(encoding="utf-8") != written:' in RENDER
     assert "out_image.unlink()" in RENDER
+    # The night a little brighter (the moon), the seasons' looks clearer.
+    assert "NIGHT_MOON = 2.0" in RENDER and '("moon", NIGHT_MOON, (0.72, 0.80, 1.0), (62, 0, -118))' in RENDER
+    data = load_relief(VIEWBOX)
+    for look in data["looks"]:
+        name = look["image"].lstrip("/")
+        size = relief.webp_size((relief.RELIEF_DIR / name).read_bytes())
+        assert size == (2 * data["res"][0], 2 * data["res"][1])
+
+
+def test_a_picture_of_another_size_than_the_projections_times_is_refused(tmp_path):
+    folder = copy_relief(tmp_path)
+    from PIL import Image
+    Image.new("RGB", (4801, 3646)).save(folder / relief.IMAGE, "WEBP")
+    assert load_relief(VIEWBOX, folder) is None
+    Image.new("RGB", (2400, 1823)).save(folder / relief.IMAGE, "WEBP")  # As before 直し53: still allowed.
+    assert load_relief(VIEWBOX, folder) is not None
 
 
 _MONTHS = """

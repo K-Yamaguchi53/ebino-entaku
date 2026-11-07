@@ -16,10 +16,15 @@ holds a seat's words.
 
 The seasons (the teacher, 11/6): the same model at dusk in spring and in
 autumn, mapdata/relief_<season>.webp (tools/render_relief.py), switched on
-the screen. Each is offered only when its picture is there and is the
-night's size (the same camera): else the night alone. Round the picture the
-screen lays a plain ground of the season's edge colour (style.css, 直し53
-段1); there is no blurred ground any more.
+the screen. Each is offered only when its picture is there and is a size
+the projection allows (the same camera): else the night alone.
+直し53 段8 (the teacher, 11/7: もっときれいに): a picture may be drawn
+PICTURE_TIMES as many pixels across and down as the projection's res (4800
+for 2400), the same camera: the screen lays it in the projection's box, so
+every point, name and line stays where it was to the pixel; only the
+picture is sharper. Each season may be either size, as it was drawn.
+Round the picture the screen lays a plain ground of the season's edge
+colour (style.css, 直し53 段1); there is no blurred ground any more.
 """
 
 import json
@@ -31,7 +36,8 @@ IMAGE = "relief.webp"
 PROJECTION = "relief_projection.json"
 HEIGHTS = "relief_heights.json"
 IMAGE_PATH = "/relief.webp"  # Where the screen asks for the picture.
-MAX_IMAGE_BYTES = 1_000_000
+MAX_IMAGE_BYTES = 4_000_000  # 直し53 段8: 4800 px across, WebP 90 (autumn's grain is the largest).
+PICTURE_TIMES = (1, 2)  # The picture's pixels per the projection's (直し53 段8).
 SEASONS = ("spring", "autumn")  # Besides the night, in the switch's order.
 
 
@@ -40,16 +46,22 @@ def season_image(season: str) -> str:
     return f"relief_{season}.webp"
 
 
+def picture_sizes(res: tuple[int, int]) -> set[tuple[int, int]]:
+    """The sizes a picture of this projection may be (直し53 段8)."""
+    return {(res[0] * k, res[1] * k) for k in PICTURE_TIMES}
+
+
 def looks(folder: Path, size: tuple[int, int]) -> list[dict]:
     """The pictures the screen may switch between: the night first, then
-    each season whose picture is there and is the night's size (a season
-    that is not is left out, never shown misplaced)."""
+    each season whose picture is there and is a size of the night's
+    projection (size: its res; a season that is not is left out, never
+    shown misplaced)."""
     found = [{"id": "night", "image": IMAGE_PATH}]
     for season in SEASONS:
         image = season_image(season)
         try:
             data = (folder / image).read_bytes()
-            if len(data) > MAX_IMAGE_BYTES or webp_size(data) != size:
+            if len(data) > MAX_IMAGE_BYTES or webp_size(data) not in picture_sizes(size):
                 continue
         except (OSError, ValueError):
             continue
@@ -84,8 +96,8 @@ def parse_relief(image: bytes, projection: dict, heights: dict, viewbox: tuple[f
     width_px, height_px = (int(v) for v in projection["res"])
     if width_px <= 0 or height_px <= 0 or len(image) > MAX_IMAGE_BYTES:
         raise ValueError("bad picture")
-    if webp_size(image) != (width_px, height_px):
-        raise ValueError("the picture is not the size the projection says")
+    if webp_size(image) not in picture_sizes((width_px, height_px)):
+        raise ValueError("the picture is not a size the projection allows")
     px = [_number(v) for v in projection["px"]]
     py = [_number(v) for v in projection["py"]]
     z = projection["z"]

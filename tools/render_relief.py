@@ -1,7 +1,7 @@
 """Draw the basin as a model in the night, seen from the south, north up (SPEC 14-66, 直し31-4).
 Run in Blender, after tools/fetch_copernicus_dem.py:
 
-    blender -b --python tools/render_relief.py -- WORK_DIR [WIDTH_PX] [SAMPLES] [SEASON]
+    blender -b --python tools/render_relief.py -- WORK_DIR [WIDTH_PX] [SAMPLES] [SEASON] [OUT_DIR]
 
 SEASON is night (the default), spring or autumn (the teacher, 11/6: the
 basin's seasons, switched on the screen). Spring and autumn are the same
@@ -12,9 +12,21 @@ the land as it is. They are written as mapdata/relief_<season>.webp; the
 projection stays the night's (the same camera: checked, not written).
 
 WORK_DIR holds heights.npy and basin_mask.npy (outside the repo); the full
-picture is drawn there too (relief.png). Written to the repo:
-  mapdata/relief.webp             the picture, made small
+picture is drawn there too (relief.png). Written to the repo (or to OUT_DIR,
+outside it, to look at a picture before it goes in):
+  mapdata/relief.webp             the picture (WebP, WEBP_QUALITY)
   mapdata/relief_projection.json  map (x, y, z) -> the picture's pixel
+
+直し53 (the teacher, 11/7: もっときれいに。くっきり＋色も澄ませる): the
+picture is WIDTH_PX across (4800), a whole number of times the projection's
+own PROJECTION_PX (2400): the same camera framed by every STEP-th height as
+before, so relief_projection.json is unchanged and the screen lays the larger
+picture in the same box (ebino/relief.py PICTURE_TIMES): every point, name
+and line stays where it was. The model is drawn from every height
+(GEOMETRY_STEP 1, the DEM's own grain). The night a little brighter, the
+moon stronger than the sky; autumn's browns cleared toward gold and grey;
+spring with cherry trees (river banks, the hills' foot, patches on the floor)
+and a little rape on the fields (blossoms()). AgX looks as LOOKS say.
 
 The map's coordinates (x right, y down, 1 unit about 33.4 m) are put at
 Blender's X = x, Y = -y; a height is (metres - BASE_M) / M_PER_UNIT, EXAG times.
@@ -42,11 +54,18 @@ SEASONS = ("night", "spring", "autumn")
 OUT_PROJECTION = REPO_DIR / "mapdata" / "relief_projection.json"
 
 BASE_M, M_PER_UNIT, EXAG = 140.0, 33.4225, 2.2
-STEP = 2  # Every STEP-th height becomes a vertex.
+STEP = 2  # Every STEP-th height frames the camera (the projection, as it has been since 直し31).
+GEOMETRY_STEP = 1  # Every height becomes a vertex (直し53: the picture twice as wide).
+PROJECTION_PX = 2400  # The projection's own width: the picture is drawn a whole number of times wider.
 SKIRT = -14.0  # The model's bottom.
 ELEV_DEG = 52.0  # How far the camera looks down.
 MARGIN = 1.03
-WEBP_QUALITY = 72
+RIVER_REACH = 4  # Units (about 130 m) of each of the three blurs round the river.
+WEBP_QUALITY = 90
+NIGHT_MOON = 2.0  # Was 1.15 (直し31-4).
+NIGHT_VIEW_LOOK = "AgX - Medium High Contrast"
+SEASON_VIEW_LOOK = "AgX - Punchy"
+VIEW_TRANSFORM = "AgX"  # Blender's own (as the pictures before 直し53 were drawn).
 
 
 def socket(sockets, identifier):
@@ -55,18 +74,46 @@ def socket(sockets, identifier):
     return next(s for s in sockets if s.identifier == identifier)
 
 
-def terrain(heights, mask):
-    """The top (smooth) with its sides and bottom: a block cut out of the ground."""
+def block(heights, step):
+    """The block's corners: the top's vertices, then its bottom's ring."""
     rows, cols = heights.shape
     z = (heights - BASE_M) / M_PER_UNIT * EXAG
-    gx, gy = np.meshgrid(np.arange(cols) * STEP, np.arange(rows) * STEP)
+    gx, gy = np.meshgrid(np.arange(cols) * step, np.arange(rows) * step)
     top = np.stack([gx.ravel(), -gy.ravel(), z.ravel()], axis=1)
     ring = ([(0, c) for c in range(cols)] + [(r, cols - 1) for r in range(1, rows)]
             + [(rows - 1, c) for c in range(cols - 2, -1, -1)] + [(r, 0) for r in range(rows - 2, 0, -1)])
     ring_idx = [r * cols + c for r, c in ring]
     bottom = top[ring_idx].copy()
     bottom[:, 2] = SKIRT
-    verts = np.concatenate([top, bottom])
+    return top, ring_idx, np.concatenate([top, bottom])
+
+
+def river_near(shape):
+    """1 on the river (mapdata/ebino_osm.json's lines), falling to 0 a few
+    RIVER_REACH away; one value per map unit, as heights.npy."""
+    drawing = json.loads((REPO_DIR / "mapdata" / "ebino_osm.json").read_text(encoding="utf-8"))
+    rows, cols = shape
+    on = np.zeros(shape, dtype=np.float32)
+    for line in drawing.get("river", []):
+        for (x0, y0), (x1, y1) in zip(line, line[1:]):
+            n = int(max(abs(x1 - x0), abs(y1 - y0)) * 2) + 1
+            xs = np.clip(np.round(np.linspace(x0, x1, n)).astype(int), 0, cols - 1)
+            ys = np.clip(np.round(np.linspace(y0, y1, n)).astype(int), 0, rows - 1)
+            on[ys, xs] = 1.0
+    near = on
+    k = RIVER_REACH
+    for _ in range(3):  # Three box blurs, about a bell.
+        pad = np.pad(near, k, mode="edge")
+        c = np.pad(np.cumsum(np.cumsum(pad, axis=0), axis=1), ((1, 0), (1, 0)))
+        n = 2 * k + 1
+        near = (c[n:, n:] - c[:-n, n:] - c[n:, :-n] + c[:-n, :-n]) / n ** 2
+    return np.clip(near / max(float(near.max()), 1e-6) * 2.2, 0, 1).astype(np.float32)
+
+
+def terrain(heights, mask, step, river=None):
+    """The top (smooth) with its sides and bottom: a block cut out of the ground."""
+    rows, cols = heights.shape
+    top, ring_idx, verts = block(heights, step)
     faces = [(r * cols + c, (r + 1) * cols + c, (r + 1) * cols + c + 1, r * cols + c + 1)
              for r in range(rows - 1) for c in range(cols - 1)]
     nb, n = len(top), len(ring_idx)
@@ -80,44 +127,60 @@ def terrain(heights, mask):
     # Where the basin is, for the floor's warm tint.
     attribute = mesh.attributes.new("basin", "FLOAT", "POINT")
     attribute.data.foreach_set("value", np.concatenate([mask.ravel(), np.zeros(n)]).astype(np.float32))
+    if river is not None:
+        # How near the river, for spring's cherry trees along its banks.
+        attribute = mesh.attributes.new("river", "FLOAT", "POINT")
+        attribute.data.foreach_set("value", np.concatenate([river.ravel(), np.zeros(n)]).astype(np.float32))
     return mesh, verts
 
 
 # Each season: the colours by height (where, linear RGB) from the basin's
 # floor (0) to 1700 m (1); the basin's floor mixed toward its own colour by
 # how much; the steep sides' dark; the lights (name, energy, colour, angles);
-# the sky (colour, strength). The night is as it was (直し31-4).
+# the sky (colour, strength); the view's look (Blender's AgX looks).
 # Heights at a glance: the floor about 230 m (0.06), the hills round it 400
 # to 800 m (0.17 to 0.42), the Ebino plateau about 1200 m (0.68), the
 # Kirishima peaks to 1700 m (1).
+# 直し53 (the teacher, 11/7: くっきり, the colours clearer): the night a
+# little brighter, the moon stronger than the sky so the valleys and ridges
+# read; autumn's reds kept, its browns (the floor, the plateau, the peaks)
+# cleared toward gold and grey; spring with cherry trees and rape (blossom).
 LOOKS = {
     "night": {
-        "ramp": [(0.0, (0.035, 0.065, 0.12)), (0.35, (0.075, 0.12, 0.19)), (1.0, (0.20, 0.25, 0.34))],
-        "basin": ((0.13, 0.14, 0.17), 0.25),
+        "ramp": [(0.0, (0.045, 0.08, 0.145)), (0.35, (0.095, 0.145, 0.225)), (1.0, (0.25, 0.30, 0.40))],
+        "basin": ((0.15, 0.165, 0.20), 0.25),
         "side": (0.012, 0.02, 0.035),
-        "lights": (("moon", 1.15, (0.72, 0.80, 1.0), (62, 0, -118)), ("rim", 0.35, (1.0, 0.86, 0.6), (70, 0, 135))),
-        "sky": ((0.012, 0.022, 0.045), 0.22),
+        "lights": (("moon", NIGHT_MOON, (0.72, 0.80, 1.0), (62, 0, -118)), ("rim", 0.4, (1.0, 0.86, 0.6), (70, 0, 135))),
+        "sky": ((0.012, 0.022, 0.045), 0.2),
+        "view_look": NIGHT_VIEW_LOOK,
     },
     # Spring at dusk. The floor's fields (below about 290 m) young green;
     # above, the slopes' fresh green with the dark of cedars and evergreens
     # in patches (most of a Kyushu hillside); the peaks pink (ミヤマキリシマ).
+    # Cherry trees in bloom here and there (blossoms()).
     "spring": {
-        "ramp": [(0.0, (0.17, 0.23, 0.07)), (0.085, (0.15, 0.21, 0.06)), (0.12, (0.11, 0.21, 0.05)),
-                 (0.60, (0.12, 0.22, 0.05)), (0.72, (0.14, 0.20, 0.07)), (0.84, (0.30, 0.12, 0.19)),
-                 (1.0, (0.20, 0.13, 0.14))],
-        "forest": ((0.035, 0.075, 0.035), 0.12),
-        "basin": ((0.17, 0.23, 0.07), 0.15),
+        "ramp": [(0.0, (0.23, 0.33, 0.08)), (0.085, (0.20, 0.30, 0.07)), (0.12, (0.12, 0.24, 0.05)),
+                 (0.60, (0.13, 0.25, 0.05)), (0.72, (0.15, 0.22, 0.07)), (0.84, (0.32, 0.12, 0.20)),
+                 (1.0, (0.21, 0.14, 0.15))],
+        "forest": ((0.035, 0.08, 0.035), 0.12),
+        "blossom": {"foot_from": (0.065, 0.09), "foot_to": (0.14, 0.2), "foot": 0.55, "river": 0.75,
+                    "hamlet_scale": 0.05, "hamlet_cut": (0.64, 0.72), "hamlet": 0.55,
+                    "thin_scale": 0.09, "thin_cut": (0.42, 0.62), "tree_scale": 0.55, "lift": 0.7, "tree_cut": (0.76, 0.84),
+                    "pink": (0.98, 0.40, 0.58), "white": (1.0, 0.86, 0.90),
+                    "rape_scale": 0.3, "rape_cut": (0.65, 0.71), "rape": (0.78, 0.60, 0.02)},
+        "basin": ((0.23, 0.33, 0.08), 0.15),
         "side": (0.018, 0.022, 0.02),
-        "lights": (("sun", 3.0, (1.0, 0.88, 0.76), (70, 0, -112)), ("rim", 0.5, (0.6, 0.68, 1.0), (70, 0, 135))),
+        "lights": (("sun", 3.8, (1.0, 0.88, 0.76), (70, 0, -112)), ("rim", 0.5, (0.6, 0.68, 1.0), (70, 0, 135))),
         "sky": ((0.08, 0.09, 0.14), 0.5),
+        "view_look": SEASON_VIEW_LOOK,
     },
     # Autumn at dusk. The floor's rice golden; above, the slopes' red,
     # orange and yellow showing in patches among the dark green; the
     # plateau's grass gold; the peaks bare.
     "autumn": {
-        "ramp": [(0.0, (0.36, 0.26, 0.07)), (0.085, (0.32, 0.23, 0.06)), (0.12, (0.42, 0.05, 0.015)),
-                 (0.30, (0.46, 0.10, 0.015)), (0.44, (0.50, 0.20, 0.02)), (0.58, (0.50, 0.34, 0.04)),
-                 (0.70, (0.42, 0.32, 0.11)), (0.86, (0.19, 0.13, 0.09)), (1.0, (0.15, 0.11, 0.09))],
+        "ramp": [(0.0, (0.56, 0.35, 0.055)), (0.085, (0.50, 0.31, 0.05)), (0.12, (0.42, 0.05, 0.015)),
+                 (0.30, (0.46, 0.10, 0.015)), (0.44, (0.50, 0.20, 0.02)), (0.58, (0.52, 0.36, 0.04)),
+                 (0.70, (0.50, 0.38, 0.08)), (0.86, (0.21, 0.18, 0.15)), (1.0, (0.18, 0.17, 0.16))],
         "forest": ((0.03, 0.075, 0.025), 0.0),
         "patches": (0.33, 0.37),
         # The crowns: about 3 units (110 m, a clump of trees) across, a
@@ -127,10 +190,11 @@ LOOKS = {
                    "colours": [(0.0, (0.04, 0.11, 0.025)), (0.24, (0.42, 0.012, 0.012)),
                                (0.40, (0.62, 0.035, 0.012)), (0.54, (0.72, 0.17, 0.01)),
                                (0.68, (0.82, 0.40, 0.02)), (0.86, (0.70, 0.26, 0.015))]},
-        "basin": ((0.36, 0.26, 0.07), 0.15),
-        "side": (0.022, 0.016, 0.012),
+        "basin": ((0.56, 0.35, 0.055), 0.15),
+        "side": (0.03, 0.02, 0.012),
         "lights": (("sun", 3.0, (1.0, 0.93, 0.84), (70, 0, -112)), ("rim", 0.5, (0.6, 0.68, 1.0), (70, 0, 135))),
         "sky": ((0.08, 0.09, 0.14), 0.5),
+        "view_look": SEASON_VIEW_LOOK,
     },
 }
 
@@ -263,6 +327,9 @@ def night_material(season="night"):
         nt.links.new(only_above.outputs[0], socket(wooded.inputs, "Factor_Float"))
         leaves = socket(wooded.outputs, "Result_Color")
 
+    if "blossom" in look:
+        leaves = blossoms(nt, look["blossom"], geometry, by_height, leaves)
+
     basin = nt.nodes.new("ShaderNodeAttribute")
     basin.attribute_name = "basin"
     warm = nt.nodes.new("ShaderNodeMix")
@@ -290,6 +357,81 @@ def night_material(season="night"):
     nt.links.new(socket(dark.outputs, "Result_Color"), bsdf.inputs["Base Color"])
     nt.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
     return material
+
+
+def blossoms(nt, blossom, geometry, by_height, leaves):
+    """Spring's cherry trees (pale pink and white) in clumps: along the
+    river, at the foot of the hills round the floor and in a few patches on
+    the floor (where hamlets keep them); rape's yellow in strips on the
+    fields. A tree is a Voronoi cell picked by its own random value where
+    the place asks for trees: likely places, not the land's own record."""
+    def node(kind, **inputs):
+        made = nt.nodes.new(kind)
+        for key, value in inputs.items():
+            made.inputs[key].default_value = value
+        return made
+
+    def op(operation, a, b=None):
+        made = nt.nodes.new("ShaderNodeMath")
+        made.operation = operation
+        for i, value in enumerate((a, b)):
+            if value is None:
+                continue
+            if isinstance(value, (int, float)):
+                made.inputs[i].default_value = value
+            else:
+                nt.links.new(value, made.inputs[i])
+        return made.outputs[0]
+
+    def band(value, lo, hi, out_lo=0.0, out_hi=1.0):
+        made = node("ShaderNodeMapRange", **{"From Min": lo, "From Max": hi, "To Min": out_lo, "To Max": out_hi})
+        nt.links.new(value, made.inputs["Value"])
+        return made.outputs["Result"]
+
+    def mix(a, b, factor):
+        made = nt.nodes.new("ShaderNodeMix")
+        made.data_type = "RGBA"
+        for name, value in (("A_Color", a), ("B_Color", b)):
+            if isinstance(value, tuple):
+                socket(made.inputs, name).default_value = (*value, 1)
+            else:
+                nt.links.new(value, socket(made.inputs, name))
+        nt.links.new(factor, socket(made.inputs, "Factor_Float"))
+        return socket(made.outputs, "Result_Color")
+
+    height = by_height.outputs["Result"]
+    river = nt.nodes.new("ShaderNodeAttribute")
+    river.attribute_name = "river"
+    # The foot of the hills: just above the floor's fields.
+    foot = op("MULTIPLY", band(height, *blossom["foot_from"]), band(height, *blossom["foot_to"], 1.0, 0.0))
+    hamlets = node("ShaderNodeTexNoise", Scale=blossom["hamlet_scale"], Detail=2.0)
+    nt.links.new(geometry.outputs["Position"], hamlets.inputs["Vector"])
+    hamlet = op("MULTIPLY", band(hamlets.outputs["Fac"], *blossom["hamlet_cut"]), band(height, 0.11, 0.08))
+    where = op("MAXIMUM", op("MULTIPLY", river.outputs["Fac"], blossom["river"]),
+               op("MAXIMUM", op("MULTIPLY", foot, blossom["foot"]), op("MULTIPLY", hamlet, blossom["hamlet"])))
+    # Patchy, never a band: a wider noise thins it here and there.
+    thin = node("ShaderNodeTexNoise", Scale=blossom["thin_scale"], Detail=1.0)
+    nt.links.new(geometry.outputs["Position"], thin.inputs["Vector"])
+    where = op("MULTIPLY", where, band(thin.outputs["Fac"], *blossom["thin_cut"]))
+    # The crowns: a fine noise's high places, more of them where the place
+    # asks for trees, so they gather into irregular groves; pink or white
+    # by a second noise.
+    crowns = node("ShaderNodeTexNoise", Scale=blossom["tree_scale"], Detail=4.0, Roughness=0.65)
+    nt.links.new(geometry.outputs["Position"], crowns.inputs["Vector"])
+    lifted = op("MULTIPLY_ADD", where, blossom["lift"])
+    nt.links.new(crowns.outputs["Fac"], lifted.node.inputs[2])
+    tree = band(lifted, *blossom["tree_cut"])
+    tint = node("ShaderNodeTexNoise", Scale=blossom["tree_scale"] * 2.0, Detail=1.0)
+    nt.links.new(geometry.outputs["Position"], tint.inputs["Vector"])
+    leaves = mix(leaves, mix(blossom["pink"], blossom["white"], band(tint.outputs["Fac"], 0.4, 0.6)), tree)
+    # Rape: thin yellow strips on the fields (a stretched noise), a little.
+    strips = node("ShaderNodeTexNoise", Scale=blossom["rape_scale"], Detail=1.0)
+    stretch = nt.nodes.new("ShaderNodeMapping")
+    stretch.inputs["Scale"].default_value = (1.0, 4.0, 1.0)
+    nt.links.new(geometry.outputs["Position"], stretch.inputs["Vector"])
+    nt.links.new(stretch.outputs["Vector"], strips.inputs["Vector"])
+    rape = op("MULTIPLY", band(strips.outputs["Fac"], *blossom["rape_cut"]), band(height, 0.085, 0.07))
+    return mix(leaves, blossom["rape"], rape)
 
 
 def lights(scene, season="night"):
@@ -348,35 +490,59 @@ def camera(scene, verts, width_px):
 def main() -> int:
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     if not argv:
-        print("usage: blender -b --python tools/render_relief.py -- WORK_DIR [WIDTH_PX] [SAMPLES] [SEASON]",
+        print("usage: blender -b --python tools/render_relief.py -- WORK_DIR [WIDTH_PX] [SAMPLES] [SEASON] [OUT_DIR]",
               file=sys.stderr)
         return 2
     season = argv[3] if len(argv) > 3 else "night"
     if season not in SEASONS:
         print(f"SEASON is one of {', '.join(SEASONS)}", file=sys.stderr)
         return 2
-    out_image = OUT_IMAGE if season == "night" else OUT_IMAGE.with_name(f"relief_{season}.webp")
+    # OUT_DIR (outside the repo) to try a picture before it goes into mapdata/.
+    out_dir = Path(argv[4]).resolve() if len(argv) > 4 else OUT_IMAGE.parent
+    out_image = out_dir / (OUT_IMAGE.name if season == "night" else f"relief_{season}.webp")
+    out_projection = out_dir / OUT_PROJECTION.name
     work = Path(argv[0]).resolve()
-    width_px = int(argv[1]) if len(argv) > 1 else 2400
-    samples = int(argv[2]) if len(argv) > 2 else 32
+    width_px = int(argv[1]) if len(argv) > 1 else 2 * PROJECTION_PX
+    samples = int(argv[2]) if len(argv) > 2 else 384
+    times = width_px / PROJECTION_PX
+    if times != int(times) or times < 1:
+        print(f"WIDTH_PX is a whole number of times {PROJECTION_PX}", file=sys.stderr)
+        return 2
     started = time.monotonic()
-    heights = np.load(work / "heights.npy")[::STEP, ::STEP]
-    mask = np.load(work / "basin_mask.npy")[::STEP, ::STEP]
+    heights = np.load(work / "heights.npy")
+    mask = np.load(work / "basin_mask.npy")
+    # The camera framed by every STEP-th height, as before (the projection
+    # unchanged); the model drawn from the heights inside that frame.
+    framing = heights[::STEP, ::STEP]
+    rows, cols = ((n - 1) * STEP + 1 for n in framing.shape)
+    _, _, frame_verts = block(framing, STEP)
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
-    mesh, verts = terrain(heights, mask)
-    block = bpy.data.objects.new("terrain", mesh)
-    scene.collection.objects.link(block)
-    block.data.materials.append(night_material(season))
+    cut = (slice(0, rows, GEOMETRY_STEP), slice(0, cols, GEOMETRY_STEP))
+    river = river_near(heights.shape)[cut] if "blossom" in LOOKS[season] else None
+    mesh, _ = terrain(heights[cut], mask[cut], GEOMETRY_STEP, river)
+    model = bpy.data.objects.new("terrain", mesh)
+    scene.collection.objects.link(model)
+    model.data.materials.append(night_material(season))
     lights(scene, season)
-    projection = camera(scene, verts, width_px)
+    projection = camera(scene, frame_verts, PROJECTION_PX)
+    # The same view drawn larger: the orthographic camera's width fits the
+    # picture's, so every pixel is `times` pixels and nothing moves.
+    scene.render.resolution_x = width_px
+    scene.render.resolution_y = projection["res"][1] * int(times)
 
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
     scene.cycles.samples = samples
     scene.cycles.use_denoising = True
     scene.render.film_transparent = True
+    scene.view_settings.view_transform = VIEW_TRANSFORM
+    try:
+        scene.view_settings.look = LOOKS[season].get("view_look", "None")
+    except TypeError as wrong:
+        print(wrong, file=sys.stderr)
+        return 2
     settings = scene.render.image_settings
     settings.file_format, settings.color_mode = "PNG", "RGBA"
     scene.render.filepath = str(work / ("relief.png" if season == "night" else f"relief_{season}.png"))
@@ -384,21 +550,21 @@ def main() -> int:
     bpy.ops.render.render(write_still=True)
     drawn = time.monotonic()
 
-    # The repo gets the small WebP, never the PNG.
+    # The repo gets the WebP, never the PNG.
     settings.file_format, settings.color_mode, settings.quality = "WEBP", "RGBA", WEBP_QUALITY
     bpy.data.images["Render Result"].save_render(str(out_image), scene=scene)
     written = json.dumps(projection, indent=1) + "\n"
-    if season == "night":
-        OUT_PROJECTION.write_text(written, encoding="utf-8")
-    elif OUT_PROJECTION.read_text(encoding="utf-8") != written:
-        # The seasons are laid where the night is: another camera is not one.
-        print("the projection is not the night's: draw the night first", file=sys.stderr)
+    if OUT_PROJECTION.is_file() and OUT_PROJECTION.read_text(encoding="utf-8") != written:
+        # Every picture is laid where the map's points are: another camera is not one.
+        print("the projection is not mapdata/relief_projection.json's", file=sys.stderr)
         out_image.unlink()
         return 1
-    print(f"{season}: picture {projection['res'][0]} x {projection['res'][1]}  samples {samples}")
+    if not out_projection.is_file():
+        out_projection.write_text(written, encoding="utf-8")
+    print(f"{season}: picture {width_px} x {scene.render.resolution_y}  samples {samples}"
+          f"  projection {projection['res'][0]} x {projection['res'][1]}")
     print(f"seconds: scene {built - started:.1f}  render {drawn - built:.1f}  all {time.monotonic() - started:.1f}")
-    print(f"wrote {out_image.relative_to(REPO_DIR)} ({out_image.stat().st_size} bytes)"
-          + (f" and {OUT_PROJECTION.relative_to(REPO_DIR)}" if season == "night" else ""))
+    print(f"wrote {out_image} ({out_image.stat().st_size} bytes)")
     return 0
 
 

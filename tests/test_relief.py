@@ -63,8 +63,10 @@ def test_the_three_files_in_the_repo_read_fit_the_map_and_are_small():
     assert data["image"] == "/relief.webp" and data["res"] == [2400, 1823]
     assert len(data["px"]) == 4 and len(data["py"]) == 4 and data["z"]["m_per_unit"] > 0
     assert data["step"] == 10 and len(data["rows"]) >= 90 and len(data["rows"][0]) == 101
-    # Small enough for the repo: the picture under 1 MB, the grid and the projection a few dozen KB.
-    assert (relief.RELIEF_DIR / relief.IMAGE).stat().st_size < 400_000
+    # Small enough for the repo: the picture (直し53 段8: 4800 px across, twice
+    # the projection's 2400, so it is sharp near) under MAX_IMAGE_BYTES, the
+    # grid and the projection a few dozen KB.
+    assert (relief.RELIEF_DIR / relief.IMAGE).stat().st_size < 1_500_000 < relief.MAX_IMAGE_BYTES
     assert (relief.RELIEF_DIR / relief.HEIGHTS).stat().st_size < 100_000
     assert (relief.RELIEF_DIR / relief.PROJECTION).stat().st_size < 2_000
     # No raw heights and no large picture in the repo.
