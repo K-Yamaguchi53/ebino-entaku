@@ -71,7 +71,6 @@ python -m venv .venv
 | 研修・交流の報告スライド | 先輩が作った、台湾研修・マレーシア研修・他県の高校との合同の発表会の報告スライド5本 |
 | 外からえびのに来た大人の話 | 1年生のオリエンテーションで話した講演スライド1本（ご本人から受け取り、使う了解ももらった） |
 | 先生の話 | 作者（教員）が書いた記事1本 |
-| 期間中に返った答え | 試した1年生が選んだ質問カード1枚への、大人2人と作者の答え（答えた本人の了解つき） |
 | 書体 | BIZ UDPMincho と BIZ UDPGothic の標準・太字の4本（SIL Open Font License 1.1）。Google Fonts の公開リポジトリ（github.com/google/fonts の ofl/bizudpmincho・ofl/bizudpgothic）から取り、字を切り出さずに woff2 にして `ebino/static/fonts/` に同梱。ライセンスの文は同じ場所の `OFL.txt` |
 
 - 生徒の氏名・取材した生徒の名前・電話番号・番地は、モデルに渡す前にコードで外しています。外し忘れがないかは、最後に関所で確かめます。
@@ -92,6 +91,16 @@ python -m venv .venv
 - 絵の外の地を作る（`mapdata/relief.webp` から。Pillow が要ります）：`python tools/make_relief_blur.py`
 - 2本の台本には numpy と Pillow が要ります（Blender の中で流す方は、Blender に入っている numpy を使います）。アプリ本体は標準ライブラリだけです。
 - 題の書体は Shippori Mincho B1（SIL Open Font License 1.1）から、題に使う字だけを切り出して同梱しています（`ebino/static/title.woff`、ライセンスの文は `ebino/static/title.OFL.txt`）。
+
+## ライセンス
+
+- コード：MIT License（`LICENSE`）。
+- 同梱しているものは、それぞれのライセンスに従います。どれも上の出典の書き方のとおりで、ライセンスの文の置き場所は次のとおりです。
+  - 書体：BIZ UDPMincho・BIZ UDPGothic（`ebino/static/fonts/OFL.txt`）と Shippori Mincho B1（`ebino/static/title.OFL.txt`）。SIL Open Font License 1.1。
+  - 手描き風の線の rough.js：MIT License（`ebino/static/rough.LICENSE.txt`）。
+  - 地図のデータ（`mapdata/ebino_osm.json`）：ODbL 1.0（Open Database License）。**© OpenStreetMap contributors**。上の「地図」の節。
+  - 地形の絵と高さの網（`mapdata/` の `relief` で始まるファイル）：Copernicus DEM の条件。帰属の文は上の「地図」の節。
+- 取材記事・ポスター・スライドなどの実データは、このリポジトリに入っていません（上の「動くURLを出さない理由」と「外から持ち込んだデータ」）。
 
 ## 作る途中で変えたこと
 
