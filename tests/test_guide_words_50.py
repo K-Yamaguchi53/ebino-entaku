@@ -36,7 +36,8 @@ def test_no_room_by_it_a_free_place_else_no_sign():
     rest = draw[at:]
     assert "const room = guideRoom(spec, box);" in rest
     # None: hidden, and unlit so it does not blink as it comes back.
-    assert rest.index("guide.hidden = true;") < rest.index("return pointGuide(guide, room, box);")
+    # 直し52 段3: then its line to what it points at (reachGuide).
+    assert rest.index("guide.hidden = true;") < rest.index("pointGuide(guide, room, box);") < rest.index("return reachGuide(")
     assert 'guide.classList.remove("fresh");' in rest
     # The old place by it (which kept nothing clear) comes only after.
     assert draw.index("const place = spot ||") > at

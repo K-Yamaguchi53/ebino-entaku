@@ -163,6 +163,22 @@ async (page) => {
             return { up: true, state: guide.dataset.state, over: words.length, far: guide.classList.contains("far") };
           });
           if (g.over) bad.push(`guide over words ${g.over}`);
+          // 直し52 段3: 「吹き出しを1つ押してみよう」 over the AI's seat's frame
+          // ("guide over ai N"); the school lifted into the meeting over the
+          // table's ring, its seats and the bubbles ("school over N").
+          const t = await p.evaluate(() => {
+            const vis = (n) => n && n.getClientRects().length && getComputedStyle(n).visibility !== "hidden";
+            const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+            const guide = document.querySelector("#guide"), ai = document.querySelector("#ai-seat");
+            const overAi = vis(guide) && guide.dataset.state === "table" && vis(ai)
+              ? Number(hit(guide.getBoundingClientRect(), ai.getBoundingClientRect())) : 0;
+            const table = [...document.querySelectorAll(".table-rim-glow, #map-overlay .table-bubble:not(.unplaced), #map-overlay .seat-press")]
+              .filter(vis).map((n) => n.getBoundingClientRect());
+            const school = [...document.querySelectorAll(".risen-school .yard-building")].filter(vis).map((n) => n.getBoundingClientRect());
+            return { overAi, school: school.reduce((sum, s) => sum + table.filter((k) => hit(s, k)).length, 0) };
+          });
+          if (t.overAi) bad.push(`guide over ai ${t.overAi}`);
+          if (t.school) bad.push(`school over ${t.school}`);
           let guideNote = "";
           if (g.up && g.far) guideNote = " (guide far)";
           if (moment === "table_out" && !g.up) guideNote = " (no guide)";

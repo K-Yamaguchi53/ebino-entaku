@@ -1628,6 +1628,8 @@ body.one-open .input-area .ask { visibility: hidden; }
 .risen-shadow { fill: var(--shadow); filter: blur(6px); pointer-events: none; }
 .one-on .yard.lifted { visibility: visible; }
 .one-on .risen-school, .one-on .risen-shadow { visibility: hidden; }
+/* 直し52 段3: the plain building is not lifted into the meeting (map.js riseSchool). */
+.risen-school.plain, .risen-shadow.plain { display: none; }
 
 /* --- 帰る前に、ひとこと (直し38): the teacher's sample, in the night's colours.
    The page scrolls here. The listener (AI) speaks in its own blue card with
@@ -2102,6 +2104,12 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
 .guide.far::after { border-width: 6px; }
 .guide.far[data-side="above"]::after, .guide.far[data-side="below"]::after { left: calc(var(--point) - 6px); }
 .guide.far[data-side="right"]::after, .guide.far[data-side="left"]::after { top: calc(var(--point) - 6px); }
+/* 直し52 段3: and a line of its colour from it to what it points at, a dot there (app.js reachGuide). */
+.guide-reach { position: fixed; z-index: 44; height: 4px; border-radius: 2px; background: var(--lamp);
+  transform-origin: 0 50%; pointer-events: none; box-shadow: 0 2px 6px var(--shadow); }
+.guide-reach[hidden] { display: none; }
+.guide-reach::after { content: ""; position: absolute; right: -6px; top: -4px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--lamp); }
 /* The bubble's choices: the one to press lit itself, no bubble over the card. */
 .map-choices button.guide-here { outline: 3px solid var(--lamp); outline-offset: 2px; font-weight: 700;
   color: var(--lamp-bright); background: var(--lamp-faint); }
@@ -2129,7 +2137,7 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
   from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--lamp) 80%, transparent), 0 6px 18px var(--shadow); }
   to { box-shadow: 0 0 0 16px transparent, 0 6px 18px var(--shadow); }
 }
-@media print { .guide, .first-look { display: none !important; } }
+@media print { .guide, .guide-reach, .first-look { display: none !important; } }
 
 /* 直し42: the sign's one movement, the three dots in turn; with motion
    reduced they stand still. */

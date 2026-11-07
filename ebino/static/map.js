@@ -1149,8 +1149,10 @@ const EbinoMap = (() => {
   // once. wideStart: the camera at once a little wider than the whole (the
   // paper plane at the start flies over it). approach: from there to the basin and
   // the school, slowing as moveTo does; never so near that the seniors come
-  // out at their windows (that is the count's press). approachEnd: there at
-  // once (a press or a key).
+  // out at their windows (that is the count's press). approachEnd: the
+  // camera at the whole at once, as the cover and the window come up over it
+  // (the same frame), so all after the first look is as it was before 直し52
+  // (the AI's seat's corner is chosen at the whole map, 直し52 段3).
   const APPROACH_WIDE = 1.12, APPROACH_NEAR = 1.6;
   let approachTo = null;
 
@@ -1180,7 +1182,7 @@ const EbinoMap = (() => {
   }
 
   function approachEnd() {
-    if (approachTo) moveTo(approachTo, 0);
+    if (approachTo && view && view.whole) moveTo(view.whole, 0);
     approachTo = null;
     frame.classList.remove("coming-in");
   }
@@ -2585,11 +2587,17 @@ const EbinoMap = (() => {
   function riseSchool(center, motion) {
     const { x, y, k, model } = view.yard, pic = center.pic;
     const from = svg.querySelector(".yard");
-    const group = svgEl("g", { class: "risen-school", "aria-hidden": "true" });
+    // 直し52 段3: the plain building (no picture of the school) is not lifted
+    // into the meeting: its flat box lay over the lower half of the table,
+    // the seats and their bubbles, and looked unfinished in the 3D map. The
+    // school is then its name only, dimmed as the other places' names are
+    // (style.css); the picture of the school rises as before.
+    const plain = from.classList.contains("plain");
+    const group = svgEl("g", { class: plain ? "risen-school plain" : "risen-school", "aria-hidden": "true" });
     for (const node of from.children) if (!node.classList.contains("yard-landing")) group.append(node.cloneNode(true));
     group.setAttribute("transform", `translate(${pic.x} ${pic.y}) scale(${pic.k})`);
-    const shadow = svgEl("ellipse", { class: "risen-shadow", cx: pic.x + model.width * pic.k / 2, cy: pic.y + model.height * pic.k * 0.97,
-      rx: model.width * pic.k * 0.5, ry: model.height * pic.k * 0.09 });
+    const shadow = svgEl("ellipse", { class: plain ? "risen-shadow plain" : "risen-shadow", cx: pic.x + model.width * pic.k / 2,
+      cy: pic.y + model.height * pic.k * 0.97, rx: model.width * pic.k * 0.5, ry: model.height * pic.k * 0.09 });
     from.classList.add("lifted");
     let done = Promise.resolve();
     if (motion) {

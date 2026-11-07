@@ -47,3 +47,5 @@ def test_the_camera_wider_then_to_the_school_never_where_the_seniors_come_out():
     assert "view.seniorStep / (2 * SCHOOL_R_PX) * (frame.clientWidth || 1) * 1.25" in approach
     assert "return moveTo(approachTo, reduced() ? 0 : ms);" in approach
     assert "wideStart, approach, approachEnd };" in MAP
+    # Under the cover, the camera back at the whole: after the first look, all as before.
+    assert "if (approachTo && view && view.whole) moveTo(view.whole, 0);" in MAP

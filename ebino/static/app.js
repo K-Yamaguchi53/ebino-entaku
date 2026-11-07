@@ -971,8 +971,10 @@ const GUIDE = {
   one: { at: () => document.querySelector(".one-asks .one-ask:not(.one-finish)"), lit: true },
   // 直し48 (the screen check): never over the AI's questions (their robots, names, bubbles).
   // 直し50 段2: never over the people's words either (voices).
+  // 直し52 段3 (ヒビキ, 1366×650: its left end over the AI's seat's blue frame): the frame kept clear too.
   table: { at: () => document.querySelector("#map-overlay .table-bubble:not(.unplaced)"), voices: peopleVoices,
-    clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line")], sides: ["above", "below", "right", "left"] },
+    clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line"), $("ai-seat")],
+    sides: ["above", "below", "right", "left"] },
   pressed: { at: () => document.querySelector('.map-choices button[data-choice="card"]'), lit: true },
   // 直し46: never over the AI's seat's heading (「AI（町の人ではありません）」)
   // nor its note (「この問いは、AI が作りました。…」), nor over the AI's
@@ -1025,6 +1027,7 @@ function drawGuide() {
   const guide = $("guide"), words = state.texts && state.texts.guide;
   const now = guideState();
   const spec = GUIDE[now];
+  guideReach().hidden = true;  // 直し52 段3: drawn again below when the bubble is away from what it points at.
   // 直し52 段1: nothing while the camera comes in before the first look.
   const target = spec && !state.approaching && shown(spec.at());
   const lit = spec && spec.lit ? target : null;
@@ -1077,7 +1080,10 @@ function drawGuide() {
       return;
     }
     guide.classList.add("narrow", "far");
-    return pointGuide(guide, room, box);
+    pointGuide(guide, room, box);
+    // 直し52 段3: its point reaches what it points at (the AI's seat: its frame).
+    const frame = target.closest && target.closest("#ai-seat");
+    return reachGuide(room, frame ? frame.getBoundingClientRect() : box);
   }
   const place = spot || (() => {
     guide.classList.remove("narrow");
@@ -1087,6 +1093,33 @@ function drawGuide() {
       left: clamp(box.left + box.width / 2 - w / 2, edge, vw - w - edge) };
   })();
   pointGuide(guide, place, box);
+}
+
+// 直し52 段3 (ヒビキ, 1366×650: 「コーチとオブザーバーの問いはここ」 far from
+// the frame, its point short, and which it meant hard to tell): the bubble
+// away from what it points at, a line of its colour from its edge to the
+// nearest of what it points at, a dot there. Never pressed, never read out.
+function guideReach() {
+  let reach = $("guide-reach");
+  if (!reach) {
+    reach = el("div", { id: "guide-reach", class: "guide-reach", "aria-hidden": "true" });
+    reach.hidden = true;
+    document.body.append(reach);
+  }
+  return reach;
+}
+
+function reachGuide(place, to) {
+  const reach = guideReach();
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const mx = place.left + place.w / 2, my = place.top + place.h / 2;
+  const ex = clamp(mx, to.left + 12, to.right - 12), ey = clamp(my, to.top, to.bottom);
+  const sx = clamp(ex, place.left + 12, place.left + place.w - 12), sy = clamp(ey, place.top, place.top + place.h);
+  const length = Math.hypot(ex - sx, ey - sy);
+  if (length < 24) return;
+  Object.assign(reach.style, { left: `${Math.round(sx)}px`, top: `${Math.round(sy) - 2}px`, width: `${Math.round(length)}px`,
+    transform: `rotate(${Math.atan2(ey - sy, ex - sx)}rad)` });
+  reach.hidden = false;
 }
 
 // The bubble at place { side, left, top, w, h }, its point at box.
