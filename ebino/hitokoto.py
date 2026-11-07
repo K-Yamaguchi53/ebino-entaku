@@ -321,6 +321,9 @@ class Hitokoto:
     # ({"kind", "a", "b"}: people's indexes), or None; asked once.
     tie: dict | None = None
     tie_asked: dict = field(default_factory=dict)  # {"reason", "seconds"} once asked.
+    # 直し50 段3: each two people on the map who stood on the two sides of
+    # one of the day's splits ([i, j], people's indexes, i < j).
+    parted: list[list[int]] = field(default_factory=list)
     # 直し49 段1: 今日の気づき, a NOTICE_ANSWERS key ("" not asked), and the
     # line written after 「あった」 or 「ちょっとあった」 ("" none).
     notice: str = ""
@@ -480,6 +483,23 @@ def find_split(session, people: list[Person], sheet_heading) -> dict | None:
     return None
 
 
+def parted_pairs(session, people: list[Person]) -> list[list[int]]:
+    """直し50 段3: every two people on the map who stood on the two sides of
+    one of the day's splits (as recorded: each side's quotes on screen), as
+    [i, j] (people's indexes, i < j)."""
+    shown = {q.utterance_id: q.seat_id for r in session.rounds for q in r.quotes}
+    at: dict[str, list[int]] = {}
+    for i, person in enumerate(people):
+        at.setdefault(person.seat_id, []).append(i)
+    pairs = set()
+    for result in session.rounds:
+        for split in result.splits:
+            a = {i for uid in split.side_a if uid in shown for i in at.get(shown[uid], [])}
+            b = {i for uid in split.side_b if uid in shown for i in at.get(shown[uid], [])}
+            pairs |= {(min(i, j), max(i, j)) for i in a for j in b if i != j}
+    return [list(pair) for pair in sorted(pairs)]
+
+
 def place(people: list[Person], split: dict | None) -> list[Person]:
     """The sample's places: the split's two at the first two, the dashed line between."""
     order = list(range(len(people)))
@@ -515,6 +535,7 @@ def begin(session, opened: list[str], sheet_heading, start: tuple[str, str] | No
     if start and talk.people and talk.people[0].why == WHY_TRAIL:
         talk.start = 0
     talk.split = find_split(session, talk.people, sheet_heading)
+    talk.parted = parted_pairs(session, talk.people)
     place(talk.people, talk.split)
     on_map = {p.seat_id for p in talk.people}
     met = [s for s in dict.fromkeys([*session.met_seats(), *session._one_seats()]) if s not in on_map]
@@ -908,6 +929,7 @@ def split_view(talk: Hitokoto) -> dict | None:
 
 
 TIE_KINDS = ("same", "differ")
+SAME_ON_SPLIT = "same_on_split"  # 直し50 段3: the reason kept when 「同じ向き」 was held back.
 TIE_SCHEMA = {
     "type": "object",
     "properties": {"kind": {"type": "string", "enum": ["same", "differ", "none"]}, "a": {"type": "string"},
@@ -936,6 +958,11 @@ def ask_tie(gate: Gate, talk: Hitokoto) -> None:
             reason = "none"
         elif kind not in TIE_KINDS or a not in ids or b not in ids or a == b:
             reason = "bad_output"
+        elif kind == "same" and sorted((int(a) - 1, int(b) - 1)) in talk.parted:
+            # 直し50 段3: 「同じ向き」 for two who parted on a split of the day
+            # (割れていたところ, just under it on the sheet) says both: shown
+            # as none. 「分かれている」 goes on as it is.
+            reason = SAME_ON_SPLIT
         else:
             talk.tie = {"kind": kind, "a": int(a) - 1, "b": int(b) - 1}
     talk.tie_asked = {"reason": reason, "seconds": seconds}
