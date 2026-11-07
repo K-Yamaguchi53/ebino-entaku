@@ -219,6 +219,11 @@ _MASK_WORDS = [
     (re.compile("この方先生"), "この先生"),
     # Only before a noun: 「この職場」というのは stays.
     (re.compile(f"「?この職場」という(?=[{_KANJI}ァ-ヶ])"), ""),
+    # 直し54i: a name masked with nothing after it before the next word (the
+    # teacher, 11/8): 協力者：この方農園 (the family's farm) → この方の農園,
+    # この方小学校四年 (a slide's self-introduction) → この方、小学校四年.
+    (re.compile("この方(?=農園|農場|牧場|商店|工房|食堂)"), "この方の"),
+    (re.compile(f"この方(?=[{_KANJI}ァ-ヶ])(?!自身|以外|以上|達|曰|様|宅|家|側|の)"), "この方、"),
 ]
 
 

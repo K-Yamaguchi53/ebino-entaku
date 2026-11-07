@@ -15,6 +15,7 @@ Which items a seat's words have:
 
 import re
 import unicodedata
+from dataclasses import replace
 
 # 種類 in ask_questions.txt.
 GROUP_ARTICLE = "記事"
@@ -355,8 +356,57 @@ def hide_problems(rows: list[dict], seats: set, items: set) -> list[str]:
     return out
 
 
+# 直し54i (the teacher, 11/8: わからないところは消せばいいのでは？): words the
+# teacher takes out of a seat's pieces, as they read in the list: a slide's
+# scraps (逆さの英語), a broken word. Found with spaces and line breaks
+# ignored; taken out of what is shown (one to one and the round table), never
+# out of what was ingested. A piece left with nothing is not shown.
+CUT_FILE = "ask_cut.tsv"
+CUT_COLUMNS = ("席", "消す言葉")
+
+
+def load_cuts(folder) -> tuple[list[dict], str]:
+    """(the rows, "" or the table not read)."""
+    rows, problem = read_rows(folder / CUT_FILE, CUT_COLUMNS)
+    return [row for row in rows or [] if row[CUT_COLUMNS[1]].strip()], problem
+
+
+def _either_width(c: str) -> str:
+    """c, and its full-width form when it is a half-width letter, digit or mark."""
+    if "!" <= c <= "~":
+        return f"[{re.escape(c)}{re.escape(chr(ord(c) + 0xFEE0))}]"
+    return re.escape(c)
+
+
+def _loose(words: str) -> re.Pattern:
+    chars = [_either_width(c) for c in unicodedata.normalize("NFKC", words) if not c.isspace()]
+    return re.compile(r"\s*".join(chars))
+
+
+def apply_cuts(utterances: list, rows: list[dict]) -> tuple[list, list[str]]:
+    """(the pieces with the rows' words taken out, the rows that take out
+    nothing). Each problem names the line and the seat, never the words."""
+    out, problems = list(utterances), []
+    for row in rows:
+        seat, words = _key(CUT_COLUMNS, row)[0], row[CUT_COLUMNS[1]].strip()
+        pattern, found = _loose(words), False
+        for n, piece in enumerate(out):
+            if piece.seat_id != seat:
+                continue
+            text = pattern.sub("", piece.text)
+            if text != piece.text:
+                found = True
+                out[n] = replace(piece, text=text.strip(), paragraph=pattern.sub("", piece.paragraph).strip())
+        if not found:
+            where = seat if any(u.seat_id == seat for u in utterances) else "席ID?"
+            problems.append(f"{CUT_FILE} {row[LINE]}行目（{where}）：この言葉が、この席の言葉に見つからない")
+    kept = [piece for piece in out if piece.text.strip(" 　\n。、・")]
+    return kept, problems
+
+
 # 直し54c: said at the server's start under a table not read (app.py).
 UNREAD_HINT = {
+    CUT_FILE: "→ この表が読めないので、消すはずの言葉も出ます。",
     PAGES_FILE: "→ この表が読めないので、県外・海外と外から来た人の席の1対1の質問は、ひとつも出ません。",
     RANKING_FILE: "→ この表が読めないので、ランキングの質問は出ません。",
     HIDE_FILE: "→ この表が読めないので、止めたはずの質問も出ます。",

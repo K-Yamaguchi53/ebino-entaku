@@ -68,6 +68,10 @@ def write(folder: Path, listed: list[list[str]]) -> bool:
         writer = csv.writer(out)
         writer.writerow(COLUMNS)
         writer.writerows(listed)
+    # 直し54i: the table of words to take out, its header when it is not there.
+    cut = folder / one_to_one.CUT_FILE
+    if not cut.exists():
+        cut.write_text("\t".join(one_to_one.CUT_COLUMNS) + "\n", encoding="utf-8")
     hide = folder / one_to_one.HIDE_FILE
     if hide.exists():
         return False
@@ -92,6 +96,7 @@ def main() -> int:
           f"出る言葉がない {sum(row[7] == NOTHING for row in listed)}）")
     print(f"書いた：データの {INGESTED_DIR} フォルダの {LIST_FILE}")
     print(f"止める表：同じフォルダの {one_to_one.HIDE_FILE}" + ("（見出しだけ作った）" if made else ""))
+    print(f"消す言葉の表：同じフォルダの {one_to_one.CUT_FILE}（席・消す言葉。一覧の言葉を写す）")
     return 0
 
 

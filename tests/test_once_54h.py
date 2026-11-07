@@ -41,7 +41,7 @@ def test_what_reads_badly_is_mended(text, want):
     "この職場の社長は、",
     "「この職場」というのは、",          # Not before a noun.
     "「この職場」とは、地域の会社だ。",
-    "この方農園で手伝った。",            # A name run into a word: its meaning is not known.
+    # A name run into the next word (この方農園) gets a break since 直し54i: test_once_54i.
     "ママと話した。",                    # Kana twice, but not a reading.
     "イイ ネ と言われた。",              # Fewer than three pairs.
     "（例）を見る。",

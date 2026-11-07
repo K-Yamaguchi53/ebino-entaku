@@ -451,6 +451,12 @@ def main(argv=None) -> int:
         print(f"1対1 ask_hide.tsv：止めた質問 {library.ask_tables['hide_rows']}・効かない行 {len(problems)}")
         for problem in problems:
             print(f"  {problem}")
+    # 直し54i: the words the teacher takes out (ask_cut.tsv), and its rows that take out nothing.
+    if library.ask_tables.get("cut_rows"):
+        problems = library.ask_tables.get("cut_problems", [])
+        print(f"ask_cut.tsv：消す言葉 {library.ask_tables['cut_rows']}・見つからない行 {len(problems)}")
+        for problem in problems:
+            print(f"  {problem}")
     print(f"open http://{HOST}:{server.server_address[1]}/  (Ctrl+C to stop)")
     try:
         server.serve_forever()

@@ -160,7 +160,10 @@ class Library:
              relief_dir: Path | None = None) -> "Library":
         seats = load_seats(data_dir / "seats.tsv")
         map_data = seat_map.load_map(map_file)
-        library = cls.build(seats, load_utterances(data_dir), load_topics(data_dir), show_private,
+        # 直し54i: the words the teacher takes out (ask_cut.tsv), before anything is built from them.
+        cut_rows, cut_unread = one_to_one.load_cuts(data_dir / INGESTED_DIR)
+        utterances, cut_problems = one_to_one.apply_cuts(load_utterances(data_dir), cut_rows)
+        library = cls.build(seats, utterances, load_topics(data_dir), show_private,
                          talk_kinds.load_saved(data_dir), purpose_summary.load_saved(data_dir),
                          load_names(data_dir, seats), subjects.load_catalog(data_dir),
                          coach.load_coach(data_dir, {seat.seat_id for seat in seats}),
@@ -180,6 +183,8 @@ class Library:
         library.ask_tables["hide_rows"] = len(rows)
         library.ask_tables["hide_problems"] = one_to_one.hide_problems(
             rows, {seat.seat_id for seat in library.all_seats}, items)
+        library.ask_tables["unread"].extend([cut_unread] if cut_unread else [])
+        library.ask_tables["cut_rows"], library.ask_tables["cut_problems"] = len(cut_rows), cut_problems
         return library
 
     def seat_view(self, seat: Seat) -> dict:
