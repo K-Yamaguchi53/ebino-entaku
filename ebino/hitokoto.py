@@ -116,11 +116,11 @@ NO_PEOPLE = "no_people"
 NOTHING_WRITTEN = "nothing_written"
 
 # The stages, in order.
-MAP, TALK, LADDER_TWO, LADDER_THREE, FILL, SCALE, FORWARD, NOTICE, WAY, SUBJECT, SUBJECT_NOTE, MEET, USE, END, \
-    LIT, SHEET = ("map", "talk", "ladder_two", "ladder_three", "fill", "scale", "forward", "notice", "way",
-                  "subject", "subject_note", "meet", "use", "end", "lit", "sheet")
-TALKING = (MAP, TALK, LADDER_TWO, LADDER_THREE, FILL, SCALE, FORWARD, NOTICE, WAY, SUBJECT, SUBJECT_NOTE, MEET, USE,
-           END)
+MAP, TALK, LADDER_TWO, LADDER_THREE, FILL, SCALE, FORWARD, NOTICE, WAY, SUBJECT, SUBJECT_NOTE, TRY, MEET, USE, \
+    END, LIT, SHEET = ("map", "talk", "ladder_two", "ladder_three", "fill", "scale", "forward", "notice", "way",
+                       "subject", "subject_note", "try", "meet", "use", "end", "lit", "sheet")
+TALKING = (MAP, TALK, LADDER_TWO, LADDER_THREE, FILL, SCALE, FORWARD, NOTICE, WAY, SUBJECT, SUBJECT_NOTE, TRY, MEET,
+           USE, END)
 SUBJECT_ANSWERS = ("yes", "no", "unsure")  # あった・なかった・わからない
 # 直し49 段1 (the teacher, 11/7: 「気づきがある、または行動などのきっかけが作れれば
 # 良い」): 今日の気づき, asked after the scale (and its next question) and
@@ -130,6 +130,13 @@ SUBJECT_ANSWERS = ("yes", "no", "unsure")  # あった・なかった・わか�
 # model is sent it or writes about it (not in written, so not the light's).
 NOTICE_ANSWERS = ("yes", "some", "not_yet", "no_answer")  # あった・ちょっとあった・まだない・答えない
 NOTICE_WRITE = ("yes", "some")
+# 直し49 段2: 「次に会うなら」 widened to 次にやってみること. Before the seat to
+# meet, four to pick: 会って聞いてみる goes on to the seat (and ② after it, as
+# before); 自分で調べてみる and 試してみる open a line (optional), no seat;
+# まだ決めない goes on. The line is the student's own, as 今日の気づき's.
+TRY_ANSWERS = ("meet", "look", "try", "later")  # 会って聞いてみる・自分で調べてみる・試してみる・まだ決めない
+TRY_WRITE = ("look", "try")
+TRY_MEET = "meet"
 
 TEXTS = "hitokoto"
 FORCE_TEXTS = "hitokoto_forces"
@@ -152,6 +159,8 @@ TEXT_IDS = (
     "sheet_tie", "tie_same", "tie_differ",
     # 直し49 段1.
     "notice_q", "notice_yes", "notice_some", "notice_not_yet", "notice_no_answer", "notice_hint", "sheet_notice",
+    # 直し49 段2.
+    "try_q", "try_meet", "try_look", "try_try", "try_later", "try_hint",
 )
 FILL_BLANK = "［　　］"  # In ladder_fill_line: where the student writes.
 
@@ -316,6 +325,10 @@ class Hitokoto:
     # line written after 「あった」 or 「ちょっとあった」 ("" none).
     notice: str = ""
     notice_text: str = ""
+    # 直し49 段2: 次にやってみること, a TRY_ANSWERS key ("" not asked), and the
+    # line written after 調べる or 試す ("" none).
+    next_try: str = ""
+    next_try_text: str = ""
 
     # --- what the screen gets ---
 
@@ -362,6 +375,8 @@ class Hitokoto:
             "tie_asked": dict(self.tie_asked),
             # 直し49 段1: the answer picked and the student's line, as written.
             "notice": {"answer": self.notice, "text": self.notice_text},
+            # 直し49 段2: what to try next, and the student's line, as written.
+            "next_try": {"answer": self.next_try, "text": self.next_try_text},
         }
 
 
@@ -939,11 +954,27 @@ def notice_view(talk: Hitokoto) -> str:
     return talk.notice_text if talk.notice in NOTICE_WRITE else ""
 
 
+def try_view(talk: Hitokoto, meet: str = "") -> dict | None:
+    """直し49 段2: 次にやってみること on the sheet: what was picked (texts/),
+    the student's line as written (調べる・試す), or the seat to meet and the
+    force to use (会って聞いてみる, as the card says it). None when まだ決めない
+    or not asked: no box."""
+    if talk.next_try not in (TRY_MEET, *TRY_WRITE):
+        return None
+    return {"answer": talk.next_try, "label": words()[f"try_{talk.next_try}"],
+            "text": talk.next_try_text if talk.next_try in TRY_WRITE else "",
+            "meet": meet if talk.next_try == TRY_MEET else ""}
+
+
 def sheet_view(talk: Hitokoto, meet: str = "") -> dict:
     light = talk.light
     now = talk.now_question if talk.now_question and talk.now_question != talk.first_question else ""
+    trying = try_view(talk, meet)
     return {"first_question": talk.first_question, "now_question": now, "story": story(talk),
-            "light": {"quote": light.quote, "why": light.why} if light else None, "next_step": next_step(talk),
+            "light": {"quote": light.quote, "why": light.why} if light else None,
+            # 直し49 段2: 次の一歩になりそうなこと only with no 次にやってみること
+            # (one next step on the sheet, not two; its words are in 自分の言葉の動き).
+            "next_step": "" if trying else next_step(talk), "next_try": trying,
             # 直し45 段5: the steps marked on the trail, with the student's line.
             "marks": [{"label": m["label"], "text": m["text"], "note": m["note"]} for m in talk.marks],
             # 直し48 段4.

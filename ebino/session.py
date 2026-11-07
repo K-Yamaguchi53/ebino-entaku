@@ -1416,7 +1416,7 @@ class Session:
         if answer not in hitokoto.SUBJECT_ANSWERS:
             raise Refused("unknown_answer")
         talk.subject = answer
-        talk.stage = hitokoto.SUBJECT_NOTE if answer == "yes" else hitokoto.MEET
+        talk.stage = hitokoto.SUBJECT_NOTE if answer == "yes" else hitokoto.TRY
         self.save()
         return {"next": talk.stage}
 
@@ -1433,15 +1433,15 @@ class Session:
                                             self._shown_subjects())
         for shown in talk.subject_pick.on_screen():
             self._count_shown_subject(shown)
-        talk.stage = hitokoto.MEET
+        talk.stage = hitokoto.TRY
         self.save()
-        return {"next": "meet", "subject": self._talk_subject(talk)}
+        return {"next": "try", "subject": self._talk_subject(talk)}
 
     def _talk_subject(self, talk: hitokoto.Hitokoto) -> dict | None:
         return subjects.view(self.library.subject_catalog, talk.subject_pick, talk.first_question)
 
     def hitokoto_subject_choose(self, choice) -> dict:
-        talk = self._talk(hitokoto.MEET, hitokoto.USE, hitokoto.END)
+        talk = self._talk(hitokoto.TRY, hitokoto.MEET, hitokoto.USE, hitokoto.END)
         pick = talk.subject_pick
         if pick is None or pick.status != subjects.STATUS_CHOOSE or pick.chosen:
             raise Refused("not_choosing")
@@ -1453,7 +1453,7 @@ class Session:
         return {"subject": self._talk_subject(talk)}
 
     def hitokoto_subject_more(self) -> dict:
-        talk = self._talk(hitokoto.MEET, hitokoto.USE, hitokoto.END)
+        talk = self._talk(hitokoto.TRY, hitokoto.MEET, hitokoto.USE, hitokoto.END)
         pick = talk.subject_pick
         if pick is None or len(pick.order) < 2 or pick.two_shown:
             raise Refused("no_other_subject")
@@ -1462,6 +1462,27 @@ class Session:
         self._count_shown_subject(pick.shown())
         self.save()
         return {"subject": self._talk_subject(talk)}
+
+    def hitokoto_try(self, answer, text="", skip: bool = False) -> dict:
+        """直し49 段2: 「このあと、やってみたいことは？」, one of four. 会って聞いて
+        みる: on to the seat to meet (and ② after it); 自分で調べてみる・試して
+        みる: a line, optional (a name in it: asked again, nothing kept), no
+        seat; まだ決めない: on. The line is sent to no model."""
+        talk = self._talk(hitokoto.TRY)
+        if answer not in hitokoto.TRY_ANSWERS:
+            raise Refused("unknown_answer")
+        line = ""
+        if answer in hitokoto.TRY_WRITE and not skip:
+            line = _line(text, hitokoto.MAX_LINE, "", required=False)
+            named = self._named(line)
+            if named:
+                return named
+            if hitokoto.is_blank(line):
+                line = ""
+        talk.next_try, talk.next_try_text = answer, line
+        talk.stage = hitokoto.MEET if answer == hitokoto.TRY_MEET else hitokoto.END
+        self.save()
+        return {"next": talk.stage}
 
     def hitokoto_meet(self, seat_id) -> dict:
         """The seat to hear more from (texts/meet_question.txt), or none. A

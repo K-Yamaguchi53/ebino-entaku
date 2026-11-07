@@ -37,10 +37,11 @@ async (page) => {
   const MOMENTS = ["intro", "before_question", "school_zoom", "table_out", "bubble_pressed", "one_coach", "one_asks", "one_to_one",
     "ai_hint", "answering_ai"];
   // 直し49 段1: hk_notice, 今日の気づき with 「あった」 pressed and a line written.
-  const HK_MOMENTS = ["hk_map", "hk_talk", "hk_ladder", "hk_scale", "hk_notice", "hk_keep", "hk_light", "hk_sheet"];
+  // 直し49 段2: hk_try, 次にやってみること with 試してみる pressed and a line written.
+  const HK_MOMENTS = ["hk_map", "hk_talk", "hk_ladder", "hk_scale", "hk_notice", "hk_try", "hk_keep", "hk_light", "hk_sheet"];
   // The button that goes on, at each moment.
   const HK_NEXT = { hk_map: "#hk-go", hk_talk: "#hk-input button[type=submit]", hk_ladder: ".hk-options .hk-quote, .hk-picks .hk-pick, .hk-fill .hk-primary",
-    hk_scale: ".hk-scale button", hk_notice: ".hk-notice-line .hk-primary", hk_keep: "#hk-to-light", hk_light: "#hk-to-sheet", hk_sheet: "#hk-print" };
+    hk_scale: ".hk-scale button", hk_notice: ".hk-notice-line .hk-primary", hk_try: ".hk-try-line .hk-primary", hk_keep: "#hk-to-light", hk_light: "#hk-to-sheet", hk_sheet: "#hk-print" };
   const browser = page.context().browser();
   const table = {};
   const measure = (p) => p.evaluate(() => {
@@ -341,8 +342,12 @@ async (page) => {
     await p.waitForFunction(() => [...document.querySelectorAll("#hk-log .hk-card.teacher form .quiet")].some((b) => !b.disabled));
     await p.locator("#hk-log .hk-card.teacher form .quiet:not([disabled])").last().click();  // いまはない
     await p.locator("#hk-log .hk-picks button:not([disabled])").nth(1).click();  // なかった
-    await p.waitForSelector(".hk-meet select");
-    await p.locator(".hk-meet .quiet").click();  // 選ばない
+    // 直し49 段2: 次にやってみること, 試してみる and a line.
+    await p.waitForSelector(".hk-try .hk-pick:not([disabled])");
+    await p.locator('.hk-try .hk-pick[data-answer="try"]').click();
+    await p.fill(".hk-try-line input", "雨の日の畑を、一回見に行ってみる");
+    if (moment === "hk_try") return;
+    await p.locator(".hk-try-line .hk-primary").click();
     // 段4 over: the main button goes on to the light (直し40-0).
     await p.waitForFunction(() => document.activeElement && document.activeElement.id === "hk-to-light");
     if (moment === "hk_keep") return;

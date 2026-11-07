@@ -16,7 +16,7 @@ from ebino.texts import NAME_IN_QUESTION, load_text
 from test_hitokoto import sitting, to_scale
 
 HK = (app_module.STATIC_DIR / "hitokoto.js").read_text(encoding="utf-8")
-ASK = HK[HK.index("  function askNotice() {"):HK.index("  // --- 段4: what to keep")]
+ASK = HK[HK.index("  function choiceWithLine("):HK.index("  // --- 段4: what to keep")]
 WORDS = hitokoto.words()
 
 
@@ -31,7 +31,7 @@ def to_notice(session, scale=8):
 def to_sheet(session):
     session.hitokoto_way("", skip=True)
     session.hitokoto_subject("no")
-    session.hitokoto_meet("")
+    session.hitokoto_try("later")
     session.hitokoto_light()
     return session.hitokoto_sheet("")
 
@@ -40,9 +40,10 @@ def test_four_answers_to_pick_and_dont_answer_is_one_of_them():
     assert hitokoto.NOTICE_ANSWERS == ("yes", "some", "not_yet", "no_answer")
     assert [WORDS[f"notice_{key}"] for key in hitokoto.NOTICE_ANSWERS] == ["あった", "ちょっとあった", "まだない", "答えない"]
     assert WORDS["notice_q"] == "今日、気づいたことや、はじめて知ったことはあった？"
-    assert ('const answers = [["yes", W.notice_yes], ["some", W.notice_some], ["not_yet", W.notice_not_yet], '
-            '["no_answer", W.notice_no_answer]];') in ASK
-    assert 'say("teacher", W.notice_q, box);' in ASK
+    assert ('answers: [["yes", W.notice_yes], ["some", W.notice_some], ["not_yet", W.notice_not_yet], '
+            '["no_answer", W.notice_no_answer]],') in ASK
+    assert 'step: "notice", question: W.notice_q, hint: W.notice_hint, write: ["yes", "some"],' in ASK
+    assert 'say("teacher", question, box);' in ASK
 
 
 @pytest.mark.parametrize("scale", [0, 8, 10, 13])
@@ -72,7 +73,7 @@ def test_an_answer_not_of_the_four_is_refused():
 def test_the_line_is_only_for_there_was_and_a_little():
     # The screen: the line is hidden until 「あった」 or 「ちょっとあった」; the others go on at once.
     assert "form.hidden = true;" in ASK
-    assert 'if (key === "yes" || key === "some") {' in ASK and "form.hidden = false;" in ASK
+    assert "if (write.includes(key)) {" in ASK and "form.hidden = false;" in ASK
     assert 'go(key, label, pick, "");' in ASK
     # The server: a line sent with the others is not kept.
     for answer in ("not_yet", "no_answer"):
@@ -90,7 +91,7 @@ def test_the_line_is_only_for_there_was_and_a_little():
 def test_the_line_has_no_example_in_it_and_says_it_may_be_left_empty():
     assert "placeholder" not in ASK  # An example is copied.
     assert WORDS["notice_hint"] == "1行でいい。書かなくても進めます"
-    assert 'const hint = el("p", "hk-notice-hint", W.notice_hint);' in ASK
+    assert 'const hint = el("p", "hk-choice-hint", hintText);' in ASK
     assert 'input.setAttribute("aria-describedby", hint.id);' in ASK
     assert 'const pass = button("quiet", W.skip,' in ASK
 

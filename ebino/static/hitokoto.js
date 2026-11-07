@@ -660,36 +660,36 @@ const EbinoHitokoto = (() => {
     return form;
   }
 
-  // --- 直し49 段1: 今日の気づき ---
+  // --- 直し49 段1・段2: 今日の気づき, 次にやってみること ---
 
-  // (the teacher, 11/7: 「気づきがある、または行動などのきっかけが作れれば良い」)
-  // Four to pick, 「答えない」 always there. 「あった」 or 「ちょっとあった」
-  // opens one line under them, optional, with no example in it (an example
-  // is copied) and the line of how little is enough; the others go on at
-  // once. The line is the student's own, set as text, sent to no model;
-  // 送る with it empty goes on as とばす does.
-  function askNotice() {
+  // A question with answers to pick (the last always one that goes on with
+  // nothing: 「答えない」, 「まだ決めない」). The answers in write open one
+  // line under them, optional, with no example in it (an example is
+  // copied) and the line of how little is enough; the others go on at once.
+  // The line is the student's own, set as text, sent to no model; 送る with
+  // it empty goes on as とばす does. after(key): what comes next.
+  function choiceWithLine({ step, question, answers, write, hint: hintText }, after) {
     clearInput();
-    const box = el("div", "hk-notice");
+    const box = el("div", `hk-${step}`);
     const picks = el("div", "hk-picks");
-    const form = el("form", "hk-answer hk-notice-line");
+    const form = el("form", `hk-answer hk-${step}-line hk-choice-line`);
     form.hidden = true;
-    const hint = el("p", "hk-notice-hint", W.notice_hint);
-    hint.id = "hk-notice-hint";
+    const hint = el("p", "hk-choice-hint", hintText);
+    hint.id = `hk-${step}-hint`;
     const input = el("input");
     Object.assign(input, { type: "text", maxLength: 120, autocomplete: "off" });
-    input.setAttribute("aria-label", W.notice_q);
+    input.setAttribute("aria-label", question);
     input.setAttribute("aria-describedby", hint.id);
     const ok = el("button", "hk-primary", W.send);
     ok.type = "submit";
-    let open = null;  // [key, label, node]: 「あった」 or 「ちょっとあった」 pressed.
+    let open = null;  // [key, label, node]: an answer with a line, pressed.
     const go = async (key, label, node, text) => {
       if (busy) return;
       busy = true;
       lock(box, node);
       let result;
       try {
-        result = await post("notice", text ? { answer: key, text } : { answer: key, skip: true });
+        result = await post(step, text ? { answer: key, text } : { answer: key, skip: true });
       } catch (error) {
         busy = false;
         unlock(box);
@@ -704,15 +704,14 @@ const EbinoHitokoto = (() => {
         return message(result.message);
       }
       say("me", label, text ? el("p", "hk-q hk-me-line", text) : null);
-      askWay();
+      after(key);
     };
     const pass = button("quiet", W.skip, () => { if (open) go(open[0], open[1], open[2], ""); });
     form.append(hint, input, ok, pass);
-    const answers = [["yes", W.notice_yes], ["some", W.notice_some], ["not_yet", W.notice_not_yet], ["no_answer", W.notice_no_answer]];
     for (const [key, label] of answers) {
       const pick = button("hk-pick", label, () => {
         if (busy) return;
-        if (key === "yes" || key === "some") {
+        if (write.includes(key)) {
           open = [key, label, pick];
           for (const other of picks.querySelectorAll(".hk-pick[aria-pressed]")) other.setAttribute("aria-pressed", String(other === pick));
           form.hidden = false;
@@ -723,7 +722,7 @@ const EbinoHitokoto = (() => {
         }
       });
       pick.dataset.answer = key;
-      if (key === "yes" || key === "some") pick.setAttribute("aria-pressed", "false");
+      if (write.includes(key)) pick.setAttribute("aria-pressed", "false");
       picks.append(pick);
     }
     form.addEventListener("submit", (event) => {
@@ -731,8 +730,27 @@ const EbinoHitokoto = (() => {
       if (open) go(open[0], open[1], open[2], input.value.trim());
     });
     box.append(picks, form);
-    say("teacher", W.notice_q, box);
+    say("teacher", question, box);
     picks.querySelector("button").focus({ preventScroll: true });
+  }
+
+  // 直し49 段1 (the teacher, 11/7: 「気づきがある、または行動などのきっかけが作
+  // れれば良い」): 今日の気づき, after the scale; 「答えない」 always there.
+  function askNotice() {
+    choiceWithLine({
+      step: "notice", question: W.notice_q, hint: W.notice_hint, write: ["yes", "some"],
+      answers: [["yes", W.notice_yes], ["some", W.notice_some], ["not_yet", W.notice_not_yet], ["no_answer", W.notice_no_answer]],
+    }, () => askWay());
+  }
+
+  // 直し49 段2: 次にやってみること, before the seat to meet. 会って聞いてみる:
+  // the seat (and ② after it), as before; 調べる・試す: a line, no seat;
+  // まだ決めない: on to the light's button, as after the others (no dead end).
+  function askTry() {
+    choiceWithLine({
+      step: "try", question: W.try_q, hint: W.try_hint, write: ["look", "try"],
+      answers: [["meet", W.try_meet], ["look", W.try_look], ["try", W.try_try], ["later", W.try_later]],
+    }, (key) => (key === "meet" ? askMeet() : atEnd()));
   }
 
   // --- 段4: what to keep, and the harvest card's ② and ③ ---
@@ -763,9 +781,9 @@ const EbinoHitokoto = (() => {
         if (key === "yes") {
           const which = say("teacher", W.subject_which);
           lineBox("subject_note", { send: W.send, skip: W.skip, placeholder: W.subject_example, label: W.subject_which },
-            (result) => { showSubject(result.subject); askMeet(); }, which);
+            (result) => { showSubject(result.subject); askTry(); }, which);
         } else {
-          askMeet();
+          askTry();
         }
       });
       box.append(pick);
@@ -1062,10 +1080,14 @@ const EbinoHitokoto = (() => {
       step.append(el("p", "hk-label", W.sheet_step), el("p", "hk-lit", `「${sheet.next_step}」`));
       box.append(step);
     }
-    if (sheet.meet) {
-      const meet = el("div", "hk-litbox");
-      meet.append(el("p", "hk-label", W.sheet_meet), el("p", "", sheet.meet));
-      box.append(meet);
+    // 直し49 段2: 次にやってみること (sheet_meet), what was picked and the
+    // student's line, or the seat to meet; まだ決めない: no box.
+    if (sheet.next_try) {
+      const next = el("div", "hk-litbox hk-try-box");
+      next.append(el("p", "hk-label", W.sheet_meet), el("p", "hk-try-what", sheet.next_try.label));
+      if (sheet.next_try.text) next.append(el("p", "hk-lit hk-try-text", `「${sheet.next_try.text}」`));
+      if (sheet.next_try.meet) next.append(el("p", "hk-try-meet", sheet.next_try.meet));
+      box.append(next);
     }
     box.append(el("p", "hk-print-note", W.print_note));
     show("sheet");

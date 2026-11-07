@@ -87,7 +87,8 @@ def to_scale(session):
     return session.hitokoto_answer("部活がない日は空いたら休む")
 
 
-def to_end(session, scale=8, forward="先輩にもう一回聞く", way="農業", subject="no", notice="not_yet"):
+def to_end(session, scale=8, forward="先輩にもう一回聞く", way="農業", subject="no", notice="not_yet",
+           next_try="meet"):
     session.hitokoto_scale(scale)
     session.hitokoto_forward(forward)
     session.hitokoto_notice(notice)  # 直し49 段1: 今日の気づき, after the scale's next question.
@@ -95,7 +96,8 @@ def to_end(session, scale=8, forward="先輩にもう一回聞く", way="農業"
     session.hitokoto_subject(subject)
     if subject == "yes":
         session.hitokoto_subject_note("家庭科")
-    return session.hitokoto_meet("")
+    session.hitokoto_try(next_try)  # 直し49 段2: 会って聞いてみる, then the seat.
+    return session.hitokoto_meet("") if next_try == "meet" else {"uses": []}
 
 
 # --- 段1: today's map ---
@@ -364,7 +366,7 @@ def test_the_subject_card_comes_only_after_yes():
     session.hitokoto_forward("", skip=True)
     session.hitokoto_notice("no_answer")
     session.hitokoto_way("", skip=True)
-    assert session.hitokoto_subject("no") == {"next": "meet"}
+    assert session.hitokoto_subject("no") == {"next": "try"}  # 直し49 段2.
     with pytest.raises(Refused):
         session.hitokoto_subject_note("家庭科")
     other, _, _, _ = sitting()
@@ -375,7 +377,7 @@ def test_the_subject_card_comes_only_after_yes():
     other.hitokoto_way("", skip=True)
     assert other.hitokoto_subject("yes") == {"next": "subject_note"}
     view = other.hitokoto_subject_note("家庭科")
-    assert view["next"] == "meet" and "subject" in view  # None with no catalog: no ③ to show.
+    assert view["next"] == "try" and "subject" in view  # None with no catalog: no ③ to show.
 
 
 def test_the_subject_card_is_asked_with_the_question_and_the_lessons_name(monkeypatch):
@@ -406,6 +408,7 @@ def test_the_meet_line_comes_only_when_a_seat_is_picked_and_the_first_line_never
     other.hitokoto_notice("no_answer")
     other.hitokoto_way("", skip=True)
     other.hitokoto_subject("unsure")
+    other.hitokoto_try("meet")
     uses = other.hitokoto_meet("S02")["uses"]
     assert uses and all(set(u) == {"force", "name", "text"} for u in uses)
     line = other.hitokoto_use(uses[0]["force"])["meet"]
@@ -527,7 +530,7 @@ def test_stop_here_goes_to_the_light_at_once():
 def test_the_sheet_reads_in_order_from_the_record_and_the_students_words(tmp_path):
     session, _, _, _ = sitting(tmp_path=tmp_path)
     to_scale(session)
-    to_end(session, subject="yes")
+    to_end(session, subject="yes", next_try="later")  # 直し49 段2: まだ決めない, so 次の一歩 is shown.
     session.hitokoto_light()
     sheet = session.hitokoto_sheet("休みの決め方で、仕事はどう変わる？")
     story = "".join(part["text"] for part in sheet["story"])
@@ -538,7 +541,7 @@ def test_the_sheet_reads_in_order_from_the_record_and_the_students_words(tmp_pat
         "「休みは空いたら取ります」", "「空いたら取るのがいいと思った」", "「農業」"]
     assert sheet["now_question"] == "休みの決め方で、仕事はどう変わる？"
     assert sheet["light"] == {"quote": "空いたら取る", "why": LIGHT_OK["why"]}
-    assert sheet["next_step"] == "先輩にもう一回聞く"
+    assert sheet["next_step"] == "先輩にもう一回聞く" and sheet["next_try"] is None
 
 
 def test_the_sheet_and_the_record_hold_no_name(tmp_path, monkeypatch):
@@ -550,6 +553,7 @@ def test_the_sheet_and_the_record_hold_no_name(tmp_path, monkeypatch):
     session.hitokoto_notice("no_answer")
     session.hitokoto_way("農業")
     session.hitokoto_subject("no")
+    session.hitokoto_try("meet")
     session.hitokoto_meet("S01")
     session.hitokoto_use("none")
     shown = json.dumps([session.hitokoto_light(), session.hitokoto_sheet("")], ensure_ascii=False)

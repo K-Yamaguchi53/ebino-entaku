@@ -279,6 +279,7 @@ class App:
             "subject_note": lambda: session.hitokoto_subject_note(body.get("text", ""), skip=skip),
             "subject_choose": lambda: session.hitokoto_subject_choose(body.get("choice")),
             "subject_more": session.hitokoto_subject_more,
+            "try": lambda: session.hitokoto_try(body.get("answer"), body.get("text", ""), skip=skip),
             "meet": lambda: session.hitokoto_meet(body.get("seat_id", "")),
             "use": lambda: session.hitokoto_use(body.get("use", "")),
             "light": session.hitokoto_light,
