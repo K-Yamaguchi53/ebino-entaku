@@ -393,12 +393,25 @@ const EbinoHitokoto = (() => {
   // fixed words) is 先生の問い, as the teacher's other questions.
   function say(who, text, extra, cls = "") {
     const card = el("div", `hk-card ${who} ${cls}`.trim());
+    if (cls !== "waiting") waitOn(who === "me" ? null : card);
     card.append(el("span", "hk-who", { ai: app.state.hitokoto.who_coach, teacher: W.who_teacher, me: W.who_me }[who]));
     if (text) card.append(el("p", "hk-q", text));
     if (extra) card.append(extra);
     $("hk-log").append(card);
     card.scrollIntoView({ block: "nearest", behavior: still() ? "auto" : "smooth" });
     return card;
+  }
+
+  // 直し51 段4: the question waiting for its answer (the last one asked,
+  // at the foot) is lit a step and its words a step larger; one answered,
+  // skipped or picked past sinks a step, smaller (its ✓ still read). The
+  // student's card answers it: none waits then.
+  function waitOn(card) {
+    for (const old of document.querySelectorAll("#hk-log .hk-card.hk-now")) {
+      old.classList.remove("hk-now");
+      old.classList.add("hk-past");
+    }
+    if (card) card.classList.add("hk-now");
   }
 
   function clearInput() {
@@ -930,6 +943,7 @@ const EbinoHitokoto = (() => {
     row.append(go);
     $("hk-input").append(row);
     $("hk-stop").hidden = true;
+    waitOn(null);  // 直し51 段4: nothing waits now.
     go.focus({ preventScroll: true });
     go.scrollIntoView({ block: "nearest", behavior: still() ? "auto" : "smooth" });
   }

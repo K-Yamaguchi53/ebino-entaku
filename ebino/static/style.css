@@ -1735,10 +1735,28 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
 .hk-card.ai { align-self: flex-start; background: var(--ai-deep); color: var(--ai-ink); border: 1px solid var(--ai); }
 .hk-card.ai .hk-who { color: var(--ai); }
 .hk-card.ai.waiting .hk-q { color: var(--soft); }
-.hk-card.teacher { align-self: flex-start; background: var(--lamp-faint); border: 1px solid var(--lamp-soft); }
+/* 直し51 段4: 先生の問い on the night's own blue, not a grey-brown over it
+   (ヒビキ, 49_try_choices: a school questionnaire's grey). */
+.hk-card.teacher { align-self: flex-start; background: var(--night-2); border: 1px solid var(--moon-faint); }
 .hk-card.teacher .hk-who { color: var(--lamp); }
 .hk-card.me { align-self: flex-end; background: var(--night-3); border: 1px solid var(--moon-faint); }
 .hk-card.me .hk-who { color: var(--soft); text-align: right; }
+/* 直し51 段4: the question waiting for its answer (at the foot) a step
+   lighter, its edge the lamp's, its words a step larger; no blinking. One
+   answered, skipped or picked past a step smaller, sunk into the night;
+   its label, words and ✓ still read (each 4.5:1 or more: tests). */
+.hk-card.teacher.hk-now { background: var(--night-3); border-color: var(--lamp); box-shadow: 0 0 0 3px var(--lamp-faint); }
+.hk-card.ai.hk-now { box-shadow: 0 0 0 3px var(--moon-faint); }
+.hk-card.hk-now > .hk-q { font-size: 20px; }
+.hk-card.hk-past { padding: 8px 14px; }
+.hk-card.hk-past > .hk-q { font-size: 15px; color: var(--soft); }
+.hk-card.teacher.hk-past { background: var(--night); border-color: var(--moon-faint); }
+.hk-card.ai.hk-past { border-color: var(--moon-soft); }
+.hk-card.hk-past .hk-who { font-size: 11px; }
+.hk-card.hk-past .hk-pick { min-height: 34px; padding: 3px 10px; font-size: 14px; }
+.hk-card.hk-past .hk-quote { padding: 6px 10px; font-size: 14px; }
+.hk-card.hk-past .hk-scale-now { font-size: 20px; }
+.hk-card.hk-past .hk-meet select { min-height: 36px; font-size: 14px; }
 .hk-input { margin-top: 12px; }
 .hk-input .message { margin: 0 0 8px; }
 .hk-answer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
