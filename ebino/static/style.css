@@ -1750,6 +1750,7 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
 /* 直し49 段1・段2: the line under the picks (今日の気づき, 次にやってみること), and how little is enough. */
 .hk-choice-line { margin-top: 10px; }
 .hk-choice-hint { flex: 1 0 100%; margin: 0; color: var(--soft); font-size: 15px; }
+.hk-choice-hint-sheet { display: block; }  /* 直し51 段3: a line of its own under the hint. */
 .hk-pick[aria-pressed="true"] { border-color: var(--lamp); box-shadow: 0 0 0 2px var(--lamp-soft); }
 .hk-me-line, .hk-notice-text, .hk-try-text { overflow-wrap: anywhere; }
 .hk-try-what { font-weight: 700; }
@@ -1834,6 +1835,15 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
   line-height: 1.7; color: var(--paper-soft); border: 1px solid var(--paper-line); border-radius: 999px; }
 .hk-sheet p.hk-ref { display: table; }
 .hk-tie-who { margin: 0; font-size: 14px; color: var(--paper-soft); }
+/* 直し51 段3: 外す by the student's own line (small, after it), 戻す in its
+   place once it is off; neither printed, nor a line taken off. */
+.hk-own { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.hk-own > .hk-lit { flex: 1 1 16em; min-width: 0; }
+.hk-drop, .hk-restore { min-height: 32px; padding: 2px 12px; font-size: 13px; color: var(--paper-soft); background: transparent;
+  border: 1px solid var(--paper-line); border-radius: 999px; }
+.hk-drop:hover, .hk-drop:focus-visible, .hk-restore:hover, .hk-restore:focus-visible { color: var(--paper-ink); border-color: var(--paper-soft); }
+.hk-restore { color: var(--paper-ink); }
+.hk-own-message { margin: 4px 0 0; font-size: 13px; }
 .hk-tie-heading { margin: 0; font-family: var(--mincho); font-size: 15px; }
 @media (max-width: 560px) { .hk-tie-two { grid-template-columns: minmax(0, 1fr); } }
 /* 直し48 段4: 「整理中」 while the sheet is made: the big word, the line, three
@@ -1884,6 +1894,8 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
   .hk-moves-list li + li { margin-top: 2px; }
   .hk-litbox, .hk-tie { padding: 6px 10px; }
   .hk-print-note { margin-top: 8px; }
+  .hk-drop, .hk-restore, .hk-own-message { display: none !important; }
+  .hk-notice-box.hk-dropped { display: none; }
 }
 @page { size: A4; margin: 12mm; }
 

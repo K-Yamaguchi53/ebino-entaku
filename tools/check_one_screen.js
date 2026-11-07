@@ -38,10 +38,13 @@ async (page) => {
     "ai_hint", "answering_ai"];
   // 直し49 段1: hk_notice, 今日の気づき with 「あった」 pressed and a line written.
   // 直し49 段2: hk_try, 次にやってみること with 試してみる pressed and a line written.
-  const HK_MOMENTS = ["hk_map", "hk_talk", "hk_ladder", "hk_scale", "hk_notice", "hk_try", "hk_keep", "hk_light", "hk_sheet"];
+  // 直し51 段3: hk_sheet_drop, the sheet with 「外す」 pressed on the student's first line.
+  const HK_MOMENTS = ["hk_map", "hk_talk", "hk_ladder", "hk_scale", "hk_notice", "hk_try", "hk_keep", "hk_light", "hk_sheet",
+    "hk_sheet_drop"];
   // The button that goes on, at each moment.
   const HK_NEXT = { hk_map: "#hk-go", hk_talk: "#hk-input button[type=submit]", hk_ladder: ".hk-options .hk-quote, .hk-picks .hk-pick, .hk-fill .hk-primary",
-    hk_scale: ".hk-scale button", hk_notice: ".hk-notice-line .hk-primary", hk_try: ".hk-try-line .hk-primary", hk_keep: "#hk-to-light", hk_light: "#hk-to-sheet", hk_sheet: "#hk-print" };
+    hk_scale: ".hk-scale button", hk_notice: ".hk-notice-line .hk-primary", hk_try: ".hk-try-line .hk-primary", hk_keep: "#hk-to-light", hk_light: "#hk-to-sheet", hk_sheet: "#hk-print",
+    hk_sheet_drop: "#hk-print" };
   const browser = page.context().browser();
   const table = {};
   const measure = (p) => p.evaluate(() => {
@@ -219,6 +222,22 @@ async (page) => {
           });
           if (lines.shut) bad.push(`closed line ${lines.shut}`);
           if (lines.open > 1) bad.push(`lines ${lines.open}`);
+          // 直し51 段3: on the sheet, no two of its lines, tags or buttons
+          // over each other ("sheet over N"), 外す・戻す among them.
+          if (moment.startsWith("hk_sheet")) {
+            const over = await p.evaluate(() => {
+              const leaves = [...document.querySelectorAll("#hk-sheet-body :is(p, li, button, .hk-ref)")]
+                .filter((n) => n.getClientRects().length && !n.closest("[hidden]"));
+              let count = 0;
+              for (let i = 0; i < leaves.length; i++) for (let j = i + 1; j < leaves.length; j++) {
+                if (leaves[i].contains(leaves[j]) || leaves[j].contains(leaves[i])) continue;
+                const a = leaves[i].getBoundingClientRect(), b = leaves[j].getBoundingClientRect();
+                if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) count++;
+              }
+              return count;
+            });
+            if (over) bad.push(`sheet over ${over}`);
+          }
           row[moment] = bad.length ? bad.join(" ") : "ok";
         } catch (error) {
           row[moment] = "could not reach: " + String(error).split("\n")[0].slice(0, 120);
@@ -383,6 +402,10 @@ async (page) => {
     if (moment === "hk_light") return;
     await p.click("#hk-to-sheet");
     await p.waitForSelector("#hk-sheet:not([hidden]) .hk-story");
+    if (moment === "hk_sheet_drop") {
+      await p.locator("#hk-sheet-body .hk-drop").first().click();
+      await p.waitForSelector("#hk-sheet-body .hk-restore");
+    }
   }
 
   // The button is brought into view by scrolling (to the window's middle,

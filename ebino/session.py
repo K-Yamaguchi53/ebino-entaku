@@ -1485,6 +1485,38 @@ class Session:
         self.save()
         return {"next": talk.stage}
 
+    def hitokoto_drop(self, line, drop, text="") -> dict:
+        """直し51 段3 (the teacher, 11/7): on the sheet, the student takes their
+        own line (今日の気づき, 次にやってみること) off it, by themselves (外す),
+        not a list of words; or puts it back (戻す). Taken off: its words go
+        from the sitting and the record at once (kept after every step, as
+        every step is); that it was taken is kept, and the answer picked. Put
+        back: the line as the screen still holds it, checked for a name again."""
+        talk = self._talk(hitokoto.SHEET)
+        if line not in hitokoto.OWN_LINES:
+            raise Refused("unknown_line")
+        if getattr(talk, line) not in hitokoto.OWN_LINES[line]:
+            raise Refused("no_line")
+        dropped = getattr(talk, f"{line}_dropped")
+        if drop is True:
+            if not dropped and not getattr(talk, f"{line}_text"):
+                raise Refused("no_line")
+            setattr(talk, f"{line}_text", "")
+            setattr(talk, f"{line}_dropped", True)
+        elif drop is False:
+            if not dropped:
+                raise Refused("not_dropped")
+            text = _line(text, hitokoto.MAX_LINE, "empty_line")
+            named = self._named(text)
+            if named:
+                return named
+            setattr(talk, f"{line}_text", text)
+            setattr(talk, f"{line}_dropped", False)
+        else:
+            raise Refused("unknown_drop")
+        self.save()
+        return {"line": line, "dropped": drop}
+
     def hitokoto_meet(self, seat_id) -> dict:
         """The seat to hear more from (texts/meet_question.txt), or none. A
         seat: ②'s uses, as the record fits them."""

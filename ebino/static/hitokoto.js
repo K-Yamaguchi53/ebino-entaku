@@ -685,6 +685,8 @@ const EbinoHitokoto = (() => {
     form.hidden = true;
     const hint = el("p", "hk-choice-hint", hintText);
     hint.id = `hk-${step}-hint`;
+    // 直し51 段3: what is written here goes on the last sheet (to be taken off there).
+    hint.append(el("span", "hk-choice-hint-sheet", W.sheet_hint));
     const input = el("input");
     Object.assign(input, { type: "text", maxLength: 120, autocomplete: "off" });
     input.setAttribute("aria-label", question);
@@ -976,6 +978,50 @@ const EbinoHitokoto = (() => {
     return line;
   }
 
+  // 直し51 段3 (the teacher, 11/7): the student's own line on the sheet,
+  // with a small 外す by it (no other line has one): pressed, the line is
+  // off the sheet (and the print), its words gone from the record, and 戻す
+  // in its place puts it back. Read aloud: 外す：今日の気づき.
+  function ownLine(line, text, words, heading, box) {
+    const row = el("div", "hk-own");
+    const say = el("p", "message hk-own-message");
+    say.setAttribute("role", "status");
+    say.hidden = true;
+    const press = (drop) => async () => {
+      if (busy) return;
+      busy = true;
+      toggle.disabled = true;
+      let result;
+      try {
+        result = await post("drop", drop ? { line, drop: true } : { line, drop: false, text: words });
+      } catch (error) {
+        result = { status: "failed", message: app.sendFailed(error) };
+      }
+      busy = false;
+      toggle.disabled = false;
+      if (result.status) {
+        say.textContent = result.message;
+        say.hidden = false;
+        return;
+      }
+      say.hidden = true;
+      text.hidden = drop;
+      box.classList.toggle("hk-dropped", drop);
+      toggle.textContent = drop ? W.restore : W.drop;
+      toggle.className = drop ? "hk-restore" : "hk-drop";
+      toggle.setAttribute("aria-label", `${drop ? W.restore : W.drop}：${heading}`);
+      toggle.onclick = press(!drop);
+      toggle.focus({ preventScroll: true });
+    };
+    const toggle = button("hk-drop", W.drop);
+    toggle.setAttribute("aria-label", `${W.drop}：${heading}`);
+    toggle.onclick = press(true);
+    row.append(text, toggle);
+    const out = document.createDocumentFragment();
+    out.append(row, say);
+    return out;
+  }
+
   async function toSheet() {
     if (busy) return;
     busy = true;
@@ -1018,7 +1064,8 @@ const EbinoHitokoto = (() => {
     // none written (「まだない」「答えない」, or not written): no box.
     if (sheet.notice) {
       const notice = el("div", "hk-litbox hk-notice-box");
-      notice.append(el("p", "hk-label", W.sheet_notice), el("p", "hk-lit hk-notice-text", `「${sheet.notice}」`));
+      const text = el("p", "hk-lit hk-notice-text", `「${sheet.notice}」`);
+      notice.append(el("p", "hk-label", W.sheet_notice), ownLine("notice", text, sheet.notice, W.sheet_notice, notice));
       box.append(notice);
     }
     const questions = el("div", "hk-qq");
@@ -1112,7 +1159,10 @@ const EbinoHitokoto = (() => {
     if (sheet.next_try) {
       const next = el("div", "hk-litbox hk-try-box");
       next.append(el("p", "hk-label", W.sheet_meet), el("p", "hk-try-what", sheet.next_try.label));
-      if (sheet.next_try.text) next.append(el("p", "hk-lit hk-try-text", `「${sheet.next_try.text}」`));
+      if (sheet.next_try.text) {
+        const text = el("p", "hk-lit hk-try-text", `「${sheet.next_try.text}」`);
+        next.append(ownLine("next_try", text, sheet.next_try.text, W.sheet_meet, next));
+      }
       if (sheet.next_try.meet) next.append(el("p", "hk-try-meet", sheet.next_try.meet));
       box.append(next);
     }

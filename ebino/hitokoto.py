@@ -137,6 +137,9 @@ NOTICE_WRITE = ("yes", "some")
 TRY_ANSWERS = ("meet", "look", "try", "later")  # 会って聞いてみる・自分で調べてみる・試してみる・まだ決めない
 TRY_WRITE = ("look", "try")
 TRY_MEET = "meet"
+# 直し51 段3: the student's own two lines on the sheet, each taken off by
+# themselves (外す) or put back (戻す): its answers that open a line.
+OWN_LINES = {"notice": NOTICE_WRITE, "next_try": TRY_WRITE}
 
 TEXTS = "hitokoto"
 FORCE_TEXTS = "hitokoto_forces"
@@ -163,6 +166,8 @@ TEXT_IDS = (
     "try_q", "try_meet", "try_look", "try_try", "try_later", "try_hint",
     # 直し51 段2: 今日の道すじ pointing at words already in full on the sheet.
     "story_word_short", "story_wrote_short", "story_more_short", "story_way_short",
+    # 直し51 段3.
+    "sheet_hint", "drop", "restore",
 )
 FILL_BLANK = "［　　］"  # In ladder_fill_line: where the student writes.
 
@@ -334,6 +339,11 @@ class Hitokoto:
     # line written after 調べる or 試す ("" none).
     next_try: str = ""
     next_try_text: str = ""
+    # 直し51 段3 (the teacher, 11/7): the student took their own line off the
+    # sheet (外す): its words gone, here and in the record; that it was taken
+    # is kept, and the answer picked. Put back (戻す): the line again.
+    notice_dropped: bool = False
+    next_try_dropped: bool = False
 
     # --- what the screen gets ---
 
@@ -379,9 +389,11 @@ class Hitokoto:
                      "b": self.people[self.tie["b"]].seat_id} if self.tie else None),
             "tie_asked": dict(self.tie_asked),
             # 直し49 段1: the answer picked and the student's line, as written.
-            "notice": {"answer": self.notice, "text": self.notice_text},
+            "notice": {"answer": self.notice, "text": self.notice_text,
+                       **({"dropped": True} if self.notice_dropped else {})},
             # 直し49 段2: what to try next, and the student's line, as written.
-            "next_try": {"answer": self.next_try, "text": self.next_try_text},
+            "next_try": {"answer": self.next_try, "text": self.next_try_text,
+                         **({"dropped": True} if self.next_try_dropped else {})},
         }
 
 

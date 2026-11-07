@@ -284,6 +284,8 @@ class App:
             "use": lambda: session.hitokoto_use(body.get("use", "")),
             "light": session.hitokoto_light,
             "sheet": lambda: session.hitokoto_sheet(body.get("now_question", "")),
+            # 直し51 段3: the student's own line off the sheet, or back on it.
+            "drop": lambda: session.hitokoto_drop(body.get("line"), body.get("drop"), body.get("text", "")),
         }
         if step not in steps:
             raise Refused("unknown_path")
