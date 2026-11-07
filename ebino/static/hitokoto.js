@@ -1079,6 +1079,7 @@ const EbinoHitokoto = (() => {
     if (sheet.notice) {
       const notice = el("div", "hk-litbox hk-notice-box");
       const text = el("p", "hk-lit hk-notice-text", `「${sheet.notice}」`);
+      text.classList.add("hk-own-text");  // 直し51 段5: the student's own, the sheet's lead.
       notice.append(el("p", "hk-label", W.sheet_notice), ownLine("notice", text, sheet.notice, W.sheet_notice, notice));
       box.append(notice);
     }
@@ -1159,8 +1160,10 @@ const EbinoHitokoto = (() => {
       // question): pointed at, （農家の言葉） or 最初の問い.
       const ref = sheet.light.ref;
       const quote = ref === "chosen" ? el("p", "hk-ref", fill(W.light_chosen_who, { who: sheet.light.who }))
-        : ref ? el("p", "hk-ref", W[ref]) : el("p", "hk-lit", `「${sheet.light.quote}」`);
-      lit.append(el("p", "hk-label", W.light_title), quote, el("p", "", sheet.light.why));
+        : ref ? el("p", "hk-ref", W[ref])
+        // 直し51 段5: the student's own words (not a person's) lead, as the two lines do.
+        : el("p", sheet.light.who ? "hk-lit" : "hk-lit hk-own-text", `「${sheet.light.quote}」`);
+      lit.append(el("p", "hk-label", W.light_title), quote, el("p", "hk-light-why", sheet.light.why));
       box.append(lit);
     }
     if (sheet.next_step) {
@@ -1175,6 +1178,7 @@ const EbinoHitokoto = (() => {
       next.append(el("p", "hk-label", W.sheet_meet), el("p", "hk-try-what", sheet.next_try.label));
       if (sheet.next_try.text) {
         const text = el("p", "hk-lit hk-try-text", `「${sheet.next_try.text}」`);
+        text.classList.add("hk-own-text");
         next.append(ownLine("next_try", text, sheet.next_try.text, W.sheet_meet, next));
       }
       if (sheet.next_try.meet) next.append(el("p", "hk-try-meet", sheet.next_try.meet));
