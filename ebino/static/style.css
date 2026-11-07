@@ -165,8 +165,9 @@ body:has(#hitokoto:not([hidden])) .masthead h1 { position: relative; top: -6px; 
 /* --- 「いまやること」 (直し31-5): the four steps and the one line, kept at the top --- */
 .now { position: sticky; top: 0; z-index: 25; max-width: 1200px; margin: 0 auto; padding: 8px 16px 10px;
   background: linear-gradient(var(--night) 85%, transparent); }
-.now-steps { display: flex; flex-wrap: wrap; gap: 4px 0; margin: 0; padding: 0; list-style: none; font-size: 14px;
-  color: var(--faint); }
+/* 直し52 段4: the steps' names 15px (14px on a short screen), in the quieter words' colour (8:1). */
+.now-steps { display: flex; flex-wrap: wrap; gap: 4px 0; margin: 0; padding: 0; list-style: none; font-size: 15px;
+  color: var(--soft); }
 .now-steps li { display: flex; align-items: center; padding: 2px 10px; border-bottom: 3px solid transparent; }
 .now-steps li + li::before { content: "─"; margin-right: 10px; margin-left: -10px; padding-left: 0; color: var(--moon-soft); }
 .now-steps li + li { padding-left: 20px; }
@@ -179,7 +180,7 @@ body:has(#hitokoto:not([hidden])) .masthead h1 { position: relative; top: -6px; 
   border-radius: 0 6px 6px 0; font-size: 26px; font-weight: 700; line-height: 1.45; color: var(--lamp-bright); }
 @media (max-height: 720px) {
   .now { padding: 4px 16px 6px; }
-  .now-steps { font-size: 13px; }
+  .now-steps { font-size: 14px; }
   .now-line { margin-top: 2px; padding: 3px 12px; font-size: 22px; }
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -720,14 +721,17 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 /* While the round table is open, the map's points behind take no mouse,
    press or touch (直し27-4); the table's own seats and chairs do. */
 .dim .points { pointer-events: none; }
-/* Place names: small, a little spaced out, in moonlight; a thin halo only. */
+/* Place names: small, a little spaced out, in moonlight; a halo of the night
+   round each letter (直し52 段4: 13px on the screen, the halo 3px of the
+   night's own colour in every season, so the words read 4.5:1 and more over
+   any land; map.js TEXT_PX). */
 .place-names { pointer-events: none; }
 .place-names text { fill: var(--soft); font-family: var(--gothic); font-size: 22px; letter-spacing: .18em;
-  paint-order: stroke; stroke: var(--veil-thin); stroke-width: 2px; stroke-linejoin: round; }
+  paint-order: stroke; stroke: var(--night); stroke-width: 2px; stroke-linejoin: round; }
 /* Each home's name where it is (直し33-3), in its kind's colour, outlined
    like the place names so it reads over the picture. */
 .home-names text { fill: var(--kind); font-family: var(--gothic); font-size: 17px; font-weight: bold; letter-spacing: .06em;
-  paint-order: stroke; stroke: var(--night); stroke-linejoin: round; }
+  paint-order: stroke; stroke: var(--night); stroke-linejoin: round; }  /* 直し52 段4: 14px, the same halo (map.js). */
 .home-gate path { fill: none; stroke: var(--kind); stroke-linecap: round; stroke-linejoin: round; }
 /* The school's name (直し35-2; the school itself is the picture, put larger on the map: 直し37-1). It takes no press. */
 .school text { fill: var(--ink); font-family: var(--gothic); font-size: 20px; font-weight: bold;
@@ -828,7 +832,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   background: color-mix(in srgb, var(--night) 72%, transparent); color: var(--moon); pointer-events: none; line-height: 1.35; }
 .map-look-label[hidden] { display: none; }
 .map-look-label .look-name { font-family: var(--mincho); font-size: 14px; font-weight: 700; }
-.map-look-label .look-note { font-size: 11px; color: var(--soft); }
+.map-look-label .look-note { font-size: 14px; color: var(--soft); }  /* 直し52 段4: was 11px. */
 .one-on .map-look-label, .moving .map-look-label, .map-look-label.crowded { visibility: hidden; }
 /* Spring's flowers: cherry-pink dots, still, on the spring picture only. */
 .spring-flowers .flower { fill: var(--sakura); fill-opacity: .85; stroke: var(--sakura-edge); stroke-opacity: .5; stroke-width: .8; }
@@ -843,8 +847,10 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .map-compass .letter { position: absolute; transform: translate(-50%, -50%); font-family: var(--gothic);
   font-size: 13px; font-weight: bold; line-height: 1; color: var(--moon);
   text-shadow: 0 0 3px var(--night-deep), 0 0 6px var(--night-deep); }
-.map-around { white-space: nowrap; padding: 1px 4px; font-family: var(--gothic); font-size: 12px;
-  line-height: 1.4; letter-spacing: .08em; color: var(--moon);
+/* 直し52 段4: 14px, on a dark ground of its own (over the light land of
+   spring and autumn the moon's colour fell to 1.7:1 with the shadow alone). */
+.map-around { white-space: nowrap; padding: 1px 6px; border-radius: 4px; font-family: var(--gothic); font-size: 14px;
+  line-height: 1.4; letter-spacing: .08em; color: var(--moon); background: color-mix(in srgb, var(--night-deep) 72%, transparent);
   text-shadow: 0 0 3px var(--night-deep), 0 0 6px var(--night-deep); }
 .map-around::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 6px;
   vertical-align: .12em; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor;
@@ -969,7 +975,7 @@ body.one-open .input-area .spoken-note { display: none; }
 /* At the table, a seat's name is a small card set by its chair. */
 .table-label { background: var(--paper); color: var(--paper-ink); border: 0;
   box-shadow: 0 0 0 1px var(--paper-line), 0 0 12px var(--lamp-faint), 0 4px 12px var(--shadow);
-  font-size: .8rem; padding: 1px 8px; border-radius: 4px; }
+  font-size: 14px; padding: 1px 8px; border-radius: 4px; }  /* 直し52 段4: was .8rem (12.8px). */
 .table-label.empty { background: var(--veil); color: var(--soft); box-shadow: none; border: 1px dashed var(--moon-soft); }
 .split-tag.narrow { font-size: .78rem; padding: 1px 6px; }
 /* The split's heading pressed where it is seen (直し40-1): a button that looks
@@ -1138,19 +1144,20 @@ body.one-open #map-heading { visibility: hidden; }
 .trail-item.on-turn { border-left-color: var(--lamp); }
 .trail-item.turn-from::before, .trail-item.turn-to::before { content: ""; position: absolute; left: -6px; top: 6px; width: 10px; height: 10px;
   border-radius: 50%; background: var(--lamp); }
-.trail-small { font-size: 12px; color: var(--soft); }
+/* 直し52 段4: the trail's small words 14px (were 12px). */
+.trail-small { font-size: 14px; color: var(--soft); }
 .trail-text { color: var(--ink); }
 .trail-question .trail-text { font-weight: 700; }
 .trail-turn { align-self: flex-start; margin-bottom: 2px; padding: 0 6px; border-radius: 4px; background: var(--lamp); color: var(--night-deep);
-  font-size: 12px; font-weight: 700; }
-.trail-label { color: var(--paper-2); font-size: 12px; }
+  font-size: 14px; font-weight: 700; }
+.trail-label { color: var(--paper-2); font-size: 14px; }
 .trail-press { all: unset; display: flex; flex-direction: column; gap: 1px; cursor: pointer; border-radius: 4px; }
 .trail-press:hover .trail-label { text-decoration: underline; }
 .trail-press:focus-visible { outline: var(--focus-w) solid var(--lamp); outline-offset: 2px; }
 .trail-item.trail-ai { margin-top: 2px; margin-bottom: 4px; padding: 5px 8px 6px 10px; border: 1px solid var(--ai); border-left-width: 2px;
   border-radius: 8px; background: var(--ai-deep); color: var(--ai-ink); }
 .trail-item.trail-ai.on-turn { border-left-color: var(--lamp); }
-.trail-ai .trail-ai-name { font-size: 12px; font-weight: 700; color: var(--ai); }
+.trail-ai .trail-ai-name { font-size: 14px; font-weight: 700; color: var(--ai); }
 .trail-ai .trail-text { color: var(--ai-ink); }
 .trail-answer { display: flex; flex-wrap: wrap; gap: 0 6px; color: var(--ink); }
 /* Only the room the column's other parts leave (basis 0): a long trail
