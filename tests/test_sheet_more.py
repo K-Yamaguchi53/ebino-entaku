@@ -135,3 +135,13 @@ def test_the_sheet_page_says_it_is_being_made_until_it_is():
     # Its dots move only where motion is not reduced.
     still = css[css.index(".hk-making-dots span {"):]
     assert "animation" not in still[:still.index("}")]
+
+
+def test_the_sheet_prints_on_one_a4_page():
+    from ebino import app as app_module
+    css = (app_module.STATIC_DIR / "style.css").read_text(encoding="utf-8")
+    # The screen check: its last line went onto a second page.
+    assert "@page { size: A4; margin: 12mm; }" in css
+    block = css[css.index("/* 直し48 段4: more on it, still one A4 sheet"):]
+    block = block[:block.index("\n}\n")]
+    assert ".hk-sheet { font-size: 13px; line-height: 1.55; }" in block and ".hk-qbox { min-height: 0;" in block

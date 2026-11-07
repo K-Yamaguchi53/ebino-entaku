@@ -130,3 +130,13 @@ def test_the_sceneries_name_in_a_corner_its_words_in_texts():
     assert "if (name === ai) continue;" in place and ".table-bubble:not(.unplaced)" in place
     assert "placeLookLabel();\n  }" in MAP  # After the map's words and bubbles are laid out.
     assert ".map-look-label { position: absolute;" in CSS and "pointer-events: none;" in CSS
+
+
+def test_the_label_never_wraps_and_keeps_off_the_hint_at_the_foot():
+    # The screen check: with the box answering コーチ the frame narrowed and
+    # the label broke inside words; at 768 it lay over 「吹き出しを押すと…」.
+    assert re.search(r"\.map-look-label \{[^}]*white-space: nowrap;", CSS)
+    assert '".map-hint, .map-choices"' in _inner("placeLookLabel")
+    # No corner free: not shown until one is (never over them).
+    assert 'label.classList.toggle("crowded", least > 0);' in _inner("placeLookLabel")
+    assert ".map-look-label.crowded { visibility: hidden; }" in CSS

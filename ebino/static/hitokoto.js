@@ -302,20 +302,22 @@ const EbinoHitokoto = (() => {
   // none for a card, the whole card is pressed; a part lit is pressed alone.
   function renderCards(parts) {
     const box = $("hk-cards");
+    const keep = picked;  // Pressed before the lit parts came: kept (the screen check).
     box.replaceChildren();
     view.people.forEach((person, index) => {
       const part = parts[String(index)] || "";
       const from = el("span", "hk-from", `${person.title}（${person.kind_label}）`);
       const words = person.said ? `「${person.text}」` : person.text;
       let card;
-      if (!part) {
+      if (!(person.sentences && person.sentences.length)) {
         card = button("hk-said hk-whole", null, () => pick(index, "", card));
         card.append(from, el("span", "hk-words", words));
         card.setAttribute("aria-pressed", "false");
       } else {
         // 直し48 段7 (the teacher, 11/7: 「フレーズよりも文章まるごと選択で
         // いい」): each whole sentence pressed alone (person.sentences, the
-        // server's: word for word); the one the lit part is in, lit.
+        // server's: word for word), from the first; when the lit parts come,
+        // the one a part is in is lit.
         card = el("div", "hk-said");
         const body = el("span", "hk-words");
         if (person.said) body.append("「");
@@ -323,7 +325,7 @@ const EbinoHitokoto = (() => {
           const kw = button("hk-kw hk-sentence", sentence, () => pick(index, sentence, kw));
           kw.setAttribute("aria-pressed", "false");
           kw.setAttribute("aria-label", `${person.title}の言葉「${sentence}」`);
-          if (sentence.includes(part)) kw.classList.add("hk-lit-part");
+          if (part && sentence.includes(part)) kw.classList.add("hk-lit-part");
           body.append(kw);
         }
         if (person.said) body.append("」");
@@ -334,13 +336,18 @@ const EbinoHitokoto = (() => {
     });
     $("hk-go").disabled = true;
     picked = null;
+    if (keep) {
+      const card = box.children[keep.person];
+      const node = card && (keep.part ? [...card.querySelectorAll(".hk-kw")].find((kw) => kw.textContent === keep.part) : card);
+      if (node) return pick(keep.person, keep.part, node);
+    }
     // 直し45 段5: the step marked first is where the first word is looked
-    // for: its person's lit part, else the whole card, already pressed.
+    // for: its person's lit part's sentence, else its first sentence (else
+    // the whole card), already pressed.
     if (Number.isInteger(view.start) && view.people[view.start]) {
-      const part = parts[String(view.start)] || "";
       const cards = box.children[view.start];
-      const node = cards && (part ? cards.querySelector(".hk-kw.hk-lit-part") || cards.querySelector(".hk-kw") : cards);
-      if (node) pick(view.start, node.classList.contains("hk-kw") ? node.textContent : part, node);
+      const node = cards && (cards.querySelector(".hk-kw.hk-lit-part") || cards.querySelector(".hk-kw") || cards);
+      if (node) pick(view.start, node.classList.contains("hk-kw") ? node.textContent : "", node);
     }
   }
 

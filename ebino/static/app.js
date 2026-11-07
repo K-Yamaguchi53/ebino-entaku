@@ -925,7 +925,9 @@ const GUIDE = {
   card: { at: () => $("question"), words: "write" },
   // 直し45 段3: no box at one to one; the questions to pick, lit.
   one: { at: () => document.querySelector(".one-asks .one-ask:not(.one-finish)"), lit: true },
-  table: { at: () => document.querySelector("#map-overlay .table-bubble:not(.unplaced)") },
+  // 直し48 (the screen check): never over the AI's questions (their robots, names, bubbles).
+  table: { at: () => document.querySelector("#map-overlay .table-bubble:not(.unplaced)"),
+    clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line")], sides: ["above", "below", "right", "left"] },
   pressed: { at: () => document.querySelector('.map-choices button[data-choice="card"]'), lit: true },
   // 直し46: never over the AI's seat's heading (「AI（町の人ではありません）」)
   // nor its note (「この問いは、AI が作りました。…」), nor over the AI's

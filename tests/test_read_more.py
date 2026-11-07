@@ -107,7 +107,9 @@ def test_at_one_to_one_only_and_its_words_in_texts():
     words = texts.screen_texts()["one_words"]
     assert words["read_more"] == "続きを読む" and words["read_less"] == "閉じる"
     says = MAP[MAP.index("  function says(pieces"):MAP.index("  // The person's words by its head")]
-    assert "voice.replaceChildren(...foldPieces(pieces.map((piece) => piece.spoken || piece.text), one.bubble));" in says
+    assert "voice.replaceChildren(...foldPieces(pieces.map((piece) => piece.spoken || piece.text), one.bubble, limit));" in says
+    # About four lines of the bubble (the screen check: 120 characters were six lines at 768).
+    assert "const limit = Math.min(FOLD_CHARS, 4 * Math.max(10, Math.floor((most - 32) / 18)));" in says
     # The table's bubbles: their short quote as before (cut at BUBBLE_CHARS, two lines).
     assert "const BUBBLE_CHARS = 36;" in MAP
     assert ".one-bubble .voice .one-rest[hidden] { display: none; }" in CSS

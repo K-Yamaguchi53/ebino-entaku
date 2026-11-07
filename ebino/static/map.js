@@ -1443,7 +1443,8 @@ const EbinoMap = (() => {
       "bottom-right": [f.width - l.width - m, f.height - l.height - m], "top-left": [m, m] };
     const ai = view && view.aiCorner && !$("ai-seat").hidden ? view.aiCorner : "";
     const busy = [...frame.querySelectorAll(".table-bubble:not(.unplaced), .table-label:not(.unplaced), .map-around, "
-      + ".map-compass, .split-tag, .school-count, .home-names text, .place-names text, .pt .shape, .one-bubble, .one-asks, .one-coach")]
+      + ".map-compass, .split-tag, .school-count, .home-names text, .place-names text, .pt .shape, .one-bubble, .one-asks, .one-coach, "
+      + ".map-hint, .map-choices")]
       .filter((n) => n.getClientRects().length).map((n) => n.getBoundingClientRect());
     const seat = $("ai-seat");
     if (seat && !seat.hidden) busy.push(seat.getBoundingClientRect());
@@ -1457,6 +1458,9 @@ const EbinoMap = (() => {
     }
     label.style.left = `${Math.round(best[0])}px`;
     label.style.top = `${Math.round(best[1])}px`;
+    // No corner free (the screen check, 768: the hint at the foot, a bubble,
+    // the ways out and the AI's seat): not shown until one is.
+    label.classList.toggle("crowded", least > 0);
   }
 
   // Spring's flowers (直し48 段6): small cherry-pink dots on the low land
@@ -3914,20 +3918,22 @@ const EbinoMap = (() => {
   // Where the words stop: the last sentence end at or before FOLD_CHARS (not
   // before half of it), else the first after it; null when they are short
   // enough, or the rest would be only a little.
-  function foldAt(text) {
+  function foldAt(text, limit = FOLD_CHARS) {
     const chars = [...text];
-    if (chars.length <= FOLD_CHARS + FOLD_SPARE) return null;
+    if (chars.length <= limit + FOLD_SPARE) return null;
     const ends = [];
     chars.forEach((c, n) => { if ("。！？!?".includes(c)) ends.push(n + 1); });
-    const before = ends.filter((n) => n <= FOLD_CHARS && n >= FOLD_CHARS / 2);
-    const at = before.length ? before[before.length - 1] : ends.find((n) => n > FOLD_CHARS);
+    const before = ends.filter((n) => n <= limit && n >= limit / 2);
+    const at = before.length ? before[before.length - 1] : ends.find((n) => n > limit);
     return at && chars.length - at >= FOLD_SPARE ? at : null;
   }
 
   // The pieces (each a line of its own), folded where foldAt says: the piece
   // the fold is in split there, the rest hidden, and the button after them.
-  function foldPieces(texts, bubble) {
-    const at = foldAt(texts.join(""));
+  // limit: about four lines of the bubble as wide as it may be (the screen
+  // check: on a narrow map 120 characters were six lines).
+  function foldPieces(texts, bubble, limit = FOLD_CHARS) {
+    const at = foldAt(texts.join(""), limit);
     if (at === null) return texts.map((text) => div("one-piece", text));
     const words = app.state.texts.one_words;
     const nodes = [], rest = [];
@@ -3982,7 +3988,10 @@ const EbinoMap = (() => {
     // Its kind's small line over the words (直し45 段1), or none.
     for (const old of one.bubble.querySelectorAll(".kind")) old.remove();
     voice.before(...kindOf({ kind_label: kindLabel }));
-    voice.replaceChildren(...foldPieces(pieces.map((piece) => piece.spoken || piece.text), one.bubble));
+    // About four lines of the widest the bubble may be (placeOne's 「most」, 18px a character).
+    const most = Math.min(overlay.getBoundingClientRect().width * 0.5, 28 * 18);
+    const limit = Math.min(FOLD_CHARS, 4 * Math.max(10, Math.floor((most - 32) / 18)));
+    voice.replaceChildren(...foldPieces(pieces.map((piece) => piece.spoken || piece.text), one.bubble, limit));
     const spoken = pieces.some((piece) => piece.spoken);
     one.bubble.classList.toggle("spoken", spoken);
     const mark = one.bubble.querySelector(".spoken-mark");

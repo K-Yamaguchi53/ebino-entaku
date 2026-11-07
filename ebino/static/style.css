@@ -819,12 +819,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .map-compass, .map-around { position: absolute; transition: opacity .9s ease; }
 /* 直し48 段6: the scenery's name, small, in a corner (map.js places it);
    never pressed; out of the way at one to one and while the map moves. */
-.map-look-label { position: absolute; z-index: 2; display: grid; margin: 0; padding: 4px 10px; border-radius: 8px;
+.map-look-label { position: absolute; z-index: 2; display: grid; margin: 0; padding: 4px 10px; border-radius: 8px; white-space: nowrap;
   background: color-mix(in srgb, var(--night) 72%, transparent); color: var(--moon); pointer-events: none; line-height: 1.35; }
 .map-look-label[hidden] { display: none; }
 .map-look-label .look-name { font-family: var(--mincho); font-size: 14px; font-weight: 700; }
 .map-look-label .look-note { font-size: 11px; color: var(--soft); }
-.one-on .map-look-label, .moving .map-look-label { visibility: hidden; }
+.one-on .map-look-label, .moving .map-look-label, .map-look-label.crowded { visibility: hidden; }
 /* Spring's flowers: cherry-pink dots, still, on the spring picture only. */
 .spring-flowers .flower { fill: var(--sakura); fill-opacity: .85; stroke: var(--sakura-edge); stroke-opacity: .5; stroke-width: .8; }
 .spring-flowers { opacity: 0; }
@@ -1854,11 +1854,22 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
   .hitokoto { max-width: none; padding: 0; }
   .hk-sheet { padding: 0; background: none; }
   .hk-litbox { background: none; break-inside: avoid; }
-  /* 直し48 段4: more on it, still one A4 sheet. */
+  /* 直し48 段4: more on it, still one A4 sheet (the screen check: the last
+     line went onto a second page): a little smaller and closer on paper. */
   .hk-met-line, .hk-tie, .hk-moves { break-inside: avoid; }
-  .hk-sheet h3 { margin-bottom: 8px; }
-  .hk-story { line-height: 1.7; margin-bottom: 10px; }
+  .hk-sheet { font-size: 13px; line-height: 1.55; }
+  .hk-sheet h3 { margin-bottom: 8px; font-size: 18px; }
+  .hk-qq { margin-bottom: 10px; }
+  .hk-qbox { min-height: 0; padding: 6px 10px; font-size: 15px; }
+  .hk-story { font-size: 14px; line-height: 1.6; margin-bottom: 8px; }
+  .hk-met, .hk-moves, .hk-tie, .hk-marked, .hk-litbox { margin-bottom: 8px; }
+  .hk-met-quote, .hk-moves-list, .hk-lit { font-size: 14px; line-height: 1.55; }
+  .hk-met-line { margin-bottom: 4px; }
+  .hk-moves-list li + li { margin-top: 2px; }
+  .hk-litbox, .hk-tie { padding: 6px 10px; }
+  .hk-print-note { margin-top: 8px; }
 }
+@page { size: A4; margin: 12mm; }
 
 /* The map's first stop for the keyboard (直し41の続き): seen only when the
    keyboard is on it, over the map's corner; pressed, past the points to the

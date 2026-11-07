@@ -331,3 +331,9 @@ def test_the_hint_to_answer_the_ai_keeps_its_questions_clear():
     assert 'document.querySelector(".map-controls")],' in APP  # The screen check's 差し戻し: the top line and the column.
     assert ".guide.narrow { max-width: min(11em, calc(100vw - 16px)); }" in CSS
     assert '.guide[data-side="right"]::after { right: 100%;' in CSS and '.guide[data-side="left"]::after { left: 100%;' in CSS
+
+
+def test_the_hint_to_press_a_bubble_keeps_off_the_ais_questions():
+    """直し48 (the screen check): 「吹き出しを1つ押してみよう」 hid the end of
+    オブザーバー's question at 768×1024."""
+    assert 'clear: () => [...document.querySelectorAll("#ai-seat-cards .ai-question"), $("now-line")], sides: ["above", "below", "right", "left"] },' in APP

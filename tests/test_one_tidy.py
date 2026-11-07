@@ -298,7 +298,7 @@ def test_stopped_past_the_limit_or_turned_off_the_tidied_words_are_shown(monkeyp
 def test_the_bubble_parts_its_pieces_where_a_sentence_ends():
     says = MAP[MAP.index("  function says(pieces, source"):MAP.index("  // The person's words by its head, on the side with room")]
     # 直し48 段5: through foldPieces (「続きを読む」), each piece still a line of its own.
-    assert "voice.replaceChildren(...foldPieces(pieces.map((piece) => piece.spoken || piece.text), one.bubble));" in says
+    assert "voice.replaceChildren(...foldPieces(pieces.map((piece) => piece.spoken || piece.text), one.bubble, limit));" in says
     assert 'if (at === null) return texts.map((text) => div("one-piece", text));' in MAP
     assert 'nodes.push(div("one-piece", text));' in MAP
     assert '.join("")' not in says

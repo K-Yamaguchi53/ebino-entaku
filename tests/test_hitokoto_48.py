@@ -88,3 +88,12 @@ def test_five_only_on_a_day_with_a_split():
     assert 5 in harvest.uses_offered(with_split)
     assert 5 not in harvest.uses_offered(without)
     assert not any(r.splits for r in without.rounds)
+
+
+def test_a_sentence_pressed_before_the_lit_parts_come_stays_pressed():
+    # The screen check: the cards were whole-card buttons until the parts
+    # came, and a press then was lost. Sentences from the first; kept.
+    cards = HK[HK.index("  function renderCards(parts) {"):HK.index("  function pick(index, part, node) {")]
+    assert "const keep = picked;" in cards and "if (node) return pick(keep.person, keep.part, node);" in cards
+    assert "if (!(person.sentences && person.sentences.length)) {" in cards
+    assert "if (part && sentence.includes(part)) kw.classList.add(\"hk-lit-part\");" in cards
