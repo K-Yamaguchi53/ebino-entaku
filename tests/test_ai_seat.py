@@ -88,6 +88,7 @@ const part = (id) => made[id] || (made[id] = { id, textContent: "", hidden: true
 const $ = part;
 function el(tag, attrs, ...kids) { return { tag, attrs, kids, classList: { add() {} }, addEventListener() {} }; }
 function mapMoved() {}
+const EbinoRobot = { make: (role) => ({ robot: role }) };  // robot.js (直し47).
 const phrased = (text) => text;  // Kept whole in its phrases (直し33-5): here, as it is.
 const state = { texts: { ai_seat_mark: "AI", ai_seat_label: "LABEL", ai_seat_note: "NOTE" } };
 %(source)s

@@ -49,6 +49,8 @@ STATIC_FILES = {
     "/map.js": ("map.js", "text/javascript; charset=utf-8"),
     # A seat as a person at one to one (直し34-3), drawn by code.
     "/person.js": ("person.js", "text/javascript; charset=utf-8"),
+    # コーチ（AI） and オブザーバー（AI） as small robots (直し47), drawn by code.
+    "/robot.js": ("robot.js", "text/javascript; charset=utf-8"),
     # 帰る前に、ひとこと (直し38): its screen.
     "/hitokoto.js": ("hitokoto.js", "text/javascript; charset=utf-8"),
     # Hand-drawn lines on the map (MIT), bundled: nothing is loaded from outside.

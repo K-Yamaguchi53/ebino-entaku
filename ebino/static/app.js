@@ -239,19 +239,20 @@ async function setup() {
   for (const step of data.texts.now_steps) {
     $("now-steps").append(el("li", { "data-step": step.id, text: step.text }));
   }
-  // コーチとオブザーバー (直し46): a card for each, the AI's mark and its
-  // name as on the cards, what it knows and what it does (ai_roles_intro.tsv).
+  // コーチとオブザーバー (直し46): a card for each, its robot (直し47, robot.js;
+  // the largest here, 「AI」 on its body) and its name as on the cards, what
+  // it knows and what it does (ai_roles_intro.tsv).
   const roles = data.ai_roles || [];
   $("start-roles").hidden = !roles.length;
   $("start-roles-lead").textContent = data.texts.guide.roles_lead;
   $("start-roles-note").textContent = data.texts.guide.roles_note;
   for (const role of roles) {
     $("start-roles-list").append(el("li", { class: "role-card", "data-role": role.role },
-      el("p", { class: "role-head" },
-        el("span", { class: "ai-mark role-mark", "aria-hidden": "true", text: data.texts.ai_seat_mark }),
-        el("span", { class: "who", text: role.name })),
-      el("p", { class: "knows", text: role.knows }),
-      el("p", { class: "does", text: role.does })));
+      EbinoRobot.make(role.role, { tag: data.texts.ai_seat_mark }),
+      el("div", { class: "role-text" },
+        el("p", { class: "role-head" }, el("span", { class: "who", text: role.name })),
+        el("p", { class: "knows", text: role.knows }),
+        el("p", { class: "does", text: role.does }))));
   }
   renderInside(data.inside || []);
   setNow();
@@ -1497,8 +1498,10 @@ function renderAiSeat(roundNo, band) {
   const cards = $("ai-seat-cards");
   cards.replaceChildren();
   for (const card of band.cards) {
+    // Its role's robot (直し47, robot.js) just before its name, small.
     const button = el("button", { type: "button", class: "ai-question", "data-role": card.role, "data-round": roundNo },
-      el("span", { class: "who", text: card.label }), el("span", { class: "words", text: card.question }));
+      el("span", { class: "who" }, EbinoRobot.make(card.role), el("span", { class: "who-name", text: card.label })),
+      el("span", { class: "words", text: card.question }));
     button.addEventListener("click", () => {
       answerTo(roundNo, card.role);
       markAiChosen(card.role);

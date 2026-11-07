@@ -3721,8 +3721,8 @@ const EbinoMap = (() => {
     board.removeAttribute("aria-busy");
     board.setAttribute("role", "group");
     const head = div("one-coach-head");
-    head.append(div("ai-mark", app.state.texts.ai_seat_mark), div("one-coach-name", view.label));
-    head.firstChild.setAttribute("aria-hidden", "true");
+    // The coach's robot (直し47, robot.js; a picture only) beside its name.
+    head.append(EbinoRobot.make("coach"), div("one-coach-name", view.label));
     const question = div("one-coach-question", view.question);
     question.id = `one-coach-q-${askNo}`;
     board.setAttribute("aria-labelledby", question.id);

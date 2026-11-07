@@ -187,7 +187,8 @@ def test_the_host_page_has_a_card_for_the_coach_and_the_observer():
     assert guide["roles_lead"] == "円卓で人の言葉を読んだあと、この2つの AI から問いが届きます。届いた問いに、1回答えてみよう。"
     assert guide["roles_note"] == "どちらも AI です。町の人ではありません。"
     roles = APP[APP.index("// コーチとオブザーバー (直し46)"):APP.index("renderInside(data.inside")]
-    assert 'class: "ai-mark role-mark", "aria-hidden": "true", text: data.texts.ai_seat_mark' in roles
+    # Its robot (直し47, robot.js; aria-hidden there), 「AI」 on its body, in place of the square mark.
+    assert 'EbinoRobot.make(role.role, { tag: data.texts.ai_seat_mark })' in roles
     assert "role.name" in roles and "role.knows" in roles and "role.does" in roles and "｜" not in roles
     assert '$("start-roles-note").textContent = data.texts.guide.roles_note;' in roles
     # On the first page, under the flow, hidden with none.
