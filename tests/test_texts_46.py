@@ -23,7 +23,8 @@ def test_the_three_hitokoto_lines_and_the_ones_left_as_they_were():
     words = hitokoto.words()
     assert words["ask_self"] == "その人の話の、どこが自分にも当てはまりそう？"
     assert words["scale_up"] == "迷いが増えたね。どこが増えた？"
-    assert words["way_q"] == "まだ決めなくていい。気になっている進み方は？"
+    # 直し48 段7 (叩き台; the teacher, 11/7: 「伝わりにくい」).
+    assert words["way_q"] == "まだ決めなくていい。このあと、どうやって進んでみたい？"
     assert words["story_way"] == "頭に置いておきたい進み方は{*text}。"
     assert words["way_ok"] == "置いておく" and words["way_example"] == "例：農業もおもしろいかも"
     assert words["who_teacher"] == "先生の問い"

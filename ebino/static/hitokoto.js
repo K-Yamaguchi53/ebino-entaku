@@ -95,6 +95,7 @@ const EbinoHitokoto = (() => {
       return open(lent);
     }
     $("hk-first").textContent = view.first_question;
+    renderTrail(view.trail || []);
     drawMap();
     if (!view.people.length) {  // No one to read today: the first question, then the scale.
       $("hk-map-lead").hidden = true;
@@ -263,6 +264,40 @@ const EbinoHitokoto = (() => {
       ...view.people.map((p) => p.title), view.split ? `${W.map_split}${app.shownQuotes(view.split.heading)}` : ""].filter(Boolean).join("。"));
   }
 
+  // 直し48 段7: today's trail beside the talk, in the order it went; a step
+  // pressed opens, in place, what was heard then (whose words, as recorded).
+  // Open beside the talk on a wide screen; folded above it when narrow.
+  function renderTrail(items) {
+    const list = $("hk-trail-list");
+    list.replaceChildren();
+    $("hk-trail-title").textContent = W.sheet_story;
+    items.forEach((item, n) => {
+      const li = el("li", `hk-trail-step kind-${item.kind}`);
+      if (!item.quote) {
+        li.append(el("p", "hk-trail-head", item.head));
+      } else {
+        const id = `hk-trail-said-${n}`;
+        const head = button("hk-trail-head", null, () => {
+          const open = head.getAttribute("aria-expanded") !== "true";
+          head.setAttribute("aria-expanded", String(open));
+          $(id).hidden = !open;
+        });
+        head.setAttribute("aria-expanded", "false");
+        head.setAttribute("aria-controls", id);
+        head.append(el("span", "hk-trail-who", [item.who, item.label].filter(Boolean).join("　")));
+        if (item.kind === "one_ask") head.append(el("span", "hk-trail-asked", item.head));
+        const said = el("div", "hk-trail-said");
+        said.id = id;
+        said.hidden = true;
+        said.append(el("p", "hk-trail-quote", item.said ? `「${item.quote}」` : item.quote));
+        li.append(head, said);
+      }
+      list.append(li);
+    });
+    $("hk-trail").hidden = !items.length;
+    $("hk-trail-fold").open = window.matchMedia("(min-width: 769px)").matches;
+  }
+
   // Each person's words, as recorded. Before the parts come back, or with
   // none for a card, the whole card is pressed; a part lit is pressed alone.
   function renderCards(parts) {
@@ -278,13 +313,20 @@ const EbinoHitokoto = (() => {
         card.append(from, el("span", "hk-words", words));
         card.setAttribute("aria-pressed", "false");
       } else {
+        // 直し48 段7 (the teacher, 11/7: 「フレーズよりも文章まるごと選択で
+        // いい」): each whole sentence pressed alone (person.sentences, the
+        // server's: word for word); the one the lit part is in, lit.
         card = el("div", "hk-said");
         const body = el("span", "hk-words");
-        const at = words.indexOf(part);  // The first place only: one place to press.
-        const kw = button("hk-kw", part, () => pick(index, part, kw));
-        kw.setAttribute("aria-pressed", "false");
-        kw.setAttribute("aria-label", `${person.title}の言葉「${part}」`);
-        body.append(words.slice(0, at), kw, words.slice(at + part.length));
+        if (person.said) body.append("「");
+        for (const sentence of person.sentences || [person.text]) {
+          const kw = button("hk-kw hk-sentence", sentence, () => pick(index, sentence, kw));
+          kw.setAttribute("aria-pressed", "false");
+          kw.setAttribute("aria-label", `${person.title}の言葉「${sentence}」`);
+          if (sentence.includes(part)) kw.classList.add("hk-lit-part");
+          body.append(kw);
+        }
+        if (person.said) body.append("」");
         card.append(from, body);
       }
       if (!person.said && person.note) card.append(el("span", "hk-note", person.note));
@@ -297,8 +339,8 @@ const EbinoHitokoto = (() => {
     if (Number.isInteger(view.start) && view.people[view.start]) {
       const part = parts[String(view.start)] || "";
       const cards = box.children[view.start];
-      const node = cards && (part ? cards.querySelector(".hk-kw") : cards);
-      if (node) pick(view.start, part, node);
+      const node = cards && (part ? cards.querySelector(".hk-kw.hk-lit-part") || cards.querySelector(".hk-kw") : cards);
+      if (node) pick(view.start, node.classList.contains("hk-kw") ? node.textContent : part, node);
     }
   }
 
@@ -557,6 +599,8 @@ const EbinoHitokoto = (() => {
       }
       busy = false;
       say("me", fill(W.scale_me, { n: range.value }));
+      // 直し48 段7: at 0, no next question; on to the way to keep.
+      if (result.next === "way") return askWay();
       say("teacher", result.question);
       lineBox("forward", { send: W.send, skip: W.skip }, () => askWay());
     });

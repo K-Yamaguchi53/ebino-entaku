@@ -1121,9 +1121,34 @@ class Session:
         self.save()
         talk = self.talk
         view = talk.map_view()
+        view["trail"] = self.hitokoto_trail()
         if talk.stage == hitokoto.SCALE:  # No one on the map: straight to the scale.
             view["question"] = talk.asked[-1].text
         return view
+
+    def hitokoto_trail(self) -> list[dict]:
+        """直し48 段7: today's trail beside 帰る前に、ひとこと's talk, in the
+        order it went, each step with what was heard then: whose words and
+        which, as recorded (a bubble pressed: the words it showed; a question
+        at one to one: the pieces of its answer). No model, no name."""
+        shown = {q.utterance_id: q.text for r in self.rounds for q in r.quotes}
+        out = []
+        for item in self.trail_view()["items"]:
+            kind = item["kind"]
+            if kind == trail.QUESTION:
+                out.append({"kind": kind, "head": item["text"], "who": "", "quote": "", "said": False})
+            elif kind == trail.OPENED:
+                uid = item["utterance_id"]
+                utterance = self._utterances.get(uid)
+                out.append({"kind": kind, "head": item["who"], "who": item["who"], "label": item["label"],
+                            "quote": shown.get(uid) or (utterance.text if utterance else ""),
+                            "said": bool(utterance and not utterance.note)})
+            elif kind == trail.ONE_ASK:
+                step = next((s for s in self.steps if s["n"] == item["n"]), {})
+                pieces = [self._utterances[i] for i in step.get("utterance_ids") or [] if i in self._utterances]
+                out.append({"kind": kind, "head": item["text"], "who": item["who"], "label": item["label"],
+                            "quote": "".join(p.text for p in pieces), "said": bool(pieces) and not pieces[0].note})
+        return out
 
     def hitokoto_parts(self) -> dict:
         """The listener's short part of each card, asked once (8 seconds)."""
@@ -1144,7 +1169,8 @@ class Session:
             if not isinstance(person, int) or isinstance(person, bool) or not 0 <= person < len(talk.people):
                 raise Refused("unknown_person")
             part = part if isinstance(part, str) else ""
-            if part and talk.parts.get(person) != part:
+            # 直し48 段7: a whole sentence of the person's words (or, as before, the lit part).
+            if part and talk.parts.get(person) != part and part not in hitokoto.sentences(talk.people[person].text):
                 raise Refused("unknown_part")
         talk.chosen, talk.chosen_part, talk.omakase = person, part, bool(omakase)
         talk.stage = hitokoto.TALK
@@ -1315,6 +1341,12 @@ class Session:
             raise Refused("unknown_scale")
         talk.scale = value
         texts = hitokoto.words()
+        # 直し48 段7 (the teacher, 11/7: at 0 a question to lower it is
+        # asked): at 0 no next question; on to the way to keep.
+        if value == 0:
+            talk.stage = hitokoto.WAY
+            self.save()
+            return {"next": "way", "question": ""}
         if value < hitokoto.SCALE_FIRST:
             key = "scale_down"
         elif value == hitokoto.SCALE_FIRST:

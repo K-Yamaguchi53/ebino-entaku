@@ -222,7 +222,9 @@ class Person:
     def view(self) -> dict:
         return {"seat_id": self.seat_id, "title": self.title, "kind": self.kind,
                 "kind_label": KIND_LABELS.get(self.kind, ""), "text": self.text, "said": self.said,
-                "note": self.note, "x": self.x, "y": self.y}
+                "note": self.note, "x": self.x, "y": self.y,
+                # 直し48 段7: its words, one whole sentence a press.
+                "sentences": sentences(self.text)}
 
 
 @dataclass
@@ -344,6 +346,37 @@ class Hitokoto:
                      "b": self.people[self.tie["b"]].seat_id} if self.tie else None),
             "tie_asked": dict(self.tie_asked),
         }
+
+
+def sentences(text: str) -> list[str]:
+    """直し48 段7 (the teacher, 11/7: 「フレーズよりも文章まるごと選択でいい」):
+    the words in whole sentences, word for word: each ends after 。！？!? (a
+    」 right after it kept with it), never inside 「」. Joined, they are the
+    words as recorded (the spaces between sentences aside)."""
+    out, start, depth = [], 0, 0
+    chars = text or ""
+    n = 0
+    while n < len(chars):
+        c = chars[n]
+        if c == "「":
+            depth += 1
+        elif c == "」":
+            depth = max(0, depth - 1)
+            # A whole sentence in 「」 (「…。」): it ends with the 」.
+            if depth == 0 and n > 0 and chars[n - 1] in "。！？!?" and chars[start:n + 1].lstrip().startswith("「"):
+                out.append(chars[start:n + 1])
+                start = n + 1
+        elif c in "。！？!?" and depth == 0:
+            end = n + 1
+            while end < len(chars) and chars[end] in "」』）)":
+                end += 1
+            out.append(chars[start:end])
+            start, n = end, end
+            continue
+        n += 1
+    if chars[start:].strip():
+        out.append(chars[start:])
+    return [s.strip() for s in out if s.strip()]
 
 
 # --- who is on the map ---

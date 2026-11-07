@@ -1663,6 +1663,42 @@ button.hk-said[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--lamp-soft); }
   border-bottom: 2px solid var(--lamp); border-radius: 4px; font: inherit; line-height: 1.6; }
 .hk-kw:hover { background: var(--lamp-glow); }
 .hk-kw[aria-pressed="true"] { background: var(--lamp); font-weight: 700; }
+/* 直し48 段7: whole sentences, each pressed alone; the listener's part's sentence lit a little more. */
+.hk-sentence { display: inline; padding: 1px 3px; background: transparent; border-bottom: 2px dotted var(--paper-line);
+  border-radius: 3px; font: inherit; line-height: inherit; text-align: left; cursor: pointer; }
+.hk-sentence.hk-lit-part { background: var(--lamp-soft); }
+.hk-sentence:hover, .hk-sentence:focus-visible { background: var(--lamp-glow); }
+.hk-sentence[aria-pressed="true"] { background: var(--lamp); font-weight: 700; }
+/* 直し48 段7: today's trail beside the talk (a column on its right on a wide
+   screen; above it, folded, when narrow), each step opening in place. */
+#hk-talk:not([hidden]):has(#hk-trail:not([hidden])) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 17rem);
+  column-gap: 24px; align-items: start; }
+#hk-talk > :not(.hk-trail) { grid-column: 1; }
+.hk-trail { grid-column: 2; grid-row: 1 / span 4; position: sticky; top: calc(var(--now-h, 0px) + 8px); max-height: 80vh;
+  overflow: auto; padding: 10px 12px; border: 1px solid var(--moon-faint); border-radius: 10px; background: var(--night-2); }
+.hk-trail[hidden] { display: none; }
+.hk-trail summary { font-family: var(--mincho); font-size: 16px; color: var(--lamp-bright); cursor: pointer; }
+.hk-trail-list { margin: 8px 0 0; padding: 0 0 0 14px; list-style: none; border-left: 2px solid var(--moon-faint); }
+.hk-trail-step { position: relative; margin: 0 0 8px; }
+.hk-trail-step::before { content: ""; position: absolute; left: -20px; top: .55em; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--night-2); border: 2px solid var(--moon); }
+.hk-trail-step.kind-question::before { border-color: var(--lamp); }
+.hk-trail-head { display: grid; width: 100%; margin: 0; padding: 4px 6px; background: transparent; border: 0; border-radius: 6px;
+  color: var(--ink); font-size: 14px; line-height: 1.5; text-align: left; }
+button.hk-trail-head { cursor: pointer; }
+button.hk-trail-head:hover, button.hk-trail-head:focus-visible { background: var(--night-3); }
+button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
+.hk-trail-who { font-weight: 700; color: var(--soft); }
+.hk-trail-asked { color: var(--ink); }
+.kind-question > .hk-trail-head { font-family: var(--mincho); color: var(--lamp-bright); }
+.hk-trail-said[hidden] { display: none; }
+.hk-trail-quote { margin: 4px 0 0 6px; padding: 6px 10px; border-radius: 6px; background: var(--paper); color: var(--paper-ink);
+  font-family: var(--mincho); font-size: 14px; line-height: 1.7; }
+@media (min-width: 1100px) { .hitokoto:has(#hk-talk:not([hidden]) #hk-trail:not([hidden])) { max-width: 1040px; } }
+@media (max-width: 768px) {
+  #hk-talk:not([hidden]):has(#hk-trail:not([hidden])) { display: block; }
+  .hk-trail { position: static; max-height: none; margin-bottom: 14px; }
+}
 .hk-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
 .hk-primary { min-height: 46px; padding: 8px 22px; background: var(--lamp); color: var(--night); border: 0; border-radius: 10px; font-weight: 700; }
 .hk-primary:hover { background: var(--lamp-bright); }
