@@ -104,6 +104,9 @@ const EbinoMap = (() => {
   const RISE_PART = 0.62, RISE_PART_UP = 0.82, RISE_FOR = 700, RING_R_M = 40.35, PICTURE_TILT = 0.788;
   // Quicker since 直し31-6 (were 1100, 1100, 160): the table is there sooner.
   const CAMERA_FOR = 700, FLY_FOR = 700, FLY_GAP = 90, BACK_FOR = 700;
+  // 直し52 段5: a breath between the last seat landing and the cards lighting
+  // (landed, then lit), with motion only; the whole no more than this longer.
+  const LANDED_PAUSE = 250;
   const CLOSEST = 3.5;  // The nearest zoom shows this part of the whole across.
   const ZOOM_STEP = 1.4;
   const POINT_R = 7.5;  // A point's radius at scale 1 (see shape()).
@@ -2852,6 +2855,10 @@ const EbinoMap = (() => {
     rescale();
     const done = await Promise.all(landed).finally(() => { if (motion && app.gathering) app.gathering(false); });
     if (!still()) return;
+    if (motion) {
+      await wait(LANDED_PAUSE);
+      if (!still()) return;
+    }
     for (const flight of flights) flight.cancel();  // The transform attribute holds the spot now.
     flights = [];
     rescale();
