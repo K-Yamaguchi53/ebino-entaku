@@ -372,15 +372,15 @@ def load_cuts(folder) -> tuple[list[dict], str]:
 
 
 def _either_width(c: str) -> str:
-    """c, and its full-width form when it is a half-width letter, digit or mark."""
-    if "!" <= c <= "~":
-        return f"[{re.escape(c)}{re.escape(chr(ord(c) + 0xFEE0))}]"
-    return re.escape(c)
+    """c as typed, its NFKC form (３ → 3, ④ → 4) and, for a half-width
+    letter, digit or mark, its full-width form: any of them is found."""
+    forms = {c, unicodedata.normalize("NFKC", c)}
+    forms |= {chr(ord(f) + 0xFEE0) for f in list(forms) if len(f) == 1 and "!" <= f <= "~"}
+    return "(?:" + "|".join(re.escape(f) for f in sorted(forms, key=len, reverse=True)) + ")"
 
 
 def _loose(words: str) -> re.Pattern:
-    chars = [_either_width(c) for c in unicodedata.normalize("NFKC", words) if not c.isspace()]
-    return re.compile(r"\s*".join(chars))
+    return re.compile(r"\s*".join(_either_width(c) for c in words if not c.isspace()))
 
 
 def apply_cuts(utterances: list, rows: list[dict]) -> tuple[list, list[str]]:

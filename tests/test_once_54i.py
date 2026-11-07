@@ -52,6 +52,12 @@ def test_spaces_line_breaks_and_widths_do_not_matter(tmp_path):
     assert kept[0].text == "前後。" and problems == []
 
 
+def test_circled_digits_and_full_width_digits_are_found_as_typed_or_either_way(tmp_path):
+    rows, _ = _cuts(tmp_path, "C01\tアクション④　日時：３月２日\nC01\t㈱町\n")
+    kept, problems = one_to_one.apply_cuts([_piece("C01", "前。アクション④日時：3月2日。㈱町の話。", 1)], rows)
+    assert kept[0].text == "前。。の話。" and problems == []
+
+
 def test_a_piece_left_with_nothing_is_not_shown(tmp_path):
     rows, _ = _cuts(tmp_path, "C01\tマイストーリー共有。\n")
     kept, _ = one_to_one.apply_cuts([_piece("C01", "マイストーリー共有。", 1), _piece("C01", "残る。", 2)], rows)
