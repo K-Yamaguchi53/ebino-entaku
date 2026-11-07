@@ -46,6 +46,7 @@ python -m venv .venv
    - `EBINO_SHOW_COMPANY`：空のままにします（`1` にすると、席に会社名も出ます）
 2. 取り込み：`.venv\Scripts\python -m ebino.ingest.run`（出るのは件数と理由だけです）
 3. 起動：`.venv\Scripts\python -m ebino.app`
+   - 「帰る前に、ひとこと」の2つの問いは、オブザーバー（AI）とコーチ（AI）が出します。前の聞き手の形にするときは、`EBINO_HITOKOTO_VOICE=listener` を付けて起動します。
 
 ## テスト
 

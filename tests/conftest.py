@@ -32,6 +32,15 @@ def no_speaker_unless_asked(monkeypatch):
     monkeypatch.setenv("EBINO_SPEAKER", "0")
 
 
+@pytest.fixture(autouse=True)
+def listener_voice_unless_asked(monkeypatch):
+    """帰る前に、ひとこと's two questions (直し53 段9): put by オブザーバー and
+    コーチ by default, one more model's requests (asked ahead, in threads):
+    the listener's (as before) where a test scripts the model's answers; the
+    tests of 段9 ask for the two (EBINO_HITOKOTO_VOICE unset or "ai")."""
+    monkeypatch.setenv("EBINO_HITOKOTO_VOICE", "listener")
+
+
 ROWS = [
     ("番号", "項目", "記事", "字数"),
     ("1", "名前", PERSON, ""),

@@ -16,6 +16,9 @@ EBINO_REFLECT=old), the student, at the end of the sitting:
      model's. Two 「わからない」 in a row turn to the ladder of questions to
      pick from, made from the record and texts/ only: the split's two
      people's words, the people on the map, and a line with a blank.
+     直し53 段9: the two questions are put by the round table's オブザーバー
+     （AI） (reaction) and コーチ（AI） (self), reading what they read there
+     (ask_ai); EBINO_HITOKOTO_VOICE=listener keeps the listener's.
   3. the teacher's scale question (0 to 15, the first question's doubt as 10)
      and the next question, by the answer (the third direction, 前).
   4. what to keep: a way to keep in mind, a lesson near the talk (③ when
@@ -46,8 +49,11 @@ name check first: with a name in it, it is neither kept nor sent.
 """
 
 import json
+import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as WaitTimeout
 from dataclasses import dataclass, field
 
 from . import harvest, subjects
@@ -55,6 +61,7 @@ from .banned_words import BANNED_WORDS
 from .coach import LURE_FORMS
 from .gate import Gate, GateError, ModelUnavailable, json_answer, json_request
 from .ingest.scrub import normalize_for_match
+from .prompts import HITOKOTO_AI as HITOKOTO_AI_PROMPT
 from .prompts import LIGHT as LIGHT_PROMPT
 from .prompts import LISTENER as LISTENER_PROMPT
 from .prompts import TIE as TIE_PROMPT
@@ -202,7 +209,9 @@ def screen_words() -> dict:
     return {"words": words(), "kinds": KIND_LABELS,
             "marks": texts.id_table(texts.TRAIL_MARKS, texts.TRAIL_MARK_IDS),
             "mark_words": texts.id_table(texts.TRAIL_MARK_WORDS, texts.TRAIL_MARK_WORD_IDS),
-            "who_coach": coach.ai_label(coach.COACH)}
+            "who_coach": coach.ai_label(coach.COACH),
+            # 直し53 段9: ① by オブザーバー（AI）, ② by コーチ（AI）.
+            "who_observer": coach.ai_label(coach.OBSERVER)}
 
 
 def is_blank(text: str) -> bool:
@@ -262,9 +271,12 @@ class Asked:
 
     step: str  # A direction, ladder_two, ladder_three, fill, scale, forward.
     text: str
-    by: str  # "listener" (passed the checks), "fixed" (texts/), "teacher".
-    fallback: str = ""  # Why the listener's question was not used: a code.
+    by: str  # "listener", "observer" or "coach" (passed the checks), "fixed" (texts/), "teacher".
+    fallback: str = ""  # Why the model's question was not used: a code.
     seconds: float = 0.0
+    # 直し53 段9: whose name the card shows, "observer" or "coach" (its fixed
+    # question too, in the place of theirs); "" with the listener (as before).
+    who: str = ""
 
 
 @dataclass
@@ -722,7 +734,11 @@ def fixed_question(direction: str, talk: Hitokoto) -> str:
 def ask_listener(gate: Gate, session, talk: Hitokoto, direction: str, answer: str = "") -> Asked:
     """The question of this direction: the listener's where it passes the
     checks, else the fixed one. answer: what the student wrote just before,
-    left out when it is of home, money or health (not dug into)."""
+    left out when it is of home, money or health (not dug into).
+    直し53 段9: by オブザーバー and コーチ unless EBINO_HITOKOTO_VOICE=listener
+    (or the round table's two are off, or コーチ has no pieces)."""
+    if ai_on(session) and (role_of(direction) != "coach" or session.library.coach_sources):
+        return ask_ai(gate, session, talk, direction, answer)
     talk.listener_asked += 1
     if answer and has_avoid(answer):
         asked = Asked(direction, fixed_question(direction, talk), "fixed", STUDENT_AVOID)
@@ -739,6 +755,120 @@ def ask_listener(gate: Gate, session, talk: Hitokoto, direction: str, answer: st
         asked = Asked(direction, fixed_question(direction, talk), "fixed", reason, seconds)
     else:
         asked = Asked(direction, text.strip(), LISTENER, "", seconds)
+    talk.asked.append(asked)
+    return asked
+
+
+# --- 直し53 段9: the two questions put by オブザーバー and コーチ ---
+# (the teacher, 11/7: 最後まで質を高めたい。妥協はしたくない). reaction by
+# オブザーバー（AI）, self by コーチ（AI）, in the same order; both always
+# (no choosing). They read what the round table's two read (the student's
+# rounds today, コーチ the coach's pieces, オブザーバー its view), the words
+# picked and their card, the answer before, and what the two asked at the
+# table (asked_before, not to be repeated); the same model as at the table
+# (coach.ROLE). The checks are the listener's (question_stop): a question
+# that fails, or not back in AI_SECONDS from the student's step, is the fixed
+# question of its direction, its reason kept as a code (never the words).
+# reaction is asked ahead for each person on the map (at most three) as the
+# map comes, and again once the lit parts are known; the student's pick
+# takes that person's (the same words picked) or asks then. self is asked
+# when reaction is answered. EBINO_HITOKOTO_VOICE=listener: the listener as
+# before (to compare the two the same morning).
+VOICE_ENV = "EBINO_HITOKOTO_VOICE"
+VOICE_LISTENER = "listener"
+AI_SECONDS = 20.0  # The most the student waits, from the step that asks.
+AI_REQUEST_SECONDS = 45.0  # One request's own limit (one asked ahead may start well before).
+STOP_WAIT = "wait_timeout"  # Not back within AI_SECONDS.
+
+
+def voice() -> str:
+    """"listener" when EBINO_HITOKOTO_VOICE says so, else "ai" (the default)."""
+    return VOICE_LISTENER if os.environ.get(VOICE_ENV, "").strip().lower() == VOICE_LISTENER else "ai"
+
+
+def role_of(direction: str) -> str:
+    from . import coach
+    return {REACTION: coach.OBSERVER, SELF: coach.COACH}[direction]
+
+
+def ai_system() -> str:
+    from . import texts
+    return HITOKOTO_AI_PROMPT.format(observer_view=texts.load_text(texts.OBSERVER_VIEW),
+                                     banned="・".join(BANNED_WORDS),
+                                     abstract="・".join(load_lines(texts.AI_ABSTRACT_WORDS)),
+                                     question_limit=MAX_QUESTION)
+
+
+def ai_data(session, talk: Hitokoto, direction: str, chosen: str, card: str, answer: str) -> dict:
+    """What the model reads: the round table's record of today (coach.Record,
+    every round), the two's questions at the table, and this step's words.
+    Seats by their titles only; never a name, the Lab or the subjects."""
+    from . import coach
+    record = coach.Record(session, len(session.rounds))
+    asked_before = [{"role": card_.role, "text": card_.text} for result in session.rounds
+                    if result.band is not None for card_ in result.band.cards]
+    role = role_of(direction)
+    data = {"role": role, "direction": direction, "first_question": talk.first_question, "rounds": record.rounds,
+            "asked_before": asked_before, "chosen": chosen, "card": card, "answer": answer}
+    if role == coach.COACH:
+        data["coach_sources"] = list(session.library.coach_sources)
+    return data
+
+
+_AHEAD = ThreadPoolExecutor(max_workers=6, thread_name_prefix="hitokoto-ahead")
+
+
+def _ask_ai(gate: Gate, data: dict):
+    from . import coach
+    return _send(gate, coach.ROLE, ai_system(), data, QUESTION_SCHEMA, AI_REQUEST_SECONDS, 800)
+
+
+def ai_on(session) -> bool:
+    return voice() == "ai" and bool(session.library.coach_on)
+
+
+def ask_ahead(gate: Gate, session, talk: Hitokoto) -> None:
+    """reaction for each person on the map, asked now (once per person and
+    words): the lit part when there is one, else the card's first sentence."""
+    if not ai_on(session) or talk.chosen is not None:
+        return
+    ahead = session.hitokoto_ahead
+    for index, person in enumerate(talk.people[:3]):
+        chosen = talk.parts.get(index) or first_sentence(person.text)
+        if (index, chosen) in ahead:
+            continue
+        data = ai_data(session, talk, REACTION, chosen, person.text, "")
+        ahead[(index, chosen)] = _AHEAD.submit(_ask_ai, gate, data)
+
+
+def ask_ai(gate: Gate, session, talk: Hitokoto, direction: str, answer: str = "") -> Asked:
+    """The question of this direction by オブザーバー or コーチ: the one asked
+    ahead for the person and words picked, else asked now; waited for at
+    most AI_SECONDS; checked as the listener's; else the fixed question."""
+    talk.listener_asked += 1
+    who = role_of(direction)
+    if answer and has_avoid(answer):
+        asked = Asked(direction, fixed_question(direction, talk), "fixed", STUDENT_AVOID, who=who)
+        talk.asked.append(asked)
+        return asked
+    person = talk.people[talk.chosen] if talk.chosen is not None else None
+    chosen = chosen_words(talk)
+    started = time.monotonic()
+    future = session.hitokoto_ahead.get((talk.chosen, chosen)) if direction == REACTION else None
+    if future is None:
+        future = _AHEAD.submit(_ask_ai, gate, ai_data(session, talk, direction, chosen, person.text if person else "", answer))
+    try:
+        reply, reason, _ = future.result(timeout=AI_SECONDS)
+    except WaitTimeout:
+        reply, reason = None, STOP_WAIT
+    seconds = round(time.monotonic() - started, 1)
+    text = reply.get("question") if isinstance(reply, dict) else None
+    if reply is not None:
+        reason = question_stop(text, Words(session, talk), gate) if isinstance(text, str) else STOP_MISSING
+    if reason:
+        asked = Asked(direction, fixed_question(direction, talk), "fixed", reason, seconds, who=who)
+    else:
+        asked = Asked(direction, text.strip(), who, "", seconds, who=who)
     talk.asked.append(asked)
     return asked
 

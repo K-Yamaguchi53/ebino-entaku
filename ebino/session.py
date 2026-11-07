@@ -194,6 +194,14 @@ class Library:
         return views
 
 
+def _with_who(view: dict, asked) -> dict:
+    """直し53 段9: whose question it is on the screen (オブザーバー or コーチ),
+    when they put it; with the listener, the view as before."""
+    if asked.who:
+        view["who"] = asked.who
+    return view
+
+
 @dataclass
 class Session:
     library: Library
@@ -231,6 +239,9 @@ class Session:
     # 帰る前に、ひとこと (直し38, hitokoto.py): in place of the reflection
     # sheet unless EBINO_REFLECT=old. None until it starts.
     talk: hitokoto.Hitokoto | None = None
+    # 直し53 段9: reaction asked ahead, (person, words) -> its request; on the
+    # screen's side only, never in the record.
+    hitokoto_ahead: dict = field(default_factory=dict)
     # 今日の道すじ (直し45 段2, trail.py): every step in turn, numbered, never
     # a clock time or a name; the screen's trail is built from it.
     steps: list[dict] = field(default_factory=list)
@@ -1119,6 +1130,8 @@ class Session:
             return kept
         self.talk = hitokoto.begin(self, opened, _sheet_heading, self._mark_start(kept))
         self.talk.marks = kept
+        self.hitokoto_ahead = {}
+        hitokoto.ask_ahead(self.gate, self, self.talk)  # 直し53 段9: as the map comes.
         self.save()
         talk = self.talk
         view = talk.map_view()
@@ -1156,6 +1169,7 @@ class Session:
         talk = self._talk(hitokoto.MAP)
         if not talk.parts_asked:
             hitokoto.ask_parts(self.gate, talk)
+            hitokoto.ask_ahead(self.gate, self, talk)  # 直し53 段9: again, with the lit parts.
             self.save()
         return {"parts": {str(index): part for index, part in talk.parts.items()}}
 
@@ -1177,7 +1191,8 @@ class Session:
         talk.stage = hitokoto.TALK
         asked = hitokoto.ask_listener(self.gate, self, talk, hitokoto.REACTION)
         self.save()
-        return {"next": "ask", "question": asked.text, "omakase": bool(omakase), "person": person, "part": part}
+        view = {"next": "ask", "question": asked.text, "omakase": bool(omakase), "person": person, "part": part}
+        return _with_who(view, asked)
 
     def _trail_marks(self, marks):
         """The marks checked: [{"n", "mark", "note", "label", "text"}], or
@@ -1287,7 +1302,7 @@ class Session:
             return self._to_scale(talk)
         talk.stage = hitokoto.TALK
         asked = hitokoto.ask_listener(self.gate, self, talk, hitokoto.DIRECTIONS[talk.listener_asked], answer)
-        return {"next": "ask", "question": asked.text}
+        return _with_who({"next": "ask", "question": asked.text}, asked)
 
     def hitokoto_answer(self, text, dont_know: bool = False) -> dict:
         """An answer to the listener's question, or 「わからない」. Once: the
@@ -1303,7 +1318,8 @@ class Session:
             talk.blank_run += 1
             if talk.blank_run == 1:
                 self.save()
-                return {"next": "again", "note": hitokoto.words()["again"], "question": talk.asked[-1].text}
+                return _with_who({"next": "again", "note": hitokoto.words()["again"], "question": talk.asked[-1].text},
+                                 talk.asked[-1])
             view = self._ladder_or_scale(talk)
             self.save()
             return view

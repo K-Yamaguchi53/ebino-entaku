@@ -1787,6 +1787,9 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
   color: var(--paper-ink); }
 .hk-card.ai { align-self: flex-start; background: var(--ai-deep); color: var(--ai-ink); border: 1px solid var(--ai); }
 .hk-card.ai .hk-who { color: var(--ai); }
+/* 直し53 段9: オブザーバー（AI）・コーチ（AI）, their robot by the name, as at the round table. */
+.hk-card.ai .hk-who .robot { --robot-line: 1.6px; width: 28px; height: 28px; margin-right: 6px; }
+.hk-card.ai[data-role] .hk-who { display: flex; align-items: center; font-size: 13px; font-weight: 700; }
 .hk-card.ai.waiting .hk-q { color: var(--soft); }
 /* 直し51 段4: 先生の問い on the night's own blue, not a grey-brown over it
    (ヒビキ, 49_try_choices: a school questionnaire's grey). */

@@ -440,10 +440,19 @@ const EbinoHitokoto = (() => {
   // student. 直し45 段5: the AI's questions as コーチ（AI） (① and ②), in the
   // AI's colour and shape. 直し46: the scale's next one (③, the teacher's
   // fixed words) is 先生の問い, as the teacher's other questions.
-  function say(who, text, extra, cls = "") {
+  // 直し53 段9: role, "observer" or "coach": the question is theirs, by
+  // their name and robot as at the round table (① オブザーバー, ② コーチ).
+  function say(who, text, extra, cls = "", role = "") {
     const card = el("div", `hk-card ${who} ${cls}`.trim());
     if (cls !== "waiting") waitOn(who === "me" ? null : card);
-    card.append(el("span", "hk-who", { ai: app.state.hitokoto.who_coach, teacher: W.who_teacher, me: W.who_me }[who]));
+    const H = app.state.hitokoto;
+    const name = who === "ai" && role === "observer" ? H.who_observer : { ai: H.who_coach, teacher: W.who_teacher, me: W.who_me }[who];
+    const head = el("span", "hk-who", name);
+    if (who === "ai" && role && typeof EbinoRobot !== "undefined") {
+      head.prepend(EbinoRobot.make(role));
+      card.dataset.role = role;
+    }
+    card.append(head);
     if (text) card.append(el("p", "hk-q", text));
     if (extra) card.append(extra);
     $("hk-log").append(card);
@@ -483,11 +492,11 @@ const EbinoHitokoto = (() => {
     if (result.status === "ask_again") return message(result.message);
     clearInput();
     if (result.next === "ask") {
-      say("ai", result.question);
+      say("ai", result.question, null, "", result.who || "");
       return answerBox();
     }
     if (result.next === "again") {  // 「だいじょうぶ。…」 and the same question, in one card.
-      say("ai", result.note).append(el("p", "hk-q", result.question));
+      say("ai", result.note, null, "", result.who || "").append(el("p", "hk-q", result.question));
       return answerBox();
     }
     if (result.next === "ladder_two") return ladderTwo(result);
