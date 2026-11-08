@@ -2053,6 +2053,22 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
   .hk-sheet.hk-lit-up { animation: none; box-shadow: none; }
   .hk-sheet.hk-lit-up > h3::after { content: none; }
 }
+/* 直し54w (the teacher, 11/8): 最初にもどる with a little ending (app.js
+   backToStart): the night closes over the page, the title comes up in the
+   lamp's light with its rule, then the first screen. Once, no blinking. */
+.back-curtain { position: fixed; inset: 0; z-index: 999; display: grid; place-items: center; background: var(--night); }
+.back-curtain-title { margin: 0; padding-left: .16em; font-family: var(--mincho); font-size: clamp(44px, min(10vw, 16vh), 140px);
+  letter-spacing: .16em; white-space: nowrap; color: var(--ink); text-shadow: 0 0 .4em var(--lamp-soft), 0 .06em .25em var(--shadow); }
+.back-curtain-title::after { content: ""; display: block; width: 70%; height: 1px; margin: .2em auto 0;
+  background: linear-gradient(90deg, transparent, var(--lamp), transparent); }
+@media (prefers-reduced-motion: no-preference) {
+  .back-curtain { animation: back-night .6s ease-in both; }
+  .back-curtain-title { animation: back-title .8s ease-out .45s both; }
+  .back-curtain-title::after { transform-origin: center; animation: back-rule .7s ease-out .8s both; }
+}
+@keyframes back-night { from { opacity: 0; } to { opacity: 1; } }
+@keyframes back-title { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes back-rule { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 /* Printed: the one sheet alone, ink on the page's white. */
 @media print {
   html:has(#hk-sheet:not([hidden])), html:has(#hk-sheet:not([hidden])) body { background: none; color: var(--paper-ink); }

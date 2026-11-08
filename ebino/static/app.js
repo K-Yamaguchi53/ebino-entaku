@@ -2703,7 +2703,21 @@ function backToStart() {
     node.value = "";
     node.checked = false;
   }
-  window.location.replace(window.location.pathname);
+  const go = () => window.location.replace(window.location.pathname);
+  // 直し54w (the teacher, 11/8): back to the first screen with a little
+  // ending: the night closes over the page and the title comes up in the
+  // lamp's light (style.css .back-curtain), then the page is read afresh.
+  // Motion reduced: straight back, as before.
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return go();
+  const curtain = document.createElement("div");
+  curtain.className = "back-curtain";
+  curtain.setAttribute("aria-hidden", "true");
+  const title = document.createElement("p");
+  title.className = "back-curtain-title";
+  title.textContent = document.querySelector(".masthead h1")?.textContent || "";
+  curtain.append(title);
+  document.body.append(curtain);
+  setTimeout(go, 1600);
 }
 
 $("ask-form").addEventListener("submit", send);
