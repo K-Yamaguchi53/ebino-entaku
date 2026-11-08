@@ -62,6 +62,21 @@
   --launch-sky-mist: rgba(var(--launch-sky), .75);
   --launch-sky-edge: rgba(var(--launch-sky), .7);
   --launch-sky-clear: rgba(var(--launch-sky), 0);
+  /* 直し54p 夜の扉: the first screen over the night's own picture, and the
+     glass the boxes and buttons are made of (the night seen through it). */
+  --hero-fade-top: rgba(6, 11, 24, .12);
+  --hero-fade-mid: rgba(6, 11, 24, .5);
+  --hero-fade-end: rgba(6, 11, 24, .95);
+  --glass: rgba(17, 28, 56, .5);
+  --glass-strong: rgba(12, 20, 42, .78);
+  --glass-hover: rgba(30, 46, 86, .62);
+  --glass-edge: rgba(214, 228, 255, .2);
+  --glass-hi: rgba(255, 255, 255, .2);
+  --lamp-deep: #d8933a;
+  --lamp-sheen: rgba(255, 246, 226, .6);
+  --glass-clear: rgba(18, 30, 62, .26);
+  --glass-sheen: rgba(255, 255, 255, .13);
+  --glass-edge-bright: rgba(230, 238, 255, .42);
   --paper: #f4ecda;  /* Unbleached paper: the cards a student reads. */
   --paper-2: #ebe1c9;
   --paper-light: #fbf6ea;
@@ -2287,3 +2302,192 @@ html.launch-on .masthead h1 { visibility: hidden; }
 .launch-gate-plane { width: 46px; height: 46px; overflow: visible; filter: drop-shadow(0 0 14px var(--lamp-soft)); }
 .launch-gate-start { font-family: var(--mincho); font-size: clamp(20px, 2.2vw, 28px); color: var(--lamp-bright); letter-spacing: .45em; padding-left: .45em; }
 .launch-gate-sound { font-family: var(--mincho); font-size: 15px; color: var(--soft); letter-spacing: .3em; padding-left: .3em; }
+
+/* 直し54p (the teacher, 11/8): 夜の扉. The first screen is the opening's last
+   frame: the night's picture of Ebino behind, the title large in the middle
+   with a lamp's rule under it; the boxes and the buttons are glass (the night
+   through them, an edge of light at the top). With transparency reduced or
+   more contrast asked for: solid night, a clearer edge. Only the first screen
+   changes its place; the rest keeps its own, in the same glass. */
+body:not(:has(#start[hidden]))::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, var(--hero-fade-top) 0%, var(--hero-fade-mid) 40%, var(--hero-fade-end) 80%),
+    url("/relief.webp") center 58% / max(118vw, 155vh) auto no-repeat; }  /* Wider than the window: the picture's melted edges never show. */
+body:not(:has(#start[hidden])) { background: transparent; }
+body:not(:has(#start[hidden])) .masthead { text-align: center; padding-top: clamp(28px, 7vh, 80px); }
+body:not(:has(#start[hidden])) .masthead h1 { font-size: clamp(76px, min(14vw, 20vh), 196px); letter-spacing: .16em;
+  margin: 0 0 clamp(14px, 3vh, 32px) .16em; text-shadow: 0 0 .4em var(--lamp-soft), 0 .06em .25em var(--shadow); }
+body:not(:has(#start[hidden])) .masthead h1::after { content: ""; display: block; width: min(360px, 34vw); height: 1px;
+  margin: .2em auto 0; background: linear-gradient(90deg, transparent, var(--lamp), transparent); }
+body:not(:has(#start[hidden])) .now { background: transparent; }
+body:not(:has(#start[hidden])) .start-purpose { text-align: center; }
+body:not(:has(#start[hidden])) .now-steps { justify-content: center; }
+body:not(:has(#start[hidden])) .now-line { max-width: 780px; margin: 8px auto 0; text-align: center; border-left: 0;
+  border-radius: var(--r-pill); }
+/* The numbers of the promises: small lamp-ringed badges. */
+.notice-list li::before { display: inline-grid; place-items: center; width: 1.9em; height: 1.9em; border: 1px solid var(--lamp-soft);
+  border-radius: 50%; font-size: 1rem; color: var(--lamp-bright); }
+
+/* The glass: the promises, the Lab buttons, the line of what to do (on the first screen), the first look. */
+.promises, .lab-choice, body:not(:has(#start[hidden])) .now-line, .first-look {
+  background: var(--glass); border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 18px 44px var(--shadow); }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .promises, .lab-choice, body:not(:has(#start[hidden])) .now-line, .first-look {
+    -webkit-backdrop-filter: blur(16px) saturate(1.25); backdrop-filter: blur(16px) saturate(1.25); }
+}
+.promises { border-radius: 18px; }
+.first-look { background: var(--glass-strong); border-color: var(--lamp-soft); border-radius: 20px; }
+
+/* The Lab buttons: a ring that lights, an arrow that goes on; lifted a little under the pointer. */
+.lab-choice { min-height: 72px; padding: 14px 20px; border-radius: 16px;
+  transition: border-color var(--step), background-color var(--step), box-shadow var(--step), translate var(--step), scale var(--press) ease-out; }
+.lab-choice::before { width: 18px; height: 18px; }
+.lab-choice::after { content: ""; flex: none; margin-left: auto; width: 9px; height: 9px; border-top: 2px solid var(--moon-soft);
+  border-right: 2px solid var(--moon-soft); rotate: 45deg; transition: border-color var(--step), translate var(--step); }
+.lab-choice:hover { background: var(--glass-hover); border-color: var(--lamp-soft);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 0 26px var(--lamp-faint), 0 18px 44px var(--shadow); }
+.lab-choice:hover::before { border-color: var(--lamp-bright); }
+.lab-choice:hover::after { border-color: var(--lamp); }
+.lab-choice[aria-pressed="true"] { border-color: var(--lamp); background: linear-gradient(180deg, var(--lamp-faint), var(--glass));
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 0 30px var(--lamp-soft), 0 18px 44px var(--shadow); }
+.lab-choice[aria-pressed="true"]::after { border-color: var(--lamp-bright); }
+.lab-choice:focus-visible { outline: var(--focus-w) solid var(--lamp); outline-offset: 3px; }
+
+/* The lamp's buttons (聞く, 次へ): honey from light to deep, a sheen at the top, a soft glow. */
+#ask-button, .first-look-go { background: linear-gradient(180deg, var(--lamp-bright) 0%, var(--lamp) 55%, var(--lamp-deep) 100%);
+  box-shadow: inset 0 1px 0 var(--lamp-sheen), 0 0 26px var(--lamp-soft), 0 8px 22px var(--shadow); }
+#ask-button:hover, .first-look-go:hover { background: linear-gradient(180deg, var(--lamp-bright) 0%, var(--lamp-bright) 45%, var(--lamp) 100%);
+  box-shadow: inset 0 1px 0 var(--lamp-sheen), 0 0 38px var(--lamp-glow), 0 10px 26px var(--shadow); }
+#ask-button:active:not(:disabled), .first-look-go:active { background: linear-gradient(180deg, var(--lamp) 0%, var(--lamp-deep) 100%);
+  box-shadow: inset 0 2px 6px var(--shadow), 0 0 20px var(--lamp-soft); }
+#ask-button { border-radius: 14px; }
+.first-look-go { letter-spacing: .12em; }
+/* The quieter buttons beside them: glass pills. */
+.first-look-back, .map-zoom { background: var(--glass); border-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-hi); }
+.first-look-back { border-radius: var(--r-pill); }
+.first-look-back:hover { background: var(--glass-hover); border-color: var(--moon); }
+
+/* Only where there is a pointer to hover with. */
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .lab-choice:hover:not(:disabled) { translate: 0 -2px; }
+  .lab-choice:hover::after { translate: 3px -3px; }
+}
+/* Transparency reduced, or more contrast: no glass, the night solid, edges clear. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .promises, .lab-choice, body:not(:has(#start[hidden])) .now-line, .first-look, .first-look-back, .map-zoom {
+    -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--night-2); border-color: var(--moon); }
+  body:not(:has(#start[hidden]))::before { background: var(--night); }
+}
+
+/* 直し54q (the teacher, 11/8): the glass on the map screen too. Behind the
+   whole screen the night's picture again, blurred and deep, so the glass
+   has something to show through it; the column of buttons on the right,
+   the line of what to do now and the message line are glass over it. The
+   map and the box to write in keep their own ground: they are what is read.
+   The screen never scrolls here, so no glass is painted over a scroll. */
+body:has(#table:not([hidden])):has(#map:not([hidden]))::before { content: ""; position: fixed; inset: -60px; z-index: -1; pointer-events: none;
+  background: url("/relief.webp") center 58% / max(170vw, 230vh) auto no-repeat;
+  filter: blur(18px) saturate(1.5) brightness(1.15); }  /* Large: only the picture's bright middle, never its melted edges. */
+body:has(#table:not([hidden])):has(#map:not([hidden])) { background: transparent; }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-controls { flex-basis: 220px; padding: var(--sp-3) var(--sp-2);
+  border: 1px solid var(--glass-edge); border-radius: 18px; background: var(--glass);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 18px 44px var(--shadow); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line { background: var(--glass); border: 1px solid var(--glass-edge);
+  border-left: 6px solid var(--lamp); border-radius: 0 14px 14px 0; box-shadow: inset 0 1px 0 var(--glass-hi); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) #ask-message { background: var(--glass); border-color: var(--glass-edge);
+  border-radius: 12px; box-shadow: inset 0 1px 0 var(--glass-hi); }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-controls,
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line,
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #ask-message {
+    -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3); }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  body:has(#table:not([hidden])):has(#map:not([hidden]))::before { filter: none; background: var(--night); }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-controls,
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line,
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #ask-message {
+    -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--night-2); border-color: var(--moon); }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line { border-left-color: var(--lamp); }
+}
+
+/* 直し54q の続き (the teacher: 「もっとガラスを強く」): clearer glass, a
+   sheen across its top, a brighter edge, the night behind brighter. (Laid
+   over the map's edge it hid the map's own labels: not done.) */
+body:has(#table:not([hidden])):has(#map:not([hidden])) .map-controls,
+body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line,
+body:has(#table:not([hidden])):has(#map:not([hidden])) #ask-message {
+  background: linear-gradient(160deg, var(--glass-sheen) 0%, transparent 42%), var(--glass-clear);
+  border-color: var(--glass-edge-bright); box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 0 24px var(--glass-sheen), 0 18px 44px var(--shadow); }
+body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line { border-left-color: var(--lamp); }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-controls,
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line,
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #ask-message {
+    -webkit-backdrop-filter: blur(14px) saturate(1.6) brightness(1.05); backdrop-filter: blur(14px) saturate(1.6) brightness(1.05); }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  body:has(#table:not([hidden])):has(#map:not([hidden]))::before { filter: none; background: var(--night); }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .map-controls,
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line,
+  body:has(#table:not([hidden])):has(#map:not([hidden])) #ask-message {
+    -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--night-2); border-color: var(--moon); box-shadow: none; }
+  body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line { border-left-color: var(--lamp); }
+}
+
+/* 直し54r (the teacher, 11/8): the guide's bubble and 「町の大人に聞く」, made
+   with care. The bubble is the lamp's own honey (as 聞く and 次へ): light at
+   the top, deep at the foot, a sheen along its top edge, a soft glow round
+   it; its point takes the colour of the side it leaves from, so bubble and
+   point are one piece. Its line to the thing pressed glows the same. */
+.guide { padding: 10px 20px; border-radius: 16px; letter-spacing: .04em;
+  background: linear-gradient(180deg, var(--lamp-bright) 0%, var(--lamp) 58%, var(--lamp-deep) 100%);
+  box-shadow: inset 0 1px 0 var(--lamp-sheen), 0 0 26px var(--lamp-soft), 0 10px 24px var(--shadow); }
+.guide[data-side="above"]::after { border-top-color: var(--lamp-deep); }
+.guide[data-side="below"]::after { border-bottom-color: var(--lamp-bright); }
+.guide.big { padding: 14px 24px; border-radius: 18px; }
+.guide-reach, .guide-reach::after { background: var(--lamp-bright); box-shadow: 0 0 10px var(--lamp-glow); }
+/* To whom the box goes: a glass tile beside the paper, with a small lamp lit
+   in it (the town's grown-ups: honey; one seat: honey, its edge lit; an
+   AI's question: the AI's blue). */
+.ask .input-to { gap: 10px; padding: 6px 10px 6px 16px; border: 1px solid var(--glass-edge-bright); border-radius: 18px;
+  background: linear-gradient(160deg, var(--glass-sheen) 0%, transparent 46%), var(--glass-clear);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 10px 26px var(--shadow); color: var(--ink); font-size: 16px; letter-spacing: .06em; }
+.ask .input-to::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--lamp-bright);
+  box-shadow: 0 0 0 3px var(--lamp-faint), 0 0 14px var(--lamp-glow); }
+.ask[data-to="seat"] .input-to { border-color: var(--lamp); color: var(--lamp-bright);
+  background: linear-gradient(160deg, var(--lamp-faint) 0%, transparent 60%), var(--glass-clear);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 0 22px var(--lamp-faint), 0 10px 26px var(--shadow); }
+.ask[data-to="ai"] .input-to { border-color: var(--ai); color: var(--ai-ink); }
+.ask[data-to="ai"] .input-to::before { background: var(--ai-ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ai) 22%, transparent), 0 0 14px var(--ai); }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ask .input-to { -webkit-backdrop-filter: blur(14px) saturate(1.6); backdrop-filter: blur(14px) saturate(1.6); }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .ask .input-to { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--night-2); border-color: var(--moon); box-shadow: none; }
+  .ask[data-to="seat"] .input-to { border-color: var(--lamp); }
+  .ask[data-to="ai"] .input-to { border-color: var(--ai); }
+}
+
+/* 直し54s (the teacher, 11/8: 「地図上のフォント」): the map's words as a map
+   is lettered. The places in the Mincho, bold, widely spaced, brighter, a
+   fuller halo of the night and a soft shadow under it, so they sit on the
+   land like names printed on an old relief map; the school's name the same
+   hand, larger in its spacing. The ways out and the scenery's name: small
+   tags of glass laid on the map (the land blurred through them). map.js
+   measures every word as drawn (getBBox), so their places follow. */
+.place-names text { fill: var(--ink); font-family: var(--mincho); font-weight: 700; letter-spacing: .24em;
+  stroke-width: 3px; filter: drop-shadow(0 1px 2px var(--shadow)); }
+.school text { font-family: var(--mincho); letter-spacing: .14em; }
+.map-around, .map-look-label { border: 1px solid var(--glass-edge); border-radius: 999px;
+  background: linear-gradient(160deg, var(--glass-sheen) 0%, transparent 50%), color-mix(in srgb, var(--night-deep) 52%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 4px 12px var(--shadow); }
+.map-around { padding: 2px 10px; }
+.map-look-label { border-radius: 12px; padding: 5px 12px; }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .map-around, .map-look-label { -webkit-backdrop-filter: blur(8px) saturate(1.4); backdrop-filter: blur(8px) saturate(1.4); }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .map-around, .map-look-label { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--night-deep); border-color: var(--moon); }
+  .place-names text { filter: none; }
+}
