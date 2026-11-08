@@ -2494,3 +2494,12 @@ body:has(#table:not([hidden])):has(#map:not([hidden])) .now-line { border-left-c
   .map-around, .map-look-label { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--night-deep); border-color: var(--moon); }
   .place-names text { filter: none; }
 }
+
+/* 直し54u (the teacher, 11/8: the triangle and the frame did not meet): a
+   lamp card's tail now comes out from under the card (behind its ground),
+   so its base never shows against the card's edge; the card's edge in the
+   lamp's light like its tail; and the choice the guide lights is framed
+   inside its own edge, not 2px out of it where it ran into the tail. */
+.map-choices { border-color: var(--lamp-soft); }
+.map-choices .tail { z-index: -1; }
+.map-choices button.guide-here { outline-offset: -3px; }
