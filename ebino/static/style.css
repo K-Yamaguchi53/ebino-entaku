@@ -2314,7 +2314,10 @@ body:not(:has(#start[hidden]))::before { content: ""; position: fixed; inset: 0;
     url("/relief.webp") center 58% / max(118vw, 155vh) auto no-repeat; }  /* Wider than the window: the picture's melted edges never show. */
 body:not(:has(#start[hidden])) { background: transparent; }
 body:not(:has(#start[hidden])) .masthead { text-align: center; padding-top: clamp(28px, 7vh, 80px); }
-body:not(:has(#start[hidden])) .masthead h1 { font-size: clamp(76px, min(14vw, 20vh), 196px); letter-spacing: .16em;
+/* 直し54t (the teacher, 11/8: a tall window broke 卓 onto a line of its own):
+   five letters at .16em apart are 5.96em; the header holds 1168px, so at
+   most 172px, and never broken. */
+body:not(:has(#start[hidden])) .masthead h1 { font-size: clamp(48px, min(13vw, 20vh), 172px); letter-spacing: .16em; white-space: nowrap;
   margin: 0 0 clamp(14px, 3vh, 32px) .16em; text-shadow: 0 0 .4em var(--lamp-soft), 0 .06em .25em var(--shadow); }
 body:not(:has(#start[hidden])) .masthead h1::after { content: ""; display: block; width: min(360px, 34vw); height: 1px;
   margin: .2em auto 0; background: linear-gradient(90deg, transparent, var(--lamp), transparent); }
