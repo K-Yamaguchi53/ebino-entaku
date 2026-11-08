@@ -1,6 +1,6 @@
 # えびの円卓　出会った数 × 試した数
 
-> 会いに行く前に、会える。
+> 町の大人と先輩の言葉で、問いを深める。
 
 **English summary:** Ebino Round Table is a tool for high school students in Ebino, Miyazaki. A student asks one question, and the real words of local adults and seniors light up on a hand-drawn map of the basin. The AI never gives its own opinion: everything the seats say is original text, verified character by character by code outside the AI.
 
@@ -8,9 +8,9 @@
 
 ## 何のための道具か
 
-えびの市の高校生が、地域の大人と先輩の言葉に一度に話を聞ける、会いに行く前の入口です。
+えびの市の高校生が、地域の大人と先輩の言葉に一度に話を聞き、自分の問いを深めるための道具です。気づいたことを、調べる・試す・聞きに行くなど、次の行動に移すきっかけにします。
 
-<!-- TODO 11/7: 画面の説明と動画へのリンク -->
+<!-- デモ動画（YouTube 限定公開）の URL は、上げたあとにここへ「## デモ動画」として入れる -->
 
 ## 動くURLを出さない理由
 
