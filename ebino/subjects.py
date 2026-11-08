@@ -349,6 +349,34 @@ def choose(gate: Gate, catalog: Catalog | None, lab: str, words: dict[str, str],
                 order=_ordered(picked, pool, counts))
 
 
+# 直し54m (the teacher, 11/8: 好きな教科・がんばりたい教科を聞いて): the student
+# picks a subject; ③ is that subject's row of the teacher's table. No model.
+SOURCE_LIKED = "liked"
+
+
+def subject_names(catalog: Catalog | None, lab: str) -> list[str]:
+    """The subjects this student learns, each once, in table order ([]: none)."""
+    if catalog is None or catalog.manabu is None:
+        return []
+    return list(dict.fromkeys(c.row.subject for c in catalog.candidates(lab)))
+
+
+def choose_subject(catalog: Catalog | None, lab: str, subject: str, words: dict[str, str],
+                   counts: Counter) -> Pick:
+    """The subject the student picked: its rows for this student, the one
+    whose clue words the record holds most first (a tie: shown fewest first,
+    then table order); 「ほかの教科も見る」 goes through the rest of them."""
+    if catalog is None:
+        return Pick(STATUS_OFF)
+    if catalog.manabu is None:
+        return Pick(STATUS_NO_MANABU)
+    pool = [c for c in catalog.candidates(lab) if c.row.subject == subject]
+    if not pool:
+        return Pick(STATUS_NO_CANDIDATE)
+    ranked = sorted(pool, key=lambda c: (-clue_hits(c.row, words), counts[c.row.key]))
+    return Pick(SHOWN, fuda=ranked[0].row.fuda, source=SOURCE_LIKED, order=ranked)
+
+
 def two_to_choose(candidates: list[Candidate], counts: Counter) -> list[Candidate]:
     """The one shown fewest times so far (ties in table order), and the next
     such of another 札 (of the same when there is no other)."""

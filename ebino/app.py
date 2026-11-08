@@ -280,6 +280,9 @@ class App:
             "way": lambda: session.hitokoto_way(body.get("text", ""), skip=skip),
             "subject": lambda: session.hitokoto_subject(body.get("answer")),
             "subject_note": lambda: session.hitokoto_subject_note(body.get("text", ""), skip=skip),
+            # 直し54m: the subject the student likes.
+            "subject_names": session.hitokoto_subject_names,
+            "liked": lambda: session.hitokoto_liked(body.get("subject"), skip=skip),
             "subject_choose": lambda: session.hitokoto_subject_choose(body.get("choice")),
             "subject_more": session.hitokoto_subject_more,
             "try": lambda: session.hitokoto_try(body.get("answer"), body.get("text", ""), skip=skip),

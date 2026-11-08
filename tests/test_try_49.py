@@ -60,7 +60,7 @@ def test_it_comes_after_the_lesson_and_before_the_seat():
     other.hitokoto_way("", skip=True)
     other.hitokoto_subject("yes")
     assert other.hitokoto_subject_note("家庭科")["next"] == "try"
-    assert "askTry();" in HK and "askMeet();" not in HK[HK.index("  function askSubject() {"):HK.index("  // ③ under")]
+    assert "askTry();" in HK and "askMeet();" not in HK[HK.index("  async function askSubject() {"):HK.index("  // ③ under")]
 
 
 def test_meet_goes_on_to_the_seat_and_the_force_to_use():

@@ -176,6 +176,8 @@ TEXT_IDS = (
     "story_word_short", "story_wrote_short", "story_more_short", "story_way_short",
     # 直し51 段3.
     "sheet_hint", "drop", "restore",
+    # 直し54m.
+    "liked_q", "liked_none", "liked_tie", "story_liked",
     # 直し52 段2: 今日のあなた, by its light on today's map (the screen only).
     "map_you",
     # 直し54: over the student's own lines to put in 「いまの問い」 with one press.
@@ -325,6 +327,12 @@ class Hitokoto:
     subject: str = ""  # A SUBJECT_ANSWERS key.
     subject_note: str = ""
     subject_pick: object = None  # subjects.Pick
+    # 直し54m: the subject the student likes ("" not said), and where it came
+    # up in today's people's words ({"person", "quote"} or None) with how
+    # that was found ({"by", "reason", "seconds"}).
+    liked: str = ""
+    liked_tie: dict | None = None
+    liked_asked: dict = field(default_factory=dict)
     meet_seat: str = ""
     meet_use: str = ""
     light: Light | None = None
@@ -394,6 +402,10 @@ class Hitokoto:
             "subject": self.subject,
             "subject_note": self.subject_note,
             "subject_pick": subjects.record(self.subject_pick),
+            "liked": self.liked,
+            "liked_tie": ({"seat_id": self.people[self.liked_tie["person"]].seat_id, "quote": self.liked_tie["quote"]}
+                          if self.liked_tie else None),
+            "liked_asked": dict(self.liked_asked),
             "meet_seat": self.meet_seat,
             "meet_use": self.meet_use,
             "light": ({"quote": light.quote, "source": light.source, "force": light.force, "by": light.by,
@@ -892,6 +904,57 @@ def ask_ai(gate: Gate, session, talk: Hitokoto, direction: str, answer: str = ""
     return asked
 
 
+# --- 直し54m: the subject the student likes, in today's people's words ---
+
+LIKED_SECONDS = 10.0  # Past it, nothing is shown but the subject's card.
+MAX_LIKED_QUOTE = 40
+LIKED_SCHEMA = {
+    "type": "object",
+    "properties": {"person": {"type": "integer"}, "quote": {"type": "string"}},
+    "required": ["person", "quote"], "additionalProperties": False,
+}
+STOP_LIKED_NONE = "none_found"
+STOP_LIKED_PERSON = "unknown_person"
+
+
+def ask_liked_tie(gate: Gate, talk: Hitokoto, subject: str) -> None:
+    """Where the subject the student picked comes up in the words of today's
+    people: the model only points at a part, word for word; code checks it is
+    that person's words (MAX_LIKED_QUOTE at most, no name, not 「わからない」).
+    Nothing found or nothing that passes: no line (talk.liked_tie None)."""
+    talk.liked_tie = None
+    if not talk.people:
+        talk.liked_asked = {"by": "code", "reason": NO_PEOPLE, "seconds": 0.0}
+        return
+    from .prompts import LIKED_TIE
+    from .subjects import ROLE as SUBJECTS_ROLE
+    data = {"subject": subject,
+            "people": [{"number": n + 1, "text": person.text} for n, person in enumerate(talk.people)]}
+    reply, reason, seconds = _send(gate, SUBJECTS_ROLE, LIKED_TIE.format(quote_limit=MAX_LIKED_QUOTE), data,
+                                   LIKED_SCHEMA, LIKED_SECONDS, 600)
+    if reply is not None:
+        number, quote = reply.get("person"), reply.get("quote")
+        quote = quote.strip() if isinstance(quote, str) else ""
+        if number == 0 or not quote:
+            reason = STOP_LIKED_NONE
+        elif not isinstance(number, int) or isinstance(number, bool) or not 1 <= number <= len(talk.people):
+            reason = STOP_LIKED_PERSON
+        elif (len(quote) < 4 or len(quote) > MAX_LIKED_QUOTE or quote not in talk.people[number - 1].text
+              or gate.names.hits(quote) or says_nothing(quote)):
+            reason = STOP_QUOTE_NOT_WRITTEN
+        else:
+            talk.liked_tie = {"person": number - 1, "quote": quote}
+    talk.liked_asked = {"by": "model", "reason": reason, "seconds": seconds}
+
+
+def liked_tie_view(talk: Hitokoto) -> dict | None:
+    if not talk.liked_tie:
+        return None
+    person = talk.people[talk.liked_tie["person"]]
+    return {"lead": fill(words()["liked_tie"], subject=talk.liked), "who": person.title,
+            "quote": talk.liked_tie["quote"]}
+
+
 # --- the light ---
 
 LIGHT_SCHEMA = {
@@ -1084,6 +1147,8 @@ def story(talk: Hitokoto, shown: list[str] | None = None) -> list[dict]:
     if talk.subject == "yes":
         out += (segments(texts["story_subject_note"], note=talk.subject_note)
                 if talk.subject_note and not elsewhere(talk.subject_note) else segments(texts["story_subject"]))
+    if talk.liked:
+        out += segments(texts["story_liked"], subject=talk.liked)
     return out
 
 

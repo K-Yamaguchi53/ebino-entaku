@@ -1521,6 +1521,37 @@ class Session:
         self.save()
         return {"next": talk.stage}
 
+    def hitokoto_subject_names(self) -> dict:
+        """直し54m: the subjects this student learns, to pick the one they
+        like (the teacher's table); [] when there is none (no 学ぶ人 table):
+        the screen asks as before. No model; the stage stays."""
+        self._talk(hitokoto.SUBJECT)
+        return {"names": subjects.subject_names(self.library.subject_catalog, self.lab)}
+
+    def hitokoto_liked(self, subject, skip: bool = False) -> dict:
+        """直し54m (the teacher, 11/8: 好きな教科・がんばりたい教科を聞いて): the
+        subject picked (or 「答えない」); where it came up in today's people's
+        words (the model points, code checks; none: no line), and ③, that
+        subject's card from the teacher's table."""
+        talk = self._talk(hitokoto.SUBJECT)
+        names = subjects.subject_names(self.library.subject_catalog, self.lab)
+        if not skip and subject not in names:
+            raise Refused("unknown_subject")
+        if skip:
+            talk.stage = hitokoto.TRY
+            self.save()
+            return {"next": "try", "subject": None, "tie": None}
+        talk.liked = subject
+        hitokoto.ask_liked_tie(self.gate, talk, subject)
+        words = {"question": talk.first_question, "people": " ".join(p.text for p in talk.people)}
+        talk.subject_pick = subjects.choose_subject(self.library.subject_catalog, self.lab, subject, words,
+                                                    self._shown_subjects())
+        for shown in talk.subject_pick.on_screen():
+            self._count_shown_subject(shown)
+        talk.stage = hitokoto.TRY
+        self.save()
+        return {"next": "try", "subject": self._talk_subject(talk), "tie": hitokoto.liked_tie_view(talk)}
+
     def hitokoto_subject_note(self, text, skip: bool = False) -> dict:
         """Which lesson (optional); then ③, asked for once, with the question
         held now and the lesson's name as the record's words."""

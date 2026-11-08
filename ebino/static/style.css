@@ -1872,6 +1872,9 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
 #hk-log .hk-done :is(.hk-meet select, .hk-fill-line input, .hk-answer input) { border-style: dashed; }
 .hk-card.teacher:has(.hk-done) { border-color: var(--moon-soft); }
 .hk-harvest { margin: 0; padding: 18px 20px; align-self: stretch; }
+/* 直し54m: where the subject liked came up in today's words. */
+.hk-liked .hk-liked-quote { margin: 0; font-family: var(--mincho); font-size: 18px; font-weight: 700; line-height: 1.6; }
+.hk-liked .hk-liked-who { margin: 4px 0 0; font-size: 14px; opacity: 0.8; }
 .hk-exit { margin: 14px 0 0; text-align: right; }
 .hk-light { padding: 22px 20px; text-align: center; border: 1px solid var(--lamp-soft); border-radius: 16px;
   background: radial-gradient(circle at 50% 0, var(--lamp-faint), transparent 70%), var(--night-2); overflow-wrap: break-word; }

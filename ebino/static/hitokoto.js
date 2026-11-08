@@ -52,7 +52,7 @@ const EbinoHitokoto = (() => {
   // The steps that wait on the model, and the kind of wait each is (直し42,
   // texts/wait_sign.tsv); the others are quick and show no sign.
   // 直し48 段4: the sheet, 「整理中」 while it is made.
-  const WAITS = { parts: "listen", choose: "listen", answer: "listen", subject_note: "subject", light: "light", sheet: "sheet" };
+  const WAITS = { parts: "listen", choose: "listen", answer: "listen", subject_note: "subject", liked: "subject", light: "light", sheet: "sheet" };
 
   async function post(step, body = {}) {
     return app.call(`/api/hitokoto/${step}`, body, { wait: WAITS[step] });
@@ -846,7 +846,55 @@ const EbinoHitokoto = (() => {
     lineBox("way", { send: W.way_ok, skip: W.way_none, placeholder: W.way_example }, () => askSubject(), card);
   }
 
-  function askSubject() {
+  // 直し54m (the teacher, 11/8: 好きな教科・がんばりたい教科を聞いて): the
+  // subjects this student learns, from the teacher's table, to press one (or
+  // 答えない); then where it came up in today's people's words (when code let
+  // it through) and that subject's card. No table: asked as before.
+  async function askSubject() {
+    clearInput();
+    let names = [];
+    try {
+      names = (await post("subject_names", {})).names || [];
+    } catch (error) {
+      names = [];
+    }
+    if (!names.length) return askSubjectBefore();
+    const box = el("div", "hk-picks");
+    for (const [key, text] of [...names.map((name) => [name, name]), ["", W.liked_none]]) {
+      const pick = button("hk-pick", text, async () => {
+        if (busy) return;
+        busy = true;
+        lock(box, pick);
+        let result;
+        try {
+          result = await post("liked", key ? { subject: key } : { skip: true });
+        } catch (error) {
+          busy = false;
+          unlock(box);
+          return message(app.sendFailed(error));
+        }
+        busy = false;
+        say("me", text);
+        showLiked(result.tie);
+        showSubject(result.subject);
+        askTry();
+      });
+      box.append(pick);
+    }
+    say("teacher", W.liked_q, box);
+    box.querySelector("button").focus({ preventScroll: true });
+  }
+
+  // Where the subject came up: the teacher's line, the words as recorded, whose.
+  function showLiked(tie) {
+    if (!tie) return;
+    const box = el("div", "harvest hk-harvest hk-liked");
+    box.append(el("p", "subject-link", tie.lead), el("p", "hk-liked-quote", `「${tie.quote}」`),
+      el("p", "hk-liked-who", tie.who));
+    $("hk-log").append(box);
+  }
+
+  function askSubjectBefore() {
     clearInput();
     const box = el("div", "hk-picks");
     const answers = [["yes", W.subject_yes], ["no", W.subject_no], ["unsure", W.subject_unsure]];

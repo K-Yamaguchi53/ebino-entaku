@@ -41,7 +41,8 @@ def test_nothing_sent_or_kept_the_ways_out_counted():
     # The ways this page sends anything, as before 直し52: the trail read, and eleven steps.
     assert re.findall(r'fetch\("([^"]+)"', HK) == ["/api/trail"]
     assert sorted(re.findall(r'post\("([a-z_]+)"', HK)) == sorted(
-        ["answer", "begin", "choose", "drop", "light", "meet", "parts", "scale", "sheet", "subject", "use"])
+        ["answer", "begin", "choose", "drop", "light", "liked", "meet", "parts", "scale", "sheet", "subject",
+         "subject_names", "use"])  # 直し54m: liked, subject_names.
     assert "localStorage" not in HK and "sessionStorage" not in HK
     # Nothing of it in the record's words either: the server never hears of it.
     assert "map_you" not in (app_module.STATIC_DIR.parent / "hitokoto.py").read_text(encoding="utf-8").split("TEXT_IDS = (")[0]
