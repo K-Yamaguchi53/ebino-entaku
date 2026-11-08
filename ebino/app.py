@@ -53,6 +53,8 @@ STATIC_FILES = {
     "/robot.js": ("robot.js", "text/javascript; charset=utf-8"),
     # 帰る前に、ひとこと (直し38): its screen.
     "/hitokoto.js": ("hitokoto.js", "text/javascript; charset=utf-8"),
+    # The opening as the page opens (直し54n).
+    "/launch.js": ("launch.js", "text/javascript; charset=utf-8"),
     # Hand-drawn lines on the map (MIT), bundled: nothing is loaded from outside.
     "/rough.js": ("rough.js", "text/javascript; charset=utf-8"),
     "/rough.LICENSE.txt": ("rough.LICENSE.txt", "text/plain; charset=utf-8"),

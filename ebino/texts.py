@@ -161,6 +161,7 @@ BACK_TO_START = "back_to_start"
 REFLECT_NEEDS_ANSWER = "reflect_needs_answer"
 # The button that ends the opening after a Lab is picked (直し30-3).
 OPENING_SKIP = "opening_skip"
+LAUNCH_LINE = "launch_line"  # 直し54n: the line under the title as the page opens.
 # Just over the two cards of コーチ and オブザーバー, until one is answered (直し30の続き-0).
 AI_ANSWER_HINT = "ai_answer_hint"
 # The same words to the same seat a second time: no new card, the one there is (直し31-2).
@@ -265,7 +266,7 @@ SCREEN_TEXTS = (
     HARVEST_MEET_PREFIX, MORE_END, MORE_CARD_DONE, SAMPLE_SUMMARIZED, HARVEST_SUBJECT_MORE,
     BUBBLE_HINT, BUBBLE_CLOSE, BUBBLE_ANSWER,
     BACK_TO_START, BACK_TO_START_CONFIRM, BACK_TO_START_YES, BACK_TO_START_NO, REFLECT_NEEDS_ANSWER,
-    OPENING_SKIP, AI_ANSWER_HINT, CARD_ALREADY,
+    OPENING_SKIP, LAUNCH_LINE, AI_ANSWER_HINT, CARD_ALREADY,
     HARVEST_SUBJECT_QUESTION, HARVEST_SUBJECT_PICK, HARVEST_SUBJECT_NONE,
     START_PURPOSE, START_ABOUT, INSIDE_HEADING, INSIDE_END, INSIDE_OPEN, QUESTION_EXAMPLES_LEAD, QUESTION_EXAMPLES_END,
     SPOKEN_NOTE, SPOKEN_MARK, AI_SEAT_LABEL, AI_SEAT_NOTE, AI_SEAT_MARK, MAP_SKIP,

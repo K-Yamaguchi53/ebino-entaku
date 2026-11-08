@@ -53,6 +53,15 @@
   --lamp-soft: rgba(245, 185, 95, .42);
   --lamp-faint: rgba(245, 185, 95, .13);
   --lamp-glow: rgba(245, 185, 95, .5);
+  --lamp-none: rgba(245, 185, 95, 0);
+  /* 直し54n: the opening (launch.js): the lamp's heart, and the sky as the
+     seasons go round (launch.js sets --launch-sky on the page). */
+  --launch-glow: rgba(255, 217, 154, .9);
+  --launch-sky: 6, 11, 24;
+  --launch-sky-solid: rgb(var(--launch-sky));
+  --launch-sky-mist: rgba(var(--launch-sky), .75);
+  --launch-sky-edge: rgba(var(--launch-sky), .7);
+  --launch-sky-clear: rgba(var(--launch-sky), 0);
   --paper: #f4ecda;  /* Unbleached paper: the cards a student reads. */
   --paper-2: #ebe1c9;
   --paper-light: #fbf6ea;
@@ -2233,3 +2242,40 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
   .wait-dots span:nth-child(2) { animation-delay: .2s; }
   .wait-dots span:nth-child(3) { animation-delay: .4s; }
 }
+
+/* 直し54n: the opening as the page opens (launch.js). Over everything, and
+   only while it plays: with motion reduced it never begins (the class is
+   never set), and the first screen is as before. The page's own title is
+   hidden while it plays; the opening's title goes to its place, then it is
+   there. Its colours: the night's, the lamp's and the paper's; the sky's
+   (--launch-sky) is set on the page by launch.js as the seasons go round. */
+.launch { display: none; }
+html.launch-on .launch { display: block; position: fixed; inset: 0; z-index: 1000; overflow: hidden; cursor: pointer;
+  background-color: var(--launch-sky-solid); }
+html.launch-on .masthead h1 { visibility: hidden; }
+.launch > *, .launch-world > *, .launch-ground > * { position: absolute; }
+.launch-world { inset: 0; overflow: hidden; }
+/* Until the pictures are read, the night's colour alone (nothing seen half made). */
+.launch:not(.launch-going) > * { visibility: hidden; }
+.launch-ground { transform-origin: 50% 50%; will-change: transform; }
+.launch-picture { inset: 0; display: block; width: 100%; height: 100%; }
+.launch-glow { border-radius: 50%; mix-blend-mode: screen;
+  background: radial-gradient(circle, var(--launch-glow) 0%, var(--lamp-soft) 18%, var(--lamp-faint) 45%, var(--lamp-none) 70%); }
+.launch-town { width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: var(--lamp-bright);
+  box-shadow: 0 0 18px 6px var(--lamp-glow), 0 0 60px 14px var(--lamp-faint); }
+.launch-fog { inset: 0; pointer-events: none;
+  background: linear-gradient(to bottom, var(--launch-sky-solid) 0%, var(--launch-sky-solid) 16%, var(--launch-sky-mist) 30%, var(--launch-sky-clear) 52%),
+    radial-gradient(ellipse at 50% 60%, var(--launch-sky-clear) 45%, var(--launch-sky-edge) 100%); }
+.launch-plane, .launch-icons { inset: 0; width: 100%; height: 100%; overflow: visible; }
+.launch-plane polygon { stroke: var(--moon-soft); stroke-width: .8; stroke-linejoin: round; }
+.launch-paper { fill: var(--paper-light); }
+.launch-paper-shade { fill: var(--paper-2); }
+.launch-flat { inset: 0; opacity: 0; background: radial-gradient(circle at 50% 55%, var(--night-3) 0%, var(--night-2) 32%, var(--night) 62%, var(--night-deep) 100%); }
+.launch-ring { width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; border: 2px solid var(--lamp-bright); opacity: 0; }
+.launch-title { left: 0; width: 100%; margin: 0; text-align: center; font-family: var(--display); font-weight: 800; line-height: 1;
+  color: var(--ink); letter-spacing: .1em; white-space: nowrap;
+  text-shadow: 0 0 .35em var(--lamp-soft), 0 .06em .2em var(--shadow); }
+.launch-title span { display: inline-block; opacity: 0; }
+.launch-rule { height: 2px; background: var(--lamp); transform: scaleX(0); transform-origin: center; }
+.launch-line { left: 0; width: 100%; text-align: center; font-family: var(--mincho); color: var(--soft); white-space: nowrap; opacity: 0; }
+.launch-skip { right: 28px; bottom: 24px; font-family: var(--mincho); font-size: 14px; color: var(--faint); letter-spacing: .2em; opacity: 0; }

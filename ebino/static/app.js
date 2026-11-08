@@ -231,6 +231,8 @@ async function setup() {
   for (const seat of data.seats) state.seatById[seat.seat_id] = seat;
   for (const line of data.texts.start_notice) $("start-notice").append(el("li", { text: line }));
   $("start-purpose").textContent = data.texts.start_purpose;
+  // 直し54n: the opening's words (launch.js), if it is still on.
+  if (window.EbinoLaunch) EbinoLaunch.words({ line: data.texts.launch_line, skip: data.texts.opening_skip });
   // The host's words, a paragraph for each of its lines.
   // 直し48 段1: on the first page all but the last; the last, 「進み方は、
   // この4つです。」, heads the second page, the four steps under it.

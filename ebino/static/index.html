@@ -10,8 +10,12 @@
 <link rel="preload" href="/fonts/BIZUDPGothic-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/BIZUDPGothic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<!-- 直し54n: the opening as the page opens (launch.js). In the head so the
+     first screen is never seen before it; it waits for the page itself. -->
+<script src="/launch.js"></script>
 </head>
 <body>
+<div id="launch" class="launch" aria-hidden="true"></div>
 <header class="masthead">
   <h1>えびの円卓</h1>
   <p id="heavy-talk" class="heavy-talk"></p>
