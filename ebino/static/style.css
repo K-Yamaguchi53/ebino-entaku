@@ -2279,3 +2279,11 @@ html.launch-on .masthead h1 { visibility: hidden; }
 .launch-rule { height: 2px; background: var(--lamp); transform: scaleX(0); transform-origin: center; }
 .launch-line { left: 0; width: 100%; text-align: center; font-family: var(--mincho); color: var(--soft); white-space: nowrap; opacity: 0; }
 .launch-skip { right: 28px; bottom: 24px; font-family: var(--mincho); font-size: 14px; color: var(--faint); letter-spacing: .2em; opacity: 0; }
+/* 直し54o: before it plays, the night's colour waits for a click (the music
+   needs one): a small paper plane, 「クリックで はじまる」 and 「音が出ます」. */
+.launch-gate { inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  visibility: hidden; opacity: 0; transition: opacity .8s ease; }
+.launch.launch-waiting > .launch-gate { visibility: visible; opacity: 1; }
+.launch-gate-plane { width: 46px; height: 46px; overflow: visible; filter: drop-shadow(0 0 14px var(--lamp-soft)); }
+.launch-gate-start { font-family: var(--mincho); font-size: clamp(20px, 2.2vw, 28px); color: var(--lamp-bright); letter-spacing: .45em; padding-left: .45em; }
+.launch-gate-sound { font-family: var(--mincho); font-size: 15px; color: var(--soft); letter-spacing: .3em; padding-left: .3em; }

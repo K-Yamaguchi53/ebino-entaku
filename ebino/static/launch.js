@@ -9,12 +9,17 @@
 // beat; the lamp's rule and one line (texts/launch_line.txt); then the title
 // goes to its place at the top of the first screen and the screen is there.
 //
-// About 8 seconds. A click on it, Enter, Esc or the space bar ends it (to
-// the title going to its place). Nothing is sent, kept or asked of the
-// server: it reads only the pictures the map uses and the title on the page.
-// No sound (a page that has not been touched may not play one). With motion
-// reduced: none at all, the first screen as before. A picture that cannot be
-// read: the flight is left out and it starts at the cut.
+// It waits on the night's colour for a click (直し54o, the teacher, 11/8:
+// music with it; a page not yet touched may not sound): 「クリックで はじまる」
+// and 「音が出ます」 (texts/launch_start.txt, launch_sound.txt). The click,
+// Enter or the space bar starts it, with its music, made here as it plays on
+// the same beats (no file); Esc there leaves it out. About 9 seconds. Once it
+// plays, a click on it, Enter, Esc or the space bar ends it (to the title
+// going to its place, the music fading with it). Nothing is sent, kept or
+// asked of the server: it reads only the pictures the map uses and the title
+// on the page. With motion reduced: none at all, no music, the first screen
+// as before. A picture that cannot be read: the flight is left out and it
+// starts at the cut (its music too).
 //
 // render(T) draws the moment T seconds in, nothing else (as the newsletter's
 // opening was made), so a skip is only a jump in T.
@@ -100,6 +105,15 @@
     parts.rule = make("div", "launch-rule", box);
     parts.line = make("div", "launch-line", box);
     parts.skip = make("div", "launch-skip", box);
+    // Waiting for the click: a small paper plane, the words under it.
+    parts.gate = make("div", "launch-gate", box);
+    const mark = make("svg", "launch-gate-plane", parts.gate, true);
+    mark.setAttribute("viewBox", "-1.3 -1.3 2.6 2.6");
+    const tilt = make("g", "", mark, true);
+    tilt.setAttribute("transform", "rotate(40)");
+    FLAT.forEach((points, side) => make("polygon", side ? "launch-paper-shade" : "launch-paper", tilt, true).setAttribute("points", points.map((q) => q.join(",")).join(" ")));
+    parts.start = make("div", "launch-gate-start", parts.gate);
+    parts.sound = make("div", "launch-gate-sound", parts.gate);
     window.EbinoLaunch.words(words);  // Words already in: shown.
   }
 
@@ -214,7 +228,132 @@
     return { scale: size / fs, dx: to.left + to.width / 2 - cx, dy: to.top + to.height / 2 - cy };
   }
 
+  // --- The music (直し54o): made here as it plays, on the same beats. Over
+  // Ebino, a soft chord for each season and notes rising to the cut; the cut,
+  // a low beat and a bell; the plane off with a breath of wind; a note for
+  // each character (E G A C D, left open); on beat 8 the lamp's chord (C),
+  // which is still sounding as the first screen comes.
+  const NOTE = (n) => 440 * Math.pow(2, (n - 69) / 12);  // A note's number to its pitch.
+  const SPRING = [60, 64, 67, 74], AUTUMN = [57, 60, 64, 67], NIGHT = [53, 57, 60, 64];
+  const CHARS = [76, 79, 81, 84, 86], HOME = [48, 55, 64, 74, 79];
+  const LEAD = 0.08;  // Seconds from the click to the first sound and frame.
+  let audio = null, music = null;
+
+  function hearing() {  // Only in the click (or key): a page may sound only after one.
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    try { const ctx = new Ctx(); ctx.resume(); return ctx; } catch (error) { return null; }
+  }
+
+  function score(ctx, from) {
+    const t0 = ctx.currentTime + LEAD - from, rate = ctx.sampleRate;
+    const master = ctx.createGain(), press = ctx.createDynamicsCompressor();
+    master.connect(press).connect(ctx.destination);
+    master.gain.setValueAtTime(0.0001, t0 + from);
+    master.gain.exponentialRampToValueAtTime(0.85, t0 + from + 0.25);
+    let seed = 11;  // The same noise each time.
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const room = ctx.createConvolver(), long = Math.floor(rate * 2.4), echo = ctx.createBuffer(2, long, rate);
+    for (let c = 0; c < 2; c++) { const d = echo.getChannelData(c); for (let i = 0; i < long; i++) d[i] = (rnd() * 2 - 1) * Math.pow(1 - i / long, 3); }
+    room.buffer = echo;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.32;
+    room.connect(wet).connect(master);
+    const noise = ctx.createBuffer(1, rate * 4, rate), nd = noise.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = rnd() * 2 - 1;
+    const send = (node, amount) => {
+      node.connect(master);
+      if (amount) { const s = ctx.createGain(); s.gain.value = amount; node.connect(s).connect(room); }
+    };
+    const shape = (g, at, d, level, a, r) => {  // Up over a, held, down over r.
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.linearRampToValueAtTime(level, at + a);
+      g.gain.setValueAtTime(level, at + Math.max(a, d - r));
+      g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+    };
+    const tone = (n, t, d, o) => {
+      if (t < from - 0.02) return;  // Started at the cut: nothing of the flight.
+      const at = t0 + t, osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = o.type || "triangle";
+      osc.frequency.value = NOTE(n) * (o.ratio || 1);
+      osc.detune.value = o.detune || 0;
+      let node = osc;
+      if (o.cut) { const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = o.cut; node = node.connect(f); }
+      node.connect(g);
+      shape(g, at, d, o.gain, o.a || 0.004, o.r || d * 0.95);
+      send(g, o.room);
+      osc.start(at);
+      osc.stop(at + d + 0.05);
+    };
+    const pad = (chord, t, d, level) => chord.forEach((n) => {
+      for (const detune of [-7, 7]) tone(n, t, d, { gain: level, a: 0.5, r: 0.55, detune, cut: 1700, room: 0.5 });
+    });
+    const pluck = (n, t, level) => {
+      tone(n, t, 1.5, { gain: level, room: 0.45 });
+      tone(n, t, 0.7, { gain: level * 0.3, type: "sine", ratio: 2, room: 0.45 });
+    };
+    const bell = (n, t, level) => [[1, 1, 3], [2.76, 0.4, 1.4], [5.4, 0.18, 0.7]].forEach(([ratio, part, d]) => tone(n, t, d, { gain: level * part, type: "sine", ratio, room: 0.6 }));
+    const thump = (t, level) => {
+      if (t < from - 0.02) return;
+      const at = t0 + t, osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(120, at);
+      osc.frequency.exponentialRampToValueAtTime(42, at + 0.35);
+      osc.connect(g);
+      shape(g, at, 0.55, level, 0.006, 0.5);
+      send(g, 0.15);
+      osc.start(at);
+      osc.stop(at + 0.6);
+    };
+    const air = (t, d, f0, f1, level, a) => {  // Wind: noise through a band that moves.
+      if (t < from - 0.02) return;
+      const at = t0 + t, src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      src.buffer = noise;
+      f.type = "bandpass";
+      f.Q.value = 1.2;
+      f.frequency.setValueAtTime(f0, at);
+      f.frequency.exponentialRampToValueAtTime(f1, at + d);
+      src.connect(f).connect(g);
+      shape(g, at, d, level, a, Math.min(0.5, d - a));
+      send(g, 0.3);
+      src.start(at);
+      src.stop(at + d + 0.05);
+    };
+    // Over Ebino: spring, autumn, night, the notes rising to the cut; a breath before it.
+    pad(SPRING, 0, 1.55, 0.035);
+    pad(AUTUMN, 1.05, 1.45, 0.035);
+    pad(NIGHT, 2.0, 1.42, 0.035);
+    for (const [n, t, d] of [[48, 0, 1.55], [45, 1.05, 1.45], [41, 2.0, 1.42]]) tone(n, t, d, { gain: 0.09, type: "sine", a: 0.4, r: 0.5 });
+    air(0, 3.38, 380, 2600, 0.11, 2.6);
+    for (let i = 0; i < 13; i++) {
+      const t = beat(-6) + i * B / 2, chord = t < 1.15 ? SPRING : t < 2.1 ? AUTUMN : NIGHT;
+      pluck(chord[i % 4] + 12 + (i >= 8 ? 12 : 0), t, L(0.025, 0.07, i / 12));
+    }
+    // The cut: a low beat and the night's bell; under the title, the night's chord held.
+    thump(CUT, 0.8);
+    [53, 57, 60, 64, 67].forEach((n) => bell(n, CUT, 0.06));
+    pad([41, 48, 57, 64], CUT, beat(8) - CUT + 0.4, 0.028);
+    air(beat(2), 0.8, 900, 5200, 0.07, 0.25);  // The plane off.
+    CHARS.forEach((n, i) => { thump(beat(3 + i), 0.32); pluck(n, beat(3 + i), 0.15); });
+    // Beat 8: the lamp's chord, home.
+    thump(beat(8), 0.4);
+    pad(HOME, beat(8), 2.6, 0.04);
+    bell(84, beat(8), 0.07);
+    pluck(79, beat(8) + B / 2, 0.06);
+    return master;
+  }
+
+  function hush(length) {  // The music away with the screen.
+    if (!music || !audio) return;
+    const now = audio.currentTime;
+    music.gain.cancelScheduledValues(now);
+    music.gain.setValueAtTime(Math.max(0.0001, music.gain.value), now);
+    music.gain.exponentialRampToValueAtTime(0.0001, now + length);
+    music = null;
+  }
+
   let began = null, ending = null, frame = 0, over = false;
+  let loaded = false, asked = false;
   function finish() {
     over = true;
     cancelAnimationFrame(frame);
@@ -223,6 +362,7 @@
     root.classList.remove("launch-on");
     root.style.removeProperty("--launch-sky");
     if (box) box.remove();
+    if (audio) { const ctx = audio; audio = null; setTimeout(() => ctx.close().catch(() => null), 2500); }  // The last chord dies away first.
   }
   function step(now) {
     if (over) return;
@@ -240,12 +380,31 @@
   function skip() {
     if (over || ending) return;
     ending = { from: performance.now(), length: SKIP_OUT, at: END };
+    hush(SKIP_OUT + 0.3);
   }
+  // Waiting: the click (Enter, space) starts it, its music with it.
+  function begin() {
+    if (asked || over) return;
+    asked = true;
+    audio = hearing();
+    box.classList.remove("launch-waiting");
+    if (loaded) play();
+  }
+  function play() {
+    const from = flight ? 0 : CUT;  // No pictures: from the cut.
+    began = performance.now() + LEAD * 1000 - from * 1000;
+    if (audio) { try { music = score(audio, from); } catch (error) { music = null; } }
+    box.classList.add("launch-going");
+    frame = requestAnimationFrame(step);
+  }
+  function onClick() { if (asked) skip(); else begin(); }
   function onKey(event) {
     if (event.key === "Enter" || event.key === "Escape" || event.key === " ") {
       event.preventDefault();
       event.stopPropagation();
-      skip();
+      if (asked) skip();
+      else if (event.key === "Escape") finish();  // Waiting, Esc: none of it.
+      else begin();
     }
   }
   function onResize() { layout(); home = null; }
@@ -260,7 +419,7 @@
   function go() {
     build();
     layout();
-    box.addEventListener("click", skip);
+    box.addEventListener("click", onClick);
     document.addEventListener("keydown", onKey, true);
     window.addEventListener("resize", onResize);
     const fonts = document.fonts && document.fonts.load ? document.fonts.load('800 100px "Ebino Title"', parts.title.textContent || "あ").catch(() => null) : null;
@@ -274,19 +433,22 @@
     Promise.all([Promise.race([pictures, late]), fonts]).then(([read]) => {
       if (over) return;
       flight = read;
-      if (!flight) began = performance.now() - CUT * 1000;  // No pictures: from the cut.
-      box.classList.add("launch-going");
-      frame = requestAnimationFrame(step);
+      loaded = true;
+      if (asked) play();  // Clicked while it was still reading.
+      else box.classList.add("launch-waiting");
     });
   }
 
-  // The app gives the words once /api/setup is in (texts/launch_line.txt, opening_skip.txt).
+  // The app gives the words once /api/setup is in (texts/launch_line.txt,
+  // opening_skip.txt, launch_start.txt, launch_sound.txt).
   window.EbinoLaunch = {
     words(given) {
       words = given || null;
       if (!parts.line) return;
       parts.line.textContent = (words && words.line) || "";
       parts.skip.textContent = (words && words.skip) || "";
+      parts.start.textContent = (words && words.start) || "";
+      parts.sound.textContent = (words && words.sound) || "";
     },
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", go);
