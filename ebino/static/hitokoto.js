@@ -1348,6 +1348,9 @@ const EbinoHitokoto = (() => {
       return;
     }
     revealed = true;
+    // 直し54v (the teacher, 11/8): the end. Once the parts have risen, the
+    // lamp is lit on the sheet (style.css .hk-lit-up). Once only.
+    box.classList.add("hk-lit-up");
     // 直し52 段6 (ヒビキ, 51_sheet_reveal): the student's words first, in the
     // order they stand on the screen (今日の気づき, 次にやってみること, 今日、
     // 光ったところ: style.css puts them at the top), 0.2 s apart, each box

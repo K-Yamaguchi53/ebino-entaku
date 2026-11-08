@@ -2036,6 +2036,23 @@ button.hk-trail-head[aria-expanded="true"] { background: var(--night-3); }
 }
 @keyframes hk-mark { from { background-size: 0% 100%; } to { background-size: 100% 100%; } }
 @keyframes hk-breathe { 50% { opacity: .55; } }
+/* 直し54v (the teacher, 11/8): the end. Once the sheet's parts have risen,
+   the lamp is lit on it: the title's rule drawn in lamp light, left to right,
+   and a warm light round the sheet that swells once and settles. Once only,
+   never blinking, the screen never moving. Motion reduced or printed: none. */
+@media (prefers-reduced-motion: no-preference) {
+  .hk-sheet.hk-lit-up { animation: hk-lamp-on 1.8s ease-out 1.2s both; }
+  .hk-sheet.hk-lit-up > h3 { position: relative; }
+  .hk-sheet.hk-lit-up > h3::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 2px;
+    background: var(--lamp); transform-origin: left center; animation: hk-rule-on .8s ease-out 1.2s both; }
+}
+@keyframes hk-lamp-on { 0% { box-shadow: 0 0 0 0 transparent; } 45% { box-shadow: 0 0 48px 8px var(--lamp-glow); }
+  100% { box-shadow: 0 0 24px 2px var(--lamp-faint); } }
+@keyframes hk-rule-on { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media print {
+  .hk-sheet.hk-lit-up { animation: none; box-shadow: none; }
+  .hk-sheet.hk-lit-up > h3::after { content: none; }
+}
 /* Printed: the one sheet alone, ink on the page's white. */
 @media print {
   html:has(#hk-sheet:not([hidden])), html:has(#hk-sheet:not([hidden])) body { background: none; color: var(--paper-ink); }
